@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MyFenrir | Secure the front door</title>
+    <meta name="description" content="A standalone MyFenrir hero landing for Telegram access gates, volunteer-admin review, and private alpha waitlist signups." />
+    <link rel="icon" href="./fenrir-splash-icon.svg" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #020405;
+        --bg-2: #05090b;
+        --panel: rgba(7, 12, 14, .88);
+        --panel-strong: rgba(11, 18, 20, .96);
+        --line: rgba(156, 235, 220, .16);
+        --text: #f7fffc;
+        --muted: #a0b8b2;
+        --muted-strong: #778b86;
+        --teal: #27d0b1;
+        --red: #ff4058;
+        --amber: #efb85d;
+        --shadow: 0 30px 90px rgba(0, 0, 0, .46);
+      }
+
+      * { box-sizing: border-box; }
+
+      html { scroll-behavior: smooth; }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 18% 12%, rgba(39,208,177,.16), transparent 20rem),
+          radial-gradient(circle at 78% 10%, rgba(255,64,88,.14), transparent 22rem),
+          radial-gradient(circle at 72% 78%, rgba(39,208,177,.10), transparent 24rem),
+          linear-gradient(180deg, var(--bg-2), var(--bg) 28rem);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(156,235,220,.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(156,235,220,.05) 1px, transparent 1px);
+        background-size: 68px 68px;
+        mask-image: linear-gradient(180deg, rgba(0,0,0,.78), transparent 72%);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .page {
+        width: min(1280px, calc(100% - 32px));
+        margin: 0 auto;
+        position: relative;
+        z-index: 1;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 20px 0 14px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+      }
+
+      .brand img {
+        width: 40px;
+        height: 40px;
+        flex: 0 0 auto;
+      }
+
+      .brand strong {
+        display: block;
+        font-size: 16px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+
+      .brand span {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .top-action {
+        border: 1px solid rgba(39,208,177,.58);
+        border-radius: 10px;
+        padding: 12px 18px;
+        text-decoration: none;
+        font-weight: 800;
+        background: rgba(5, 10, 11, .82);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.03);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(300px, 1fr) minmax(320px, .9fr);
+        gap: clamp(14px, 2vw, 26px);
+        align-items: start;
+        padding: 10px 0 12px;
+        min-height: 76svh;
+      }
+
+      .hero-copy {
+        padding-top: 8px;
+      }
+
+      h1 {
+        margin: 16px 0 12px;
+        max-width: 560px;
+        font-size: clamp(36px, 5vw, 80px);
+        line-height: .86;
+        text-transform: uppercase;
+        text-wrap: balance;
+      }
+
+      .accent {
+        background: linear-gradient(90deg, #fff7ef, var(--teal) 32%, var(--amber) 66%, var(--red));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .lede {
+        max-width: 620px;
+        margin: 0 0 12px;
+        color: #d6e6e1;
+        font-size: clamp(16px, 1.55vw, 20px);
+        line-height: 1.48;
+      }
+
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 12px 0 12px;
+      }
+
+      .button,
+      .button-secondary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        min-height: 46px;
+        padding: 0 18px;
+        border-radius: 10px;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .button {
+        color: #061112;
+        background: linear-gradient(135deg, #d8fff6, var(--teal) 55%, #ff7b8d);
+        box-shadow: 0 18px 34px rgba(39,208,177,.16), inset 0 0 0 1px rgba(255,255,255,.22);
+      }
+
+      .button-secondary {
+        border: 1px solid var(--line);
+        background: rgba(6, 10, 12, .88);
+        color: var(--text);
+      }
+
+      .benefits {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .benefit {
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 999px;
+        padding: 8px 12px;
+        color: #dffcf6;
+        background: rgba(255,255,255,.045);
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .visual {
+        position: relative;
+        min-height: 540px;
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid rgba(156,235,220,.15);
+        background:
+          radial-gradient(circle at 50% 8%, rgba(39,208,177,.14), transparent 28rem),
+          radial-gradient(circle at 50% 92%, rgba(255,64,88,.14), transparent 20rem),
+          linear-gradient(180deg, rgba(7, 11, 12, .92), rgba(4, 8, 9, .96));
+        box-shadow: var(--shadow);
+      }
+
+      .visual::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(56, 255, 230, .06) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(56, 255, 230, .05) 1px, transparent 1px);
+        background-size: 74px 74px;
+        mask-image: linear-gradient(180deg, rgba(0,0,0,.65), transparent 84%);
+        opacity: .45;
+      }
+
+      .visual-art {
+        position: absolute;
+        inset: 20px 18px 84px;
+        display: grid;
+        place-items: center;
+      }
+
+      .visual-art img {
+        display: block;
+        width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        filter: drop-shadow(0 28px 60px rgba(0,0,0,.42));
+      }
+
+      .visual-caption {
+        position: absolute;
+        left: 18px;
+        right: 18px;
+        bottom: 16px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .visual-caption strong {
+        display: block;
+        font-size: 16px;
+      }
+
+      .visual-caption span {
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background:
+          linear-gradient(160deg, rgba(255,255,255,.08), rgba(255,255,255,.03)),
+          var(--panel);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+        padding: 16px;
+      }
+
+      .panel h2 {
+        margin: 2px 0 10px;
+        font-size: 26px;
+        line-height: 1.02;
+      }
+
+      .panel p {
+        margin: 0 0 18px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .capsule-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .capsule {
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 999px;
+        padding: 7px 10px;
+        background: rgba(255,255,255,.045);
+        color: #dffcf6;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      form {
+        display: grid;
+        gap: 10px;
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+        color: #d8e6e2;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid rgba(156,235,220,.16);
+        border-radius: 10px;
+        background: rgba(4, 8, 9, .96);
+        color: var(--text);
+        min-height: 40px;
+        padding: 10px 12px;
+        font: inherit;
+        resize: vertical;
+        outline: none;
+      }
+
+      textarea { min-height: 96px; }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        border-color: rgba(39,208,177,.72);
+        box-shadow: 0 0 0 3px rgba(39,208,177,.14);
+      }
+
+      .form-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+
+      button {
+        border: 0;
+        border-radius: 10px;
+        min-height: 46px;
+        padding: 0 18px;
+        color: #061112;
+        background: linear-gradient(135deg, #d8fff6, var(--teal) 48%, #ff7b8d);
+        font-size: 14px;
+        font-weight: 900;
+        cursor: pointer;
+        box-shadow: 0 18px 34px rgba(39,208,177,.14), inset 0 0 0 1px rgba(255,255,255,.18);
+      }
+
+      .secondary-link {
+        color: var(--text);
+        text-decoration: none;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        min-height: 46px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 18px;
+        font-size: 14px;
+        font-weight: 800;
+        background: rgba(6, 10, 12, .88);
+      }
+
+      .status {
+        min-height: 22px;
+        color: #cffff6;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .fineprint {
+        color: var(--muted-strong);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .footer {
+        padding: 16px 0 40px;
+        color: var(--muted);
+      }
+
+      .footer p {
+        margin: 0;
+      }
+
+      @media (max-width: 1120px) {
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .visual {
+          min-height: 540px;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .topbar {
+          display: block;
+        }
+
+        .brand {
+          margin-bottom: 14px;
+        }
+
+        .hero {
+          padding-top: 12px;
+        }
+
+        .form-row {
+          grid-template-columns: 1fr;
+        }
+
+        .benefits {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        h1 {
+          font-size: clamp(38px, 10vw, 66px);
+        }
+
+        .visual {
+          min-height: 620px;
+        }
+
+        .visual-art {
+          inset: 18px 16px 92px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        * { scroll-behavior: auto; transition: none !important; animation: none !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <a class="brand" href="./admin-guide.html">
+          <img src="./fenrir-splash-icon.svg" alt="" />
+          <div>
+            <strong>MyFenrir</strong>
+            <span>Standalone hero landing</span>
+          </div>
+        </a>
+        <a class="top-action" href="#join">Join Waitlist</a>
+      </header>
+
+      <section class="hero" aria-label="Hero landing">
+        <div class="hero-copy">
+          <h1><span class="accent">Secure the front door</span><br />to your Telegram community.</h1>
+          <p class="lede">MyFenrir is the security-first access layer for private communities. Bring volunteer-admin review, gated onboarding, and a calmer launch flow to the front of your room.</p>
+          <div class="cta-row">
+            <a class="button" href="#join">Request Alpha Access</a>
+            <a class="button-secondary" href="./admin-guide.html">Read the admin guide</a>
+          </div>
+          <div class="benefits" id="why">
+            <span class="benefit">Volunteer-admin review</span>
+            <span class="benefit">Protected access gates</span>
+            <span class="benefit">MyFenrir + Neon Nexus</span>
+          </div>
+        </div>
+
+        <aside class="visual" aria-label="Security hero visual">
+          <div class="visual-art">
+            <img src="./fenrir-cyber-guardian-hero.svg" alt="Fenrir guarding an encrypted access gate" />
+          </div>
+          <div class="visual-caption">
+            <strong>Community front door</strong>
+            <span>One clear entrance for people who belong, with less invite clutter and a calmer review path.</span>
+          </div>
+        </aside>
+
+        <aside class="panel" id="join">
+          <div class="capsule-row">
+            <span class="capsule">Private alpha</span>
+            <span class="capsule">Controlled beta</span>
+            <span class="capsule">Volunteer admins</span>
+          </div>
+          <h2>Join the waitlist</h2>
+          <p>Tell us who you are, what you want to test, and the fastest way to reach you when the queue opens.</p>
+          <form id="waitlist-form">
+            <div class="form-row">
+              <label>
+                Full name
+                <input name="name" autocomplete="name" placeholder="Your name" required />
+              </label>
+              <label>
+                Email address
+                <input name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+              </label>
+            </div>
+            <div class="form-row">
+              <label>
+                What are you here to test?
+                <select name="interest" required>
+                  <option value="">Choose one</option>
+                  <option>Telegram access gates</option>
+                  <option>Volunteer-admin review</option>
+                  <option>Neon Nexus community setup</option>
+                  <option>Billing and launch flow</option>
+                  <option>General alpha testing</option>
+                </select>
+              </label>
+              <label>
+                Telegram handle
+                <input name="telegramHandle" autocomplete="off" placeholder="@yourhandle" />
+              </label>
+            </div>
+            <label>
+              Anything we should know?
+              <textarea name="message" placeholder="Short note about your use case, team, or what you want to try first."></textarea>
+            </label>
+            <input name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;" />
+            <div class="form-actions">
+              <button type="submit">Request Alpha Access</button>
+              <a class="secondary-link" href="./waitlist/index.html">Open waitlist page</a>
+            </div>
+            <div id="waitlist-status" class="status" aria-live="polite"></div>
+            <div class="fineprint">
+              By submitting, you agree that Fenrir Bridge may review this request for alpha access. No public launch promises yet.
+            </div>
+          </form>
+        </aside>
+      </section>
+
+      <footer class="footer">
+        <p>MyFenrir standalone hero landing · built separate from the live root site · private alpha / controlled beta</p>
+      </footer>
+    </main>
+
+    <script>
+      const form = document.getElementById('waitlist-form');
+      const status = document.getElementById('waitlist-status');
+      const submitButton = form.querySelector('button[type="submit"]');
+      const localPreview = location.protocol === 'file:';
+
+      const errorMessages = {
+        invalid_name: 'Please enter your name.',
+        invalid_email: 'Please enter a valid email address.',
+        invalid_interest: 'Please choose what you want to test.',
+        d1_not_configured: 'Waitlist is not available right now. Please try again later.'
+      };
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const data = Object.fromEntries(new FormData(form).entries());
+        if ((data.company || '').trim()) {
+          status.textContent = 'Thanks. Your request is queued.';
+          form.reset();
+          return;
+        }
+
+        status.textContent = 'Sending request...';
+        submitButton.disabled = true;
+
+        if (localPreview) {
+          status.textContent = 'Local preview mode. Open the deployed page to submit a real request.';
+          submitButton.disabled = false;
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/public/waitlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: data.name,
+              email: data.email,
+              interest: data.interest,
+              telegramHandle: data.telegramHandle,
+              message: data.message,
+              source: 'hero-landing-page',
+              pagePath: location.pathname,
+              referrer: document.referrer || ''
+            })
+          });
+
+          const payload = await response.json().catch(() => null);
+          if (!response.ok || !payload?.ok) {
+            status.textContent = errorMessages[payload?.error] || 'We could not save the request yet. Please try again.';
+            return;
+          }
+
+          status.textContent = 'You are on the waitlist. We will reach out when your queue opens.';
+          form.reset();
+        } catch (error) {
+          status.textContent = 'Network error while saving the request.';
+        } finally {
+          submitButton.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

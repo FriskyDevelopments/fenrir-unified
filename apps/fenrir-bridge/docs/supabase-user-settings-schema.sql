@@ -1,0 +1,3 @@
+-- Reference copy of Supabase user settings schema (see supabase/migrations/)
+-- profiles: display_name, locale, preferred_billing (telegram_stars | stripe), notifications
+-- user_roles: owner | admin | user (managed via frisky-role-manager edge function)

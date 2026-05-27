@@ -1,0 +1,17 @@
+{
+  "name": "Fenrir Bridge",
+  "short_name": "Fenrir",
+  "description": "Private link armor for Telegram groups and live rooms.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050607",
+  "theme_color": "#ff1744",
+  "icons": [
+    {
+      "src": "/fenrir-splash-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

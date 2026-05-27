@@ -1,0 +1,13 @@
+name = "fenrir-auth-proxy"
+main = "workers/fenrir-auth-proxy.js"
+compatibility_date = "2026-05-15"
+
+[vars]
+SUPABASE_AUTH_ORIGIN = "https://yqevglppbhuoxxfsfnih.supabase.co"
+AUTH_PROXY_ALLOWED_ORIGINS = "https://www.myfenrir.com,https://myfenrir.com,https://beta.fenrir-bridge.pages.dev,http://localhost:4173,http://127.0.0.1:4173,http://localhost:5173,http://127.0.0.1:5173"
+
+# Route this Worker only after auth.friskydev.com exists in the same
+# Cloudflare account as a proxied DNS record. Do not CNAME it directly to
+# *.supabase.co with orange-cloud proxy enabled, because that triggers 1014.
+#
+# route = { pattern = "auth.friskydev.com/*", zone_name = "friskydev.com" }

@@ -1,0 +1,13 @@
+{
+  "name": "fenrir-bridge",
+  "compatibility_date": "2026-05-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "pages_build_output_dir": "dist",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "fenrir-bridge",
+      "database_id": "1238059e-2638-4317-982e-e74dda046ccb"
+    }
+  ]
+}

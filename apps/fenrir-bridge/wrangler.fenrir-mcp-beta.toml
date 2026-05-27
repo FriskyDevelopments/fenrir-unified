@@ -1,0 +1,20 @@
+name = "fenrir-mcp-beta"
+main = "workers/fenrir-mcp-beta.js"
+compatibility_date = "2026-05-08"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+routes = [
+  { pattern = "www.myfenrir.com/api/mcp*", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/api/routes/audit*", zone_name = "myfenrir.com" },
+  { pattern = "myfenrir.com/api/mcp*", zone_name = "myfenrir.com" },
+  { pattern = "myfenrir.com/api/routes/audit*", zone_name = "myfenrir.com" }
+]
+
+[vars]
+MCP_ALLOWED_ORIGINS = "https://www.myfenrir.com,https://auth.friskydev.com,http://localhost:5173,http://localhost:5177,http://localhost:6274,http://127.0.0.1:5173,http://127.0.0.1:5177,http://127.0.0.1:6274"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fenrir-bridge"
+database_id = "1238059e-2638-4317-982e-e74dda046ccb"

@@ -1,0 +1,14 @@
+name = "fenrir-gate-router"
+main = "workers/fenrir-gate-router.js"
+compatibility_date = "2026-05-08"
+
+routes = [
+  { pattern = "myfenrir.com/gate/*", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/gate/*", zone_name = "myfenrir.com" },
+  { pattern = "myfenrir.com/api/telegram/webhook", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/api/telegram/webhook", zone_name = "myfenrir.com" }
+]
+
+[vars]
+FENRIR_GATE_TARGET_HOST = "fenrir-stars-payments.hrgrrtks2p.workers.dev"
+FENRIR_GATE_ROUTE_LABEL = "fenrir/gate"

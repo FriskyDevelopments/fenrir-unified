@@ -1,0 +1,14 @@
+name = "fenrir-direct-oauth-guard"
+main = "workers/fenrir-direct-oauth-guard.js"
+compatibility_date = "2026-05-16"
+
+routes = [
+  { pattern = "myfenrir.com/", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/", zone_name = "myfenrir.com" },
+  { pattern = "myfenrir.com/api/auth/me", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/api/auth/me", zone_name = "myfenrir.com" },
+  { pattern = "myfenrir.com/api/auth/login/*", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/api/auth/login/*", zone_name = "myfenrir.com" },
+  { pattern = "myfenrir.com/api/auth/callback/*", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/api/auth/callback/*", zone_name = "myfenrir.com" }
+]

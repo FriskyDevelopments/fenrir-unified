@@ -1,0 +1,10 @@
+/waitlist /waitlist/index.html 200
+/waitlist/admin-guide.html /waitlist/admin-guide/ 301
+/waitlist/admin-guide /waitlist/admin-guide.html 200
+/waitlist/admin-guide.html /waitlist/admin-guide.html 200
+/waitlist/admin-guide/ /waitlist/admin-guide/index.html 200
+/subscribe /waitlist/index.html 200
+/invitation /invitation/ 301
+/invitation/ /invitation/index.html 200
+/adminguidebook /adminguidebook.html 200
+/* /index.html 200

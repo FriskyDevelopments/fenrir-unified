@@ -4,6 +4,7 @@ set -euo pipefail
 bridge_src="${FENRIR_BRIDGE_SRC:-/Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-bridge}"
 cinema_src="${FENRIR_CINEMA_SRC:-/Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-cinema}"
 portal_src="${FENRIR_PORTAL_SRC:-/Users/friskypup/Documents/Playground/experiments/fenrir-portal}"
+bridge_fallback_src="${FENRIR_BRIDGE_FALLBACK_SRC:-/private/tmp/fenrir-current-build}"
 
 run_with_timeout() {
   local seconds="$1"
@@ -61,6 +62,7 @@ check_source() {
 
 fail=0
 check_source "fenrir-bridge" "$bridge_src" "package.json" || fail=1
+check_source "bridge-fallback" "$bridge_fallback_src" "package.json" || true
 check_source "fenrir-cinema" "$cinema_src" "package.json" || fail=1
 check_source "fenrir-portal" "$portal_src" "index.html" || fail=1
 

@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "error": "vercel_preview_api_disabled",
+  "detail": "This Vercel preview serves the frontend only. API writes are disabled so preview traffic cannot mutate production Community Gate data."
+}

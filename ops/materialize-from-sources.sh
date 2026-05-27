@@ -6,6 +6,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 bridge_src="${FENRIR_BRIDGE_SRC:-/Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-bridge}"
 cinema_src="${FENRIR_CINEMA_SRC:-/Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-cinema}"
 portal_src="${FENRIR_PORTAL_SRC:-/Users/friskypup/Documents/Playground/experiments/fenrir-portal}"
+bridge_fallback_src="${FENRIR_BRIDGE_FALLBACK_SRC:-/private/tmp/fenrir-current-build}"
+bridge_overlay_src="${FENRIR_BRIDGE_OVERLAY_SRC:-/private/tmp/fenrir-bridge-local}"
 
 run_with_timeout() {
   local seconds="$1"
@@ -82,7 +84,56 @@ copy_project() {
     "$src/" "$dest/"
 }
 
-copy_project "$bridge_src" "$repo_root/apps/fenrir-bridge" "package.json"
+apply_bridge_local_fixes() {
+  local pkg="$repo_root/apps/fenrir-bridge/package.json"
+
+  [ -f "$pkg" ] || return 0
+
+  node - "$pkg" <<'NODE'
+const fs = require("fs");
+const path = process.argv[2];
+const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
+pkg.scripts ||= {};
+const wrap = (cmd) => `bash scripts/run-with-node-lts.sh ${cmd}`;
+pkg.scripts.dev = wrap("vite --host 0.0.0.0");
+pkg.scripts.build = wrap("vite build");
+pkg.scripts.typecheck = wrap("tsc --noEmit");
+if (pkg.scripts["test:auth-redirect"]) {
+  pkg.scripts["test:auth-redirect"] = wrap("node scripts/test-auth-redirect.mjs");
+}
+if (pkg.scripts["verify:readiness"]) {
+  pkg.scripts["verify:readiness"] = wrap("node scripts/verify-readiness.mjs");
+}
+for (const name of ["safe-box", "bugbug:trial", "bugbug:auth"]) {
+  if (pkg.scripts[name]) {
+    const original = pkg.scripts[name].replace(/^node /, "node ");
+    pkg.scripts[name] = wrap(original);
+  }
+}
+for (const name of ["postinstall", "predev", "pretypecheck"]) {
+  if (pkg.scripts[name]) {
+    pkg.scripts[name] = wrap("node scripts/clean-icloud-dupes.mjs");
+  }
+}
+fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
+NODE
+}
+
+if copy_project "$bridge_src" "$repo_root/apps/fenrir-bridge" "package.json"; then
+  :
+elif [ -d "$bridge_fallback_src" ]; then
+  printf 'Using readable Fenrir Bridge fallback: %s\n' "$bridge_fallback_src" >&2
+  copy_project "$bridge_fallback_src" "$repo_root/apps/fenrir-bridge" "package.json"
+else
+  exit 1
+fi
+
+if [ -d "$bridge_overlay_src" ]; then
+  printf 'Overlaying Fenrir Bridge local repair copy: %s\n' "$bridge_overlay_src" >&2
+  copy_project "$bridge_overlay_src" "$repo_root/apps/fenrir-bridge" "package.json" || true
+fi
+apply_bridge_local_fixes
+
 copy_project "$cinema_src" "$repo_root/apps/fenrir-cinema" "package.json"
 copy_project "$portal_src" "$repo_root/legacy/fenrir-portal" "index.html"
 
