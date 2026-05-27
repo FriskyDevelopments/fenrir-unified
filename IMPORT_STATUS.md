@@ -41,14 +41,16 @@ apps/fenrir-bridge/workers/
 apps/fenrir-bridge/docs/
 ```
 
-Worker note: `workers/fenrir-direct-oauth-guard.js` was copied from the primary source because it was readable. Other standalone worker files were still FileProvider-blocked in the primary source at the time of this import.
+Worker note: `workers/fenrir-direct-oauth-guard.js` was copied from the primary source because it was readable. `workers/fenrir-gate-router.js` and `workers/fenrir-stars-payments.js` were recovered from the readable nested Git pack at:
+
+```text
+/Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-bridge/.git/objects/pack/pack-64ff648a6efad7e72dfda5a088a902f133763236.pack
+```
 
 Strict verifier currently still expects these missing files before the import can be considered complete:
 
 ```text
-apps/fenrir-bridge/workers/fenrir-gate-router.js
 apps/fenrir-bridge/workers/fenrir-mcp-beta.js
-apps/fenrir-bridge/workers/fenrir-stars-payments.js
 apps/fenrir-cinema/package.json
 apps/fenrir-cinema/src
 ```
@@ -63,6 +65,8 @@ The remaining standalone worker and Fenrir Cinema source files were found only i
 /Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-bridge/workers/
 /Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-cinema/
 ```
+
+`fenrir-mcp-beta.js` was not present in the readable nested Git pack that recovered the other worker files. Fenrir Cinema is not a nested Git repo, and the parent `frisky-spark-lab` Git pack is also FileProvider-blocked from this sandbox.
 
 Those files are still FileProvider-blocked from this sandbox. `brctl download` could not be used here because the process is sandboxed. A broader local search did not reveal a readable duplicate of the remaining missing source files before it was stopped for safety.
 
