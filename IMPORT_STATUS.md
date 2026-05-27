@@ -70,6 +70,12 @@ The remaining standalone worker and Fenrir Cinema source files were found only i
 
 Those files are still FileProvider-blocked from this sandbox. `brctl download` could not be used here because the process is sandboxed. A broader local search did not reveal a readable duplicate of the remaining missing source files before it was stopped for safety.
 
+The successful worker recovery is now preserved as:
+
+```bash
+python3 ops/recover-bridge-workers-from-pack.py
+```
+
 ## Next Command
 
 Once the source folders are hydrated locally:
