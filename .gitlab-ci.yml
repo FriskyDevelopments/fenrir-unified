@@ -1,0 +1,31 @@
+stages:
+  - verify
+
+verify:layout:
+  stage: verify
+  image: alpine:3.20
+  script:
+    - apk add --no-cache bash findutils grep
+    - bash ops/verify-layout.sh
+
+fenrir-bridge:install-and-build:
+  stage: verify
+  image: node:22
+  rules:
+    - exists:
+        - apps/fenrir-bridge/package.json
+  script:
+    - cd apps/fenrir-bridge
+    - npm ci
+    - npm run build
+
+fenrir-cinema:install-and-build:
+  stage: verify
+  image: node:22
+  rules:
+    - exists:
+        - apps/fenrir-cinema/package.json
+  script:
+    - cd apps/fenrir-cinema
+    - npm ci
+    - npm run build
