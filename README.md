@@ -36,7 +36,13 @@ That script copies source-controlled project files and skips secrets, generated 
 
 ## Verify
 
-After materialization:
+For the GitLab seed layout:
+
+```bash
+bash ops/verify-layout.sh
+```
+
+For the primary app:
 
 ```bash
 cd apps/fenrir-bridge
@@ -47,3 +53,18 @@ npm run build
 ```
 
 Do not run a Cloudflare deploy until `npm run wrangler:check` is green.
+
+## Push To GitLab
+
+Create an empty GitLab project, then connect this local repo:
+
+```bash
+bash ops/configure-gitlab-remote.sh <gitlab-remote-url>
+git push -u origin main
+```
+
+If direct network push is unavailable, create an import bundle:
+
+```bash
+bash ops/create-gitlab-bundle.sh
+```

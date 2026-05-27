@@ -1,6 +1,6 @@
 # Import Status
 
-Current state: Fenrir Bridge imported from readable local fallback; Fenrir Cinema partially reconstructed from verified session evidence; legacy portal still blocked by source hydration.
+Current state: Fenrir Bridge imported and worker-complete; Fenrir Cinema partially reconstructed from verified session evidence; legacy portal still blocked by source hydration.
 
 ## Organized Repo Created
 
@@ -18,11 +18,17 @@ The repo is initialized on `main` and has:
 - Layout verifier.
 - Source readiness checker.
 - Imported `apps/fenrir-bridge` source from `/private/tmp/fenrir-current-build`, overlaid with local deploy-safety fixes where available.
+- Recovered all required Fenrir Bridge standalone workers into `apps/fenrir-bridge/workers/`.
 - Recreated the GitLab seed for `apps/fenrir-cinema` from prior session evidence, including the recovered Go / No-Go Remotion flow.
 
 ## Current Blocker
 
-The primary source folders exist, but some required files are not locally readable. They are cloud/FileProvider placeholders.
+The GitLab seed layout is now complete locally. Remaining blockers are outside the source tree:
+
+- No GitLab remote URL is configured yet.
+- The legacy portal and some original Fenrir Cinema sidecar files are still FileProvider placeholders, so they are documented rather than claimed as fully imported.
+
+The primary source folders exist, but some original files are not locally readable. They are cloud/FileProvider placeholders.
 
 Latest readiness result:
 
@@ -48,10 +54,10 @@ Worker note: `workers/fenrir-direct-oauth-guard.js` was copied from the primary 
 /Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-bridge/.git/objects/pack/pack-64ff648a6efad7e72dfda5a088a902f133763236.pack
 ```
 
-Strict verifier currently still expects this missing file before the import can be considered complete:
+Strict verifier now passes for the GitLab seed:
 
 ```text
-apps/fenrir-bridge/workers/fenrir-mcp-beta.js
+bash ops/verify-layout.sh
 ```
 
 Fenrir Cinema is now present in the organized repo, but it is not claimed as a full source recovery. The recovered app is documented in:
@@ -64,20 +70,22 @@ apps/fenrir-cinema/RECOVERY_NOTES.md
 
 On 2026-05-27, local artifact search found a readable Fenrir Bridge fallback at `/private/tmp/fenrir-current-build`, which was imported.
 
-The remaining standalone worker and unrecovered Fenrir Cinema source files were found only in their original cloud-backed source folders:
+The unrecovered Fenrir Cinema and legacy portal source files were found only in their original cloud-backed source folders:
 
 ```text
-/Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-bridge/workers/
 /Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-cinema/
+/Users/friskypup/Documents/Playground/experiments/fenrir-portal/
 ```
 
-`fenrir-mcp-beta.js` was not present in the readable nested Git pack that recovered the other worker files. Fenrir Cinema is not a nested Git repo, and the parent `frisky-spark-lab` Git pack is also FileProvider-blocked from this sandbox.
+`fenrir-mcp-beta.js` was not present in the readable nested Git pack that recovered the other worker files. It was later recovered from prior Codex session evidence: the original `apply_patch Add File` entry from 2026-05-12, plus the later auth-hardening patches that require `FRISKY_BOT_API_TOKEN` with `MCP_BETA_TOKEN` as a legacy fallback.
+
+Fenrir Cinema is not a nested Git repo, and the parent `frisky-spark-lab` Git pack is FileProvider-blocked from this sandbox.
 
 On 2026-05-27, prior Codex session evidence was used to recover the Fenrir Cinema Remotion package shell and the `FenrirDeployTemporalFlow` Go / No-Go artifact. The original `Composition.tsx`, `AdminGuidebook.tsx`, and `NeonNexusMJ.tsx` remain blocked until the source folder is hydrated.
 
-Those files are still FileProvider-blocked from this sandbox. `brctl download` could not be used here because the process is sandboxed. A broader local search did not reveal a readable duplicate of the remaining missing source files before it was stopped for safety.
+Those original sidecar/legacy files are still FileProvider-blocked from this sandbox. `brctl download` could not be used here because the process is sandboxed. A broader local search did not reveal a readable duplicate of the remaining missing source files before it was stopped for safety.
 
-The successful worker recovery is now preserved as:
+The successful pack-based worker recovery is preserved as:
 
 ```bash
 python3 ops/recover-bridge-workers-from-pack.py
@@ -85,7 +93,15 @@ python3 ops/recover-bridge-workers-from-pack.py
 
 ## Next Command
 
-Once the source folders are hydrated locally:
+To connect this local seed to GitLab:
+
+```bash
+cd /Users/friskypup/Documents/Playground/fenrir-unified-gitlab
+bash ops/configure-gitlab-remote.sh <gitlab-remote-url>
+git push -u origin main
+```
+
+If the original source folders are later hydrated locally:
 
 ```bash
 cd /Users/friskypup/Documents/Playground/fenrir-unified-gitlab
@@ -103,4 +119,4 @@ This import is complete only when:
 - `apps/fenrir-cinema/package.json` and `src` exist, with recovery notes for any partial source.
 - generated folders and secrets are absent.
 - `bash ops/verify-layout.sh` exits green.
-- GitLab remote is configured and pushed, if remote creation/push is requested.
+- GitLab remote is configured and pushed.

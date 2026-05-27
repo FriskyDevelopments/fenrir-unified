@@ -27,5 +27,5 @@ fenrir-cinema:install-and-build:
         - apps/fenrir-cinema/package.json
   script:
     - cd apps/fenrir-cinema
-    - npm ci
+    - npm install
     - npm run build
