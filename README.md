@@ -42,6 +42,12 @@ For the GitLab seed layout:
 bash ops/verify-layout.sh
 ```
 
+For the full GitLab handoff gate:
+
+```bash
+bash ops/audit-gitlab-readiness.sh
+```
+
 For the primary app:
 
 ```bash
@@ -61,6 +67,7 @@ Create an empty GitLab project, then connect this local repo:
 ```bash
 bash ops/configure-gitlab-remote.sh <gitlab-remote-url>
 git push -u origin main
+bash ops/audit-gitlab-readiness.sh
 ```
 
 If direct network push is unavailable, create an import bundle:

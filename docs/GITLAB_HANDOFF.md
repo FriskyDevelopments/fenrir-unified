@@ -15,6 +15,7 @@ This repository is the organized Fenrir seed intended for GitLab.
 - `legacy/fenrir-portal` is documented but not imported because the original files are still FileProvider placeholders.
 - Generated folders, dependency folders, and local secret files are excluded.
 - `bash ops/verify-layout.sh` must pass before push.
+- `bash ops/audit-gitlab-readiness.sh` must pass after the GitLab remote is configured and pushed.
 
 ## Push Path
 
@@ -24,6 +25,7 @@ Create an empty GitLab project, then run:
 cd /Users/friskypup/Documents/Playground/fenrir-unified-gitlab
 bash ops/configure-gitlab-remote.sh <gitlab-remote-url>
 git push -u origin main
+bash ops/audit-gitlab-readiness.sh
 ```
 
 Expected remote URL shapes:
@@ -48,6 +50,7 @@ git clone /path/to/fenrir-unified-gitlab.bundle fenrir-unified
 cd fenrir-unified
 git remote add origin <gitlab-remote-url>
 git push -u origin main
+bash ops/audit-gitlab-readiness.sh
 ```
 
 ## Remaining Source Caveats
