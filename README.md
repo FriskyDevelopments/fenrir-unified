@@ -75,3 +75,9 @@ If direct network push is unavailable, create an import bundle:
 ```bash
 bash ops/create-gitlab-bundle.sh
 ```
+
+If `glab` is authenticated and network access is available, create the private GitLab project and push in one step:
+
+```bash
+bash ops/create-gitlab-project-and-push.sh <namespace>/fenrir-unified
+```

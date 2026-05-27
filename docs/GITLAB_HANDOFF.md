@@ -28,6 +28,14 @@ git push -u origin main
 bash ops/audit-gitlab-readiness.sh
 ```
 
+Or let `glab` create the private project and push it:
+
+```bash
+bash ops/create-gitlab-project-and-push.sh <namespace>/fenrir-unified
+```
+
+This machine already has `glab` installed. If `glab auth status` cannot reach `gitlab.com`, run the same command again from a network that can resolve GitLab.
+
 Expected remote URL shapes:
 
 ```text
