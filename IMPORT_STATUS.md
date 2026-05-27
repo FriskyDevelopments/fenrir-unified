@@ -53,6 +53,19 @@ apps/fenrir-cinema/package.json
 apps/fenrir-cinema/src
 ```
 
+## Recovery Attempts
+
+On 2026-05-27, local artifact search found a readable Fenrir Bridge fallback at `/private/tmp/fenrir-current-build`, which was imported.
+
+The remaining standalone worker and Fenrir Cinema source files were found only in their original cloud-backed source folders:
+
+```text
+/Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-bridge/workers/
+/Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-cinema/
+```
+
+Those files are still FileProvider-blocked from this sandbox. `brctl download` could not be used here because the process is sandboxed. A broader local search did not reveal a readable duplicate of the remaining missing source files before it was stopped for safety.
+
 ## Next Command
 
 Once the source folders are hydrated locally:
