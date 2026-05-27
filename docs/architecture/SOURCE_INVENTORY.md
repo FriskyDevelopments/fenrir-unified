@@ -98,6 +98,33 @@ public/
 preview/
 ```
 
+Recovered in this GitLab seed:
+
+```text
+package.json
+remotion.config.ts
+tsconfig.json
+src/DeployTemporalFlow.tsx
+src/Root.tsx
+src/index.css
+src/index.ts
+preview/fenrir-deploy-temporal-flow.svg
+public/fenrir-cut-wordmark-800.png
+public/fenrir-splash-icon-512.png
+public/fenrir-splash-icon.svg
+RECOVERY_NOTES.md
+```
+
+Still source-blocked in the original FileProvider folder:
+
+```text
+src/Composition.tsx
+src/AdminGuidebook.tsx
+src/NeonNexusMJ.tsx
+README.md
+package-lock.json
+```
+
 Do not import:
 
 ```text

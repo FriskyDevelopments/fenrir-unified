@@ -1,6 +1,6 @@
 # Import Status
 
-Current state: Fenrir Bridge imported from readable local fallback; Fenrir Cinema and legacy portal still blocked by source hydration.
+Current state: Fenrir Bridge imported from readable local fallback; Fenrir Cinema partially reconstructed from verified session evidence; legacy portal still blocked by source hydration.
 
 ## Organized Repo Created
 
@@ -18,6 +18,7 @@ The repo is initialized on `main` and has:
 - Layout verifier.
 - Source readiness checker.
 - Imported `apps/fenrir-bridge` source from `/private/tmp/fenrir-current-build`, overlaid with local deploy-safety fixes where available.
+- Recreated the GitLab seed for `apps/fenrir-cinema` from prior session evidence, including the recovered Go / No-Go Remotion flow.
 
 ## Current Blocker
 
@@ -47,19 +48,23 @@ Worker note: `workers/fenrir-direct-oauth-guard.js` was copied from the primary 
 /Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-bridge/.git/objects/pack/pack-64ff648a6efad7e72dfda5a088a902f133763236.pack
 ```
 
-Strict verifier currently still expects these missing files before the import can be considered complete:
+Strict verifier currently still expects this missing file before the import can be considered complete:
 
 ```text
 apps/fenrir-bridge/workers/fenrir-mcp-beta.js
-apps/fenrir-cinema/package.json
-apps/fenrir-cinema/src
+```
+
+Fenrir Cinema is now present in the organized repo, but it is not claimed as a full source recovery. The recovered app is documented in:
+
+```text
+apps/fenrir-cinema/RECOVERY_NOTES.md
 ```
 
 ## Recovery Attempts
 
 On 2026-05-27, local artifact search found a readable Fenrir Bridge fallback at `/private/tmp/fenrir-current-build`, which was imported.
 
-The remaining standalone worker and Fenrir Cinema source files were found only in their original cloud-backed source folders:
+The remaining standalone worker and unrecovered Fenrir Cinema source files were found only in their original cloud-backed source folders:
 
 ```text
 /Users/friskypup/Documents/Playground/frisky-spark-lab/apps/fenrir-bridge/workers/
@@ -67,6 +72,8 @@ The remaining standalone worker and Fenrir Cinema source files were found only i
 ```
 
 `fenrir-mcp-beta.js` was not present in the readable nested Git pack that recovered the other worker files. Fenrir Cinema is not a nested Git repo, and the parent `frisky-spark-lab` Git pack is also FileProvider-blocked from this sandbox.
+
+On 2026-05-27, prior Codex session evidence was used to recover the Fenrir Cinema Remotion package shell and the `FenrirDeployTemporalFlow` Go / No-Go artifact. The original `Composition.tsx`, `AdminGuidebook.tsx`, and `NeonNexusMJ.tsx` remain blocked until the source folder is hydrated.
 
 Those files are still FileProvider-blocked from this sandbox. `brctl download` could not be used here because the process is sandboxed. A broader local search did not reveal a readable duplicate of the remaining missing source files before it was stopped for safety.
 
@@ -93,7 +100,7 @@ This import is complete only when:
 
 - `apps/fenrir-bridge/package.json` exists.
 - `apps/fenrir-bridge/src`, `functions`, `workers`, and `docs` exist.
-- `apps/fenrir-cinema/package.json` and `src` exist.
+- `apps/fenrir-cinema/package.json` and `src` exist, with recovery notes for any partial source.
 - generated folders and secrets are absent.
 - `bash ops/verify-layout.sh` exits green.
 - GitLab remote is configured and pushed, if remote creation/push is requested.
