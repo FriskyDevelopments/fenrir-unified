@@ -354,8 +354,7 @@ export const authService = {
     if (hasSupabaseCallbackInLocation()) {
       const completed = await completeSupabaseSession();
       if (completed) {
-        const refreshed = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
-        return { ok: true as const, data: refreshed };
+        return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
       }
     }
 
@@ -364,21 +363,11 @@ export const authService = {
       if (!result.authenticated) {
         const completed = await completeSupabaseSession();
         if (completed) {
-          const refreshed = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
-          return { ok: true as const, data: refreshed };
+          return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
         }
       }
       return { ok: true as const, data: result };
     } catch {
-      try {
-        const completed = await completeSupabaseSession();
-        if (completed) {
-          const result = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
-          return { ok: true as const, data: result };
-        }
-      } catch {
-        // Fall through to the signed-out state. The sign-in button will surface provider errors.
-      }
       return { ok: true as const, data: { authenticated: false } as AuthSession };
     }
   },

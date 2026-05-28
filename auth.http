@@ -1,0 +1,57 @@
+### Login
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+> {%
+  console.log("LOGIN STATUS:", response.status);
+  console.log("LOGIN HEADERS:", response.headers);
+  console.log("LOGIN BODY:", response.body);
+  if (response.body.access_token) {
+    client.global.set("access_token", response.body.access_token);
+  }
+  if (response.body.token) {
+    client.global.set("access_token", response.body.token);
+  }
+  if (response.body.session && response.body.session.access_token) {
+    client.global.set("access_token", response.body.session.access_token);
+  }
+%}
+
+### Test authenticated route
+GET {{host}}/api/me
+Authorization: Bearer {{access_token}}
+
+> {%
+  console.log("ME STATUS:", response.status);
+  console.log("ME BODY:", response.body);
+%}
+
+### Frisky MCP initialize probe
+POST https://mcp.friskydev.com/mcp
+Accept: application/json, text/event-stream
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-03-26",
+    "capabilities": {},
+    "clientInfo": {
+      "name": "webstorm-debug",
+      "version": "0.1.0"
+    }
+  }
+}
+
+> {%
+  console.log("MCP STATUS:", response.status);
+  console.log("MCP HEADERS:", response.headers);
+  console.log("MCP BODY:", response.body);
+%}

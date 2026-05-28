@@ -24,7 +24,7 @@ const checks = [
   {
     name: "callback path consumes the stored post-auth destination",
     pass: source.includes("if (isAuthCallbackPath(pathname)) return consumePostAuthDestination();") &&
-      source.includes('if (hasCallbackParams && pathname === "/") return consumePostAuthDestination();')
+      source.includes('if (hasCallbackParams && (pathname === "/" || pathname === "/login")) return consumePostAuthDestination();')
   },
   {
     name: "root hash token callback redirects to managed MyFenrir dashboard",
@@ -86,7 +86,8 @@ const simulatedStorage = new Map();
 const callbackPaths = new Set(["/auth/callback", "/auth/v1/callback", "/login"]);
 
 function isAuthCallbackPath(pathname) {
-  return callbackPaths.has(pathname);
+  const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  return callbackPaths.has(normalizedPath);
 }
 
 function isSafeRedirectPath(path) {
@@ -107,12 +108,13 @@ function consumePostAuthDestination() {
 
 function callbackDestinationPath(pathname, hasCallbackParams = false) {
   if (isAuthCallbackPath(pathname)) return consumePostAuthDestination();
-  if (hasCallbackParams && pathname === "/") return consumePostAuthDestination();
+  if (hasCallbackParams && (pathname === "/" || pathname === "/login")) return consumePostAuthDestination();
   return pathname;
 }
 
 const cases = [
   { saved: "/locks", callback: "/auth/callback", hasCallbackParams: false, expected: "/locks" },
+  { saved: "/telegram", callback: "/login", hasCallbackParams: true, expected: "/telegram" },
   { saved: "/telegram", callback: "/login", hasCallbackParams: false, expected: "/telegram" },
   { saved: "https://evil.example/path", callback: "/auth/callback", hasCallbackParams: false, expected: "/main" },
   { saved: "//evil.example/path", callback: "/auth/callback", hasCallbackParams: false, expected: "/main" },

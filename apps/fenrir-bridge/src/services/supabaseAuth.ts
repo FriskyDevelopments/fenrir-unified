@@ -35,7 +35,11 @@ export function hasSupabaseCallbackInLocation() {
 }
 
 function isAuthCallbackPath(pathname: string) {
-  return pathname === "/auth/callback" || pathname === "/auth/v1/callback" || pathname === "/login";
+  const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  return normalizedPath === "/auth/callback" || 
+         normalizedPath === "/auth/v1/callback" || 
+         normalizedPath === "/login" ||
+         normalizedPath === sanitizeRedirectPath(authRedirectPath);
 }
 
 function fallbackPostAuthDestination() {
@@ -80,7 +84,7 @@ function consumePostAuthDestination() {
 
 function callbackDestinationPath(pathname: string, hasCallbackParams = false) {
   if (isAuthCallbackPath(pathname)) return consumePostAuthDestination();
-  if (hasCallbackParams && pathname === "/") return consumePostAuthDestination();
+  if (hasCallbackParams && (pathname === "/" || pathname === "/login")) return consumePostAuthDestination();
   return pathname;
 }
 
@@ -120,7 +124,6 @@ export async function completeSupabaseSession() {
       setAuthCallbackError(`code_exchange_failed:${encodeURIComponent(error instanceof Error ? error.message : "exchange_failed")}`);
       return false;
     }
-    clearCallbackParameters(params.hasCallbackParams);
   }
 
   const { data, error } = await supabase.auth.getSession();
@@ -195,10 +198,8 @@ function clearCallbackParameters(hasCallbackParams = false) {
     nextParams.delete(key);
   }
   const nextSearch = nextParams.toString();
-  window.history.replaceState({}, "", `${destinationPath}${nextSearch ? `?${nextSearch}` : ""}`);
-  if (window.location.hash) {
-    window.history.replaceState({}, "", `${destinationPath}${nextSearch ? `?${nextSearch}` : ""}`);
-  }
+  const target = `${destinationPath}${nextSearch ? `?${nextSearch}` : ""}`;
+  window.history.replaceState({}, "", target);
 }
 
 function setAuthCallbackError(code: string) {

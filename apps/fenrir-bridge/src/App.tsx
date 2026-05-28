@@ -1055,7 +1055,11 @@ const dashboardPageAliases: Record<string, PageKey> = {
 };
 
 function isAuthCallbackPath(pathname: string) {
-  return pathname === "/auth/callback" || pathname === "/auth/v1/callback" || pathname === "/login";
+  const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  return normalizedPath === "/auth/callback" || 
+         normalizedPath === "/auth/v1/callback" || 
+         normalizedPath === "/login" ||
+         normalizedPath === (import.meta.env.VITE_AUTH_REDIRECT_PATH || "/auth/callback");
 }
 
 function activePageFromLocation(path: string, hash: string): PageKey {
@@ -1174,7 +1178,7 @@ export function App() {
   async function refreshAuth() {
     const result = await authService.me();
     setAuth(result.data);
-    if (result.data.authenticated && isAuthCallbackPath(window.location.pathname)) {
+    if (result.data.authenticated && (isAuthCallbackPath(window.location.pathname) || window.location.hash.includes("access_token="))) {
       window.history.replaceState({}, "", managedDashboardPath);
     }
   }

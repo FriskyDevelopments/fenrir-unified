@@ -16,3 +16,6 @@ coverage/
 .next/
 *.local
 package-lock.json.tmp
+
+http-client.private.env.json
+.idea/httpRequests/
