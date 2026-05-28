@@ -27,7 +27,13 @@ function configuredRedirectTarget() {
 let client: SupabaseClient | null = null;
 
 export function isSupabaseAuthConfigured() {
-  return Boolean(supabaseUrl && supabaseAnonKey);
+  return Boolean(
+    supabaseUrl && 
+    supabaseAnonKey && 
+    !supabaseUrl.includes("example.supabase.co") && 
+    !supabaseUrl.includes("<your-project-ref>") &&
+    supabaseUrl.startsWith("https://")
+  );
 }
 
 export function hasSupabaseCallbackInLocation() {
@@ -162,6 +168,7 @@ export async function signOutSupabase() {
 
 function supabaseClient() {
   if (!isSupabaseAuthConfigured()) {
+    console.warn("Supabase auth is not configured correctly. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env. Placeholder 'example.supabase.co' is not allowed.");
     throw new Error("supabase_auth_not_configured");
   }
   client ??= createClient(supabaseUrl, supabaseAnonKey);

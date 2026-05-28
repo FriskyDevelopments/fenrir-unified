@@ -5,6 +5,10 @@ const root = new URL("..", import.meta.url).pathname;
 const source = readFileSync(join(root, "src/services/supabaseAuth.ts"), "utf8");
 const appSource = readFileSync(join(root, "src/App.tsx"), "utf8");
 const directOauthGuardSource = readFileSync(join(root, "workers/fenrir-direct-oauth-guard.js"), "utf8");
+const directOauthSource = readFileSync(join(root, "functions/_lib/oauth.ts"), "utf8");
+const directOauthLoginSource = readFileSync(join(root, "functions/api/auth/login/[provider].ts"), "utf8");
+const directOauthCallbackSource = readFileSync(join(root, "functions/api/auth/callback/[provider].ts"), "utf8");
+const apiSource = readFileSync(join(root, "src/services/api.ts"), "utf8");
 const mainSource = readFileSync(join(root, "src/main.tsx"), "utf8");
 const honeybadgerClientSource = readFileSync(join(root, "src/services/honeybadger.ts"), "utf8");
 const honeybadgerServerSource = readFileSync(join(root, "functions/_lib/honeybadger.ts"), "utf8");
@@ -34,9 +38,31 @@ const checks = [
   },
   {
     name: "auth service handles pending Supabase callback before /api/auth/me",
-    pass: readFileSync(join(root, "src/services/api.ts"), "utf8").includes("if (hasSupabaseCallbackInLocation())") &&
-      readFileSync(join(root, "src/services/api.ts"), "utf8").indexOf("if (hasSupabaseCallbackInLocation())") <
-        readFileSync(join(root, "src/services/api.ts"), "utf8").indexOf('apiRequest<AuthSession & { ok: boolean }>("/api/auth/me")')
+    pass: apiSource.includes("if (hasSupabaseCallbackInLocation())") &&
+      apiSource.indexOf("if (hasSupabaseCallbackInLocation())") <
+        apiSource.indexOf('apiRequest<AuthSession & { ok: boolean }>("/api/auth/me")')
+  },
+  {
+    name: "auth service starts Fenrir direct OAuth login",
+    pass: apiSource.includes("VITE_DIRECT_AUTH_ORIGIN") &&
+      apiSource.includes('window.location.assign(`${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`)') &&
+      !apiSource.includes("signInWithSupabase(provider)")
+  },
+  {
+    name: "direct OAuth login stores a signed PKCE transaction cookie",
+    pass: directOauthLoginSource.includes("createOAuthTransaction(provider") &&
+      directOauthLoginSource.includes("transactionSetCookie") &&
+      directOauthSource.includes("code_challenge_method") &&
+      directOauthSource.includes("S256") &&
+      directOauthSource.includes("code_verifier: tx.verifier")
+  },
+  {
+    name: "direct OAuth callback validates state and OIDC ID tokens",
+    pass: directOauthCallbackSource.includes("readOAuthTransaction") &&
+      directOauthCallbackSource.includes("validateOAuthTransaction") &&
+      directOauthSource.includes("id_token_signature_invalid") &&
+      directOauthSource.includes("id_token_nonce_invalid") &&
+      directOauthSource.includes("id_token_audience_invalid")
   },
   {
     name: "authenticated app shell never normalizes login success back to public root",

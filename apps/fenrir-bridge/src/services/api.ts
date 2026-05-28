@@ -1,7 +1,7 @@
 import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from "@simplewebauthn/browser";
 import { copy } from "../i18n";
 import { addBridge, addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
-import { completeSupabaseSession, hasSupabaseCallbackInLocation, isSupabaseAuthConfigured, signInWithSupabase, signOutSupabase } from "./supabaseAuth";
+import { completeSupabaseSession, hasSupabaseCallbackInLocation, signOutSupabase } from "./supabaseAuth";
 import type { AppState, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck } from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
@@ -15,6 +15,8 @@ const telegramBotUsername = () =>
   )
     .replace(/^@/, "")
     .trim();
+
+const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? "").trim().replace(/\/$/, "");
 
 export type PaidPlan = Exclude<Plan, "free">;
 
@@ -152,6 +154,16 @@ function devAuthSession(): AuthSession & { ok: true } {
       plan: store.org.plan
     }
   };
+}
+
+function safeCurrentAuthReturnPath() {
+  const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (!path.startsWith("/") || path.startsWith("//")) return "/main";
+  const pathname = window.location.pathname || "/";
+  if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) {
+    return "/main";
+  }
+  return path;
 }
 
 function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: string): T {
@@ -372,12 +384,8 @@ export const authService = {
     }
   },
   async login(provider: "google" | "microsoft" | "apple") {
-    if (isSupabaseAuthConfigured()) {
-      await signInWithSupabase(provider);
-      return;
-    }
-
-    throw new Error("supabase_auth_not_configured");
+    const returnTo = safeCurrentAuthReturnPath();
+    window.location.assign(`${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
   },
   async telegramLogin(payload: TelegramLoginPayload) {
     return apiRequest<{ ok: true; authenticated: true; user: AuthSession["user"]; org: AuthSession["org"] }>("/api/auth/telegram-session", {

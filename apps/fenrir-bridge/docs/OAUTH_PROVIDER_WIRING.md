@@ -1,10 +1,13 @@
-# OAuth Provider Wiring
+# Direct OAuth Provider Wiring
 
-Fenrir signs users in through Supabase Auth with three app providers:
+Fenrir signs users in directly with three app providers:
 
-- Google: `signInWithOAuth({ provider: "google" })`
-- Microsoft: `signInWithOAuth({ provider: "azure" })`
-- Apple: `signInWithOAuth({ provider: "apple" })`
+- Google: `/api/auth/login/google`
+- Microsoft: `/api/auth/login/microsoft`
+- Apple: `/api/auth/login/apple`
+
+The callback validates the OAuth transaction cookie, PKCE verifier, state,
+nonce, and OIDC ID token before minting `fenrir_session`.
 
 ## Production URLs
 
@@ -12,21 +15,10 @@ Use these values for the production app:
 
 - App origin: `https://myfenrir.com`
 - WWW origin: `https://www.myfenrir.com`
-- App callback: `https://myfenrir.com/auth/callback`
-- WWW callback: `https://www.myfenrir.com/auth/callback`
-- Supabase provider callback: `https://yqevglppbhuoxxfsfnih.supabase.co/auth/v1/callback`
-
-## Supabase Auth
-
-In Supabase Authentication, enable Google, Azure, and Apple providers with their
-provider client IDs and secrets.
-
-In Supabase URL Configuration:
-
-- Site URL: `https://myfenrir.com`
-- Additional Redirect URLs:
-  - `https://myfenrir.com/auth/callback`
-  - `https://www.myfenrir.com/auth/callback`
+- Auth origin: `https://auth.myfenrir.com`
+- Google callback: `https://auth.myfenrir.com/api/auth/callback/google`
+- Microsoft callback: `https://auth.myfenrir.com/api/auth/callback/microsoft`
+- Apple callback: `https://auth.myfenrir.com/api/auth/callback/apple`
 
 ## Google
 
@@ -35,12 +27,18 @@ In Google Auth Platform, create or edit the web OAuth client.
 - Authorized JavaScript origins:
   - `https://myfenrir.com`
   - `https://www.myfenrir.com`
+  - `https://auth.myfenrir.com`
 - Authorized redirect URI:
-  - `https://yqevglppbhuoxxfsfnih.supabase.co/auth/v1/callback`
+  - `https://auth.myfenrir.com/api/auth/callback/google`
 
 ## Microsoft
 
-The publisher-domain verification files are hosted from `public/.well-known/`:
+In Microsoft Entra, configure the web redirect URI:
+
+- `https://auth.myfenrir.com/api/auth/callback/microsoft`
+
+The publisher-domain verification files are hosted from `public/.well-known/`
+and must be reachable on `https://auth.myfenrir.com/.well-known/`:
 
 - `microsoft-identity-association.json`
 - `microsoft-identity-association`
@@ -52,18 +50,33 @@ Both must include application ID `bd7f4392-853c-4c41-89e7-443691424188`.
 For Sign in with Apple on the web, configure a Services ID and add:
 
 - Web domain: `myfenrir.com`
+- Web domain: `auth.myfenrir.com`
 - Return URLs:
-  - `https://yqevglppbhuoxxfsfnih.supabase.co/auth/v1/callback`
-  - `https://myfenrir.com/auth/callback`
-  - `https://www.myfenrir.com/auth/callback`
+  - `https://auth.myfenrir.com/api/auth/callback/apple`
 
 Apple's current web Sign in with Apple setup does not require uploading a static
 domain-association file for this Services ID flow.
 
 ## Fenrir Readiness Flags
 
-After each provider is configured in the provider console and in Supabase, set
-these Cloudflare Pages production variables:
+Set these Cloudflare Pages production variables:
+
+```bash
+SESSION_SECRET=
+VITE_DIRECT_AUTH_ORIGIN=https://auth.myfenrir.com
+PUBLIC_SITE_URL=https://www.myfenrir.com
+PUBLIC_AUTH_URL=https://auth.myfenrir.com
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+APPLE_CLIENT_ID=
+APPLE_TEAM_ID=
+APPLE_KEY_ID=
+APPLE_PRIVATE_KEY=
+```
+
+After each provider is configured in the provider console, set:
 
 ```bash
 FENRIR_GOOGLE_OAUTH_CONFIGURED=true
@@ -71,8 +84,7 @@ FENRIR_MICROSOFT_OAUTH_CONFIGURED=true
 FENRIR_APPLE_OAUTH_CONFIGURED=true
 ```
 
-`/api/readiness` uses these flags plus `SUPABASE_URL` and `SUPABASE_ANON_KEY`
-to report whether Google, Microsoft, and Apple are ready.
+`/api/readiness` treats the direct provider credentials as readiness signals.
 
 ## Neon Community Gate
 

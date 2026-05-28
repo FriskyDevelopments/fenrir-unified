@@ -23,12 +23,20 @@ export type SessionPayload = {
 const sessionCookie = "fenrir_session";
 const week = 60 * 60 * 24 * 7;
 
-export function cookieHeader(name: string, value: string, maxAge: number) {
-  return `${name}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+export function cookieHeader(name: string, value: string, maxAge: number, domain?: string) {
+  let header = `${name}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+  if (domain) {
+    header += `; Domain=${domain}`;
+  }
+  return header;
 }
 
-export function clearCookieHeader(name: string) {
-  return `${name}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+export function clearCookieHeader(name: string, domain?: string) {
+  let header = `${name}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+  if (domain) {
+    header += `; Domain=${domain}`;
+  }
+  return header;
 }
 
 export function readCookie(request: Request, name: string) {
@@ -59,8 +67,8 @@ export async function readSession(request: Request, env: AuthEnv) {
   return payload;
 }
 
-export function sessionSetCookie(token: string) {
-  return cookieHeader(sessionCookie, token, week);
+export function sessionSetCookie(token: string, domain?: string) {
+  return cookieHeader(sessionCookie, token, week, domain);
 }
 
 export function createSessionPayload(input: {

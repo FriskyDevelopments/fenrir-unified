@@ -111,7 +111,7 @@ Current Cloud Run service URL:
 https://fenrir-bridge-5nznlsxd7a-uc.a.run.app
 ```
 
-Recommended Supabase Auth setup for real admin login:
+Recommended auth setup for real admin login:
 
 ```sh
 SESSION_SECRET=
@@ -120,52 +120,59 @@ SUPABASE_ANON_KEY=
 SUPABASE_ADMIN_EMAILS=
 ```
 
-Vite client variables for the Supabase web app:
+Vite client variables:
 
 ```sh
-VITE_SUPABASE_URL=https://yqevglppbhuoxxfsfnih.supabase.co
-VITE_SUPABASE_ANON_KEY=
-VITE_AUTH_REDIRECT_ORIGIN=https://www.myfenrir.com
-VITE_AUTH_REDIRECT_PATH=/auth/callback
+VITE_DIRECT_AUTH_ORIGIN=https://auth.myfenrir.com
 VITE_FENRIR_MANAGED_URL=https://www.myfenrir.com/main
 VITE_CUSTOM_DOMAIN_URL=
 ```
 
-Enable Google, Azure/Microsoft, and Apple in Supabase Auth > Providers. Supabase stores the provider client IDs/secrets; Cloudflare verifies Supabase access tokens with `SUPABASE_URL` and `SUPABASE_ANON_KEY`, then mints Fenrir's HttpOnly session cookie. `SUPABASE_ADMIN_EMAILS` is optional but recommended; use a comma-separated allowlist for dashboard admins.
+Direct OAuth is handled by Fenrir Pages Functions. Cloudflare stores the provider client IDs/secrets, validates OIDC ID tokens, and mints Fenrir's HttpOnly session cookie. `SUPABASE_ADMIN_EMAILS` is optional but recommended; use a comma-separated allowlist for dashboard admins.
 
-Direct provider OAuth through Fenrir is disabled. Do not register provider callbacks to `/api/auth/callback/:provider`; register the Supabase Auth callback URL instead.
+Supabase can still be used for profile storage with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, but browser login no longer starts with Supabase Auth.
 
-This free setup uses the raw Supabase project callback host. For production branding, Supabase Auth can later run behind the Frisky-owned custom auth domain after that paid Supabase feature is enabled and verified.
-
-Required provider callback URL for Google, Microsoft, and Apple:
+Required provider callback URLs:
 
 ```text
-https://yqevglppbhuoxxfsfnih.supabase.co/auth/v1/callback
+https://auth.myfenrir.com/api/auth/callback/google
+https://auth.myfenrir.com/api/auth/callback/microsoft
+https://auth.myfenrir.com/api/auth/callback/apple
 ```
-
-Required app redirect URL inside Supabase Auth URL settings:
 
 ```text
-https://www.myfenrir.com/auth/callback
+PUBLIC_SITE_URL=https://www.myfenrir.com
+PUBLIC_AUTH_URL=https://auth.myfenrir.com
 ```
+
+Route `auth.myfenrir.com` to the same Cloudflare Pages project as Fenrir Bridge, then register callbacks on that host.
 
 Required Cloudflare auth variables:
-
 ```sh
 SESSION_SECRET=
+VITE_DIRECT_AUTH_ORIGIN=https://auth.myfenrir.com
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+APPLE_CLIENT_ID=
+APPLE_TEAM_ID=
+APPLE_KEY_ID=
+APPLE_PRIVATE_KEY=
 SUPABASE_URL=https://yqevglppbhuoxxfsfnih.supabase.co
-SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_ADMIN_EMAILS=
 FENRIR_CANONICAL_ORIGIN=https://www.myfenrir.com
+PUBLIC_SITE_URL=https://www.myfenrir.com
+PUBLIC_AUTH_URL=https://auth.myfenrir.com
 ```
 
-The service-role key is server-only. It is used by Fenrir Supabase Edge Functions to verify owner/admin membership from `user_roles` instead of trusting stale JWT role claims.
+The service-role key is server-only. It is used for profile storage and must never be exposed as a Vite variable.
 
 Apple notes:
 
-- Apple provider secrets live in Supabase Auth, not Cloudflare Pages.
-- Apple posts callbacks with `response_mode=form_post`; Supabase receives the provider callback and Fenrir only exchanges a Supabase access token for its HttpOnly session cookie.
+- Apple provider secrets live in Cloudflare Pages variables.
+- Apple posts callbacks with `response_mode=form_post`; Fenrir's callback supports both GET and POST.
 
 ## Cursor Stripe Handoff
 

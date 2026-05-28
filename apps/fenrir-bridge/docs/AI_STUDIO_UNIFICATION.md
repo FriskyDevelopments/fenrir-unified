@@ -53,7 +53,7 @@ Authorized redirect URIs:
 ```text
 https://ais-dev-og5czv3p7j6pv3nroqllho-209442768096.us-west2.run.app
 https://ais-pre-og5czv3p7j6pv3nroqllho-209442768096.us-west2.run.app
-https://<your-project-ref>.supabase.co/auth/v1/callback
+https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback
 ```
 
 Then use the same values in both systems:

@@ -19,6 +19,7 @@ export default defineConfig(({ mode }) => {
             }
 
             if (!supabaseAuthBase) {
+              console.warn(`Vite local redirect blocked: VITE_SUPABASE_URL is "${env.VITE_SUPABASE_URL}"`);
               res.statusCode = 500;
               res.setHeader("Content-Type", "text/plain; charset=utf-8");
               res.end("Fenrir auth is misconfigured: VITE_SUPABASE_URL must be the raw Supabase project URL, not localhost or myfenrir.com.");

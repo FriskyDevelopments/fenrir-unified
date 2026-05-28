@@ -5,7 +5,7 @@ const SERVER_VERSION = "0.1.0-beta";
 
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://www.myfenrir.com",
-  "https://auth.friskydev.com",
+  "https://auth.myfenrir.com",
   "http://localhost:5173",
   "http://localhost:5177",
   "http://localhost:6274",

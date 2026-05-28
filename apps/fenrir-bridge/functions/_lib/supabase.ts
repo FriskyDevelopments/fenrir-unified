@@ -21,6 +21,10 @@ type SupabaseUserResponse = {
 
 export async function createSessionFromSupabaseToken(accessToken: string, env: SupabaseEnv) {
   const supabaseUrl = requireEnv(env.SUPABASE_URL, "SUPABASE_URL").replace(/\/$/, "");
+  if (supabaseUrl.includes("example.supabase.co") || supabaseUrl.includes("<your-project-ref>")) {
+    console.error(`Supabase URL misconfigured in edge function: ${supabaseUrl}`);
+    throw new Error("supabase_url_misconfigured");
+  }
   const anonKey = requireEnv(env.SUPABASE_ANON_KEY, "SUPABASE_ANON_KEY");
   const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
     headers: {

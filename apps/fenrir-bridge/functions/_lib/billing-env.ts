@@ -28,6 +28,8 @@ export type BillingEnv = AuthEnv & {
   MEDIA_PROXY_ALLOWED_HOSTS?: string;
   /** Base URL for Stripe success/cancel/portal returns (no trailing slash). Falls back to request origin. */
   PUBLIC_SITE_URL?: string;
+  /** Base URL for Authentication (e.g. auth.myfenrir.com). Falls back to PUBLIC_SITE_URL or request origin. */
+  PUBLIC_AUTH_URL?: string;
 };
 
 export function requireEnv(value: string | undefined, name: string): string {
@@ -62,4 +64,27 @@ export function siteOrigin(request: Request, env: BillingEnv) {
   if (configured) return configured.replace(/\/$/, "");
   const url = new URL(request.url);
   return `${url.protocol}//${url.host}`;
+}
+
+export function authOrigin(request: Request, env: BillingEnv) {
+  const configured = env.PUBLIC_AUTH_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  return siteOrigin(request, env);
+}
+
+export function cookieDomain(request: Request, env: BillingEnv) {
+  const site = siteOrigin(request, env);
+  try {
+    const url = new URL(site);
+    const parts = url.hostname.split(".");
+    // If it's something like myfenrir.com, use the root domain for app cookies.
+    if (parts.length >= 2) {
+      // Basic logic: last two parts (e.g. myfenrir.com)
+      // Note: doesn't handle co.uk but good enough for this MVP
+      return parts.slice(-2).join(".");
+    }
+  } catch {
+    // fallback to null
+  }
+  return undefined;
 }
