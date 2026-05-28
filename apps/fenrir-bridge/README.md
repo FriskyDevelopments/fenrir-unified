@@ -123,7 +123,7 @@ SUPABASE_ADMIN_EMAILS=
 Vite client variables for the Supabase web app:
 
 ```sh
-VITE_SUPABASE_URL=https://auth.friskydev.com
+VITE_SUPABASE_URL=https://yqevglppbhuoxxfsfnih.supabase.co
 VITE_SUPABASE_ANON_KEY=
 VITE_AUTH_REDIRECT_ORIGIN=https://www.myfenrir.com
 VITE_AUTH_REDIRECT_PATH=/auth/callback
@@ -135,12 +135,12 @@ Enable Google, Azure/Microsoft, and Apple in Supabase Auth > Providers. Supabase
 
 Direct provider OAuth through Fenrir is disabled. Do not register provider callbacks to `/api/auth/callback/:provider`; register the Supabase Auth callback URL instead.
 
-For production branding, Supabase Auth must run behind the Frisky-owned custom auth domain. Otherwise Google, Microsoft, and Apple will show the raw project callback host, such as `<project-ref>.supabase.co`, on their authorization screens.
+This free setup uses the raw Supabase project callback host. For production branding, Supabase Auth can later run behind the Frisky-owned custom auth domain after that paid Supabase feature is enabled and verified.
 
 Required provider callback URL for Google, Microsoft, and Apple:
 
 ```text
-https://auth.friskydev.com/auth/v1/callback
+https://yqevglppbhuoxxfsfnih.supabase.co/auth/v1/callback
 ```
 
 Required app redirect URL inside Supabase Auth URL settings:
@@ -153,7 +153,7 @@ Required Cloudflare auth variables:
 
 ```sh
 SESSION_SECRET=
-SUPABASE_URL=https://auth.friskydev.com
+SUPABASE_URL=https://yqevglppbhuoxxfsfnih.supabase.co
 SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_ADMIN_EMAILS=

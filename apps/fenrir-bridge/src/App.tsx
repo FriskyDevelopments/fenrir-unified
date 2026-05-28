@@ -985,7 +985,7 @@ async function lookupDomainDns(domain: string): Promise<DomainSearchResult> {
     });
     window.clearTimeout(timeout);
     if (!response.ok) throw new Error("dns_lookup_failed");
-    const payload = await response.json<{ Status?: number; Answer?: Array<{ data?: string }> }>().catch(() => null);
+    const payload = (await response.json().catch(() => null)) as { Status?: number; Answer?: Array<{ data?: string }> } | null;
     const records = (payload?.Answer ?? []).map((answer) => String(answer.data ?? "").replace(/\.$/, "")).filter(Boolean).slice(0, 3);
     if (records.length) {
       return {
@@ -1367,6 +1367,7 @@ export function App() {
   }
 
   async function checkDns(domain: FriskyDomain) {
+    setNotice("Checking live DNS propagation...");
     const result = await domainService.checkDns(domain.id);
     setNotice(result.ok ? `${domain.domain} verified.` : result.error?.message ?? "DNS check failed.");
     if (result.ok) {

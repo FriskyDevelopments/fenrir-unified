@@ -14,7 +14,7 @@ Use these values for the production app:
 - WWW origin: `https://www.myfenrir.com`
 - App callback: `https://myfenrir.com/auth/callback`
 - WWW callback: `https://www.myfenrir.com/auth/callback`
-- Supabase provider callback: `https://<supabase-project-ref>.supabase.co/auth/v1/callback`
+- Supabase provider callback: `https://yqevglppbhuoxxfsfnih.supabase.co/auth/v1/callback`
 
 ## Supabase Auth
 
@@ -36,7 +36,7 @@ In Google Auth Platform, create or edit the web OAuth client.
   - `https://myfenrir.com`
   - `https://www.myfenrir.com`
 - Authorized redirect URI:
-  - `https://<supabase-project-ref>.supabase.co/auth/v1/callback`
+  - `https://yqevglppbhuoxxfsfnih.supabase.co/auth/v1/callback`
 
 ## Microsoft
 
@@ -53,7 +53,7 @@ For Sign in with Apple on the web, configure a Services ID and add:
 
 - Web domain: `myfenrir.com`
 - Return URLs:
-  - `https://<supabase-project-ref>.supabase.co/auth/v1/callback`
+  - `https://yqevglppbhuoxxfsfnih.supabase.co/auth/v1/callback`
   - `https://myfenrir.com/auth/callback`
   - `https://www.myfenrir.com/auth/callback`
 

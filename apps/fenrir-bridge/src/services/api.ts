@@ -484,7 +484,7 @@ export const aiOpsService = {
     appendAudit("jules_ticket_created", "FriskyOrg", store.org.id, { label: "backend hardening task" });
   },
   geminiDnsExplanation() {
-    appendAudit("gemini_dns_explained", "FriskyDomain", store.domains[0]?.id ?? "none", { assistant: "Gemini" });
+    appendAudit("gemini_dns_explained", "FriskyDomain", store.domains[0]?.id ?? "none", { assistant: "Gemini", note: "DNS wizard guidance generated." });
   },
   cursorHandoff() {
     appendAudit("cursor_handoff_exported", "FriskyOrg", store.org.id, { target: "Cursor workspace" });
