@@ -60,20 +60,31 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
   }
 
   const authBase = authOrigin(context.request, context.env);
-  const redirectUri = `${authBase}/api/auth/callback/${provider}`;
+  const callbackUri = `${authBase}/api/auth/callback/${provider}`;
 
   try {
     const tx = await readOAuthTransaction(context.request, context.env);
     validateOAuthTransaction(tx, provider, state);
-    const result = await exchangeCodeForSession(provider, context.env, code, redirectUri, tx!);
+    const result = await exchangeCodeForSession(provider, context.env, code, callbackUri, tx!);
     const sessionPayload = result.session;
     if (context.env.DB) {
       await ensureDefaultWorkspace(context.env.DB, sessionPayload);
     }
     await upsertProfileForSession(context.env, sessionPayload, result.identityId);
 
+    const returnToUrl = tx?.returnTo ?? "/main";
+    let finalLocation: string;
+
+    if (returnToUrl.startsWith("http")) {
+      const targetUrl = new URL(returnToUrl);
+      const targetOrigin = `${targetUrl.protocol}//${targetUrl.host}`;
+      finalLocation = `${targetOrigin}/api/auth/complete?token=${encodeURIComponent(await signSessionTransfer(sessionPayload, returnToUrl, context.env))}`;
+    } else {
+      finalLocation = `${siteBase}/api/auth/complete?token=${encodeURIComponent(await signSessionTransfer(sessionPayload, returnToUrl, context.env))}`;
+    }
+
     const headers = new Headers({
-      Location: `${siteBase}/api/auth/complete?token=${encodeURIComponent(await signSessionTransfer(sessionPayload, tx?.returnTo ?? "/main", context.env))}`
+      Location: finalLocation
     });
     headers.append("Set-Cookie", clearTransactionCookie());
     return new Response(null, {

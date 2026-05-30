@@ -201,10 +201,50 @@ export async function exchangeCodeForSession(
 }
 
 export function safeReturnPath(value: string | null | undefined) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/main";
+  if (!value) return "/main";
+  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+  if (!value.startsWith("/") || value.startsWith("//")) return "/main";
   const pathname = value.split(/[?#]/, 1)[0] || "/";
   if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) return "/main";
   return value;
+}
+
+export function safeAllowedReturnTo(value: string | null | undefined, env: OAuthEnv) {
+  if (!value) return validateRedirectUri(null, env);
+  if (value.startsWith("http://") || value.startsWith("https://")) return validateRedirectUri(value, env);
+  return safeReturnPath(value);
+}
+
+export function validateRedirectUri(uri: string | null | undefined, env: OAuthEnv): string {
+  const defaultUri = env.PUBLIC_SITE_URL || "";
+  const allowed = (env.ALLOWED_REDIRECT_URIS || defaultUri)
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean);
+
+  if (!uri) {
+    if (!defaultUri) {
+      throw new Error("No Redirect URI provided and no default configured.");
+    }
+    return defaultUri;
+  }
+
+  if (allowed.includes(uri)) {
+    return uri;
+  }
+
+  // Allow sub-paths if the base domain is allowed (simple check)
+  for (const base of allowed) {
+    if (uri.startsWith(base) && (uri.length === base.length || uri[base.length] === "/" || uri[base.length] === "?")) {
+      return uri;
+    }
+  }
+
+  if (!defaultUri) {
+    throw new Error("Redirect URI not allowed and no default configured.");
+  }
+
+  return defaultUri;
 }
 
 async function exchangeGoogleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<DirectOAuthSession> {

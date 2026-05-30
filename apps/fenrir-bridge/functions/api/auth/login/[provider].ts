@@ -4,8 +4,9 @@ import {
   getAuthorizationUrl,
   isDirectOAuthAvailable,
   isOAuthProvider,
-  safeReturnPath,
+  safeAllowedReturnTo,
   transactionSetCookie,
+  validateRedirectUri,
   type OAuthEnv
 } from "../../../_lib/oauth";
 import { authOrigin } from "../../../_lib/billing-env";
@@ -28,10 +29,17 @@ export const onRequestGet: PagesFunction<OAuthEnv> = async (context) => {
   }
 
   const origin = authOrigin(context.request, context.env);
-  const redirectUri = `${origin}/api/auth/callback/${provider}`;
+  const callbackUri = `${origin}/api/auth/callback/${provider}`;
   const requestUrl = new URL(context.request.url);
-  const tx = await createOAuthTransaction(provider, context.env, safeReturnPath(requestUrl.searchParams.get("return_to")));
-  const url = await getAuthorizationUrl(provider, context.env, redirectUri, tx);
+
+  // Validate the redirect URI if one was provided in the query params (e.g. for white-labeling)
+  // The 'redirect_uri' is where the user goes AFTER the entire flow is complete.
+  // The 'callbackUri' is where the OAuth provider sends the user back to us.
+  const finalRedirectUri = validateRedirectUri(requestUrl.searchParams.get("redirect_uri"), context.env);
+  const returnTo = safeAllowedReturnTo(requestUrl.searchParams.get("return_to") || finalRedirectUri, context.env);
+  
+  const tx = await createOAuthTransaction(provider, context.env, returnTo);
+  const url = await getAuthorizationUrl(provider, context.env, callbackUri, tx);
 
   return new Response(null, {
     status: 302,

@@ -3,6 +3,11 @@
   "compatibility_date": "2026-05-17",
   "compatibility_flags": ["nodejs_compat"],
   "pages_build_output_dir": "dist",
+  "vars": {
+    "PUBLIC_SITE_URL": "https://myfenrir.com",
+    "PUBLIC_AUTH_URL": "https://auth.myfenrir.com",
+    "ALLOWED_REDIRECT_URIS": "https://myfenrir.com,https://www.myfenrir.com,http://localhost:5173"
+  },
   "d1_databases": [
     {
       "binding": "DB",
