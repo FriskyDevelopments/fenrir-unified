@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = new URL("..", import.meta.url).pathname;
-const source = readFileSync(join(root, "src/services/supabaseAuth.ts"), "utf8");
 const appSource = readFileSync(join(root, "src/App.tsx"), "utf8");
 const directOauthGuardSource = readFileSync(join(root, "workers/fenrir-direct-oauth-guard.js"), "utf8");
 const directOauthSource = readFileSync(join(root, "functions/_lib/oauth.ts"), "utf8");
@@ -12,41 +11,49 @@ const apiSource = readFileSync(join(root, "src/services/api.ts"), "utf8");
 const mainSource = readFileSync(join(root, "src/main.tsx"), "utf8");
 const honeybadgerClientSource = readFileSync(join(root, "src/services/honeybadger.ts"), "utf8");
 const honeybadgerServerSource = readFileSync(join(root, "functions/_lib/honeybadger.ts"), "utf8");
+const workosSource = readFileSync(join(root, "functions/_lib/workos.ts"), "utf8");
+const workosLoginSource = readFileSync(join(root, "functions/api/auth/workos/login.ts"), "utf8");
+const workosCallbackSource = readFileSync(join(root, "functions/api/auth/callback/workos.ts"), "utf8");
 
 const checks = [
   {
-    name: "stores the pre-login path before Supabase OAuth",
-    pass: source.includes("window.localStorage.setItem(postAuthDestinationKey, currentPostAuthDestination())") &&
-      source.includes("rememberPostAuthDestination();") &&
-      source.indexOf("rememberPostAuthDestination();") < source.indexOf("supabase.auth.signInWithOAuth")
-  },
-  {
-    name: "root/login fallback targets the managed MyFenrir dashboard",
-    pass: source.includes('import.meta.env.VITE_FENRIR_MANAGED_URL ?? "/main"') &&
-      source.includes('return destination === "/" || !isSafeRedirectPath(destination) ? fallbackPostAuthDestination() : destination;')
-  },
-  {
-    name: "callback path consumes the stored post-auth destination",
-    pass: source.includes("if (isAuthCallbackPath(pathname)) return consumePostAuthDestination();") &&
-      source.includes('if (hasCallbackParams && (pathname === "/" || pathname === "/login")) return consumePostAuthDestination();')
-  },
-  {
-    name: "root hash token callback redirects to managed MyFenrir dashboard",
-    pass: source.includes("hasSupabaseCallbackParams(search) || hasSupabaseCallbackParams(hash)") &&
-      source.includes("params.hasCallbackParams || isAuthCallbackPath(window.location.pathname)") &&
-      source.includes("clearCallbackParameters(params.hasCallbackParams)")
-  },
-  {
-    name: "auth service handles pending Supabase callback before /api/auth/me",
-    pass: apiSource.includes("if (hasSupabaseCallbackInLocation())") &&
-      apiSource.indexOf("if (hasSupabaseCallbackInLocation())") <
-        apiSource.indexOf('apiRequest<AuthSession & { ok: boolean }>("/api/auth/me")')
-  },
-  {
-    name: "auth service starts Fenrir direct OAuth login",
+    name: "auth service routes social login through WorkOS AuthKit",
     pass: apiSource.includes("VITE_DIRECT_AUTH_ORIGIN") &&
-      apiSource.includes('window.location.assign(`${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`)') &&
-      !apiSource.includes("signInWithSupabase(provider)")
+      apiSource.includes("/api/auth/workos/login?provider=") &&
+      apiSource.includes("return_to=${encodeURIComponent(returnTo)}") &&
+      !apiSource.includes("signInWithSupabase")
+  },
+  {
+    name: "Supabase client login flow is fully removed from the browser bundle",
+    pass: !apiSource.includes("supabaseAuth") &&
+      !apiSource.includes("completeSupabaseSession") &&
+      !apiSource.includes("hasSupabaseCallbackInLocation")
+  },
+  {
+    name: "WorkOS login builds an AuthKit authorize URL with a signed state cookie",
+    pass: workosLoginSource.includes("buildAuthorizationUrl") &&
+      workosLoginSource.includes("stateSetCookie") &&
+      workosSource.includes("user_management/authorize") &&
+      workosSource.includes('params.set("provider", providerHint ? providerMap[providerHint] : "authkit")')
+  },
+  {
+    name: "WorkOS login fails closed to /login on misconfig, never a raw 500",
+    pass: workosLoginSource.includes('auth_error: "workos_login_init_failed"') &&
+      workosLoginSource.includes("isWorkOSConfigured(context.env)") &&
+      workosLoginSource.includes("status: 302")
+  },
+  {
+    name: "WorkOS callback validates state, exchanges the code, and mints the Fenrir session cookie",
+    pass: workosCallbackSource.includes("readState") &&
+      workosCallbackSource.includes("stored.state !== state") &&
+      workosCallbackSource.includes("exchangeCodeForSession") &&
+      workosCallbackSource.includes("signSession") &&
+      workosCallbackSource.includes("sessionSetCookie") &&
+      workosSource.includes("user_management/authenticate")
+  },
+  {
+    name: "auth service reads the server session via /api/auth/me",
+    pass: apiSource.includes('apiRequest<AuthSession & { ok: boolean }>("/api/auth/me")')
   },
   {
     name: "direct OAuth login stores a signed PKCE transaction cookie",
@@ -86,15 +93,17 @@ const checks = [
       honeybadgerServerSource.includes('"X-API-Key": apiKey')
   },
   {
-    name: "rejects unsafe or callback destinations",
-    pass: source.includes("path.startsWith(\"//\")") &&
-      source.includes("return !isAuthCallbackPath(pathname);")
+    name: "WorkOS return_to rejects open redirects and auth loops",
+    pass: workosSource.includes('value.startsWith("//")') &&
+      workosSource.includes('pathname.startsWith("/auth/")') &&
+      workosSource.includes('pathname.startsWith("/api/auth/")') &&
+      workosSource.includes('return "/main"')
   },
   {
-    name: "callback cleanup removes OAuth parameters",
-    pass: source.includes("\"code\"") &&
-      source.includes("\"error_description\"") &&
-      source.includes("nextParams.delete(key)")
+    name: "WorkOS state cookie is HMAC-signed and expires",
+    pass: workosSource.includes("HttpOnly; Secure; SameSite=Lax") &&
+      workosSource.includes("timingSafeEqual(signature, expected)") &&
+      workosSource.includes("payload.exp < Math.floor(Date.now() / 1000)")
   }
 ];
 
