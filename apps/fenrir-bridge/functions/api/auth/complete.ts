@@ -13,7 +13,14 @@ export const onRequestGet: PagesFunction<OAuthEnv> = async (context) => {
     return Response.redirect(`${siteBase}/login?auth_error=oauth_transfer_invalid`, 302);
   }
 
-  const session = await signSession(transfer.session, context.env);
+  let session: string;
+  try {
+    session = await signSession(transfer.session, context.env);
+  } catch (error) {
+    // Signing requires SESSION_SECRET; a misconfig must not 500 the callback.
+    console.error("Failed to sign Fenrir session in /api/auth/complete", error);
+    return Response.redirect(`${siteBase}/login?auth_error=session_sign_failed`, 302);
+  }
   const returnTo = safeReturnPath(transfer.returnTo);
   
   // If returnTo is an absolute URL, use it directly.
