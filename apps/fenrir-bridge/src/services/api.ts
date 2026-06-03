@@ -1,8 +1,7 @@
 import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from "@simplewebauthn/browser";
 import { copy } from "../i18n";
 import { addBridge, addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
-import { completeSupabaseSession, hasSupabaseCallbackInLocation, signOutSupabase } from "./supabaseAuth";
-import type { AppState, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck } from "./types";
+import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck } from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
 export const defaultBillingCheckoutErrorMessage = copy.en.checkoutErrorGeneric;
@@ -97,7 +96,7 @@ export type AuthSession = {
     id: string;
     email: string;
     name: string;
-    authProvider: "google" | "microsoft" | "apple" | "telegram" | "passkey";
+    authProvider: "google" | "microsoft" | "apple" | "workos" | "telegram" | "passkey";
   };
   org?: {
     id: string;
@@ -363,29 +362,16 @@ export const webauthnService = {
 
 export const authService = {
   async me() {
-    if (hasSupabaseCallbackInLocation()) {
-      const completed = await completeSupabaseSession();
-      if (completed) {
-        return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
-      }
-    }
-
     try {
       const result = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
-      if (!result.authenticated) {
-        const completed = await completeSupabaseSession();
-        if (completed) {
-          return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
-        }
-      }
       return { ok: true as const, data: result };
     } catch {
       return { ok: true as const, data: { authenticated: false } as AuthSession };
     }
   },
-  async login(provider: "google" | "microsoft" | "apple") {
+  async login(_provider: "google" | "microsoft" | "apple") {
     const returnTo = safeCurrentAuthReturnPath();
-    window.location.assign(`${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
+    window.location.assign(`${directAuthOrigin}/api/auth/login/workos?return_to=${encodeURIComponent(returnTo)}`);
   },
   async telegramLogin(payload: TelegramLoginPayload) {
     return apiRequest<{ ok: true; authenticated: true; user: AuthSession["user"]; org: AuthSession["org"] }>("/api/auth/telegram-session", {
@@ -394,7 +380,11 @@ export const authService = {
     });
   },
   async logout() {
-    await signOutSupabase();
+    try {
+      window.localStorage.removeItem("fenrir_post_auth_destination");
+    } catch {
+      // Optional cleanup only.
+    }
     await apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }).catch(() => null);
   }
 };
@@ -548,5 +538,11 @@ export const telegramIdentityService = {
       method: "POST",
       body: JSON.stringify(input)
     });
+  }
+};
+
+export const communitySecurityService = {
+  async getReport(communitySlug: string = "fenrir"): Promise<{ ok: true; data: CommunitySecurityReport }> {
+    return apiRequest<{ ok: true; data: CommunitySecurityReport }>(`/api/community-gate/admin/security-report?communitySlug=${encodeURIComponent(communitySlug)}`);
   }
 };
