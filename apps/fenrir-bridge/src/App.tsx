@@ -1404,7 +1404,15 @@ export function App() {
 
   async function createLiveRoom() {
     const domainId = selectedDomainRecord?.id;
-    if (!domainId || !roomTargetInput.trim()) return;
+    if (!domainId) {
+      setNotice(`${c.chooseDomain}. ${c.easyCloudflareBody ?? ""}`.trim());
+      navigateActive("dns");
+      return;
+    }
+    if (!roomTargetInput.trim()) {
+      setNotice(`${ui.liveRoomUrlHint}.`);
+      return;
+    }
     const targetUrl = safeHttpUrl(roomTargetInput);
     if (!targetUrl) {
       setNotice(ui.liveRoomUrlHint + ".");
@@ -1976,12 +1984,20 @@ export function App() {
                 <button type="button" className="compact-button ghost" key={provider.id} onClick={() => {
                   setRoomProviderInput(provider.id);
                   setRoomCoverInput(providerLogoPresets[provider.id]);
+                  setNotice(`${provider.name} logo preset applied.`);
                 }}>
                   <ProviderBadge provider={provider.id} c={c} compact />
                 </button>
               ))}
             </div>
             <div className="room-wow-preview" aria-label="Live room preview">
+              <img
+                className="room-logo-preview"
+                src={safeHttpUrl(roomCoverInput) || providerLogoPresets[roomProviderInput]}
+                alt="Room logo preview"
+                style={{ height: 40, width: "auto", maxWidth: 160, objectFit: "contain", borderRadius: 8 }}
+                onError={(event) => { (event.currentTarget as HTMLImageElement).src = providerLogoPresets[roomProviderInput]; }}
+              />
               <div className="room-wow-link">
                 <ProviderBadge provider={roomProviderInput} c={c} />
                 <span>{selectedDomainRecord?.domain ?? "vip.myfenrir.com"}/{roomSlugInput.trim() || "studio"}</span>
