@@ -6,4 +6,4 @@
   Cross-Origin-Opener-Policy: same-origin
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://web-platforms.sfo2.cdn.digitaloceanspaces.com; object-src 'none'; connect-src 'self' https://yqevglppbhuoxxfsfnih.supabase.co https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://web-platforms.sfo2.cdn.digitaloceanspaces.com; object-src 'none'; connect-src 'self' https://yqevglppbhuoxxfsfnih.supabase.co https://cloudflareinsights.com https://dns.google; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests

@@ -978,8 +978,8 @@ async function lookupDomainDns(domain: string): Promise<DomainSearchResult> {
   }
   try {
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 2800);
-    const response = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=NS`, {
+    const timeout = window.setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=NS`, {
       headers: { accept: "application/dns-json" },
       signal: controller.signal
     });
@@ -1879,7 +1879,15 @@ export function App() {
               }}
               onOpenRegistrar={(domain) => {
                 const query = encodeURIComponent(domain);
-                openSafeUrl(`https://www.dynadot.com/domain/search?domain=${query}`);
+                // Route through the configured affiliate link so purchases earn commission.
+                const link = findCommissionLink(state.commissionLinks, "dynadot")
+                  ?? findCommissionLink(state.commissionLinks, "cj-dynadot");
+                if (link) commerceService.click(link.id);
+                const base = resolveCommissionDestination(link, "dynadot");
+                const dest = base && /dynadot\.com/.test(base) && !base.includes("?")
+                  ? `${base.replace(/\/$/, "")}/domain/search?domain=${query}`
+                  : base || `https://www.dynadot.com/domain/search?domain=${query}`;
+                openSafeUrl(dest);
               }}
             />
             <div className="domain-builder-layout">
@@ -4726,7 +4734,7 @@ function DnsWizard({ domains, selected, onSelect, c }: { domains: FriskyDomain[]
         <DnsRecord type="TXT" name={selected.txtRecordName} value={selected.txtRecordValue} purpose={c.txtPurpose} />
         <DnsRecord type="CNAME" name={selected.cnameHost} value={selected.cnameTarget} purpose={c.cnamePurpose} />
         <div className="provider-tabs">
-          {["Cloudflare recommended", "Dynadot registrar", "Namecheap registrar", "Generic registrar"].map((provider) => (
+          {["Dynadot registrar", "Namecheap registrar", "Porkbun registrar", "Generic registrar"].map((provider) => (
             <div className="provider" key={provider}>
               <b>{provider}</b>
               <small>{c.friskyTipBody}</small>
