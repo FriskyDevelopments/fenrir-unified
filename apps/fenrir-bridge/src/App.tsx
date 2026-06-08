@@ -809,10 +809,10 @@ const domainTagPresets = ["launch", "client", "vip", "community", "paid", "inter
 const domainSearchTlds = ["com", "io", "app", "dev", "ai"] as const;
 
 const providerLogoPresets: Record<LiveRoomProvider, string> = {
-  zoom: "https://upload.wikimedia.org/wikipedia/commons/7/7b/Zoom_Communications_Logo.svg",
-  google_meet: "https://upload.wikimedia.org/wikipedia/commons/9/9b/Google_Meet_icon_%282020%29.svg",
-  whereby: "https://assets-global.website-files.com/5c45f12b43c3101f4504272f/5c45f12b43c3106a45042802_whereby-logo.svg",
-  webex: "https://upload.wikimedia.org/wikipedia/commons/f/f9/Webex_by_Cisco_logo.svg",
+  zoom: "/provider-logos/zoom.svg",
+  google_meet: "/provider-logos/google_meet.svg",
+  whereby: "/provider-logos/whereby.svg",
+  webex: "/provider-logos/webex.svg",
   other: "/fenrir-splash-icon.svg"
 };
 
