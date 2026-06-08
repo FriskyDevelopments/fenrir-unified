@@ -13,6 +13,17 @@ export async function onRequest(context: any) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <script>
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.has("code") || params.has("error") || params.has("state")) {
+                const pendingBot = sessionStorage.getItem("pending_activation_bot");
+                if (pendingBot === "security" || pendingBot === "core") {
+                    window.location.href = "/activation/" + pendingBot + window.location.search;
+                }
+            }
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CYBERPUP // ACTIVATION GATEWAY</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -136,7 +147,7 @@ export async function onRequest(context: any) {
         </div>
 
         <div class="flex flex-col gap-4">
-            <a href="/activation/security${url.search}" class="btn-option btn-option-security p-5 rounded-xl block text-left">
+            <a href="/activation/security${url.search}" onclick="sessionStorage.setItem('pending_activation_bot', 'security')" class="btn-option btn-option-security p-5 rounded-xl block text-left">
                 <div class="flex items-center justify-between">
                     <div>
                         <h2 class="text-white text-sm font-semibold tracking-wide uppercase">Cyberpup Security</h2>
@@ -146,7 +157,7 @@ export async function onRequest(context: any) {
                 </div>
             </a>
 
-            <a href="/activation/core${url.search}" class="btn-option btn-option-core p-5 rounded-xl block text-left">
+            <a href="/activation/core${url.search}" onclick="sessionStorage.setItem('pending_activation_bot', 'core')" class="btn-option btn-option-core p-5 rounded-xl block text-left">
                 <div class="flex items-center justify-between">
                     <div>
                         <h2 class="text-white text-sm font-semibold tracking-wide uppercase">Cyberpup Core</h2>
@@ -170,7 +181,7 @@ export async function onRequest(context: any) {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "public, max-age=60",
-      "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com https://telegram.org https://oauth.telegram.org https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://esm.run https://*.esm.run; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; object-src 'none'; connect-src 'self' https://yqevglppbhuoxxfsfnih.supabase.co https://cloudflareinsights.com https://*.supabase.co https://api.workos.com https://auth.workos.com; frame-src https://oauth.telegram.org; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://auth.workos.com; upgrade-insecure-requests"
+      "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com https://telegram.org https://oauth.telegram.org https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://esm.run https://*.esm.run; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; object-src 'none'; connect-src 'self' https://yqevglppbhuoxxfsfnih.supabase.co https://cloudflareinsights.com https://*.supabase.co https://api.workos.com https://auth.workos.com https://*.telegram.org; frame-src https://oauth.telegram.org https://telegram.org; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://auth.workos.com; upgrade-insecure-requests"
     }
   });
 }
