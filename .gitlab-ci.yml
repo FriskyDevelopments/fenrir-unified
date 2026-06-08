@@ -57,11 +57,9 @@ fenrir-bridge:deploy:
     - if: '$CI_COMMIT_BRANCH == "main" && $CLOUDFLARE_API_TOKEN'
       when: manual
   variables:
-    WRANGLER: "deno run -A npm:wrangler@4.90.0"
+    WRANGLER: "npx wrangler"
     WRANGLER_SEND_METRICS: "false"
   script:
-    - curl -fsSL https://deno.land/install.sh | sh
-    - export PATH="$HOME/.deno/bin:$PATH"
     - cd apps/fenrir-bridge
     - npm ci
     - npm run build
