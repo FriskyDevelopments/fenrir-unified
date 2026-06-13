@@ -5962,6 +5962,28 @@ p {
     font-size: clamp(38px, 13vw, 58px);
   }
 
+  /* On phones the decorative hero (giant headline + protocol rail) overlapped
+     the login card and overflowed the viewport. Hide it and show a single
+     clean, centered card. */
+  .auth-hero-copy {
+    display: none;
+  }
+
+  .auth-shell {
+    justify-items: center;
+    width: 100%;
+  }
+
+  .auth-card {
+    width: 100%;
+    max-width: 440px;
+    margin-inline: auto;
+  }
+
+  .auth-page {
+    overflow-x: hidden;
+  }
+
   .auth-hero-visual {
     width: min(360px, 88vw);
     margin: 0 auto 14px;
