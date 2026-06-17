@@ -44,6 +44,8 @@ fenrir-bridge:diagnose-login:
     - bash apps/fenrir-bridge/scripts/diagnose-login.sh
     - echo "=================================================="
     - bash apps/fenrir-bridge/scripts/probe-login-app.sh
+    - echo "=================================================="
+    - bash apps/fenrir-bridge/scripts/probe-redirects.sh
 
 # Production deploy for fenrir-bridge to Cloudflare Pages.
 #
