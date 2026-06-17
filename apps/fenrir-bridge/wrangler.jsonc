@@ -4,7 +4,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "pages_build_output_dir": "dist",
   "vars": {
-    "PUBLIC_SITE_URL": "https://myfenrir.com",
+    "PUBLIC_SITE_URL": "https://www.myfenrir.com",
     "ALLOWED_REDIRECT_URIS": "https://myfenrir.com,https://www.myfenrir.com,https://auth.myfenrir.com,http://localhost:5173"
   },
   "d1_databases": [
