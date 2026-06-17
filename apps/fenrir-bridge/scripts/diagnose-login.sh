@@ -86,6 +86,16 @@ fi
 # Probe whether each host actually serves the callback Pages Function. With no
 # code/state, a working function redirects (302) to /login?auth_error=...; a host
 # that doesn't serve the app returns 404 or redirects elsewhere.
+echo "==> Identifying what serves each host (server / cf-ray / x-vercel-id)"
+for host in https://myfenrir.com https://www.myfenrir.com https://auth.myfenrir.com; do
+  hdr="$(curl -s -D - -o /dev/null -m 15 "$host/" 2>/dev/null || echo '')"
+  srv="$(printf '%s' "$hdr" | grep -iE '^server:' | head -1 | tr -d '\r')"
+  ray="$(printf '%s' "$hdr" | grep -iE '^cf-ray:' | head -1 | tr -d '\r')"
+  vrc="$(printf '%s' "$hdr" | grep -iE '^x-vercel-id:|^x-vercel-cache:' | head -1 | tr -d '\r')"
+  echo "    $host : ${srv:-no-server} ${ray:+| $ray} ${vrc:+| $vrc}"
+done
+echo
+
 echo "==> Probing whether each host serves the callback function"
 for host in https://myfenrir.com https://www.myfenrir.com https://auth.myfenrir.com; do
   cb="${host}/api/auth/callback/workos"
