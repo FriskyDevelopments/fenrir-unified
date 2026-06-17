@@ -78,6 +78,29 @@ deploy-login-app:
       echo "login route headers:"; printf '%s\n' "$r" | grep -iE 'location|http/' | head
       curl -s -o /dev/null -w 'login page status: %{http_code}\n' https://login.myfenrir.com/ || true
 
+# Deploy the self-contained Cloudflare Worker login (the Cloudflare route, no
+# Vercel). Runs on a GitLab runner, needs a valid CLOUDFLARE_API_TOKEN. Sets the
+# WORKOS_API_KEY secret when that variable is exposed to the job.
+deploy-login-worker:
+  stage: deploy
+  image: node:22
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^claude\// && $CLOUDFLARE_API_TOKEN'
+      when: manual
+  variables:
+    WRANGLER: "npx -y wrangler@4.90.0"
+    WRANGLER_SEND_METRICS: "false"
+  script:
+    - cd myfenrir-login-worker
+    - |
+      if [ -n "${WORKOS_API_KEY:-}" ]; then
+        printf '%s' "$WORKOS_API_KEY" | $WRANGLER secret put WORKOS_API_KEY || echo "secret put failed (set it manually)"
+      else
+        echo "WORKOS_API_KEY not exposed to this job; set it with: wrangler secret put WORKOS_API_KEY"
+      fi
+    - $WRANGLER deploy
+
+
 # Production deploy for fenrir-bridge to Cloudflare Pages.
 #
 # Auth in CI is API-token based (CLOUDFLARE_API_TOKEN), NOT the operator's
