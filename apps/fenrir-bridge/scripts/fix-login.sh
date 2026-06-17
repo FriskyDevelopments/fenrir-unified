@@ -42,15 +42,69 @@ npx wrangler pages deploy dist --project-name="$PROJECT" --branch=main --commit-
 echo "==> Verifying live endpoints..."
 sleep 3
 hz="$(curl -s -o /dev/null -w '%{http_code}' https://www.myfenrir.com/healthz || echo ERR)"
-wo="$(curl -s -o /dev/null -w '%{http_code}' 'https://auth.myfenrir.com/api/auth/workos/login?provider=google' || echo ERR)"
+
+# Capture the WorkOS authorize URL the live app actually emits (the 302 Location),
+# then decode the exact client_id + redirect_uri it sends. This is the single
+# most useful signal: "Invalid client ID" from WorkOS means one of these two is
+# wrong, so we print them for direct comparison against the WorkOS dashboard.
+login_url='https://auth.myfenrir.com/api/auth/workos/login?provider=google'
+wo="$(curl -s -o /dev/null -w '%{http_code}' "$login_url" || echo ERR)"
+authorize="$(curl -s -o /dev/null -w '%{redirect_url}' "$login_url" || echo '')"
+
+sent_client_id="$(printf '%s' "$authorize" | sed -n 's/.*[?&]client_id=\([^&]*\).*/\1/p')"
+sent_redirect="$(printf '%s' "$authorize" | sed -n 's/.*[?&]redirect_uri=\([^&]*\).*/\1/p')"
+# URL-decode the redirect_uri for readability.
+sent_redirect="$(printf '%b' "${sent_redirect//%/\\x}")"
+
 echo "    healthz       = $hz   (want 200)"
 echo "    workos login  = $wo   (want 302 -> redirect to WorkOS)"
 echo
-if [ "$hz" = "200" ] && [ "$wo" = "302" ]; then
-  echo "PASS — login is wired and live. Open https://www.myfenrir.com and sign in."
-else
-  echo "NOT YET. If workos login = 410/500, the secrets/redirect URI need a look."
-  echo "Make sure the WorkOS dashboard redirect URI is exactly:"
-  echo "  https://auth.myfenrir.com/api/auth/callback/workos"
-  exit 2
+echo "    --- exactly what the live site sends to WorkOS ---"
+echo "    client_id     = ${sent_client_id:-<none>}"
+echo "    redirect_uri  = ${sent_redirect:-<none>}"
+echo "    expected      = https://auth.myfenrir.com/api/auth/callback/workos"
+echo
+
+# Follow the authorize URL once to see whether WorkOS accepts it. WorkOS renders
+# "Invalid client ID" in the page body when the client_id is unknown, and a
+# distinct redirect-uri message when only the redirect is unregistered.
+verdict="unknown"
+if [ -n "$authorize" ]; then
+  body="$(curl -s -L "$authorize" || echo '')"
+  if printf '%s' "$body" | grep -qiE 'invalid client|client[_ ]id'; then
+    verdict="invalid_client_id"
+  elif printf '%s' "$body" | grep -qiE 'redirect[_ ]uri'; then
+    verdict="redirect_uri_not_allowed"
+  elif [ -n "$body" ]; then
+    verdict="authkit_ok"
+  fi
 fi
+
+if [ "$hz" = "200" ] && [ "$wo" = "302" ] && [ "$verdict" = "authkit_ok" ]; then
+  echo "PASS — login is wired, deployed, and WorkOS accepts the request."
+  echo "Open https://www.myfenrir.com and sign in."
+  exit 0
+fi
+
+echo "NOT YET — WorkOS verdict: $verdict"
+case "$verdict" in
+  invalid_client_id)
+    echo "  The client_id above is not recognized by WorkOS. Open the WorkOS"
+    echo "  dashboard, select the SAME environment your sk_/client_ keys came"
+    echo "  from, and confirm the 'Client ID' on the Configuration page matches"
+    echo "  the value printed above CHARACTER-FOR-CHARACTER (no extra spaces,"
+    echo "  no Staging-vs-Production mix-up). Re-run this script with the"
+    echo "  correct WORKOS_CLIENT_ID."
+    ;;
+  redirect_uri_not_allowed)
+    echo "  The client_id is valid but the redirect URI is not registered."
+    echo "  In WorkOS -> Redirects, add exactly:"
+    echo "    https://auth.myfenrir.com/api/auth/callback/workos"
+    ;;
+  *)
+    echo "  If workos login = 410/500, the secrets need a look. Make sure the"
+    echo "  WorkOS redirect URI is exactly:"
+    echo "    https://auth.myfenrir.com/api/auth/callback/workos"
+    ;;
+esac
+exit 2
