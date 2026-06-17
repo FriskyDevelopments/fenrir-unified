@@ -3317,11 +3317,6 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
             <AuthProviderButton provider="google" label={c.continueGoogle} onClick={() => void signInWithProvider("google")} />
             <AuthProviderButton provider="microsoft" label={c.continueMicrosoft} onClick={() => void signInWithProvider("microsoft")} />
           </div>
-          <div className="telegram-login-callout">
-            <p className="label">Telegram identity proof</p>
-            <p className="muted">If you come through Telegram, use the login widget below. Fenrir will verify the signed Telegram identity and keep you in the same session.</p>
-            <TelegramLoginWidget botUsername={telegramLoginBotUsername} />
-          </div>
           <div className="auth-passkey-row">
             <button type="button" className="secondary" onClick={() => void signInWithPasskey()}>
               {c.passkeySignIn}

@@ -6,9 +6,8 @@ import { friskyClientAuthEngine, type AuthProvider } from "../services/authGatew
 import { AuthProviderButton } from "../components/AuthProviderButton";
 import { AuthSurface } from "../components/AuthSurface";
 import { GlowCard } from "../components/GlowCard";
-import { TelegramLoginWidget } from "../components/TelegramLoginWidget";
 import { brandThemes } from "../theme/brandThemes";
-import { managedDashboardPath, telegramLoginBotUsername, twoFactorHelpLinks } from "../app/shared";
+import { managedDashboardPath, twoFactorHelpLinks } from "../app/shared";
 import { BrandSignature } from "./routeCommon";
 
 export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
@@ -50,11 +49,6 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
             <AuthProviderButton provider="apple" label={c.continueApple} onClick={() => void signInWithProvider("apple")} />
             <AuthProviderButton provider="google" label={c.continueGoogle} onClick={() => void signInWithProvider("google")} />
             <AuthProviderButton provider="microsoft" label={c.continueMicrosoft} onClick={() => void signInWithProvider("microsoft")} />
-          </div>
-          <div className="telegram-login-callout">
-            <p className="label">Telegram identity proof</p>
-            <p className="muted">If you come through Telegram, use the login widget below. Fenrir will verify the signed Telegram identity and keep you in the same session.</p>
-            <TelegramLoginWidget botUsername={telegramLoginBotUsername} />
           </div>
           <div className="auth-passkey-row">
             <button type="button" className="secondary" onClick={() => void signInWithPasskey()}>
