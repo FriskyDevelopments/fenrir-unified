@@ -42,6 +42,8 @@ fenrir-bridge:diagnose-login:
   script:
     - apk add --no-cache bash curl grep sed coreutils
     - bash apps/fenrir-bridge/scripts/diagnose-login.sh
+    - echo "=================================================="
+    - bash apps/fenrir-bridge/scripts/probe-www.sh
 
 # Production deploy for fenrir-bridge to Cloudflare Pages.
 #
