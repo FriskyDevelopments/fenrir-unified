@@ -83,6 +83,18 @@ if [ -n "$client_id" ]; then
   echo
 fi
 
+# Probe whether each host actually serves the callback Pages Function. With no
+# code/state, a working function redirects (302) to /login?auth_error=...; a host
+# that doesn't serve the app returns 404 or redirects elsewhere.
+echo "==> Probing whether each host serves the callback function"
+for host in https://myfenrir.com https://www.myfenrir.com https://auth.myfenrir.com; do
+  cb="${host}/api/auth/callback/workos"
+  cstat="$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$cb" 2>/dev/null || echo ERR)"
+  cloc="$(curl -s -o /dev/null -m 15 -w '%{redirect_url}' "$cb" 2>/dev/null || echo '')"
+  echo "    $cb -> $cstat ${cloc:+(-> $cloc)}"
+done
+echo
+
 echo "==> WorkOS verdict: $verdict"
 case "$verdict" in
   authkit_ok)
