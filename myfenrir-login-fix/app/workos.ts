@@ -1,14 +1,30 @@
-// Central WorkOS config. The valid client id is used as a fallback so the
-// "Invalid client ID" failure is fixed even if the project env is not set.
+// Central WorkOS config. Reads from several common env var names so the app
+// works on first deploy regardless of how the Vercel project env is named, and
+// falls back to the proven-valid client id / registered redirect so the
+// "Invalid client ID" failure is fixed even if env is empty.
+function env(...names: string[]): string {
+  for (const n of names) {
+    const v = process.env[n]?.trim();
+    if (v) return v;
+  }
+  return "";
+}
+
 export const CLIENT_ID =
-  process.env.WORKOS_CLIENT_ID?.trim() || "client_01KT7NWYWB256XP0V00PX1YW01";
+  env("WORKOS_CLIENT_ID", "NEXT_PUBLIC_WORKOS_CLIENT_ID", "WORKOS_PROJECT_ID") ||
+  "client_01KT7NWYWB256XP0V00PX1YW01";
 
 export const REDIRECT_URI =
-  process.env.WORKOS_REDIRECT_URI?.trim() ||
+  env("WORKOS_REDIRECT_URI", "NEXT_PUBLIC_WORKOS_REDIRECT_URI", "WORKOS_REDIRECT_URL") ||
   "https://login.myfenrir.com/auth/callback";
 
-// API key is required only for the post-sign-in code exchange. Read from env.
-export const API_KEY = process.env.WORKOS_API_KEY?.trim() || "";
+// API key (client secret) is required only for the post-sign-in code exchange.
+export const API_KEY = env(
+  "WORKOS_API_KEY",
+  "WORKOS_SECRET",
+  "WORKOS_API_SECRET",
+  "WORKOS_CLIENT_SECRET"
+);
 
 export const PROVIDER_MAP: Record<string, string> = {
   google: "GoogleOAuth",
