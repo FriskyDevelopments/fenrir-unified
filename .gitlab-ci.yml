@@ -31,6 +31,18 @@ fenrir-cinema:install-and-build:
     - npm install
     - npm run build
 
+# Live login diagnostic. Runs on GitLab's network (which CAN reach WorkOS and the
+# production site), needs NO Cloudflare token. It reads exactly what the live site
+# sends to WorkOS and classifies the failure so the real cause is unambiguous.
+fenrir-bridge:diagnose-login:
+  stage: verify
+  image: alpine:3.20
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^claude\//'
+  script:
+    - apk add --no-cache bash curl grep sed coreutils
+    - bash apps/fenrir-bridge/scripts/diagnose-login.sh
+
 # Production deploy for fenrir-bridge to Cloudflare Pages.
 #
 # Auth in CI is API-token based (CLOUDFLARE_API_TOKEN), NOT the operator's
