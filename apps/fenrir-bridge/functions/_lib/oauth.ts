@@ -21,11 +21,22 @@ export type OAuthTransaction = {
   nonce: string;
   returnTo: string;
   exp: number;
+  /** Community Gate slug, set only for the community OAuth bridge flow. */
+  community?: string;
 };
 
 export type DirectOAuthSession = {
   session: SessionPayload;
   identityId: string;
+};
+
+/** Raw verified identity from an OAuth provider, before any operator/community session is minted. */
+export type OAuthIdentity = {
+  provider: OAuthProvider;
+  email: string;
+  name: string;
+  identityId: string;
+  emailVerified: boolean;
 };
 
 export type OAuthSessionTransfer = {
@@ -39,6 +50,11 @@ const transactionMaxAge = 10 * 60;
 
 export function isOAuthProvider(value: unknown): value is OAuthProvider {
   return value === "google" || value === "microsoft" || value === "apple";
+}
+
+/** Providers offered by the Community Gate. */
+export function isCommunityOAuthProvider(value: unknown): value is OAuthProvider {
+  return isOAuthProvider(value);
 }
 
 export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): boolean {
@@ -62,6 +78,22 @@ export async function createOAuthTransaction(provider: OAuthProvider, env: OAuth
     nonce: randomUrlToken(32),
     returnTo: safeReturnPath(returnTo),
     exp: Math.floor(Date.now() / 1000) + transactionMaxAge
+  };
+}
+
+export async function createCommunityOAuthTransaction(
+  provider: OAuthProvider,
+  _env: OAuthEnv,
+  options: { community: string; returnTo: string }
+): Promise<OAuthTransaction> {
+  return {
+    provider,
+    state: randomUrlToken(32),
+    verifier: randomUrlToken(64),
+    nonce: randomUrlToken(32),
+    returnTo: safeCommunityReturnPath(options.returnTo),
+    exp: Math.floor(Date.now() / 1000) + transactionMaxAge,
+    community: options.community
   };
 }
 
@@ -160,6 +192,44 @@ export function clearTransactionCookie(domain?: string) {
   return header;
 }
 
+const communityTransactionCookie = "fenrir_community_oauth_tx";
+const communityTransactionPath = "/api/community-auth";
+
+export async function communityTransactionSetCookie(tx: OAuthTransaction, env: OAuthEnv, domain?: string) {
+  const encoded = base64Url(new TextEncoder().encode(JSON.stringify(tx)));
+  const signature = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
+  let header = `${communityTransactionCookie}=${encoded}.${signature}; Path=${communityTransactionPath}; HttpOnly; Secure; SameSite=Lax; Max-Age=${transactionMaxAge}`;
+  if (domain) header += `; Domain=${domain}`;
+  return header;
+}
+
+export async function readCommunityOAuthTransaction(request: Request, env: OAuthEnv): Promise<OAuthTransaction | null> {
+  const token = readCookie(request, communityTransactionCookie);
+  if (!token) return null;
+  const [encoded, signature] = token.split(".");
+  if (!encoded || !signature) return null;
+  const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
+  if (!timingSafeEqual(signature, expected)) return null;
+  const tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
+  if (!isOAuthProvider(tx.provider)) return null;
+  if (!tx.exp || tx.exp < Math.floor(Date.now() / 1000)) return null;
+  return tx;
+}
+
+export function clearCommunityTransactionCookie(domain?: string) {
+  let header = `${communityTransactionCookie}=; Path=${communityTransactionPath}; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+  if (domain) header += `; Domain=${domain}`;
+  return header;
+}
+
+/** Only allow relative paths under /community for the community OAuth returnTo. */
+export function safeCommunityReturnPath(value: string | null | undefined) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
+  const pathname = value.split(/[?#]/, 1)[0] || "/";
+  if (!pathname.startsWith("/community/")) return "/";
+  return value;
+}
+
 export async function readOAuthTransaction(request: Request, env: OAuthEnv): Promise<OAuthTransaction | null> {
   const token = readCookie(request, transactionCookie);
   if (!token) return null;
@@ -179,6 +249,19 @@ export function validateOAuthTransaction(tx: OAuthTransaction | null, provider: 
   if (!state || !timingSafeEqual(tx.state, state)) throw new Error("oauth_state_invalid");
 }
 
+export async function exchangeCodeForIdentity(
+  provider: OAuthProvider,
+  env: OAuthEnv,
+  code: string,
+  redirectUri: string,
+  tx: OAuthTransaction
+): Promise<OAuthIdentity> {
+  if (provider === "google") return exchangeGoogleCode(env, code, redirectUri, tx);
+  if (provider === "microsoft") return exchangeMicrosoftCode(env, code, redirectUri, tx);
+  if (provider === "apple") return exchangeAppleCode(env, code, redirectUri, tx);
+  throw new Error(`exchange_not_implemented_for:${provider}`);
+}
+
 export async function exchangeCodeForSession(
   provider: OAuthProvider,
   env: OAuthEnv,
@@ -186,18 +269,17 @@ export async function exchangeCodeForSession(
   redirectUri: string,
   tx: OAuthTransaction
 ): Promise<DirectOAuthSession> {
-  let result: DirectOAuthSession;
-  if (provider === "google") {
-    result = await exchangeGoogleCode(env, code, redirectUri, tx);
-  } else if (provider === "microsoft") {
-    result = await exchangeMicrosoftCode(env, code, redirectUri, tx);
-  } else if (provider === "apple") {
-    result = await exchangeAppleCode(env, code, redirectUri, tx);
-  } else {
-    throw new Error(`exchange_not_implemented_for:${provider}`);
-  }
-  assertAdminAllowed(result.session.email, env.SUPABASE_ADMIN_EMAILS);
-  return result;
+  const identity = await exchangeCodeForIdentity(provider, env, code, redirectUri, tx);
+  assertAdminAllowed(identity.email, env.SUPABASE_ADMIN_EMAILS);
+  return {
+    identityId: identity.identityId,
+    session: createSessionPayload({
+      email: identity.email,
+      name: identity.name,
+      provider: identity.provider,
+      identityId: identity.identityId
+    })
+  };
 }
 
 export function safeReturnPath(value: string | null | undefined) {
@@ -247,7 +329,7 @@ export function validateRedirectUri(uri: string | null | undefined, env: OAuthEn
   return defaultUri;
 }
 
-async function exchangeGoogleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<DirectOAuthSession> {
+async function exchangeGoogleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
   const clientId = requireEnv(env.GOOGLE_CLIENT_ID, "GOOGLE_CLIENT_ID");
   const clientSecret = requireEnv(env.GOOGLE_CLIENT_SECRET, "GOOGLE_CLIENT_SECRET");
 
@@ -270,17 +352,15 @@ async function exchangeGoogleCode(env: OAuthEnv, code: string, redirectUri: stri
   const sub = stringClaim(claims.sub, "google_missing_sub");
   const identityId = `google:${sub}`;
   return {
+    provider: "google",
+    email,
+    name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
     identityId,
-    session: createSessionPayload({
-      email,
-      name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
-      provider: "google",
-      identityId
-    })
+    emailVerified: parseBoolClaim(claims.email_verified, false)
   };
 }
 
-async function exchangeMicrosoftCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<DirectOAuthSession> {
+async function exchangeMicrosoftCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
   const clientId = requireEnv(env.MICROSOFT_CLIENT_ID, "MICROSOFT_CLIENT_ID");
   const clientSecret = requireEnv(env.MICROSOFT_CLIENT_SECRET, "MICROSOFT_CLIENT_SECRET");
 
@@ -299,21 +379,21 @@ async function exchangeMicrosoftCode(env: OAuthEnv, code: string, redirectUri: s
     nonce: tx.nonce,
     jwksUrl: "https://login.microsoftonline.com/common/discovery/v2.0/keys"
   });
-  const email = typeof claims.email === "string" ? claims.email : stringClaim(claims.preferred_username, "microsoft_missing_email");
+  const email = typeof claims.email === "string" && claims.email.trim().length > 0
+    ? claims.email
+    : stringClaim(claims.preferred_username, "microsoft_missing_email");
   const sub = stringClaim(claims.sub, "microsoft_missing_sub");
   const identityId = `microsoft:${sub}`;
   return {
+    provider: "microsoft",
+    email,
+    name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
     identityId,
-    session: createSessionPayload({
-      email,
-      name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
-      provider: "microsoft",
-      identityId
-    })
+    emailVerified: parseBoolClaim(claims.email_verified ?? claims.xms_edov, true)
   };
 }
 
-async function exchangeAppleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<DirectOAuthSession> {
+async function exchangeAppleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
   const clientId = requireEnv(env.APPLE_CLIENT_ID, "APPLE_CLIENT_ID");
   const clientSecret = await createAppleClientSecret(env);
 
@@ -336,18 +416,27 @@ async function exchangeAppleCode(env: OAuthEnv, code: string, redirectUri: strin
   const sub = stringClaim(claims.sub, "apple_missing_sub");
   const identityId = `apple:${sub}`;
   return {
+    provider: "apple",
+    email,
+    name: email.split("@")[0],
     identityId,
-    session: createSessionPayload({
-      email,
-      name: email.split("@")[0],
-      provider: "apple",
-      identityId
-    })
+    emailVerified: parseBoolClaim(claims.email_verified, true)
   };
 }
 
+let fetchOverride: typeof fetch | null = null;
+
+/** Test hook: override global fetch for OAuth token/JWKS calls. */
+export function __setFetchForTests(fetchFn: typeof fetch | null) {
+  fetchOverride = fetchFn;
+}
+
+function httpFetch(input: RequestInfo | URL, init?: RequestInit) {
+  return (fetchOverride ?? fetch)(input, init);
+}
+
 async function exchangeToken(url: string, params: Record<string, string>, provider: OAuthProvider) {
-  const tokenRes = await fetch(url, {
+  const tokenRes = await httpFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(params)
@@ -373,7 +462,7 @@ async function verifyIdToken(token: string, options: {
   const kid = stringClaim(header.kid, "id_token_missing_kid");
   if (alg !== "RS256") throw new Error(`unsupported_id_token_alg:${alg}`);
 
-  const jwks = await fetch(options.jwksUrl).then((response) => {
+  const jwks = await httpFetch(options.jwksUrl).then((response) => {
     if (!response.ok) throw new Error("jwks_fetch_failed");
     return response.json();
   }) as { keys?: JsonWebKey[] };
@@ -475,6 +564,16 @@ function timingSafeEqual(a: string, b: string) {
 function stringClaim(value: unknown, error: string) {
   if (typeof value !== "string" || !value.trim()) throw new Error(error);
   return value;
+}
+
+function parseBoolClaim(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+  return fallback;
 }
 
 function assertAdminAllowed(email: string, allowlist?: string) {
