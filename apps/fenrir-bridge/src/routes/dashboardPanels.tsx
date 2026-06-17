@@ -1140,15 +1140,6 @@ export function BridgeGallery({
   );
 }
 
-: { bridge: FriskyBridge }) {
-  const photoUrl = bridgeGroupPhotoUrl(bridge);
-  return (
-    <span className="group-avatar" style={photoUrl ? { backgroundImage: `url("${photoUrl}")` } : undefined}>
-      <span>🐺</span>
-    </span>
-  );
-}
-
 export function DomainChoice({ c }: { c: Copy }) {
   return (
     <div className="domain-choice">

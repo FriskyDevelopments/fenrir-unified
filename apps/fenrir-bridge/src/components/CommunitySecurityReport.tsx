@@ -1,10 +1,6 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { communitySecurityService } from "../services/api";
 import type { CommunitySecurityReport } from "../services/types";
-import { LoadingSkeleton } from "./LoadingSkeleton";
-import { ErrorMessage } from "./ErrorMessage";
-import { StatCard } from "./StatCard";
-import { StatListItem } from "./StatListItem";
 
 export function CommunitySecurityReport({ communitySlug }: { communitySlug?: string }) {
   const [report, setReport] = useState<CommunitySecurityReport | null>(null);
@@ -58,16 +54,26 @@ export function CommunitySecurityReport({ communitySlug }: { communitySlug?: str
   }
 
   if (loading) {
-    return <LoadingSkeleton />;
+    return (
+      <div className="animate-pulse space-y-6">
+        <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="h-32 bg-gray-200 rounded-lg"></div>
+          <div className="h-32 bg-gray-200 rounded-lg"></div>
+          <div className="h-32 bg-gray-200 rounded-lg"></div>
+        </div>
+        <div className="h-64 bg-gray-200 rounded-lg mt-6"></div>
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <ErrorMessage
-        title="Error Loading Report"
-        message={error}
-        details="Check your connection and ensure you have the correct permissions."
-      />
+      <div className="p-6 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+        <h3 className="text-lg font-medium mb-2">Error Loading Report</h3>
+        <p>{error}</p>
+        <p className="mt-4 text-sm opacity-80">Check your connection and ensure you have the correct permissions.</p>
+      </div>
     );
   }
 
@@ -91,9 +97,18 @@ export function CommunitySecurityReport({ communitySlug }: { communitySlug?: str
       <section>
         <h3 className="text-xl font-semibold mb-4 text-gray-800">Fenrir Impact Summary</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard label="Blocked Attempts" value={report.impact.blockedAttempts} variant="indigo" />
-          <StatCard label="Profile Fixes Needed" value={report.impact.usersNeedingProfileFixes} variant="orange" />
-          <StatCard label="Fully Verified Users" value={report.impact.fullyVerifiedUsers} variant="emerald" />
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 shadow-sm">
+            <div className="text-indigo-600 text-sm font-medium mb-1">Blocked Attempts</div>
+            <div className="text-3xl font-bold text-indigo-900">{report.impact.blockedAttempts}</div>
+          </div>
+          <div className="bg-orange-50 border border-orange-100 rounded-xl p-6 shadow-sm">
+            <div className="text-orange-600 text-sm font-medium mb-1">Profile Fixes Needed</div>
+            <div className="text-3xl font-bold text-orange-900">{report.impact.usersNeedingProfileFixes}</div>
+          </div>
+          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-6 shadow-sm">
+            <div className="text-emerald-600 text-sm font-medium mb-1">Fully Verified Users</div>
+            <div className="text-3xl font-bold text-emerald-900">{report.impact.fullyVerifiedUsers}</div>
+          </div>
         </div>
       </section>
 
@@ -104,10 +119,22 @@ export function CommunitySecurityReport({ communitySlug }: { communitySlug?: str
         <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
           <h3 className="text-lg font-semibold mb-4 text-gray-800">User Statistics</h3>
           <ul className="space-y-3">
-            <StatListItem label="Total Users" value={report.users.total} />
-            <StatListItem label="Verified Users" value={report.users.verified} valueColor="emerald" />
-            <StatListItem label="Blocked Users" value={report.users.blocked} valueColor="red" />
-            <StatListItem label="Pending Users" value={report.users.pending} valueColor="yellow" isLast />
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Total Users</span>
+              <span className="font-semibold">{report.users.total}</span>
+            </li>
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Verified Users</span>
+              <span className="font-semibold text-emerald-600">{report.users.verified}</span>
+            </li>
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Blocked Users</span>
+              <span className="font-semibold text-red-600">{report.users.blocked}</span>
+            </li>
+            <li className="flex justify-between items-center py-2">
+              <span className="text-gray-600">Pending Users</span>
+              <span className="font-semibold text-yellow-600">{report.users.pending}</span>
+            </li>
           </ul>
         </section>
 
@@ -115,11 +142,26 @@ export function CommunitySecurityReport({ communitySlug }: { communitySlug?: str
         <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
           <h3 className="text-lg font-semibold mb-4 text-gray-800">Login Sessions</h3>
           <ul className="space-y-3">
-            <StatListItem label="Total Sessions" value={report.sessions.total} />
-            <StatListItem label="Successful" value={report.sessions.successful} valueColor="emerald" />
-            <StatListItem label="Failed / Blocked" value={`${report.sessions.failed} / ${report.sessions.blocked}`} valueColor="red" />
-            <StatListItem label="Expired" value={report.sessions.expired} />
-            <StatListItem label="Pending Review" value={report.sessions.pending} valueColor="yellow" isLast />
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Total Sessions</span>
+              <span className="font-semibold">{report.sessions.total}</span>
+            </li>
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Successful</span>
+              <span className="font-semibold text-emerald-600">{report.sessions.successful}</span>
+            </li>
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Failed / Blocked</span>
+              <span className="font-semibold text-red-600">{report.sessions.failed} / {report.sessions.blocked}</span>
+            </li>
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Expired</span>
+              <span className="font-semibold">{report.sessions.expired}</span>
+            </li>
+            <li className="flex justify-between items-center py-2">
+              <span className="text-gray-600">Pending Review</span>
+              <span className="font-semibold text-yellow-600">{report.sessions.pending}</span>
+            </li>
           </ul>
         </section>
       </div>
