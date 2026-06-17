@@ -60,6 +60,29 @@ elif printf '%s' "$body" | grep -qiE 'authkit|sign in|continue with|password|ema
   verdict="authkit_ok"
 fi
 
+# Probe which callback hosts WorkOS has registered for this client_id, by asking
+# WorkOS to authorize with each candidate redirect_uri and reading its verdict.
+# A registered redirect renders AuthKit; an unregistered one is rejected.
+if [ -n "$client_id" ]; then
+  echo "==> Probing which redirect_uri hosts WorkOS accepts for this client_id"
+  for host in https://myfenrir.com https://www.myfenrir.com https://auth.myfenrir.com; do
+    cand="${host}/api/auth/callback/workos"
+    enc="$(printf '%s' "$cand" | sed 's|:|%3A|g; s|/|%2F|g')"
+    url="https://api.workos.com/user_management/authorize?client_id=${client_id}&redirect_uri=${enc}&response_type=code&state=probe&provider=authkit"
+    pb="$(curl -s -L -m 20 "$url" 2>/dev/null || echo '')"
+    if printf '%s' "$pb" | grep -qiE 'redirect.?uri'; then
+      echo "    $cand -> NOT registered"
+    elif printf '%s' "$pb" | grep -qiE 'invalid client'; then
+      echo "    $cand -> client_id rejected (unexpected)"
+    elif printf '%s' "$pb" | grep -qiE 'authkit|sign in|continue with|password|email'; then
+      echo "    $cand -> REGISTERED (AuthKit renders)"
+    else
+      echo "    $cand -> unknown"
+    fi
+  done
+  echo
+fi
+
 echo "==> WorkOS verdict: $verdict"
 case "$verdict" in
   authkit_ok)
