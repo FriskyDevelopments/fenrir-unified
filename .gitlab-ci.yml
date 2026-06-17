@@ -47,6 +47,37 @@ fenrir-bridge:diagnose-login:
     - echo "=================================================="
     - bash apps/fenrir-bridge/scripts/probe-redirects.sh
 
+# Deploy the corrected login app to the Vercel `myfenrir-login` project
+# (login.myfenrir.com). Runs on a GitLab runner (which can reach Vercel), so it
+# needs only a VERCEL_TOKEN CI variable — no local Vercel access required.
+# Fixes the "Invalid client ID" by replacing the app that ships client_replace_me.
+deploy-login-app:
+  stage: deploy
+  image: node:22
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^claude\// && $VERCEL_TOKEN'
+      when: manual
+  script:
+    - npm i -g vercel@latest
+    - cd myfenrir-login-fix
+    # Link to the existing myfenrir-login project (login.myfenrir.com is aliased to it).
+    - vercel pull --yes --environment=production --token "$VERCEL_TOKEN" --scope pupfrs-projects || true
+    - 'printf ''{"projectId":"prj_aHokkMeJysf4z2KV6HoqYweQYXeK","orgId":"team_bBVvJfbJ6tQWNqcHrjopBrjd"}'' > .vercel/project.json 2>/dev/null || (mkdir -p .vercel && printf ''{"projectId":"prj_aHokkMeJysf4z2KV6HoqYweQYXeK","orgId":"team_bBVvJfbJ6tQWNqcHrjopBrjd"}'' > .vercel/project.json)'
+    # If WORKOS_API_KEY is exposed to this job, ensure it is set on the project.
+    - |
+      if [ -n "${WORKOS_API_KEY:-}" ]; then
+        vercel env rm WORKOS_API_KEY production --yes --token "$VERCEL_TOKEN" --scope pupfrs-projects >/dev/null 2>&1 || true
+        printf '%s' "$WORKOS_API_KEY" | vercel env add WORKOS_API_KEY production --token "$VERCEL_TOKEN" --scope pupfrs-projects || true
+      fi
+    - vercel deploy --prod --yes --token "$VERCEL_TOKEN" --scope pupfrs-projects
+    # Verify the live app now sends the valid client id.
+    - apt-get update -qq && apt-get install -y -qq curl >/dev/null 2>&1 || true
+    - sleep 5
+    - |
+      r="$(curl -s -X POST https://login.myfenrir.com/api/auth/login?provider=google -D - -o /dev/null || true)"
+      echo "login route headers:"; printf '%s\n' "$r" | grep -iE 'location|http/' | head
+      curl -s -o /dev/null -w 'login page status: %{http_code}\n' https://login.myfenrir.com/ || true
+
 # Production deploy for fenrir-bridge to Cloudflare Pages.
 #
 # Auth in CI is API-token based (CLOUDFLARE_API_TOKEN), NOT the operator's
