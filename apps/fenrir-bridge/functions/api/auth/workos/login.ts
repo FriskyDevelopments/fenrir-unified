@@ -1,5 +1,5 @@
 import { noStoreJson } from "../../../_lib/responses";
-import { authOrigin } from "../../../_lib/billing-env";
+import { authOrigin, cookieDomain } from "../../../_lib/billing-env";
 import {
   buildAuthorizationUrl,
   createStatePayload,
@@ -38,7 +38,10 @@ export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
       status: 302,
       headers: {
         Location: url,
-        "Set-Cookie": await stateSetCookie(statePayload, context.env)
+        // Scope the state cookie to the registrable domain so a login started on
+        // www/apex is still sent to the auth-subdomain callback. A host-only state
+        // cookie is the recurring root cause of workos_state_invalid.
+        "Set-Cookie": await stateSetCookie(statePayload, context.env, cookieDomain(context.request, context.env))
       }
     });
   } catch (error) {
