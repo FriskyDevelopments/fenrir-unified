@@ -199,18 +199,6 @@ export function CommunityAuthProposalPanel({ proposal, locale }: { proposal: Com
     </div>
   );
 }
-
-: { c: Copy; compact?: boolean }) {
-  return (
-    <div className={compact ? "brand-signature compact" : "brand-signature"}>
-      <span>{c.friskyForged}</span>
-      <span>
-        {c.friskyMagicPrefix} <strong>Fenrir Protocol</strong> {c.friskyMagicSuffix}
-      </span>
-      <small>{c.friskyCompany}</small>
-    </div>
-  );
-}
 export function FenrirSilhouette({ className }: { className: string }) {
   return (
     <svg className={className} viewBox="0 0 640 520" role="img" aria-label="Fenrir silhouette">
@@ -865,15 +853,6 @@ export function ProductionReadinessPanel({
   );
 }
 
-: { title: string; subtitle: string }) {
-  return (
-    <div className="panel-title">
-      <h2>{title}</h2>
-      <p>{subtitle}</p>
-    </div>
-  );
-}
-
 export function Metric({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
     <section className={`metric ${tone}`}>
@@ -1096,17 +1075,6 @@ export function LiveDomainSearchPanel({
         ))}
       </div>
     </div>
-  );
-}
-
-: { provider: LiveRoomProvider; c: Copy; compact?: boolean }) {
-  const meta = liveRoomProviders.find((item) => item.id === provider);
-  const label = providerLabel(provider, c);
-  return (
-    <span className={`provider-brand provider-brand-${provider} ${compact ? "compact-provider-brand" : ""}`} aria-label={`${label} logo`}>
-      <span className="provider-logo-mark">{meta?.icon ?? label[0]}</span>
-      <span className="provider-logo-word">{meta?.brand ?? label}</span>
-    </span>
   );
 }
 
