@@ -18,7 +18,7 @@ const telegramBotUsername = () =>
     .replace(/^@/, "")
     .trim();
 
-const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? "").trim().replace(/\/$/, "");
+const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN || "https://auth.myfenrir.com").trim().replace(/\/$/, "");
 
 export type PaidPlan = Exclude<Plan, "free">;
 

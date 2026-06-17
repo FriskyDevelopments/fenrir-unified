@@ -1,5 +1,5 @@
 import { noStoreJson } from "../../../_lib/responses";
-import { authOrigin } from "../../../_lib/billing-env";
+import { authOrigin, cookieDomain } from "../../../_lib/billing-env";
 import {
   buildAuthorizationUrl,
   createStatePayload,
@@ -38,7 +38,7 @@ export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
       status: 302,
       headers: {
         Location: url,
-        "Set-Cookie": await stateSetCookie(statePayload, context.env)
+        "Set-Cookie": await stateSetCookie(statePayload, context.env, cookieDomain(context.request, context.env))
       }
     });
   } catch (error) {

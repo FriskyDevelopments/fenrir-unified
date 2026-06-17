@@ -81,23 +81,22 @@ export function siteOrigin(request: Request, env: BillingEnv) {
 }
 
 export function authOrigin(request: Request, env: BillingEnv) {
-  const url = new URL(request.url);
-  const requestOrigin = `${url.protocol}//${url.host}`;
-
+  // Prefer explicitly configured auth URL (set as Cloudflare Pages secret or wrangler var).
   const configuredAuth = env.PUBLIC_AUTH_URL?.trim();
-  if (configuredAuth) {
-    // If we are currently ON the configured auth domain, use it.
-    if (requestOrigin === configuredAuth.replace(/\/$/, "")) {
-      return requestOrigin;
-    }
-  }
-
-  // If the current request origin is one of the allowed domains, it might be a white-label site.
-  // In that case, we should check if it's supposed to use its own origin for auth or the central one.
-  // For now, if PUBLIC_AUTH_URL is set, we generally want to use it for the OAuth provider config,
-  // UNLESS the request is already on a domain that is allowed.
-  
   if (configuredAuth) return configuredAuth.replace(/\/$/, "");
+
+  // Fall back to the first auth.* subdomain in the allowed redirect list.
+  // This means adding https://auth.myfenrir.com to ALLOWED_REDIRECT_URIS is enough
+  // to pin the WorkOS redirect URI to that domain without needing a separate secret.
+  const allowed = (env.ALLOWED_REDIRECT_URIS || "")
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean);
+  const authSubdomain = allowed.find((u) => {
+    try { return new URL(u).hostname.startsWith("auth."); } catch { return false; }
+  });
+  if (authSubdomain) return authSubdomain.replace(/\/$/, "");
+
   return siteOrigin(request, env);
 }
 

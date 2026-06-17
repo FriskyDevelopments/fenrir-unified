@@ -11,10 +11,12 @@ import {
 } from "../../../_lib/workos";
 
 export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
-  const siteBase = siteOrigin(context.request, context.env);
+  // Use the canonical main-site origin for redirects (not auth subdomain).
+  const rootDomain = cookieDomain(context.request, context.env);
+  const siteBase = context.env.PUBLIC_SITE_URL?.trim().replace(/\/$/, "") || siteOrigin(context.request, context.env);
 
   if (!isWorkOSConfigured(context.env)) {
-    return redirectWithAuthError(siteBase, "workos_not_configured", null);
+    return redirectWithAuthError(siteBase, "workos_not_configured", null, rootDomain);
   }
 
   const url = new URL(context.request.url);
@@ -24,10 +26,10 @@ export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
   const providerErrorDescription = url.searchParams.get("error_description");
 
   if (providerError) {
-    return redirectWithAuthError(siteBase, providerError, providerErrorDescription);
+    return redirectWithAuthError(siteBase, providerError, providerErrorDescription, rootDomain);
   }
   if (!code) {
-    return redirectWithAuthError(siteBase, "missing_code", null);
+    return redirectWithAuthError(siteBase, "missing_code", null, rootDomain);
   }
 
   try {
@@ -46,19 +48,19 @@ export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
     const finalLocation = returnTo.startsWith("http") ? returnTo : `${siteBase}${returnTo}`;
 
     const headers = new Headers({ Location: finalLocation });
-    headers.append("Set-Cookie", sessionSetCookie(session, cookieDomain(context.request, context.env)));
-    headers.append("Set-Cookie", clearStateCookie());
+    headers.append("Set-Cookie", sessionSetCookie(session, rootDomain));
+    headers.append("Set-Cookie", clearStateCookie(rootDomain));
     return new Response(null, { status: 302, headers });
   } catch (error) {
     console.error("WorkOS callback failed", error);
-    return redirectWithAuthError(siteBase, error instanceof Error ? error.message : "workos_exchange_failed", null);
+    return redirectWithAuthError(siteBase, error instanceof Error ? error.message : "workos_exchange_failed", null, rootDomain);
   }
 };
 
-function redirectWithAuthError(siteBase: string, error: string, detail: string | null) {
+function redirectWithAuthError(siteBase: string, error: string, detail: string | null, rootDomain?: string) {
   const params = new URLSearchParams({ auth_error: error });
   if (detail) params.set("auth_error_detail", detail);
   const headers = new Headers({ Location: `${siteBase}/login?${params.toString()}` });
-  headers.append("Set-Cookie", clearStateCookie());
+  headers.append("Set-Cookie", clearStateCookie(rootDomain));
   return new Response(null, { status: 302, headers });
 }
