@@ -20,6 +20,19 @@ fenrir-bridge:install-and-build:
     - npm ci
     - npm run build
 
+# Hermetic auth tests: Supabase, Neon, and every OAuth provider fetch are mocked,
+# so this runs with no network egress and no secrets.
+fenrir-bridge:test:
+  stage: verify
+  image: node:22
+  rules:
+    - exists:
+        - apps/fenrir-bridge/package.json
+  script:
+    - cd apps/fenrir-bridge
+    - npm ci
+    - npm test
+
 fenrir-cinema:install-and-build:
   stage: verify
   image: node:22
