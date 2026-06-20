@@ -6,7 +6,8 @@ compatibility_date = "2026-05-17"
 #   wrangler secret put WORKOS_API_KEY
 [vars]
 WORKOS_CLIENT_ID = "client_01KT7NWYWB256XP0V00PX1YW01"
-WORKOS_REDIRECT_URI = "https://login.myfenrir.com/auth/callback"
+# The Worker handles its own callback at this URL. Register it in WorkOS → Redirects.
+WORKOS_REDIRECT_URI = "https://myfenrir-login.hrgrrtks2p.workers.dev/auth/callback"
 SITE_URL = "https://www.myfenrir.com"
 
 # To serve login.myfenrir.com from this Worker, add a route once DNS for that
