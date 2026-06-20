@@ -108,7 +108,8 @@ export async function exchangeCodeForSession(
 
 export function safeReturnPath(value: string | null | undefined) {
   if (!value) return "/main";
-  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+  // SECURITY: relative-path only. The WorkOS login flow is same-origin; honoring
+  // an absolute returnTo here would be an open redirect (?return_to=https://evil).
   if (!value.startsWith("/") || value.startsWith("//")) return "/main";
   const pathname = value.split(/[?#]/, 1)[0] || "/";
   if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) {

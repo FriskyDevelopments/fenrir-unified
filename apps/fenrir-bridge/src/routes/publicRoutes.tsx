@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import type { Copy, Locale } from "../i18n";
+import type { Copy } from "../i18n";
 import { bridgeService, liveRoomService } from "../services/api";
 import type { FriskyBridge, FriskyCommissionLink, FriskyLiveRoom, FriskyTelegramInvite } from "../services/types";
-import { absoluteUrl, commissionFallbackBySlug, findCommissionLink, openAnyUrl, resolveCommissionDestination, trustedFenrirImageUrl } from "../app/shared";
+import { absoluteUrl, commissionFallbackBySlug, openAnyUrl, resolveCommissionDestination, trustedFenrirImageUrl } from "../app/shared";
 import type { UiCopy } from "../app/uiCopy";
 import { GroupAvatar, providerLabel } from "./routeCommon";
+import { GlowCard } from "../components/GlowCard";
+import { UnavailableCard } from "../components/UnavailableCard";
+import { brandThemes, themeClassName, themeCssVars } from "../theme/brandThemes";
 
 export function GoRoutePage({
   c,
@@ -241,12 +244,15 @@ function PublicBridgeRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy 
           <code>{resolved.bridge.publicUrl}</code>
         </section>
       ) : (
-        <section className="join-card unavailable">
-          <span className="mark">F</span>
-          <p className="label">{loaded ? c.publicLockUnavailable : ui.resolvingLockState}</p>
-          <h1>{loaded ? c.invitePaused : ui.checkingRoute}</h1>
-          <p>{loaded ? c.invitePausedBody : ui.resolvingBridgeState}</p>
-        </section>
+        <UnavailableCard
+          loaded={loaded}
+          unavailableLabel={c.publicLockUnavailable}
+          unavailableTitle={c.invitePaused}
+          unavailableBody={c.invitePausedBody}
+          loadingLabel={ui.resolvingLockState}
+          loadingTitle={ui.checkingRoute}
+          loadingBody={ui.resolvingBridgeState}
+        />
       )}
     </main>
   );
@@ -307,12 +313,15 @@ function PublicRoomRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy })
           </button>
         </section>
       ) : (
-        <section className="join-card unavailable">
-          <span className="mark">F</span>
-          <p className="label">{loaded ? c.publicRoomUnavailable : ui.resolvingLockState}</p>
-          <h1>{loaded ? c.roomPaused : ui.checkingRoute}</h1>
-          <p>{loaded ? c.roomPausedBody : ui.roomWaitingBody}</p>
-        </section>
+        <UnavailableCard
+          loaded={loaded}
+          unavailableLabel={c.publicRoomUnavailable}
+          unavailableTitle={c.roomPaused}
+          unavailableBody={c.roomPausedBody}
+          loadingLabel={ui.resolvingLockState}
+          loadingTitle={ui.checkingRoute}
+          loadingBody={ui.roomWaitingBody}
+        />
       )}
     </main>
   );

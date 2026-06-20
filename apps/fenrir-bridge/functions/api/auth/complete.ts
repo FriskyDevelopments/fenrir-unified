@@ -1,6 +1,6 @@
 import { sessionSetCookie, signSession } from "../../_lib/auth";
 import { cookieDomain, siteOrigin } from "../../_lib/billing-env";
-import { readSessionTransfer, safeReturnPath, type OAuthEnv } from "../../_lib/oauth";
+import { readSessionTransfer, safeAllowedReturnTo, type OAuthEnv } from "../../_lib/oauth";
 
 export const onRequestGet: PagesFunction<OAuthEnv> = async (context) => {
   const url = new URL(context.request.url);
@@ -21,7 +21,7 @@ export const onRequestGet: PagesFunction<OAuthEnv> = async (context) => {
     console.error("Failed to sign Fenrir session in /api/auth/complete", error);
     return Response.redirect(`${siteBase}/login?auth_error=session_sign_failed`, 302);
   }
-  const returnTo = safeReturnPath(transfer.returnTo);
+  const returnTo = safeAllowedReturnTo(transfer.returnTo, context.env);
   
   // If returnTo is an absolute URL, use it directly.
   // Otherwise, use the current origin + returnTo.
