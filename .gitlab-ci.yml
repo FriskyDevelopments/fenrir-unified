@@ -1,6 +1,32 @@
 stages:
+  - review
   - verify
   - deploy
+
+# Required CI/CD variables (Settings → CI/CD → Variables, Masked):
+#   DASHSCOPE_API_KEY  — Alibaba DashScope key
+#   GITLAB_TOKEN       — Project Access Token, scope: api
+
+qwen_review:
+  stage: review
+  image: debian:bookworm-slim
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $DASHSCOPE_API_KEY && $GITLAB_TOKEN'
+    - when: never
+  timeout: 10 minutes
+  allow_failure: true
+  before_script:
+    - apt-get update -q && apt-get install -y -q git jq curl ca-certificates
+  script: |
+    TARGET="${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-main}"
+    git fetch origin "$TARGET" --depth=50 2>/dev/null || true
+    DIFF="$(git diff "origin/${TARGET}"...HEAD 2>/dev/null || git diff HEAD~1 || echo 'no diff')"
+    DIFF="${DIFF:0:14000}"
+    PAYLOAD="$(jq -n --arg diff "$DIFF" '{model:"qwen-coder-plus-latest",messages:[{role:"system",content:"You are a strict senior engineer."},{role:"user",content:("Review this MR diff. Check: security, secrets, breaking changes.\n\n- **Verdict:** APPROVE / REQUEST CHANGES / COMMENT\n- **Risks**\n- **Required fixes**\n- **Nits** (<=3)\n\nDiff:\n```\n"+$diff+"\n```")}],max_tokens:1000,temperature:0.1}')"
+    REVIEW="$(curl -sf https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions -H "Authorization: Bearer ${DASHSCOPE_API_KEY}" -H "Content-Type: application/json" -d "$PAYLOAD" | jq -r '.choices[0].message.content // "Review unavailable."')"
+    curl -sf -X POST -H "PRIVATE-TOKEN: ${GITLAB_TOKEN}" -H "Content-Type: application/json" \
+      -d "$(jq -n --arg r "### 🤖 Qwen Code Review\n\n${REVIEW}\n\n---\n<sub>qwen-coder-plus-latest</sub>" '{body:$r}')" \
+      "https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
 
 verify:layout:
   stage: verify
