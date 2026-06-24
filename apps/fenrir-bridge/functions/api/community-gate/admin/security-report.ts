@@ -1,23 +1,42 @@
 import { neon } from "@neondatabase/serverless";
-import { readSession } from "../../../_lib/auth";
+import {
+  assertCommunityStaff,
+  authErrorResponse,
+  communityGateConfigured,
+  communityGateNotConfigured,
+  parseSlug,
+  requireCommunityGateUser
+} from "../../../_lib/community-gate";
 import { noStoreJson } from "../../../_lib/responses";
 
 export async function onRequestGet(context: any) {
-  const session = await readSession(context.request, context.env);
-  if (!session) {
-    return noStoreJson({ ok: false, error: "authentication_required" }, { status: 401 });
-  }
+  if (!communityGateConfigured(context.env)) return communityGateNotConfigured(context.env);
 
   const url = new URL(context.request.url);
-  const communitySlug = url.searchParams.get("communitySlug");
+  const communitySlug = parseSlug(url.searchParams.get("communitySlug"));
   if (!communitySlug) {
     return noStoreJson({ ok: false, error: "communitySlug_required" }, { status: 400 });
   }
 
+  // AUTHZ: this is a per-community moderation report (user/session/blocked-attempt
+  // analytics). It must be gated to staff of THAT community. Previously it only
+  // checked that *some* Fenrir session existed, so any logged-in user could read
+  // any community's security report by passing its slug (IDOR). Require the caller
+  // to be community_owner/community_staff for the requested slug (or platform_admin).
+  let staff;
   try {
-    if (!context.env.NEON_DATABASE_URL) {
-      throw new Error("NEON_DATABASE_URL is not configured.");
-    }
+    const user = await requireCommunityGateUser(context.request, context.env);
+    staff = await assertCommunityStaff(context.env, user, communitySlug);
+  } catch (error) {
+    return authErrorResponse(error);
+  }
+  void staff;
+
+  if (!context.env.NEON_DATABASE_URL) {
+    return noStoreJson({ ok: false, error: "data_store_not_configured" }, { status: 503 });
+  }
+
+  try {
     const sql = neon(context.env.NEON_DATABASE_URL);
 
     // Run read-only analytical queries against Neon
@@ -29,32 +48,32 @@ export async function onRequestGet(context: any) {
 
     // Get user stats
     const usersRes = await sql`
-      SELECT 
+      SELECT
         COUNT(*) as total,
         COUNT(CASE WHEN status = 'verified' THEN 1 END) as verified,
         COUNT(CASE WHEN status = 'blocked' THEN 1 END) as blocked,
         COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
-      FROM users 
+      FROM users
       WHERE community_id = ${community.id}
     `;
 
     // Profile stats
     const profileRes = await sql`
       SELECT COUNT(*) as missing_display_name
-      FROM user_profiles 
+      FROM user_profiles
       WHERE community_id = ${community.id} AND (display_name IS NULL OR display_name = '')
     `;
 
     // Session stats
     const sessionsRes = await sql`
-      SELECT 
+      SELECT
         COUNT(*) as total,
         COUNT(CASE WHEN status = 'successful' THEN 1 END) as successful,
         COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
         COUNT(CASE WHEN status = 'blocked' THEN 1 END) as blocked,
         COUNT(CASE WHEN status = 'expired' THEN 1 END) as expired,
         COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
-      FROM user_sessions 
+      FROM user_sessions
       WHERE community_id = ${community.id}
     `;
 
@@ -90,40 +109,10 @@ export async function onRequestGet(context: any) {
       }
     });
   } catch (error: any) {
-    // If the database isn't actually configured or we're missing tables, we return mock data 
-    // to satisfy the frontend UI for demonstration purposes, matching the PR_DESCRIPTION format.
-    console.warn("Neon DB error, falling back to mock data:", error.message);
-    
-    return noStoreJson({
-      ok: true,
-      data: {
-        community: {
-          id: "uuid-fallback",
-          slug: communitySlug,
-          name: communitySlug === "fenrir" ? "Fenrir Protocol" : communitySlug
-        },
-        users: {
-          total: 100,
-          verified: 85,
-          blocked: 10,
-          pending: 5,
-          missingDisplayName: 3
-        },
-        sessions: {
-          total: 500,
-          successful: 400,
-          failed: 50,
-          blocked: 30,
-          expired: 15,
-          pending: 5
-        },
-        impact: {
-          blockedAttempts: 80,
-          usersNeedingProfileFixes: 3,
-          fullyVerifiedUsers: 85
-        },
-        generatedAt: new Date().toISOString()
-      }
-    });
+    // Never fabricate stats: returning mock data as `ok: true` masked real
+    // outages and showed operators numbers that were not real. Surface a
+    // genuine error instead.
+    console.error("security_report_query_failed", error?.message ?? error);
+    return noStoreJson({ ok: false, error: "security_report_unavailable" }, { status: 502 });
   }
 }
