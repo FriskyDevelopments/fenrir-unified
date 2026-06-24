@@ -14,6 +14,19 @@ export type SessionPayload = {
   email: string;
   name: string;
   provider: SessionProvider;
+  /**
+   * Canonical master identity: the Supabase auth.users UUID (FriskyDEV project).
+   * THIS is the id every Frisky product keys its per-product data against.
+   * Optional only for backward compatibility with sessions minted before the
+   * Fenrir Protocol unification — new sessions always populate it when the
+   * Supabase admin API is configured. See _lib/frisky-account.ts.
+   */
+  frisky_account_id?: string;
+  /**
+   * @deprecated Legacy synthetic id (FNV-1a hash of `provider:sub`). Diverges
+   * per login channel for the same human, so it is NOT a stable cross-product
+   * key. Retained for existing rows/sessions; prefer `frisky_account_id`.
+   */
   frisky_user_id: string;
   frisky_org_id: string;
   iat: number;
@@ -76,6 +89,8 @@ export function createSessionPayload(input: {
   name: string;
   provider: SessionProvider;
   identityId: string;
+  /** Canonical Supabase auth.users UUID; resolved via resolveFriskyAccountId. */
+  friskyAccountId?: string;
   friskyUserId?: string;
   friskyOrgId?: string;
 }): SessionPayload {
@@ -85,6 +100,7 @@ export function createSessionPayload(input: {
     email: input.email,
     name: input.name,
     provider: input.provider,
+    ...(input.friskyAccountId ? { frisky_account_id: input.friskyAccountId } : {}),
     frisky_user_id: friskyUserId,
     frisky_org_id: input.friskyOrgId ?? stableFriskyId("org", friskyUserId),
     iat: now,

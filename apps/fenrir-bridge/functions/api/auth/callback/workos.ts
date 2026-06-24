@@ -1,5 +1,6 @@
 import { sessionSetCookie, signSession } from "../../../_lib/auth";
 import { cookieDomain, siteOrigin } from "../../../_lib/billing-env";
+import { resolveFriskyAccountId, type SupabaseAdminEnv } from "../../../_lib/frisky-account";
 import { ensureDefaultWorkspace } from "../../../_lib/workspaces";
 import {
   clearStateCookie,
@@ -39,6 +40,15 @@ export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
     }
 
     const { session: sessionPayload } = await exchangeCodeForSession(context.env, code);
+
+    // Fenrir Protocol: collapse this verified email onto the one canonical
+    // master account (Supabase auth.users UUID). Never blocks login — if the
+    // admin API is unconfigured or unreachable, we keep the legacy synthetic id.
+    const accountId = await resolveFriskyAccountId(context.env as unknown as SupabaseAdminEnv, sessionPayload.email);
+    if (accountId) {
+      sessionPayload.frisky_account_id = accountId;
+    }
+
     if (context.env.DB) {
       await ensureDefaultWorkspace(context.env.DB, sessionPayload);
     }
