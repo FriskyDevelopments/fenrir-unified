@@ -54,9 +54,15 @@ export async function getAccountByEmail(env: SupabaseAdminEnv, email: string): P
   ).catch(() => null);
   if (!response || !response.ok) return null;
   const data = (await response.json().catch(() => null)) as { users?: Array<{ id?: string; email?: string }> } | null;
-  const user = data?.users?.find((u) => (u.email ?? "").toLowerCase() === normalized) ?? data?.users?.[0];
+  // SECURITY: match ONLY on an exact (case-insensitive) email. Some GoTrue
+  // versions ignore the `?email=` filter and return the full, paginated user
+  // list — in that case a `?? users[0]` fallback would silently collapse a
+  // brand-new email onto whatever arbitrary account happens to be first,
+  // cross-wiring two humans onto one master identity. Never guess: if no row
+  // matches the exact email, treat it as "no account" so the caller creates one.
+  const user = data?.users?.find((u) => (u.email ?? "").trim().toLowerCase() === normalized);
   if (!user?.id) return null;
-  return { id: user.id, email: user.email ?? normalized };
+  return { id: user.id, email: (user.email ?? normalized).trim().toLowerCase() };
 }
 
 /**
