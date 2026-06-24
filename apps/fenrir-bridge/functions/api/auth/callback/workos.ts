@@ -64,9 +64,27 @@ export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
     return new Response(null, { status: 302, headers });
   } catch (error) {
     console.error("WorkOS callback failed", error);
-    return redirectWithAuthError(siteBase, error instanceof Error ? error.message : "workos_exchange_failed", null, stateDomain);
+    return redirectWithAuthError(siteBase, safeAuthErrorCode(error), null, stateDomain);
   }
 };
+
+// Allow-list the error codes that may appear in the user-visible /login URL.
+// Anything else (e.g. an unexpected runtime error whose message could carry
+// internal detail) collapses to a single generic code.
+const KNOWN_AUTH_ERRORS = new Set([
+  "workos_state_invalid",
+  "workos_token_exchange_failed",
+  "workos_missing_email",
+  "workos_missing_user_id",
+  "missing_env:SESSION_SECRET",
+  "missing_env:WORKOS_CLIENT_ID",
+  "missing_env:WORKOS_API_KEY"
+]);
+
+function safeAuthErrorCode(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  return KNOWN_AUTH_ERRORS.has(message) ? message : "workos_exchange_failed";
+}
 
 function redirectWithAuthError(siteBase: string, error: string, detail: string | null, domain?: string) {
   const params = new URLSearchParams({ auth_error: error });

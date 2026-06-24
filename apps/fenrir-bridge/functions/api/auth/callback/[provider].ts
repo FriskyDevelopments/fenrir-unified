@@ -13,6 +13,7 @@ import {
 import { authOrigin, siteOrigin } from "../../../_lib/billing-env";
 import { ensureDefaultWorkspace } from "../../../_lib/workspaces";
 import { upsertProfileForSession } from "../../../_lib/supabase-profiles";
+import { resolveFriskyAccountId, type SupabaseAdminEnv } from "../../../_lib/frisky-account";
 
 async function handleCallback(context: EventContext<OAuthEnv, "provider", unknown>) {
   const provider = context.params.provider;
@@ -67,6 +68,22 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
     validateOAuthTransaction(tx, provider, state);
     const result = await exchangeCodeForSession(provider, context.env, code, callbackUri, tx!);
     const sessionPayload = result.session;
+
+    // Fenrir Protocol: collapse this verified email onto the one canonical
+    // master account (Supabase auth.users UUID), exactly like the WorkOS
+    // callback. Without this, a human who signs in via direct Google/Apple
+    // OAuth gets a session with NO frisky_account_id while the same human via
+    // WorkOS gets one — defeating "one login across products". Never blocks
+    // login: resolveFriskyAccountId returns null when the admin API is
+    // unconfigured/unreachable, and we keep the legacy synthetic id.
+    const accountId = await resolveFriskyAccountId(
+      context.env as unknown as SupabaseAdminEnv,
+      sessionPayload.email
+    ).catch(() => null);
+    if (accountId) {
+      sessionPayload.frisky_account_id = accountId;
+    }
+
     if (context.env.DB) {
       await ensureDefaultWorkspace(context.env.DB, sessionPayload);
     }
