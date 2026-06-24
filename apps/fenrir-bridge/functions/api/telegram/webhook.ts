@@ -61,17 +61,29 @@ export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
   if (!update) return Response.json({ ok: false, error: "invalid_update" }, { status: 400 });
 
   if (update.pre_checkout_query) {
-    await handlePreCheckout(context.env, update.pre_checkout_query, channel);
+    try {
+      await handlePreCheckout(context.env, update.pre_checkout_query, channel);
+    } catch (e) {
+      console.error("handlePreCheckout error:", e);
+    }
     return Response.json({ ok: true });
   }
 
   if (update.message?.successful_payment) {
-    await handleSuccessfulPayment(context.env, update.message, channel);
+    try {
+      await handleSuccessfulPayment(context.env, update.message, channel);
+    } catch (e) {
+      console.error("handleSuccessfulPayment error:", e);
+    }
     return Response.json({ ok: true });
   }
 
   if (update.message?.text) {
-    await handleMessage(context.env, update.message, channel, siteOrigin(context.request, context.env));
+    try {
+      await handleMessage(context.env, update.message, channel, siteOrigin(context.request, context.env));
+    } catch (e) {
+      console.error("handleMessage error:", e);
+    }
   }
 
   return Response.json({ ok: true });
