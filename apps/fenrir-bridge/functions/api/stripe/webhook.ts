@@ -114,7 +114,7 @@ export async function onRequestPost(context: { request: Request; env: BillingEnv
   const signature = context.request.headers.get("stripe-signature");
   let event: Stripe.Event;
   try {
-    event = constructStripeWebhookEvent(rawBody, signature, context.env) as Stripe.Event;
+    event = (await constructStripeWebhookEvent(rawBody, signature, context.env)) as Stripe.Event;
   } catch (error) {
     console.error("stripe_webhook_verify_failed", error);
     const message = error instanceof Error ? error.message : "";

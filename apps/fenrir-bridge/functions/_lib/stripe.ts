@@ -9,10 +9,22 @@ export function getStripe(env: BillingEnv) {
   });
 }
 
+// Cloudflare Workers / Pages Functions have no Node `crypto` module, so the
+// synchronous `constructEvent` (which HMACs via node:crypto) throws
+// "SubtleCryptoProvider cannot be used in a synchronous context" at runtime —
+// silently failing EVERY Stripe webhook and dropping all subscription updates.
+// On the Workers runtime you must use the async API with a SubtleCrypto
+// provider. Returns a Promise; callers must await it.
 export function constructStripeWebhookEvent(rawBody: string, signature: string | null, env: BillingEnv) {
   const secret = requireEnv(env.STRIPE_WEBHOOK_SECRET, "STRIPE_WEBHOOK_SECRET");
   if (!signature) {
     throw new Error("missing_stripe_signature");
   }
-  return Stripe.webhooks.constructEvent(rawBody, signature, secret);
+  return Stripe.webhooks.constructEventAsync(
+    rawBody,
+    signature,
+    secret,
+    undefined,
+    Stripe.createSubtleCryptoProvider()
+  );
 }
