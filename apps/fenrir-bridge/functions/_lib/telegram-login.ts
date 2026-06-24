@@ -1,6 +1,6 @@
 import { createSessionPayload } from "./auth";
 import type { BillingEnv } from "./billing-env";
-import { resolveFriskyAccountId, type SupabaseAdminEnv } from "./frisky-account";
+import { ensureCommunityUserByEmail } from "./community-auth";
 import { getTelegramIdentityLink, upsertTelegramIdentityLinkStatement } from "./telegram-identity";
 
 export type TelegramLoginPayload = {
@@ -51,23 +51,21 @@ export async function createSessionFromTelegramLogin(db: D1Database, env: Billin
         email: linked.email
       }
     : null;
-  // Fenrir Protocol: collapse this verified Telegram identity onto the one canonical
-  // master account (Supabase auth.users UUID), exactly like the WorkOS / direct-OAuth
-  // callbacks already do. Never blocks login — resolveFriskyAccountId returns null when
-  // the admin API is unconfigured/unreachable, and we keep the legacy synthetic id.
+  // Community Bridge: collapse this verified Telegram identity onto the Neon
+  // `fenrir_community_users` record (the bridge master), keyed by email. Never blocks
+  // login — ensureCommunityUserByEmail returns null when Neon is unconfigured/unreachable,
+  // and we keep the legacy synthetic id for the D1-backed session/workspace.
   const accountEmail = existing?.email ?? syntheticEmail;
-  const friskyAccountId = await resolveFriskyAccountId(env as unknown as SupabaseAdminEnv, accountEmail).catch(
-    () => null
-  );
+  const communityUser = await ensureCommunityUserByEmail(env, accountEmail, telegramName).catch(() => null);
   const session = createSessionPayload({
     email: accountEmail,
     name: telegramName,
     provider: "telegram",
     identityId: `telegram:${telegramUserId}`,
-    friskyAccountId: friskyAccountId ?? undefined,
     friskyUserId: existing?.friskyUserId,
     friskyOrgId: existing?.friskyOrgId
   });
+  if (communityUser) session.community_user_id = communityUser.id;
 
   await db.batch([
     db

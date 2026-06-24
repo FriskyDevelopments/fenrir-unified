@@ -23,9 +23,19 @@ export type SessionPayload = {
    */
   frisky_account_id?: string;
   /**
+   * Community Bridge master identity: the Neon `fenrir_community_users.id` (UUID),
+   * resolved/created by verified email. For the community bridge the Neon record —
+   * NOT Supabase auth.users — is the master account (see _lib/community-auth.ts:
+   * ensureCommunityUserByEmail). `frisky_account_id` may still be carried as an
+   * optional cross-reference. Optional: null when Neon is unconfigured/unreachable
+   * (login never blocks on it).
+   */
+  community_user_id?: string;
+  /**
    * @deprecated Legacy synthetic id (FNV-1a hash of `provider:sub`). Diverges
    * per login channel for the same human, so it is NOT a stable cross-product
-   * key. Retained for existing rows/sessions; prefer `frisky_account_id`.
+   * key. Retained for existing rows/sessions; prefer `community_user_id`
+   * (community bridge) / `frisky_account_id` (central).
    */
   frisky_user_id: string;
   frisky_org_id: string;

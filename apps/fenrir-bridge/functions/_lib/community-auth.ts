@@ -517,6 +517,28 @@ export async function upsertCommunityBrand(env: CommunityAuthEnv, slug: string, 
   };
 }
 
+/**
+ * Resolve-or-create the Neon `fenrir_community_users` row for a verified email and
+ * return its UUID — the Community Bridge master identity. Email is the join key, so a
+ * returning human (social or Telegram, any provider) collapses onto the same Neon user.
+ * No org/community scope required (unlike ensureCommunityMembershipForEmail). Returns
+ * null when Neon is unconfigured — callers must treat it as best-effort (never block login).
+ */
+export async function ensureCommunityUserByEmail(env: CommunityAuthEnv, email: string, displayName?: string): Promise<{ id: string; email: string } | null> {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail || !env.NEON_DATABASE_URL?.trim()) return null;
+  const sql = await communitySql(env);
+  const [user] = await sql`
+    insert into fenrir_community_users (email, display_name)
+    values (${normalizedEmail}, ${displayName?.trim() || normalizedEmail.split("@")[0]})
+    on conflict (email) do update
+      set display_name = coalesce(fenrir_community_users.display_name, excluded.display_name),
+          updated_at = now()
+    returning id, email
+  `;
+  return user ? { id: String(user.id), email: String(user.email) } : null;
+}
+
 export async function ensureCommunityMembershipForEmail(sql: Awaited<ReturnType<typeof communitySql>>, email: string, orgId: string | null) {
   const normalizedEmail = email.trim().toLowerCase();
   if (!normalizedEmail || !orgId) {

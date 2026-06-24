@@ -1,6 +1,7 @@
 import { sessionSetCookie, signSession } from "../../../_lib/auth";
 import { cookieDomain, siteOrigin } from "../../../_lib/billing-env";
 import { resolveFriskyAccountId, type SupabaseAdminEnv } from "../../../_lib/frisky-account";
+import { ensureCommunityUserByEmail, type CommunityAuthEnv } from "../../../_lib/community-auth";
 import { ensureDefaultWorkspace } from "../../../_lib/workspaces";
 import {
   clearStateCookie,
@@ -47,6 +48,17 @@ export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
     const accountId = await resolveFriskyAccountId(context.env as unknown as SupabaseAdminEnv, sessionPayload.email);
     if (accountId) {
       sessionPayload.frisky_account_id = accountId;
+    }
+
+    // Community Bridge master: resolve/create the Neon `fenrir_community_users` record
+    // by email (the bridge keys on Neon, not Supabase). Never blocks login.
+    const communityUser = await ensureCommunityUserByEmail(
+      context.env as unknown as CommunityAuthEnv,
+      sessionPayload.email,
+      sessionPayload.name
+    ).catch(() => null);
+    if (communityUser) {
+      sessionPayload.community_user_id = communityUser.id;
     }
 
     if (context.env.DB) {
