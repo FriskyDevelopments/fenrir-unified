@@ -75,7 +75,18 @@ export async function readSession(request: Request, env: AuthEnv) {
   if (!encoded || !signature) return null;
   const expected = await hmac(requireSecret(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
-  const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as SessionPayload;
+  // A signature-valid token can still carry a malformed/empty body (e.g. a
+  // truncated cookie, or a token minted by an older/other shape). Decoding or
+  // JSON.parse throwing here must NOT 500 the ~20 endpoints that call
+  // readSession (including /api/auth/me, which the SPA polls on every load) —
+  // an unreadable session is simply "not authenticated".
+  let payload: SessionPayload;
+  try {
+    payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as SessionPayload;
+  } catch {
+    return null;
+  }
+  if (!payload || typeof payload !== "object") return null;
   if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
   return payload;
 }

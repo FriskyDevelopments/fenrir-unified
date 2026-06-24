@@ -195,7 +195,13 @@ export async function readSessionTransfer(token: string, env: OAuthEnv): Promise
   if (!encoded || !signature) return null;
   const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
-  const transfer = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthSessionTransfer;
+  let transfer: OAuthSessionTransfer;
+  try {
+    transfer = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthSessionTransfer;
+  } catch {
+    return null;
+  }
+  if (!transfer || typeof transfer !== "object") return null;
   if (!transfer.exp || transfer.exp < Math.floor(Date.now() / 1000)) return null;
   if (!transfer.session?.email || !transfer.session?.frisky_user_id || !transfer.session?.frisky_org_id) return null;
   return {
@@ -229,7 +235,13 @@ export async function readCommunityOAuthTransaction(request: Request, env: OAuth
   if (!encoded || !signature) return null;
   const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
-  const tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
+  let tx: OAuthTransaction;
+  try {
+    tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
+  } catch {
+    return null;
+  }
+  if (!tx || typeof tx !== "object") return null;
   if (!isOAuthProvider(tx.provider)) return null;
   if (!tx.exp || tx.exp < Math.floor(Date.now() / 1000)) return null;
   return tx;
@@ -256,7 +268,13 @@ export async function readOAuthTransaction(request: Request, env: OAuthEnv): Pro
   if (!encoded || !signature) return null;
   const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
-  const tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
+  let tx: OAuthTransaction;
+  try {
+    tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
+  } catch {
+    return null;
+  }
+  if (!tx || typeof tx !== "object") return null;
   if (!isOAuthProvider(tx.provider)) return null;
   if (!tx.exp || tx.exp < Math.floor(Date.now() / 1000)) return null;
   return tx;

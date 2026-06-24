@@ -82,7 +82,11 @@ export async function exchangeCodeForSession(
   });
 
   if (!response.ok) {
-    throw new Error(`workos_token_exchange_failed:${await response.text()}`);
+    // Log the upstream body for operators, but throw only a stable code: the
+    // callback surfaces error.message in a user-visible redirect URL, so the
+    // raw WorkOS response (which can echo request fields) must not leak there.
+    console.error("WorkOS token exchange failed", response.status, await response.text().catch(() => ""));
+    throw new Error("workos_token_exchange_failed");
   }
 
   const data = (await response.json()) as WorkOSAuthenticateResponse;
@@ -139,7 +143,13 @@ export async function readState(request: Request, env: WorkOSEnv): Promise<WorkO
   if (!encoded || !signature) return null;
   const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
-  const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as WorkOSStatePayload;
+  let payload: WorkOSStatePayload;
+  try {
+    payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as WorkOSStatePayload;
+  } catch {
+    return null;
+  }
+  if (!payload || typeof payload !== "object") return null;
   if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
   return payload;
 }
