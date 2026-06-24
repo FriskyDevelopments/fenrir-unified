@@ -5,14 +5,16 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 routes = [
-  { pattern = "www.myfenrir.com/api/mcp*", zone_name = "myfenrir.com" },
-  { pattern = "www.myfenrir.com/api/routes/audit*", zone_name = "myfenrir.com" },
-  { pattern = "myfenrir.com/api/mcp*", zone_name = "myfenrir.com" },
-  { pattern = "myfenrir.com/api/routes/audit*", zone_name = "myfenrir.com" }
+  { pattern = "auth.myfenrir.com/api/mcp*", zone_name = "myfenrir.com" },
+  { pattern = "auth.myfenrir.com/api/routes/audit*", zone_name = "myfenrir.com" },
+  { pattern = "auth.myfenrir.com/.well-known/oauth*", zone_name = "myfenrir.com" },
+  { pattern = "gate.myfenrir.com/api/mcp*", zone_name = "myfenrir.com" },
+  { pattern = "gate.myfenrir.com/.well-known/oauth*", zone_name = "myfenrir.com" }
 ]
 
 [vars]
-MCP_ALLOWED_ORIGINS = "https://www.myfenrir.com,https://auth.myfenrir.com,http://localhost:5173,http://localhost:5177,http://localhost:6274,http://127.0.0.1:5173,http://127.0.0.1:5177,http://127.0.0.1:6274"
+MCP_ALLOWED_ORIGINS = "https://www.myfenrir.com,https://auth.myfenrir.com,https://gate.myfenrir.com,http://localhost:5173,http://localhost:5177,http://localhost:6274,http://127.0.0.1:5173,http://127.0.0.1:5177,http://127.0.0.1:6274"
+WORKOS_CLIENT_ID = "client_01KT7NWYWB256XP0V00PX1YW01"
 
 [[d1_databases]]
 binding = "DB"

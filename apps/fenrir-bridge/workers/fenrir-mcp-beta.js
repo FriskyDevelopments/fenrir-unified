@@ -122,12 +122,22 @@ const resources = [
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return emptyResponse(204, request, env);
+
+    const url = new URL(request.url);
+
+    // OAuth discovery — unauthenticated, no origin check
+    if (request.method === "GET" && url.pathname === "/.well-known/oauth-protected-resource") {
+      return oauthProtectedResourceMetadata(url);
+    }
+    if (request.method === "GET" && url.pathname === "/.well-known/oauth-authorization-server") {
+      return oauthAuthorizationServerMetadata(env);
+    }
+
     if (!isAllowedOrigin(request, env)) {
       return json({ ok: false, error: "origin_not_allowed" }, { status: 403 }, request, env);
     }
 
-    const url = new URL(request.url);
-    const authFailure = mcpAuthFailure(request, env);
+    const authFailure = await mcpAuthFailure(request, env, url);
     if (authFailure) return authFailure;
     if (isMcpEndpoint(url.pathname)) return handleMcp(request, env, url);
     if (request.method === "GET") return handleRestGet(request, env, url);
@@ -469,14 +479,28 @@ function isAllowedOrigin(request, env) {
   return allowed.has("*") || allowed.has(origin);
 }
 
-function mcpAuthFailure(request, env) {
-  const configured = configuredMcpAuthToken(env);
-  if (!configured) {
+async function mcpAuthFailure(request, env, url) {
+  const header = request.headers.get("Authorization") || "";
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  const received = match?.[1]?.trim() || "";
+
+  // 1. Static token (bot/legacy — backward compat)
+  const staticToken = configuredMcpAuthToken(env);
+  if (staticToken && received && timingSafeEqual(received, staticToken)) return null;
+
+  // 2. WorkOS JWT — validate against WorkOS JWKS
+  if (received && env.WORKOS_CLIENT_ID) {
+    const claims = await validateWorkOSJwt(received, env);
+    if (claims) return null;
+  }
+
+  // Neither valid — return 401
+  if (!staticToken && !workosConfigured(env)) {
     return json(
       {
         ok: false,
         error: "mcp_auth_not_configured",
-        detail: "Set the FRISKY_BOT_API_TOKEN Worker secret before exposing Fenrir MCP beta. MCP_BETA_TOKEN is still accepted as a legacy fallback."
+        detail: "Set FRISKY_BOT_API_TOKEN (static) or WORKOS_CLIENT_ID + WORKOS_API_KEY (WorkOS) before exposing Fenrir MCP beta."
       },
       { status: 503 },
       request,
@@ -484,17 +508,89 @@ function mcpAuthFailure(request, env) {
     );
   }
 
-  const header = request.headers.get("Authorization") || "";
-  const match = header.match(/^Bearer\s+(.+)$/i);
-  const received = match?.[1]?.trim() || "";
-  if (!received || !timingSafeEqual(received, configured)) {
-    return json({ ok: false, error: "mcp_auth_required" }, { status: 401 }, request, env);
+  const resourceMetaUrl = workosConfigured(env)
+    ? `${url.protocol}//${url.host}/.well-known/oauth-protected-resource`
+    : null;
+  const headers = new Headers();
+  headers.set("content-type", "application/json; charset=utf-8");
+  headers.set("cache-control", "no-store");
+  applyCors(headers, request, env);
+  if (resourceMetaUrl) {
+    headers.set("WWW-Authenticate", `Bearer resource_metadata="${resourceMetaUrl}"`);
   }
-  return null;
+  return new Response(JSON.stringify({ ok: false, error: "mcp_auth_required" }, null, 2), { status: 401, headers });
 }
 
 function configuredMcpAuthToken(env) {
   return String(env.FRISKY_BOT_API_TOKEN || env.MCP_BETA_TOKEN || "").trim();
+}
+
+function workosConfigured(env) {
+  return Boolean(env.WORKOS_CLIENT_ID?.trim() && env.WORKOS_API_KEY?.trim());
+}
+
+async function validateWorkOSJwt(token, env) {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  let header, payload;
+  try {
+    header = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[0])));
+    payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[1])));
+  } catch { return null; }
+  if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
+  if (payload.iss !== "https://api.workos.com") return null;
+  try {
+    const jwksUrl = `https://api.workos.com/user_management/jwks/${env.WORKOS_CLIENT_ID}`;
+    const jwks = await fetch(jwksUrl, { cf: { cacheTtl: 3600 } }).then((r) => r.json());
+    const jwk = jwks.keys?.find((k) => k.kid === header.kid && k.kty === "RSA");
+    if (!jwk) return null;
+    const key = await crypto.subtle.importKey(
+      "jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]
+    );
+    const valid = await crypto.subtle.verify(
+      "RSASSA-PKCS1-v1_5", key,
+      base64UrlToBytes(parts[2]),
+      new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
+    );
+    return valid ? payload : null;
+  } catch { return null; }
+}
+
+function oauthProtectedResourceMetadata(url) {
+  const base = `${url.protocol}//${url.host}`;
+  return new Response(JSON.stringify({
+    resource: `${base}/mcp`,
+    authorization_servers: ["https://api.workos.com"],
+    bearer_methods_supported: ["header"],
+    scopes_supported: ["openid", "profile", "email"]
+  }, null, 2), {
+    status: 200,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=3600", "access-control-allow-origin": "*" }
+  });
+}
+
+function oauthAuthorizationServerMetadata(env) {
+  const clientId = env.WORKOS_CLIENT_ID || "";
+  return new Response(JSON.stringify({
+    issuer: "https://api.workos.com",
+    authorization_endpoint: "https://api.workos.com/user_management/authorize",
+    token_endpoint: "https://api.workos.com/user_management/authenticate",
+    jwks_uri: `https://api.workos.com/user_management/jwks/${clientId}`,
+    response_types_supported: ["code"],
+    grant_types_supported: ["authorization_code"],
+    code_challenge_methods_supported: ["S256"],
+    scopes_supported: ["openid", "profile", "email"],
+    token_endpoint_auth_methods_supported: ["none"]
+  }, null, 2), {
+    status: 200,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=3600", "access-control-allow-origin": "*" }
+  });
+}
+
+function base64UrlToBytes(value) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
 function allowedOrigins(env) {
