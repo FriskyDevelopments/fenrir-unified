@@ -443,13 +443,27 @@ code {
     drop-shadow(0 0 1px rgba(255,255,255,.72))
     drop-shadow(0 24px 42px rgba(34,199,168,.22))
     drop-shadow(0 10px 28px rgba(255,23,68,.22));
+  /* Fenrir mark breathes — a slow glow-pulse. */
+  animation: wordmarkGlow 5.6s ease-in-out infinite;
+  will-change: filter;
 }
 
 .auth-hero-copy h1 {
+  position: relative;
   max-width: 560px;
   margin: 0 0 14px;
   color: #fff7f2;
-  background: linear-gradient(90deg, #fff8f2 0%, var(--theme-primary) 30%, var(--theme-accent) 58%, var(--theme-secondary) 100%);
+  /* Wider, looping rainbow so the flowing shimmer is seamless. */
+  background: linear-gradient(
+    90deg,
+    #fff8f2 0%,
+    var(--theme-primary) 22%,
+    var(--theme-accent) 44%,
+    var(--theme-secondary) 66%,
+    var(--theme-primary) 84%,
+    #fff8f2 100%
+  );
+  background-size: 240% auto;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -457,6 +471,21 @@ code {
   line-height: .93;
   text-transform: uppercase;
   text-shadow: 0 0 34px rgba(255,23,68,.12);
+  /* Living hero headline: the rainbow gradient flows continuously. */
+  animation: authTitleChrome 7s ease-in-out infinite;
+  will-change: background-position;
+}
+
+/* Periodic light-sweep across the headline (built keyframe authTitleScan). */
+.auth-hero-copy h1::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.4) 50%, transparent 60%);
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: authTitleScan 9s ease-in-out infinite;
 }
 
 .auth-hero-copy p {
@@ -5554,6 +5583,22 @@ p {
   }
 }
 
+@keyframes wordmarkGlow {
+  0%,
+  100% {
+    filter:
+      drop-shadow(0 0 1px rgba(255,255,255,.72))
+      drop-shadow(0 24px 42px rgba(34,199,168,.18))
+      drop-shadow(0 10px 28px rgba(255,23,68,.16));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 3px rgba(255,255,255,.92))
+      drop-shadow(0 26px 54px rgba(34,199,168,.36))
+      drop-shadow(0 12px 36px rgba(255,23,68,.32));
+  }
+}
+
 @keyframes authTitleChrome {
   0%,
   100% {
@@ -5725,6 +5770,9 @@ p {
   .pulse-item,
   .auth-fog,
   .auth-rune,
+  .auth-wordmark,
+  .auth-hero-copy h1,
+  .auth-hero-copy h1::after,
   .auth-enter-title span,
   .auth-enter-title::before,
   .auth-enter-title::after,
