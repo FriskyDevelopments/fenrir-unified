@@ -14,7 +14,7 @@ function subscriptionCustomerId(sub: Stripe.Subscription) {
   return typeof sub.customer === "string" ? sub.customer : sub.customer.id;
 }
 
-async function persistSubscriptionFromStripe(env: BillingEnv, stripe: Stripe, sub: Stripe.Subscription, orgFallback?: string | null) {
+export async function persistSubscriptionFromStripe(env: BillingEnv, stripe: Stripe, sub: Stripe.Subscription, orgFallback?: string | null) {
   const db = env.DB;
   if (!db) return;
 
