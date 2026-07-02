@@ -48,9 +48,17 @@ export async function buildAuthorizationUrl(
     response_type: "code",
     state
   });
-  // With a provider hint, jump straight to that connection; otherwise show the
-  // hosted AuthKit screen so the user can choose.
-  params.set("provider", providerHint ? providerMap[providerHint] : "authkit");
+  // Always use the hosted AuthKit selector. Jumping straight to a specific
+  // connection (GoogleOAuth/MicrosoftOAuth/AppleOAuth) makes WorkOS return
+  // 404 {"message":"Not Found"} when that connection isn't enabled in the
+  // active environment — the post-login "Not Found" users hit. AuthKit shows
+  // exactly the methods the environment has enabled and is the robust default.
+  // (providerHint retained for future use once per-connection jump is desired
+  // and the connections are enabled in the WorkOS dashboard.)
+  const connection = providerHint && env.WORKOS_ALLOW_PROVIDER_HINT === "1"
+    ? providerMap[providerHint]
+    : "authkit";
+  params.set("provider", connection);
   return `https://api.workos.com/user_management/authorize?${params.toString()}`;
 }
 

@@ -36,6 +36,25 @@ if (( ${#missing[@]} )); then
   exit 1
 fi
 
+# GUARD: never clobber the production WorkOS key with a dead local one.
+# The #1 recurring cause of the myfenrir.com login loop was this script pushing a
+# stale/rotated WORKOS_API_KEY from .env.local on every deploy, so the live key
+# (which matches WORKOS_CLIENT_ID) got overwritten with one that returns
+# `invalid_client` -> workos_token_exchange_failed -> bounce to /login.
+# Validate the pair against WorkOS BEFORE pushing; abort if it doesn't match.
+echo "==> Validating WORKOS_API_KEY matches WORKOS_CLIENT_ID against WorkOS…"
+wk_err=$(curl -s -X POST "https://api.workos.com/user_management/authenticate" \
+  -H "Content-Type: application/json" \
+  -d "{\"client_id\":\"${WORKOS_CLIENT_ID}\",\"client_secret\":\"${WORKOS_API_KEY}\",\"grant_type\":\"authorization_code\",\"code\":\"deploy_preflight_probe\"}" \
+  | sed -nE 's/.*"error" *: *"([^"]+)".*/\1/p')
+if [[ "$wk_err" == "invalid_client" ]]; then
+  echo "ERROR: WORKOS_API_KEY in .env.local does NOT match WORKOS_CLIENT_ID ($WORKOS_CLIENT_ID)." >&2
+  echo "       WorkOS returned invalid_client. Pushing this would re-break login (the loop)." >&2
+  echo "       Get the current API key from the WorkOS dashboard for this client and put it in .env.local first." >&2
+  exit 3
+fi
+echo "    OK (WorkOS did not reject the key/client pair)."
+
 echo "==> Pushing ${#required[@]} secrets to Cloudflare Pages project '$PROJECT' (via OAuth)…"
 for k in "${required[@]}"; do
   printf '%s' "${!k}" | env -u CLOUDFLARE_API_TOKEN $WRANGLER pages secret put "$k" --project-name "$PROJECT"
