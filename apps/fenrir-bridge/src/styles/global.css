@@ -4012,6 +4012,17 @@ p {
   align-self: end;
 }
 
+.live-domain-result .register-cta {
+  background: linear-gradient(135deg, #22c7a8, #9ff4e4);
+  color: #04140e;
+  font-weight: 800;
+  border: none;
+}
+
+.live-domain-result .register-cta:hover {
+  filter: brightness(1.06);
+}
+
 .form-column {
   display: grid;
   gap: 8px;

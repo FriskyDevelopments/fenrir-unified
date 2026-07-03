@@ -837,6 +837,47 @@ function openSafeUrl(value: string) {
   return openAnyUrl(value);
 }
 
+// Registrar referral: a visitor searches a name, and if they register it we route
+// the click through the owner's affiliate link so MyFenrir earns the referral
+// commission. Falls back to a plain registrar search when no affiliate config is
+// present, so the feature always works — set the env vars once a program (Dynadot,
+// Namecheap/Impact, or a CJ deep-link) is approved and it starts earning with no
+// code change.
+const DOMAIN_REGISTRAR = (import.meta.env.VITE_DOMAIN_REGISTRAR ?? "dynadot").trim().toLowerCase();
+const DOMAIN_REFERRAL_TEMPLATE = (import.meta.env.VITE_DOMAIN_REFERRAL_TEMPLATE ?? "").trim();
+const DYNADOT_REFERRAL_CODE = (import.meta.env.VITE_DYNADOT_REFERRAL_CODE ?? "").trim();
+const NAMECHEAP_AFFILIATE_ID = (import.meta.env.VITE_NAMECHEAP_AFFILIATE_ID ?? "").trim();
+
+function registrarSearchUrl(domain: string) {
+  const d = encodeURIComponent(domain);
+  switch (DOMAIN_REGISTRAR) {
+    case "namecheap":
+      return `https://www.namecheap.com/domains/registration/results/?domain=${d}`;
+    case "porkbun":
+      return `https://porkbun.com/checkout/search?q=${d}`;
+    case "cloudflare":
+      return `https://dash.cloudflare.com/?to=/:account/domains/register/${d}`;
+    default:
+      return `https://www.dynadot.com/domain/search?domain=${d}`;
+  }
+}
+
+function registrarPurchaseUrl(domain: string) {
+  const base = registrarSearchUrl(domain);
+  // Network deep link (Commission Junction / Impact): wrap the target URL.
+  if (DOMAIN_REFERRAL_TEMPLATE.includes("{target}")) {
+    return DOMAIN_REFERRAL_TEMPLATE.replace("{target}", encodeURIComponent(base));
+  }
+  // Direct referral params on the registrar's own domain.
+  if (DOMAIN_REGISTRAR === "dynadot" && DYNADOT_REFERRAL_CODE) {
+    return `${base}&s=${encodeURIComponent(DYNADOT_REFERRAL_CODE)}`;
+  }
+  if (DOMAIN_REGISTRAR === "namecheap" && NAMECHEAP_AFFILIATE_ID) {
+    return `${base}&aff=${encodeURIComponent(NAMECHEAP_AFFILIATE_ID)}`;
+  }
+  return base;
+}
+
 function openAnyUrl(value: string) {
   const target = absoluteUrl(value);
   if (!target) return false;
@@ -1897,8 +1938,7 @@ export function App() {
                 setNotice(`${domain} moved into the Fenrir domain wizard.`);
               }}
               onOpenRegistrar={(domain) => {
-                const query = encodeURIComponent(domain);
-                openSafeUrl(`https://www.dynadot.com/domain/search?domain=${query}`);
+                openSafeUrl(registrarPurchaseUrl(domain));
               }}
             />
             <div className="domain-builder-layout">
@@ -4601,8 +4641,8 @@ function LiveDomainSearchPanel({
       <div className="live-domain-search-head">
         <div>
           <span className="launch-wow-status">Live domain search</span>
-          <h3>Find a clean Fenrir front door before you wire DNS.</h3>
-          <p>Checks live availability (RDAP + DNS) on our edge, then sends promising names into the domain wizard.</p>
+          <h3>Search your name, grab the domain.</h3>
+          <p>Type any brand or handle — we check live availability (RDAP + DNS) across TLDs, then you register the one you want in a click.</p>
         </div>
         <div className="live-domain-search-form">
           <input
@@ -4649,11 +4689,17 @@ function LiveDomainSearchPanel({
                 {result.records?.length ? <small>DNS: {result.records.join(" / ")}</small> : null}
               </div>
               <div className="row-actions">
+                {result.status === "available" ? (
+                  <button type="button" className="compact-button register-cta" onClick={() => onOpenRegistrar(result.domain)}>
+                    Register →
+                  </button>
+                ) : (
+                  <button type="button" className="ghost compact-button" onClick={() => onOpenRegistrar(result.domain)}>
+                    {result.status === "taken" ? "Who owns it" : "Check registrar"}
+                  </button>
+                )}
                 <button type="button" className="secondary compact-button" onClick={() => onPick(result.domain)}>
                   Use in wizard
-                </button>
-                <button type="button" className="ghost compact-button" onClick={() => onOpenRegistrar(result.domain)}>
-                  Check registrar
                 </button>
               </div>
             </article>
