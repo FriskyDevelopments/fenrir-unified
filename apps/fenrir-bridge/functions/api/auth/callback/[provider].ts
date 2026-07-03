@@ -84,10 +84,17 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
       sessionPayload.frisky_account_id = accountId;
     }
 
+    // Best-effort enrichment — must never block a successful login.
     if (context.env.DB) {
-      await ensureDefaultWorkspace(context.env.DB, sessionPayload);
+      try {
+        await ensureDefaultWorkspace(context.env.DB, sessionPayload);
+      } catch (e) {
+        console.error("callback enrichment: ensureDefaultWorkspace failed (non-blocking)", e);
+      }
     }
-    await upsertProfileForSession(context.env, sessionPayload, result.identityId);
+    await upsertProfileForSession(context.env, sessionPayload, result.identityId).catch((e) =>
+      console.error("callback enrichment: upsertProfileForSession failed (non-blocking)", e)
+    );
 
     const returnToUrl = tx?.returnTo ?? "/main";
     let finalLocation: string;

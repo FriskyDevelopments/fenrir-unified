@@ -42,27 +42,42 @@ export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
 
     const { session: sessionPayload } = await exchangeCodeForSession(context.env, code);
 
-    // Fenrir Protocol: collapse this verified email onto the one canonical
-    // master account (Supabase auth.users UUID). Never blocks login — if the
-    // admin API is unconfigured or unreachable, we keep the legacy synthetic id.
-    const accountId = await resolveFriskyAccountId(context.env as unknown as SupabaseAdminEnv, sessionPayload.email);
-    if (accountId) {
-      sessionPayload.frisky_account_id = accountId;
+    // ── Enrichment is BEST-EFFORT and must NEVER block login ──────────────────
+    // Once WorkOS returns a verified email the user IS authenticated; resolving
+    // their Supabase master account, Neon community record, and D1 workspace are
+    // enhancements. A hiccup in any of them (env drift, schema change, network)
+    // must not throw the successful auth into the catch below and bounce the user
+    // back to /login — that is the recurring "it authenticates but won't log in"
+    // regression. Each step is individually guarded; failures degrade, not block.
+
+    // Fenrir Protocol: collapse this verified email onto the one canonical master
+    // account (Supabase auth.users UUID). Falls back to the legacy synthetic id.
+    try {
+      const accountId = await resolveFriskyAccountId(context.env as unknown as SupabaseAdminEnv, sessionPayload.email);
+      if (accountId) sessionPayload.frisky_account_id = accountId;
+    } catch (e) {
+      console.error("callback enrichment: resolveFriskyAccountId failed (non-blocking)", e);
     }
 
-    // Community Bridge master: resolve/create the Neon `fenrir_community_users` record
-    // by email (the bridge keys on Neon, not Supabase). Never blocks login.
-    const communityUser = await ensureCommunityUserByEmail(
-      context.env as unknown as CommunityAuthEnv,
-      sessionPayload.email,
-      sessionPayload.name
-    ).catch(() => null);
-    if (communityUser) {
-      sessionPayload.community_user_id = communityUser.id;
+    // Community Bridge master: resolve/create the Neon `fenrir_community_users` record.
+    try {
+      const communityUser = await ensureCommunityUserByEmail(
+        context.env as unknown as CommunityAuthEnv,
+        sessionPayload.email,
+        sessionPayload.name
+      );
+      if (communityUser) sessionPayload.community_user_id = communityUser.id;
+    } catch (e) {
+      console.error("callback enrichment: ensureCommunityUserByEmail failed (non-blocking)", e);
     }
 
+    // Default D1 workspace bootstrap.
     if (context.env.DB) {
-      await ensureDefaultWorkspace(context.env.DB, sessionPayload);
+      try {
+        await ensureDefaultWorkspace(context.env.DB, sessionPayload);
+      } catch (e) {
+        console.error("callback enrichment: ensureDefaultWorkspace failed (non-blocking)", e);
+      }
     }
 
     const session = await signSession(sessionPayload, context.env);
