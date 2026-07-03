@@ -9,7 +9,7 @@ export type WorkOSEnv = BillingEnv & {
   WORKOS_API_KEY?: string;
   /** "1" enables jumping straight to a provider connection instead of the AuthKit box. */
   WORKOS_ALLOW_PROVIDER_HINT?: string;
-  /** Comma list of provider hints whose WorkOS connection is enabled (default "google,microsoft"). */
+  /** Comma list of provider hints whose WorkOS connection works end-to-end (default "google"). */
   WORKOS_DIRECT_CONNECTIONS?: string;
 };
 
@@ -52,16 +52,18 @@ export async function buildAuthorizationUrl(
     response_type: "code",
     state
   });
-  // Jump straight to the provider's own sign-in (GoogleOAuth/MicrosoftOAuth)
-  // instead of the hosted AuthKit selector — the generic "WorkOS box". The jump
-  // stays inside the WorkOS-brokered flow (WorkOS's own registered callback), so
-  // there is NO redirect_uri_mismatch — verified: GoogleOAuth/MicrosoftOAuth 302
-  // to accounts.google.com / login.microsoftonline.com. The only hazard is a
-  // connection that isn't enabled in this WorkOS environment: it 404s. Apple's
-  // connection is NOT enabled here, so it must fall back to AuthKit. Gate on the
-  // enabled allow-list (default google,microsoft) to keep that safe.
+  // Jump straight to the provider's own sign-in (e.g. GoogleOAuth) instead of
+  // the hosted AuthKit selector — the generic "WorkOS box". The jump stays
+  // inside the WorkOS-brokered flow (WorkOS's own registered callback), so
+  // there is no redirect_uri_mismatch on OUR side. Hazards, verified live:
+  //   - a connection not enabled in this WorkOS env 404s (Apple);
+  //   - MicrosoftOAuth 302s to login.microsoftonline.com but the Azure app
+  //     behind the connection is missing WorkOS's redirect URI → Microsoft
+  //     rejects with invalid_request (broken through AuthKit too — fix is in
+  //     the Azure portal / WorkOS dashboard, not here).
+  // Gate on the works-end-to-end allow-list (default: google only).
   const enabled = new Set(
-    (env.WORKOS_DIRECT_CONNECTIONS ?? "google,microsoft")
+    (env.WORKOS_DIRECT_CONNECTIONS ?? "google")
       .split(",")
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean)
