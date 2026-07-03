@@ -9,7 +9,6 @@ import {
   stateSetCookie,
   type WorkOSEnv
 } from "../../../_lib/workos";
-import { isDirectOAuthAvailable, isOAuthProvider, type OAuthEnv } from "../../../_lib/oauth";
 
 export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
   if (!isWorkOSConfigured(context.env)) {
@@ -29,33 +28,10 @@ export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
     const providerHint = isWorkOSProviderHint(providerParam) ? providerParam : undefined;
     const returnTo = safeReturnPath(requestUrl.searchParams.get("return_to"));
 
-    // Prefer direct provider OAuth when the connection's client credentials are
-    // configured (e.g. Google). Jumping straight to the provider skips WorkOS's
-    // generic hosted AuthKit selector — the "workos box" — and lands the user on
-    // Google/Microsoft/Apple's own branded sign-in. Providers without direct
-    // credentials fall through to the AuthKit path below, which is the robust
-    // default (AuthKit shows exactly the methods the environment has enabled).
-    //
-    // Gated behind FENRIR_DIRECT_SOCIAL_LOGIN=1 because the direct flow only
-    // completes once the provider's own console has our callback registered
-    // (Google: https://www.myfenrir.com/api/auth/callback/google as an
-    // Authorized redirect URI). Until that's set, direct Google returns
-    // redirect_uri_mismatch — so default OFF keeps the working WorkOS flow, and
-    // the owner flips this to "1" the moment the redirect URI is registered.
-    const directSocialEnabled =
-      (context.env as unknown as { FENRIR_DIRECT_SOCIAL_LOGIN?: string }).FENRIR_DIRECT_SOCIAL_LOGIN === "1";
-    if (
-      directSocialEnabled &&
-      providerParam &&
-      providerParam !== "workos" &&
-      isOAuthProvider(providerParam) &&
-      isDirectOAuthAvailable(providerParam, context.env as unknown as OAuthEnv)
-    ) {
-      const direct = new URL(`/api/auth/login/${providerParam}`, requestUrl.origin);
-      if (returnTo) direct.searchParams.set("return_to", returnTo);
-      return new Response(null, { status: 302, headers: { Location: direct.toString() } });
-    }
-
+    // The provider hint (google/microsoft) makes buildAuthorizationUrl jump
+    // straight to that WorkOS connection — the provider's own sign-in — instead
+    // of the generic AuthKit "box". See functions/_lib/workos.ts. Enabled via
+    // WORKOS_ALLOW_PROVIDER_HINT=1; Apple stays on AuthKit (connection disabled).
     const origin = authOrigin(context.request, context.env);
     const redirectUri = `${origin}/api/auth/callback/workos`;
 

@@ -7,6 +7,10 @@ import { requireEnv, type BillingEnv } from "./billing-env";
 export type WorkOSEnv = BillingEnv & {
   WORKOS_CLIENT_ID?: string;
   WORKOS_API_KEY?: string;
+  /** "1" enables jumping straight to a provider connection instead of the AuthKit box. */
+  WORKOS_ALLOW_PROVIDER_HINT?: string;
+  /** Comma list of provider hints whose WorkOS connection is enabled (default "google,microsoft"). */
+  WORKOS_DIRECT_CONNECTIONS?: string;
 };
 
 export type WorkOSProviderHint = "google" | "microsoft" | "apple";
@@ -48,16 +52,23 @@ export async function buildAuthorizationUrl(
     response_type: "code",
     state
   });
-  // Always use the hosted AuthKit selector. Jumping straight to a specific
-  // connection (GoogleOAuth/MicrosoftOAuth/AppleOAuth) makes WorkOS return
-  // 404 {"message":"Not Found"} when that connection isn't enabled in the
-  // active environment — the post-login "Not Found" users hit. AuthKit shows
-  // exactly the methods the environment has enabled and is the robust default.
-  // (providerHint retained for future use once per-connection jump is desired
-  // and the connections are enabled in the WorkOS dashboard.)
-  const connection = providerHint && env.WORKOS_ALLOW_PROVIDER_HINT === "1"
-    ? providerMap[providerHint]
-    : "authkit";
+  // Jump straight to the provider's own sign-in (GoogleOAuth/MicrosoftOAuth)
+  // instead of the hosted AuthKit selector — the generic "WorkOS box". The jump
+  // stays inside the WorkOS-brokered flow (WorkOS's own registered callback), so
+  // there is NO redirect_uri_mismatch — verified: GoogleOAuth/MicrosoftOAuth 302
+  // to accounts.google.com / login.microsoftonline.com. The only hazard is a
+  // connection that isn't enabled in this WorkOS environment: it 404s. Apple's
+  // connection is NOT enabled here, so it must fall back to AuthKit. Gate on the
+  // enabled allow-list (default google,microsoft) to keep that safe.
+  const enabled = new Set(
+    (env.WORKOS_DIRECT_CONNECTIONS ?? "google,microsoft")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const canJump =
+    Boolean(providerHint) && env.WORKOS_ALLOW_PROVIDER_HINT === "1" && enabled.has(providerHint as string);
+  const connection = canJump ? providerMap[providerHint as WorkOSProviderHint] : "authkit";
   params.set("provider", connection);
   return `https://api.workos.com/user_management/authorize?${params.toString()}`;
 }
