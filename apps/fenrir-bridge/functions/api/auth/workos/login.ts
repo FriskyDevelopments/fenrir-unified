@@ -9,6 +9,7 @@ import {
   stateSetCookie,
   type WorkOSEnv
 } from "../../../_lib/workos";
+import { isDirectOAuthAvailable, isOAuthProvider, type OAuthEnv } from "../../../_lib/oauth";
 
 export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
   if (!isWorkOSConfigured(context.env)) {
@@ -27,6 +28,23 @@ export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
     const providerParam = requestUrl.searchParams.get("provider");
     const providerHint = isWorkOSProviderHint(providerParam) ? providerParam : undefined;
     const returnTo = safeReturnPath(requestUrl.searchParams.get("return_to"));
+
+    // Prefer direct provider OAuth when the connection's client credentials are
+    // configured (e.g. Google). Jumping straight to the provider skips WorkOS's
+    // generic hosted AuthKit selector — the "workos box" — and lands the user on
+    // Google/Microsoft/Apple's own branded sign-in. Providers without direct
+    // credentials fall through to the AuthKit path below, which is the robust
+    // default (AuthKit shows exactly the methods the environment has enabled).
+    if (
+      providerParam &&
+      providerParam !== "workos" &&
+      isOAuthProvider(providerParam) &&
+      isDirectOAuthAvailable(providerParam, context.env as unknown as OAuthEnv)
+    ) {
+      const direct = new URL(`/api/auth/login/${providerParam}`, requestUrl.origin);
+      if (returnTo) direct.searchParams.set("return_to", returnTo);
+      return new Response(null, { status: 302, headers: { Location: direct.toString() } });
+    }
 
     const origin = authOrigin(context.request, context.env);
     const redirectUri = `${origin}/api/auth/callback/workos`;
