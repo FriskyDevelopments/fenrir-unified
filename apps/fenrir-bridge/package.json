@@ -26,7 +26,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "postinstall": "bash scripts/run-with-node-lts.sh node scripts/clean-icloud-dupes.mjs",
     "predev": "bash scripts/run-with-node-lts.sh node scripts/clean-icloud-dupes.mjs",
-    "pretypecheck": "bash scripts/run-with-node-lts.sh node scripts/clean-icloud-dupes.mjs"
+    "pretypecheck": "bash scripts/run-with-node-lts.sh node scripts/clean-icloud-dupes.mjs",
+    "dev:mock": "FENRIR_DEV_MOCK_API=1 bash scripts/run-with-node-lts.sh vite --host 0.0.0.0"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",

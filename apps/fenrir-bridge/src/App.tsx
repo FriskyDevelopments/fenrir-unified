@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import { copy, detectLocale, languageNames, locales, type Copy, type Locale } from "./i18n";
 import { aiOpsService, appService, authService, billingService, bridgeService, commerceService, domainService, liveRoomService, readinessService, telegramIdentityService, telegramService, webauthnService, type AuthSession, type BillingStatusPayload, type PaidPlan, type ReadinessPayload, type TelegramIdentityLinkPayload } from "./services/api";
@@ -289,9 +289,9 @@ const uiCopy: Record<Locale, {
     botOsRouteFooterCommunity: "Community Gate",
     botOsRouteFooterHome: "Fenrir Bridge",
     communityEmailPlaceholder: "you@community.com",
-    neonMagicBusy: "Creating Neon link...",
-    neonMagicButton: "Send Neon magic link",
-    neonMagicSuccessMessage: "Neon auth link sent. Check your inbox and follow the latest approval step.",
+    neonMagicBusy: "Sending your entry link...",
+    neonMagicButton: "Email me my entry link",
+    neonMagicSuccessMessage: "Entry link sent. Open your inbox and tap the newest link to continue.",
     neonMagicDevLinkLabel: "Open dev auth link",
     fallbackPartnerLabel: "Fallback links",
     challengeLayer: "Challenge layer",
@@ -460,9 +460,9 @@ const uiCopy: Record<Locale, {
     botOsRouteFooterCommunity: "Community Gate",
     botOsRouteFooterHome: "Fenrir Bridge",
     communityEmailPlaceholder: "tu@comunidad.com",
-    neonMagicBusy: "Creando enlace Neon...",
-    neonMagicButton: "Enviar enlace mágico Neon",
-    neonMagicSuccessMessage: "Enlace de autenticación Neon enviado. Revisa el correo y sigue el último paso de aprobación.",
+    neonMagicBusy: "Enviando tu enlace de entrada...",
+    neonMagicButton: "Envíame mi enlace de entrada",
+    neonMagicSuccessMessage: "Enlace enviado. Abre tu correo y toca el enlace más reciente para continuar.",
     neonMagicDevLinkLabel: "Abrir enlace de prueba Neon",
     fallbackPartnerLabel: "Enlaces de respaldo"
   },
@@ -605,9 +605,9 @@ const uiCopy: Record<Locale, {
     botOsRouteFooterCommunity: "Community Gate",
     botOsRouteFooterHome: "Fenrir Bridge",
     communityEmailPlaceholder: "vous@communaute.com",
-    neonMagicBusy: "Création du lien Neon...",
-    neonMagicButton: "Envoyer le lien magique Neon",
-    neonMagicSuccessMessage: "Lien d'authentification Neon envoyé. Vérifiez votre e-mail et suivez l'étape d'approbation.",
+    neonMagicBusy: "Envoi de votre lien d'entrée...",
+    neonMagicButton: "Envoyez-moi mon lien d'entrée",
+    neonMagicSuccessMessage: "Lien envoyé. Ouvrez votre boîte mail et touchez le lien le plus récent pour continuer.",
     neonMagicDevLinkLabel: "Ouvrir le lien développeur Neon",
     fallbackPartnerLabel: "Liens de secours"
   },
@@ -750,9 +750,9 @@ const uiCopy: Record<Locale, {
     botOsRouteFooterCommunity: "Community Gate",
     botOsRouteFooterHome: "Fenrir Bridge",
     communityEmailPlaceholder: "du@gemeinschaft.com",
-    neonMagicBusy: "Neon-Link wird erstellt...",
-    neonMagicButton: "Neon-Magic-Link senden",
-    neonMagicSuccessMessage: "Neon-Auth-Link gesendet. E-Mail prüfen und dem letzten Freigabeschritt folgen.",
+    neonMagicBusy: "Dein Zugangslink wird gesendet...",
+    neonMagicButton: "Zugangslink an mich senden",
+    neonMagicSuccessMessage: "Link gesendet. Öffne dein Postfach und tippe auf den neuesten Link.",
     neonMagicDevLinkLabel: "Neon-Entwicklerlink öffnen",
     fallbackPartnerLabel: "Fallback-Links"
   }
@@ -2597,7 +2597,7 @@ const brandWizardStepDetails: Record<BrandWizardStep, { title: string; body: str
   Access: {
     title: "Set the entry rules",
     body: "Decide whether people enter immediately, need an invite, or wait for review.",
-    outcome: "Neon stores the membership state and audit trail."
+    outcome: "Member state and the audit trail are stored in the community's own vault."
   }
 };
 
@@ -2619,6 +2619,36 @@ function cleanCommunityAssetUrl(value?: string | null) {
   const trimmed = value?.trim();
   if (!trimmed) return null;
   return trimmed.includes(legacyNeonPromoAsset) ? null : trimmed;
+}
+
+// Builds a self-contained SVG monogram (data: URI) from the community name and
+// palette — a real logo in one click, no file hosting required. Small (~1 KB),
+// stored in logo_url like any other URL and rendered via <img>, so it is inert.
+function monogramLogoDataUri(name: string, primary: string, accent: string, secondary: string): string {
+  const trimmed = (name || "").trim();
+  const emojiMatch = trimmed.match(/^\p{Extended_Pictographic}/u);
+  const glyph = emojiMatch
+    ? emojiMatch[0]
+    : trimmed
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((word) => word[0]?.toUpperCase() ?? "")
+        .join("") || "F";
+  const fontSize = emojiMatch ? 30 : glyph.length > 1 ? 24 : 30;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${primary}"/>
+      <stop offset="0.55" stop-color="${secondary}"/>
+      <stop offset="1" stop-color="${accent}"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="#0b0e10"/>
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="none" stroke="url(#ring)" stroke-width="2.5"/>
+  <path d="M14 20l6-8 3 7zM50 20l-6-8-3 7z" fill="url(#ring)" opacity="0.9"/>
+  <text x="32" y="${emojiMatch ? 42 : 41}" text-anchor="middle" font-family="'Space Grotesk','Inter',system-ui,sans-serif" font-weight="700" font-size="${fontSize}" fill="url(#ring)">${glyph.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>
+</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 const brandImageFields = [
@@ -2656,25 +2686,39 @@ const brandStylePresets = [
 const communityGateWalkthrough = [
   {
     label: "What it is",
-    title: "A branded front door before Neon decides access.",
-    body: "Visitors land on your public community gate, see your brand, prove identity, and then Neon checks whether they can enter."
+    icon: "gate",
+    title: "A branded front door for your community.",
+    body: "Visitors land on your public gate, see your brand, prove who they are — and your rules decide who gets in."
   },
   {
     label: "How to set it",
-    title: "Pick address, brand, words, login methods, and access mode.",
-    body: "The builder walks through the slug, name, logo/background, colors, welcome copy, and rules like provisional, open, invite-only, or disabled."
+    icon: "wand",
+    title: "Address, look, words, and door rules. Minutes, not hours.",
+    body: "Pick the short URL, drop in a logo or generate one, choose colors and welcome copy, then set the entry mode: open, review-first, invite-only, or closed."
   },
   {
     label: "How it works",
-    title: "Fenrir handles the door. Neon keeps the member state.",
-    body: "Fenrir renders the gate and routes the flow. Neon stores membership, invite state, review status, and audit history away from Fenrir Bridge customer data."
+    icon: "vault",
+    title: "Fenrir guards the door. Members live in their own vault.",
+    body: "The gate handles identity and routing. Membership, invites, review status, and the audit trail stay in the community's own isolated records."
   },
   {
     label: "Why subscribe",
-    title: "You get a real community access system, not another loose link.",
-    body: "Subscription unlocks branded gates, safer onboarding, isolated community records, review workflows, and a cleaner upgrade path for paid/private communities."
+    icon: "crown",
+    title: "A real access system, not another loose link.",
+    body: "Subscription unlocks branded gates, safer onboarding, isolated member records, review workflows, and a clean path to paid or private communities."
   }
 ] as const;
+
+function WalkthroughIcon({ name }: { name: "gate" | "wand" | "vault" | "crown" }) {
+  const paths: Record<string, ReactNode> = {
+    gate: <path d="M4 20V8l8-4 8 4v12M4 12h16M9 20v-5a3 3 0 0 1 6 0v5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />,
+    wand: <path d="M5 19L15 9m1.5-4.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7zM19 14l.5 1.4L21 16l-1.5.6L19 18l-.6-1.4L17 16l1.4-.6zM8 4l.6 1.6L10 6l-1.4.6L8 8l-.6-1.4L6 6l1.4-.4z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />,
+    vault: <><rect x="4" y="5" width="16" height="14" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.7" /><circle cx="12" cy="12" r="3.4" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="M12 8.6v-1.4M12 16.8v-1.4M8.6 12H7.2M16.8 12h-1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></>,
+    crown: <path d="M4 17h16M5 16l-1-8 4.5 3L12 5l3.5 6L20 8l-1 8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+  };
+  return <svg viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
+}
 
 function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNotice: (message: string) => void }) {
   const [step, setStep] = useState<BrandWizardStep>("Address");
@@ -2770,20 +2814,26 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
 
   return (
     <section className="panel wide community-brand-wizard">
-      <PanelTitle title="Community Gate Builder" subtitle="Customize the public gate people use before Neon decides access." />
+      <PanelTitle title="Community Gate Builder" subtitle="Brand and personalize your community's front door — live preview on the right, done in minutes." />
       <div className="community-gate-walkthrough" aria-label="Community Gate walkthrough">
         <div className="community-gate-walkthrough-head">
-          <span className="status good">Community Gate walkthrough</span>
+          <span className="walkthrough-kicker">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="none" stroke="currentColor" strokeWidth="1.7" /></svg>
+            Community Gate walkthrough
+          </span>
           <h3>How the gate protects and grows the community.</h3>
           <p>
-            Use this before styling: it explains the setup, the access flow, the subscription value,
-            and what Neon owns behind the scenes.
+            One guarded URL: your brand on the door, your rules on the lock,
+            and every member decision recorded.
           </p>
         </div>
         <div className="community-gate-walkthrough-grid">
           {communityGateWalkthrough.map((item, index) => (
-            <article key={item.label}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
+            <article key={item.label} style={{ "--stagger": index } as CSSProperties}>
+              <span className="walkthrough-orb" aria-hidden="true">
+                <WalkthroughIcon name={item.icon} />
+                <i>{String(index + 1).padStart(2, "0")}</i>
+              </span>
               <b>{item.label}</b>
               <h4>{item.title}</h4>
               <p>{item.body}</p>
@@ -2791,28 +2841,32 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
           ))}
         </div>
         <div className="community-gate-flow" aria-label="Community Gate access flow">
+          <span className="flow-signal" aria-hidden="true" />
           {[
-            "Visitor opens branded gate",
-            "Identity proof",
-            "Neon membership check",
+            "Visitor opens your gate",
+            "Proves identity",
+            "Rules check",
             "Approve, review, or block",
-            "Audit trail stays separate"
+            "Audit trail recorded"
           ].map((item, index) => (
-            <span key={item}>{index + 1}. {item}</span>
+            <span className="flow-node" key={item} style={{ "--stagger": index } as CSSProperties}>
+              <i>{index + 1}</i>
+              {item}
+            </span>
           ))}
         </div>
         <div className="community-gate-wow" aria-label="Community Gate subscription value">
-          <div>
+          <div style={{ "--stagger": 0 } as CSSProperties}>
             <span>Gate</span>
             <b>Branded entry</b>
             <small>Logo, colors, copy, and trusted login in one public URL.</small>
           </div>
-          <div>
-            <span>Neon</span>
+          <div style={{ "--stagger": 1 } as CSSProperties}>
+            <span>Vault</span>
             <b>Member truth</b>
             <small>Membership, invite status, review state, and audit history stay isolated.</small>
           </div>
-          <div>
+          <div style={{ "--stagger": 2 } as CSSProperties}>
             <span>Subscribe</span>
             <b>Paid community ready</b>
             <small>Unlock private gates, review workflows, safer onboarding, and upgrade paths.</small>
@@ -2852,7 +2906,12 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
           </ol>
 
           {loadError ? <p className="muted brand-wizard-error">{loadError}</p> : null}
-          {authorizationReason ? <p className="muted">Authorization: {authorizationReason}</p> : null}
+          {authorizationReason ? (
+            <p className="brand-wizard-authorized">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              You can edit this gate
+            </p>
+          ) : null}
 
           <div className="brand-wizard-step-header">
             <span>Step {stepIndex + 1} of {brandWizardSteps.length}</span>
@@ -2879,10 +2938,36 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
 
           {step === "Images" && (
             <div className="brand-wizard-image-builder">
+              <div className="brand-monogram-card">
+                <img
+                  className="brand-monogram-preview"
+                  src={monogramLogoDataUri(previewBrand.name, previewBrand.primary_color, previewBrand.accent_color, previewBrand.secondary_color)}
+                  alt={`Generated monogram for ${previewBrand.name}`}
+                />
+                <div>
+                  <b>Instant logo — zero hosting</b>
+                  <small>
+                    A monogram built live from your community name and colors. Change either and it
+                    follows. One click and the gate has a real mark.
+                  </small>
+                </div>
+                <button
+                  type="button"
+                  className="compact-button"
+                  onClick={() =>
+                    setDraft((current) => ({
+                      ...current,
+                      logo_url: monogramLogoDataUri(previewBrand.name, previewBrand.primary_color, previewBrand.accent_color, previewBrand.secondary_color)
+                    }))
+                  }
+                >
+                  Use this monogram
+                </button>
+              </div>
               <div className="brand-asset-help-card">
                 <span className="brand-asset-help-icon">＋</span>
                 <div>
-                  <b>Add your own art</b>
+                  <b>Or add your own art</b>
                   <small>Upload the file to /public, Cloudflare R2, Supabase Storage, or any public HTTPS CDN. Then paste that final URL below. Local files cannot be served to visitors until they are hosted.</small>
                 </div>
               </div>
@@ -3018,7 +3103,7 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
                     );
                   })}
                 </div>
-                <small>Magic link is the live Community Gate method today. OAuth providers stay visible as planned options until their Neon session bridge is wired.</small>
+                <small>Magic link is the live Community Gate method today. OAuth providers stay visible as planned options until their session bridge is wired.</small>
               </div>
             </div>
           )}
@@ -3040,6 +3125,11 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
         </div>
 
         <aside className="brand-wizard-preview" aria-label="Public gate preview">
+          <div className="brand-wizard-preview-chrome" aria-hidden="true">
+            <span className="preview-live-dot" />
+            <span className="preview-live-label">Live preview</span>
+            <code className="preview-url">myfenrir.com{publicGatePath}</code>
+          </div>
           <AuthSurface
             theme={previewTheme}
             locale={locale}
@@ -3048,7 +3138,8 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
             logoUrl={previewBrand.logo_url}
             backgroundUrl={previewBrand.background_url}
           >
-            <GlowCard className="auth-card" aria-label="Community gate preview">
+            <GlowCard className="auth-card community-gate-card" aria-label="Community gate preview">
+              <span className="gate-aura" aria-hidden="true" />
               <div className="auth-card-header">
                 <span className="status good">Preview</span>
                 <span className="auth-card-kicker">/{slug}</span>
@@ -3094,60 +3185,68 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
   const communityName = brand?.name || theme.productName;
   const gateText = {
     en: {
-      kicker: "Private community access",
-      body: "Enter with a scoped Neon session. Fenrir keeps the client portal, invite checks, and community membership state separated.",
-      stepIdentity: "Identity",
-      stepIdentityBody: "Email link confirms the person.",
-      stepInvite: "Invite",
-      stepInviteBody: "Community rules decide the next door.",
-      stepSession: "Session",
-      stepSessionBody: "Access stays isolated from Frisky admin auth.",
+      kicker: "Private community",
+      body: "This is the guarded entrance. Prove it's really you, and the community's own rules decide the door.",
+      stepIdentity: "Verify",
+      stepIdentityBody: "Confirm your email with one tap.",
+      stepInvite: "Rules",
+      stepInviteBody: "Invites and membership rules pick your door.",
+      stepSession: "Enter",
+      stepSessionBody: "Your access opens, private to this community.",
+      emailLabel: "Your email",
       emailHint: "Use the email tied to your invite or membership request.",
-      trustA: "No shared client-portal cookie",
-      trustB: "Invite code ready",
-      trustC: "Audit trail on approval"
+      trustA: "Private by design",
+      trustB: "Invite-aware",
+      trustC: "Every approval is audited",
+      guarded: "Guarded by Fenrir"
     },
     es: {
-      kicker: "Acceso privado de comunidad",
-      body: "Entra con una sesion Neon separada. Fenrir mantiene aislados el portal de clientes, los invites y el estado de membresia.",
-      stepIdentity: "Identidad",
-      stepIdentityBody: "El enlace por email confirma a la persona.",
-      stepInvite: "Invite",
-      stepInviteBody: "Las reglas de comunidad deciden la siguiente puerta.",
-      stepSession: "Sesion",
-      stepSessionBody: "El acceso queda aislado del auth admin Frisky.",
+      kicker: "Comunidad privada",
+      body: "Esta es la entrada custodiada. Demuestra que eres tú, y las reglas de la comunidad deciden la puerta.",
+      stepIdentity: "Verifica",
+      stepIdentityBody: "Confirma tu correo con un toque.",
+      stepInvite: "Reglas",
+      stepInviteBody: "Invites y reglas de membresía eligen tu puerta.",
+      stepSession: "Entra",
+      stepSessionBody: "Tu acceso se abre, privado para esta comunidad.",
+      emailLabel: "Tu correo",
       emailHint: "Usa el correo ligado a tu invite o solicitud.",
-      trustA: "Sin cookie compartida del portal",
-      trustB: "Invite listo",
-      trustC: "Auditoria en aprobacion"
+      trustA: "Privado por diseño",
+      trustB: "Reconoce invitaciones",
+      trustC: "Cada aprobación queda auditada",
+      guarded: "Custodiado por Fenrir"
     },
     fr: {
-      kicker: "Acces communaute privee",
-      body: "Entrez avec une session Neon separee. Fenrir isole le portail client, les invitations et l'etat membre.",
-      stepIdentity: "Identite",
-      stepIdentityBody: "Le lien email confirme la personne.",
-      stepInvite: "Invitation",
-      stepInviteBody: "Les regles communaute ouvrent la prochaine porte.",
-      stepSession: "Session",
-      stepSessionBody: "L'acces reste isole de l'auth admin Frisky.",
-      emailHint: "Utilisez l'email lie a votre invitation ou demande.",
-      trustA: "Pas de cookie portail partage",
-      trustB: "Invitation prete",
-      trustC: "Audit a l'approbation"
+      kicker: "Communauté privée",
+      body: "Voici l'entrée gardée. Prouvez que c'est bien vous, et les règles de la communauté décident de la porte.",
+      stepIdentity: "Vérifiez",
+      stepIdentityBody: "Confirmez votre e-mail d'un geste.",
+      stepInvite: "Règles",
+      stepInviteBody: "Invitations et règles d'adhésion choisissent votre porte.",
+      stepSession: "Entrez",
+      stepSessionBody: "Votre accès s'ouvre, privé à cette communauté.",
+      emailLabel: "Votre e-mail",
+      emailHint: "Utilisez l'email lié à votre invitation ou demande.",
+      trustA: "Privé par conception",
+      trustB: "Invitations reconnues",
+      trustC: "Chaque approbation est auditée",
+      guarded: "Gardé par Fenrir"
     },
     de: {
-      kicker: "Privater Community-Zugang",
-      body: "Betritt die Community mit einer getrennten Neon-Session. Fenrir trennt Client-Portal, Einladungen und Mitgliedsstatus.",
-      stepIdentity: "Identitaet",
-      stepIdentityBody: "Der E-Mail-Link bestaetigt die Person.",
-      stepInvite: "Einladung",
-      stepInviteBody: "Community-Regeln bestimmen die naechste Tuer.",
-      stepSession: "Session",
-      stepSessionBody: "Der Zugang bleibt vom Frisky-Admin-Auth isoliert.",
+      kicker: "Private Community",
+      body: "Das ist der bewachte Eingang. Zeig, dass du es bist — die Regeln der Community entscheiden über die Tür.",
+      stepIdentity: "Bestätigen",
+      stepIdentityBody: "Bestätige deine E-Mail mit einem Tipp.",
+      stepInvite: "Regeln",
+      stepInviteBody: "Einladungen und Mitgliedsregeln wählen deine Tür.",
+      stepSession: "Eintreten",
+      stepSessionBody: "Dein Zugang öffnet sich, privat für diese Community.",
+      emailLabel: "Deine E-Mail",
       emailHint: "Nutze die E-Mail deiner Einladung oder Anfrage.",
-      trustA: "Kein geteilter Portal-Cookie",
-      trustB: "Einladung bereit",
-      trustC: "Audit bei Freigabe"
+      trustA: "Privat by Design",
+      trustB: "Einladungen zählen",
+      trustC: "Jede Freigabe wird auditiert",
+      guarded: "Bewacht von Fenrir"
     }
   }[locale];
 
@@ -3199,7 +3298,8 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
       logoUrl={brand?.logo_url}
       backgroundUrl={cleanCommunityAssetUrl(brand?.background_url)}
     >
-        <GlowCard className="auth-card" aria-label="Fenrir Community Gate auth">
+        <GlowCard className="auth-card community-gate-card" aria-label="Fenrir Community Gate auth">
+          <span className="gate-aura" aria-hidden="true" />
           <div className="auth-card-header">
             <span className="status good">Community Gate</span>
             <span className="auth-card-kicker">/{slug}</span>
@@ -3240,7 +3340,7 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
           </div>
           <form className="community-auth-form" onSubmit={requestLink}>
             <label>
-              <span>{c.serviceEmail}</span>
+              <span>{gateText.emailLabel}</span>
               <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required placeholder={ui.communityEmailPlaceholder} autoComplete="email" />
               <small>{gateText.emailHint}</small>
             </label>
@@ -3254,6 +3354,10 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
             <span>{gateText.trustA}</span>
             <span>{gateText.trustB}</span>
             <span>{gateText.trustC}</span>
+          </div>
+          <div className="community-guarded-chip" aria-label={gateText.guarded}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="M8.5 10.2l2.6 4.6 1.4-2.4 1.5 1.1 1.5-3.3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <span>{gateText.guarded}</span>
           </div>
         </GlowCard>
     </AuthSurface>
@@ -3410,28 +3514,28 @@ function authErrorMessage() {
 function CommunityAuthProposalPanel({ proposal, locale }: { proposal: CommunityAuthProposal | null; locale: Locale }) {
   const text = {
     en: {
-      title: "Community Gate auth",
-      body: "Fenrir Community Gate uses its own Neon database, tables, and session cookie. It does not share FriskyDev client-portal auth.",
-      configured: "Neon ready",
-      missing: "Neon env pending"
+      title: "Your privacy here",
+      body: "This community keeps its own member records, sign-in, and audit log. Nothing is shared with other accounts or communities.",
+      configured: "Gate online",
+      missing: "Gate warming up"
     },
     es: {
-      title: "Auth de Community Gate",
-      body: "Fenrir Community Gate usa su propia base Neon, tablas y cookie de sesion. No comparte el auth del portal FriskyDev.",
-      configured: "Neon listo",
-      missing: "Faltan env de Neon"
+      title: "Tu privacidad aquí",
+      body: "Esta comunidad guarda sus propios registros de miembros, acceso y auditoría. Nada se comparte con otras cuentas o comunidades.",
+      configured: "Puerta en línea",
+      missing: "Puerta preparándose"
     },
     fr: {
-      title: "Auth Community Gate",
-      body: "Fenrir Community Gate utilise sa propre base Neon, ses tables et son cookie de session. Il ne partage pas l'auth du portail FriskyDev.",
-      configured: "Neon pret",
-      missing: "Env Neon en attente"
+      title: "Votre confidentialité ici",
+      body: "Cette communauté garde ses propres registres de membres, connexions et audits. Rien n'est partagé avec d'autres comptes ou communautés.",
+      configured: "Porte en ligne",
+      missing: "Porte en préparation"
     },
     de: {
-      title: "Community Gate Auth",
-      body: "Fenrir Community Gate nutzt eine eigene Neon-Datenbank, eigene Tabellen und ein eigenes Session-Cookie. Es teilt nicht das FriskyDev Client-Portal-Auth.",
-      configured: "Neon bereit",
-      missing: "Neon env fehlt"
+      title: "Deine Privatsphäre hier",
+      body: "Diese Community führt eigene Mitgliederdaten, Logins und Audit-Logs. Nichts wird mit anderen Konten oder Communities geteilt.",
+      configured: "Tor online",
+      missing: "Tor startet"
     }
   }[locale];
 
