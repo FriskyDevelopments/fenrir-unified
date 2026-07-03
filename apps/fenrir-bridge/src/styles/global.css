@@ -3960,14 +3960,52 @@ p {
   line-height: 1.35;
 }
 
-.live-domain-result.no_dns_signal {
-  border-color: rgba(34,199,168,.28);
-  background: linear-gradient(135deg, rgba(34,199,168,.09), rgba(255,255,255,.03));
+.live-domain-result.available {
+  border-color: rgba(34,199,168,.34);
+  background: linear-gradient(135deg, rgba(34,199,168,.1), rgba(255,255,255,.03));
 }
 
-.live-domain-result.dns_found {
+.live-domain-result.taken {
+  border-color: rgba(255,51,78,.26);
+  background: linear-gradient(135deg, rgba(255,51,78,.07), rgba(255,255,255,.03));
+}
+
+.live-domain-result.unknown {
   border-color: rgba(241,183,92,.28);
-  background: linear-gradient(135deg, rgba(241,183,92,.08), rgba(255,255,255,.03));
+  background: linear-gradient(135deg, rgba(241,183,92,.07), rgba(255,255,255,.03));
+}
+
+.live-domain-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-domain-meta .price-tier {
+  color: #d9f6ee;
+  font-family: var(--mono);
+  font-weight: 800;
+  letter-spacing: .04em;
+  border: 1px solid rgba(34,199,168,.3);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
+.live-domain-meta .conf-badge {
+  color: #9ff4e4;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  border: 1px solid rgba(34,199,168,.34);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.live-domain-meta .confirm-note {
+  color: #f1c98a;
+  font-size: 11px;
 }
 
 .live-domain-result .row-actions {

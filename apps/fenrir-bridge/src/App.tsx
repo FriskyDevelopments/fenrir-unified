@@ -806,7 +806,7 @@ const liveRoomProviders: Array<{ id: LiveRoomProvider; name: string; icon: strin
 ];
 
 const domainTagPresets = ["launch", "client", "vip", "community", "paid", "internal"] as const;
-const domainSearchTlds = ["com", "io", "app", "dev", "ai"] as const;
+const domainSearchTlds = ["com", "io", "app", "gg", "dev", "ai"] as const;
 
 const providerLogoPresets: Record<LiveRoomProvider, string> = {
   zoom: "/provider-logos/zoom.svg",
@@ -949,9 +949,12 @@ function defaultDomainTags(domain: FriskyDomain) {
 
 type DomainSearchResult = {
   domain: string;
-  status: "ready" | "dns_found" | "no_dns_signal" | "invalid" | "error";
+  status: "ready" | "available" | "taken" | "unknown" | "invalid" | "error";
   summary: string;
   records: string[];
+  priceTier?: string;
+  registrarConfirm?: boolean;
+  confidence?: "authoritative" | "signal" | "none";
 };
 
 function cleanDomainSearchBase(value: string) {
@@ -972,37 +975,53 @@ function domainSearchCandidates(value: string) {
   return domainSearchTlds.map((tld) => `${base}.${tld}`);
 }
 
+type AvailabilityApiResult = {
+  domain: string;
+  verdict: "available" | "taken" | "unknown" | "invalid";
+  confidence: "authoritative" | "signal" | "none";
+  taken: boolean | null;
+  registrarConfirm: boolean;
+  summary: string;
+  records: string[];
+  priceTier: string;
+};
+
+function mapAvailability(result: AvailabilityApiResult): DomainSearchResult {
+  const status = result.verdict === "invalid" ? "invalid" : result.verdict;
+  return {
+    domain: result.domain,
+    status,
+    summary: result.summary,
+    records: result.records ?? [],
+    priceTier: result.priceTier,
+    registrarConfirm: result.registrarConfirm,
+    confidence: result.confidence
+  };
+}
+
+// Availability now resolves on the Cloudflare edge (see
+// functions/api/domains/availability.ts) via RDAP + DoH, so the check no longer
+// depends on the visitor's local DNS resolver — the cause of the "timed out"
+// failures when a VPN hijacked DNS on the client.
 async function lookupDomainDns(domain: string): Promise<DomainSearchResult> {
   if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain)) {
     return { domain, status: "invalid", summary: "Use a valid domain name.", records: [] };
   }
   try {
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 2800);
-    const response = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=NS`, {
-      headers: { accept: "application/dns-json" },
+    const timeout = window.setTimeout(() => controller.abort(), 9000);
+    const response = await fetch(`/api/domains/availability?domain=${encodeURIComponent(domain)}`, {
+      headers: { accept: "application/json" },
       signal: controller.signal
     });
     window.clearTimeout(timeout);
-    if (!response.ok) throw new Error("dns_lookup_failed");
-    const payload = (await response.json().catch(() => null)) as { Status?: number; Answer?: Array<{ data?: string }> } | null;
-    const records = (payload?.Answer ?? []).map((answer) => String(answer.data ?? "").replace(/\.$/, "")).filter(Boolean).slice(0, 3);
-    if (records.length) {
-      return {
-        domain,
-        status: "dns_found",
-        summary: "DNS exists. Treat as owned or already configured.",
-        records
-      };
-    }
-    return {
-      domain,
-      status: "no_dns_signal",
-      summary: "No NS signal found. Check registrar availability next.",
-      records: []
-    };
+    if (!response.ok) throw new Error("availability_lookup_failed");
+    const payload = (await response.json().catch(() => null)) as { ok?: boolean; results?: AvailabilityApiResult[] } | null;
+    const first = payload?.results?.[0];
+    if (!payload?.ok || !first) throw new Error("availability_no_result");
+    return mapAvailability(first);
   } catch {
-    return { domain, status: "error", summary: "Live DNS lookup timed out. Check registrar availability directly.", records: [] };
+    return { domain, status: "unknown", summary: "Couldn't reach the availability service. Check at a registrar directly.", records: [], registrarConfirm: true };
   }
 }
 
@@ -1360,7 +1379,7 @@ export function App() {
     }
     setDomainSearchBusy(true);
     setDomainSearchResults([]);
-    const results = await Promise.all(candidates.slice(0, 5).map(lookupDomainDns));
+    const results = await Promise.all(candidates.slice(0, 6).map(lookupDomainDns));
     setDomainSearchResults(results);
     setDomainSearchBusy(false);
     setNotice(`Live domain search checked ${results.length} option${results.length === 1 ? "" : "s"}.`);
@@ -4583,7 +4602,7 @@ function LiveDomainSearchPanel({
         <div>
           <span className="launch-wow-status">Live domain search</span>
           <h3>Find a clean Fenrir front door before you wire DNS.</h3>
-          <p>Checks public DNS now, then sends promising names into the domain wizard.</p>
+          <p>Checks live availability (RDAP + DNS) on our edge, then sends promising names into the domain wizard.</p>
         </div>
         <div className="live-domain-search-form">
           <input
@@ -4601,31 +4620,45 @@ function LiveDomainSearchPanel({
         </div>
       </div>
       <div className="live-domain-results" aria-label="Domain search results">
-        {(results.length ? results : domainSearchCandidates(value).slice(0, 5).map((domain) => ({
+        {(results.length ? results : domainSearchCandidates(value).slice(0, 6).map((domain) => ({
           domain,
           status: "ready" as const,
-          summary: "Ready to check live DNS.",
+          summary: "Ready to check availability.",
           records: []
-        }))).map((result) => (
-          <article className={`live-domain-result ${result.status}`} key={result.domain}>
-            <div>
-              <b>{result.domain}</b>
-              <span className={`status ${result.status === "dns_found" ? "amber" : result.status === "no_dns_signal" ? "good" : result.status === "ready" ? "blue" : "danger"}`}>
-                {result.status === "dns_found" ? "DNS found" : result.status === "no_dns_signal" ? "No DNS signal" : result.status === "ready" ? "Ready" : result.status}
-              </span>
-            </div>
-            <p>{result.summary}</p>
-            {result.records.length ? <small>NS: {result.records.join(" / ")}</small> : <small>Registrar check still required before purchase.</small>}
-            <div className="row-actions">
-              <button type="button" className="secondary compact-button" onClick={() => onPick(result.domain)}>
-                Use in wizard
-              </button>
-              <button type="button" className="ghost compact-button" onClick={() => onOpenRegistrar(result.domain)}>
-                Check registrar
-              </button>
-            </div>
-          </article>
-        ))}
+        }))).map((result) => {
+          const tone = result.status === "available" ? "good"
+            : result.status === "taken" ? "danger"
+            : result.status === "ready" ? "blue"
+            : "amber";
+          const label = result.status === "available" ? "Available"
+            : result.status === "taken" ? "Taken"
+            : result.status === "ready" ? "Ready"
+            : result.status === "unknown" ? "Check registrar"
+            : result.status === "invalid" ? "Invalid" : result.status;
+          return (
+            <article className={`live-domain-result ${result.status}`} key={result.domain}>
+              <div>
+                <b>{result.domain}</b>
+                <span className={`status ${tone}`}>{label}</span>
+              </div>
+              <p>{result.summary}</p>
+              <div className="live-domain-meta">
+                {result.priceTier ? <small className="price-tier" title="Rough first-year price tier">{result.priceTier}</small> : null}
+                {result.confidence === "authoritative" ? <small className="conf-badge">RDAP verified</small> : null}
+                {result.registrarConfirm ? <small className="confirm-note">Confirm at registrar before buying</small> : null}
+                {result.records?.length ? <small>DNS: {result.records.join(" / ")}</small> : null}
+              </div>
+              <div className="row-actions">
+                <button type="button" className="secondary compact-button" onClick={() => onPick(result.domain)}>
+                  Use in wizard
+                </button>
+                <button type="button" className="ghost compact-button" onClick={() => onOpenRegistrar(result.domain)}>
+                  Check registrar
+                </button>
+              </div>
+            </article>
+          );
+        })}
       </div>
     </div>
   );

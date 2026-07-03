@@ -48,7 +48,7 @@ export const liveRoomProviders: Array<{ id: LiveRoomProvider; name: string; icon
 ];
 
 export const domainTagPresets = ["launch", "client", "vip", "community", "paid", "internal"] as const;
-export const domainSearchTlds = ["com", "io", "app", "dev", "ai"] as const;
+export const domainSearchTlds = ["com", "io", "app", "gg", "dev", "ai"] as const;
 
 export const providerLogoPresets: Record<LiveRoomProvider, string> = {
   zoom: "https://upload.wikimedia.org/wikipedia/commons/7/7b/Zoom_Communications_Logo.svg",
@@ -191,9 +191,22 @@ export function defaultDomainTags(domain: FriskyDomain) {
 
 export type DomainSearchResult = {
   domain: string;
-  status: "ready" | "dns_found" | "no_dns_signal" | "invalid" | "error";
+  status: "ready" | "available" | "taken" | "unknown" | "invalid" | "error";
   summary: string;
   records: string[];
+  priceTier?: string;
+  registrarConfirm?: boolean;
+  confidence?: "authoritative" | "signal" | "none";
+};
+
+type AvailabilityApiResult = {
+  domain: string;
+  verdict: "available" | "taken" | "unknown" | "invalid";
+  confidence: "authoritative" | "signal" | "none";
+  registrarConfirm: boolean;
+  summary: string;
+  records: string[];
+  priceTier: string;
 };
 
 export function cleanDomainSearchBase(value: string) {
@@ -214,37 +227,36 @@ export function domainSearchCandidates(value: string) {
   return domainSearchTlds.map((tld) => `${base}.${tld}`);
 }
 
+// Resolves availability on the Cloudflare edge (functions/api/domains/availability.ts)
+// via RDAP + DoH, so the check is independent of the visitor's local DNS resolver
+// — the cause of the old "Live DNS lookup timed out" failures behind a VPN.
 export async function lookupDomainDns(domain: string): Promise<DomainSearchResult> {
   if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain)) {
     return { domain, status: "invalid", summary: "Use a valid domain name.", records: [] };
   }
   try {
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 2800);
-    const response = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=NS`, {
-      headers: { accept: "application/dns-json" },
+    const timeout = window.setTimeout(() => controller.abort(), 9000);
+    const response = await fetch(`/api/domains/availability?domain=${encodeURIComponent(domain)}`, {
+      headers: { accept: "application/json" },
       signal: controller.signal
     });
     window.clearTimeout(timeout);
-    if (!response.ok) throw new Error("dns_lookup_failed");
-    const payload = (await response.json().catch(() => null)) as { Status?: number; Answer?: Array<{ data?: string }> } | null;
-    const records = (payload?.Answer ?? []).map((answer) => String(answer.data ?? "").replace(/\.$/, "")).filter(Boolean).slice(0, 3);
-    if (records.length) {
-      return {
-        domain,
-        status: "dns_found",
-        summary: "DNS exists. Treat as owned or already configured.",
-        records
-      };
-    }
+    if (!response.ok) throw new Error("availability_lookup_failed");
+    const payload = (await response.json().catch(() => null)) as { ok?: boolean; results?: AvailabilityApiResult[] } | null;
+    const first = payload?.results?.[0];
+    if (!payload?.ok || !first) throw new Error("availability_no_result");
     return {
-      domain,
-      status: "no_dns_signal",
-      summary: "No NS signal found. Check registrar availability next.",
-      records: []
+      domain: first.domain,
+      status: first.verdict === "invalid" ? "invalid" : first.verdict,
+      summary: first.summary,
+      records: first.records ?? [],
+      priceTier: first.priceTier,
+      registrarConfirm: first.registrarConfirm,
+      confidence: first.confidence
     };
   } catch {
-    return { domain, status: "error", summary: "Live DNS lookup timed out. Check registrar availability directly.", records: [] };
+    return { domain, status: "unknown", summary: "Couldn't reach the availability service. Check at a registrar directly.", records: [], registrarConfirm: true };
   }
 }
 
