@@ -6585,3 +6585,471 @@ p {
     grid-template-columns: 1fr;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Community Gate 2.0 — walkthrough journey, animated flow, gate aura,
+   monogram builder, live-preview chrome. Appended as an override layer.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Walkthrough: header ─────────────────────────────────────────── */
+.walkthrough-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: max-content;
+  border: 1px solid rgba(34,199,168,.4);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: var(--teal);
+  font-size: 11.5px;
+  font-weight: 900;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  background: rgba(34,199,168,.08);
+  box-shadow: 0 0 18px rgba(34,199,168,.14);
+  animation: gateKickerPulse 4.2s ease-in-out infinite;
+}
+
+.walkthrough-kicker svg {
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes gateKickerPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(34,199,168,.1); }
+  50% { box-shadow: 0 0 24px rgba(34,199,168,.3); }
+}
+
+/* ── Walkthrough: journey cards with orbs + stagger ──────────────── */
+.community-gate-walkthrough-grid {
+  position: relative;
+  gap: 12px;
+}
+
+.community-gate-walkthrough-grid article {
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  border-radius: 12px;
+  background: linear-gradient(160deg, rgba(9,16,16,.9), rgba(6,10,12,.72));
+  transition: transform .28s ease, border-color .28s ease, box-shadow .28s ease;
+  animation: walkthroughRise .7s cubic-bezier(.22,.9,.28,1) both;
+  animation-delay: calc(var(--stagger, 0) * 120ms);
+}
+
+.community-gate-walkthrough-grid article:hover {
+  transform: translateY(-4px);
+  border-color: rgba(34,199,168,.45);
+  box-shadow: 0 14px 34px rgba(0,0,0,.4), 0 0 22px rgba(34,199,168,.12);
+}
+
+.community-gate-walkthrough-grid article::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(34,199,168,.08) 50%, transparent 70%);
+  background-size: 240% 100%;
+  animation: walkthroughSheen 6.5s ease-in-out infinite;
+  animation-delay: calc(var(--stagger, 0) * 800ms);
+  pointer-events: none;
+}
+
+@keyframes walkthroughRise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes walkthroughSheen {
+  0%, 55% { background-position: 120% 0; }
+  85%, 100% { background-position: -120% 0; }
+}
+
+.walkthrough-orb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(34,199,168,.4) !important;
+  border-radius: 13px !important;
+  padding: 0 !important;
+  color: var(--teal) !important;
+  background: radial-gradient(circle at 32% 28%, rgba(34,199,168,.24), rgba(4,10,10,.9));
+  box-shadow: 0 0 16px rgba(34,199,168,.16);
+}
+
+.walkthrough-orb svg {
+  width: 22px;
+  height: 22px;
+}
+
+.walkthrough-orb i {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  border: 1px solid rgba(255,51,78,.5);
+  border-radius: 999px;
+  padding: 0 4px;
+  color: #ff9dad;
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 900;
+  background: rgba(20,5,8,.94);
+}
+
+/* ── Walkthrough: flow pipeline with traveling signal ────────────── */
+.community-gate-flow {
+  position: relative;
+  isolation: isolate;
+  border-radius: 12px;
+  border: 1px solid rgba(241,183,92,.16);
+  padding: 14px 12px 12px;
+  background: rgba(10,8,4,.4);
+  overflow: hidden;
+}
+
+.community-gate-flow::before {
+  content: "";
+  position: absolute;
+  left: 3%;
+  right: 3%;
+  top: 50%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(241,183,92,.4) 12%, rgba(241,183,92,.4) 88%, transparent);
+  z-index: -1;
+}
+
+.flow-signal {
+  position: absolute;
+  top: calc(50% - 2px);
+  left: 0;
+  width: 46px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, #f1b75c, #fff2dd);
+  filter: drop-shadow(0 0 8px rgba(241,183,92,.8));
+  animation: gateFlowSignal 5.2s cubic-bezier(.5,.05,.5,.95) infinite;
+  min-height: 0 !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+@keyframes gateFlowSignal {
+  0% { left: -8%; opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { left: 104%; opacity: 0; }
+}
+
+.community-gate-flow .flow-node {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  align-content: start;
+  background: linear-gradient(160deg, rgba(24,18,8,.92), rgba(12,9,5,.88));
+  border-color: rgba(241,183,92,.3);
+  border-radius: 10px;
+  transition: transform .25s ease, border-color .25s ease;
+  animation: walkthroughRise .6s ease both;
+  animation-delay: calc(var(--stagger, 0) * 110ms);
+}
+
+.community-gate-flow .flow-node:hover {
+  transform: translateY(-3px);
+  border-color: rgba(241,183,92,.6);
+}
+
+.community-gate-flow .flow-node i {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(241,183,92,.5);
+  border-radius: 999px;
+  color: #f1b75c;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  background: rgba(241,183,92,.1);
+  animation: flowNodePing 5.2s ease infinite;
+  animation-delay: calc(var(--stagger, 0) * 1.04s);
+}
+
+@keyframes flowNodePing {
+  0%, 14%, 100% { box-shadow: 0 0 0 0 rgba(241,183,92,0); }
+  7% { box-shadow: 0 0 0 7px rgba(241,183,92,.16); }
+}
+
+/* ── Walkthrough: value trio ─────────────────────────────────────── */
+.community-gate-wow div {
+  border-radius: 12px;
+  transition: transform .28s ease, box-shadow .28s ease;
+  animation: walkthroughRise .7s ease both;
+  animation-delay: calc(var(--stagger, 0) * 140ms);
+}
+
+.community-gate-wow div:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 36px rgba(0,0,0,.42), 0 0 24px rgba(34,199,168,.14);
+}
+
+/* ── Public gate card: aura + guarded chip + step sequence ───────── */
+.community-gate-card {
+  position: relative;
+  isolation: isolate;
+}
+
+.gate-aura {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--gate-aura-angle, 0deg),
+    transparent 0%,
+    color-mix(in srgb, var(--theme-primary, #22c7a8) 85%, white) 8%,
+    transparent 18%,
+    transparent 46%,
+    color-mix(in srgb, var(--theme-accent, #9b8cff) 70%, transparent) 55%,
+    transparent 64%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: gateAuraSpin 7s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@property --gate-aura-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes gateAuraSpin {
+  to { --gate-aura-angle: 360deg; }
+}
+
+.community-gate-steps section {
+  transition: border-color .3s ease, background .3s ease, transform .3s ease;
+  animation: walkthroughRise .6s ease both;
+}
+
+.community-gate-steps section:nth-child(1) { animation-delay: 80ms; }
+.community-gate-steps section:nth-child(2) { animation-delay: 190ms; }
+.community-gate-steps section:nth-child(3) { animation-delay: 300ms; }
+
+.community-gate-steps section:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--theme-primary, #22c7a8) 55%, transparent);
+}
+
+.community-gate-steps b {
+  animation: gateStepBeat 4.8s ease infinite;
+}
+
+.community-gate-steps section:nth-child(1) b { animation-delay: 0s; }
+.community-gate-steps section:nth-child(2) b { animation-delay: 1.6s; }
+.community-gate-steps section:nth-child(3) b { animation-delay: 3.2s; }
+
+@keyframes gateStepBeat {
+  0%, 18%, 100% { text-shadow: none; }
+  9% { text-shadow: 0 0 14px color-mix(in srgb, var(--theme-primary, #22c7a8) 80%, transparent); }
+}
+
+.community-guarded-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 12px;
+  width: 100%;
+  color: color-mix(in srgb, var(--theme-primary, #22c7a8) 75%, #cfe8e1);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  opacity: .82;
+}
+
+.community-guarded-chip svg {
+  width: 15px;
+  height: 15px;
+  animation: gateKickerPulse 4.2s ease-in-out infinite;
+}
+
+.community-submit-button {
+  background: linear-gradient(120deg,
+    color-mix(in srgb, var(--theme-primary, #22c7a8) 88%, black),
+    color-mix(in srgb, var(--theme-accent, #9b8cff) 82%, black)) !important;
+  background-size: 180% 180% !important;
+  animation: authButtonGradient 6s ease infinite;
+  border: none;
+}
+
+/* ── Wizard: authorized chip, monogram card, preview chrome ──────── */
+.brand-wizard-authorized {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  width: max-content;
+  border: 1px solid rgba(34,199,168,.32);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: var(--teal);
+  font-size: 11.5px;
+  font-weight: 800;
+  background: rgba(34,199,168,.07);
+}
+
+.brand-wizard-authorized svg {
+  width: 14px;
+  height: 14px;
+}
+
+.brand-monogram-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid rgba(34,199,168,.34);
+  border-radius: 12px;
+  padding: 13px 14px;
+  background:
+    radial-gradient(circle at 8% 20%, rgba(34,199,168,.14), transparent 42%),
+    rgba(5,12,12,.7);
+}
+
+.brand-monogram-card b {
+  display: block;
+  color: #f3fffa;
+  font-size: 14px;
+}
+
+.brand-monogram-card small {
+  display: block;
+  margin-top: 3px;
+  color: #9fb4ad;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.brand-monogram-preview {
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  animation: mascotBreathe 5s ease-in-out infinite;
+  filter: drop-shadow(0 6px 16px rgba(34,199,168,.24));
+}
+
+.brand-wizard-preview {
+  position: relative;
+}
+
+.brand-wizard-preview-chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+  padding: 9px 13px;
+  background: rgba(8,12,13,.92);
+}
+
+.preview-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #2fe6a7;
+  box-shadow: 0 0 0 0 rgba(47,230,167,.5);
+  animation: previewLivePulse 2.2s ease infinite;
+}
+
+@keyframes previewLivePulse {
+  0% { box-shadow: 0 0 0 0 rgba(47,230,167,.5); }
+  70% { box-shadow: 0 0 0 8px rgba(47,230,167,0); }
+  100% { box-shadow: 0 0 0 0 rgba(47,230,167,0); }
+}
+
+.preview-live-label {
+  color: #2fe6a7;
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.preview-url {
+  margin-left: auto;
+  overflow: hidden;
+  max-width: 60%;
+  color: #9fb4ad;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The wizard preview embeds the full AuthSurface into a narrow rail; the
+   hero column is meant for a whole viewport and collapses into vertical
+   letter soup there. Show only the gate card, cleanly framed. */
+.brand-wizard-preview .community-auth-surface {
+  border-radius: 0 0 12px 12px;
+  overflow: hidden;
+}
+
+.brand-wizard-preview .auth-hero-copy {
+  display: grid;
+  justify-items: center;
+  padding: 0;
+}
+
+.brand-wizard-preview .auth-hero-copy h1,
+.brand-wizard-preview .auth-hero-copy p,
+.brand-wizard-preview .auth-hero-copy .protocol-rail,
+.brand-wizard-preview .auth-hero-visual {
+  display: none;
+}
+
+.brand-wizard-preview .auth-wordmark {
+  max-width: 150px;
+  max-height: 54px;
+  margin: 0;
+}
+
+.brand-wizard-preview .auth-shell {
+  grid-template-columns: 1fr;
+  gap: 14px;
+  padding: 22px 20px 26px;
+}
+
+.brand-wizard-preview .auth-language-dock {
+  display: none;
+}
+
+/* ── Reduced motion: freeze the layer's animation, keep the design ── */
+@media (prefers-reduced-motion: reduce) {
+  .walkthrough-kicker,
+  .community-gate-walkthrough-grid article,
+  .community-gate-walkthrough-grid article::after,
+  .flow-signal,
+  .community-gate-flow .flow-node,
+  .community-gate-flow .flow-node i,
+  .community-gate-wow div,
+  .gate-aura,
+  .community-gate-steps section,
+  .community-gate-steps b,
+  .community-guarded-chip svg,
+  .community-submit-button,
+  .brand-monogram-preview,
+  .preview-live-dot {
+    animation: none !important;
+    transition: none !important;
+  }
+}

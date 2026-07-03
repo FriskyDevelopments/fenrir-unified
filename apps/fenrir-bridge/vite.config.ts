@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { fenrirDevMockApi } from "./dev/mockApi";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -8,6 +9,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
+      // Serve-time only; enabled by `npm run dev:mock` for UI work without WorkOS/Neon.
+      ...(env.FENRIR_DEV_MOCK_API === "1" ? [fenrirDevMockApi()] : []),
       {
         name: "fenrir-local-supabase-auth-redirect",
         configureServer(server) {
