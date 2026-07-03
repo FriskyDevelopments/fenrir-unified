@@ -35,7 +35,17 @@ export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
     // Google/Microsoft/Apple's own branded sign-in. Providers without direct
     // credentials fall through to the AuthKit path below, which is the robust
     // default (AuthKit shows exactly the methods the environment has enabled).
+    //
+    // Gated behind FENRIR_DIRECT_SOCIAL_LOGIN=1 because the direct flow only
+    // completes once the provider's own console has our callback registered
+    // (Google: https://www.myfenrir.com/api/auth/callback/google as an
+    // Authorized redirect URI). Until that's set, direct Google returns
+    // redirect_uri_mismatch — so default OFF keeps the working WorkOS flow, and
+    // the owner flips this to "1" the moment the redirect URI is registered.
+    const directSocialEnabled =
+      (context.env as unknown as { FENRIR_DIRECT_SOCIAL_LOGIN?: string }).FENRIR_DIRECT_SOCIAL_LOGIN === "1";
     if (
+      directSocialEnabled &&
       providerParam &&
       providerParam !== "workos" &&
       isOAuthProvider(providerParam) &&
