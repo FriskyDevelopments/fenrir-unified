@@ -118,6 +118,34 @@ export function fenrirDevMockApi(): Plugin {
           return json(res, 200, { ok: true, message: "Magic link sent (dev mock).", devLink: "/community/neon-nexus?mock-link=1" });
         }
 
+        // Representative availability payload so the live-domain-search UI can be
+        // previewed/screenshotted locally. Prod uses the real RDAP+DoH endpoint.
+        if (url === "/api/domains/availability") {
+          const raw = ((req.url ?? "").split("?")[1] ?? "");
+          const params = new URLSearchParams(raw);
+          const domain = (params.get("domain") || params.get("domains") || "").split(",")[0] ?? "";
+          const tld = domain.split(".").pop() ?? "com";
+          const takenSet = new Set(["com", "io", "dev"]);
+          const taken = takenSet.has(tld);
+          const tiers: Record<string, string> = { com: "$", io: "$$$", app: "$", gg: "$$$$", dev: "$", ai: "$$$$", wolf: "$$", pack: "$$" };
+          return json(res, 200, {
+            ok: true,
+            results: [
+              {
+                domain,
+                verdict: taken ? "taken" : "available",
+                confidence: "authoritative",
+                source: "rdap+dns",
+                taken,
+                registrarConfirm: false,
+                summary: taken ? "Registered. This domain is taken." : "Not registered — available.",
+                records: taken ? ["ns1.example-dns.com"] : [],
+                priceTier: tiers[tld] ?? "$$"
+              }
+            ]
+          });
+        }
+
         // Everything else: 404 JSON so the SPA's built-in devApiFallback demo
         // store (src/services/api.ts) takes over — it already mocks auth,
         // app-state, billing, and the rest of the dashboard in DEV.

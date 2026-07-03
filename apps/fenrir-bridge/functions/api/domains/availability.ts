@@ -33,6 +33,29 @@ const PRICE_TIERS: Record<string, string> = {
   gold: "$$$", club: "$", live: "$", chat: "$$", social: "$$", community: "$$"
 };
 
+// IANA-bootstrapped RDAP base URLs for the TLDs the wizard/front-door set uses.
+// ccTLDs without RDAP (.ai Anguilla, .gg Guernsey) are intentionally absent —
+// they resolve via the DNS signal only.
+const RDAP_BASE: Record<string, string> = {
+  com: "https://rdap.verisign.com/com/v1/",
+  net: "https://rdap.verisign.com/net/v1/",
+  org: "https://rdap.publicinterestregistry.org/rdap/",
+  app: "https://www.registry.google/rdap/",
+  dev: "https://www.registry.google/rdap/",
+  gold: "https://rdap.identitydigital.services/rdap/",
+  wolf: "https://rdap.identitydigital.services/rdap/",
+  pack: "https://rdap.identitydigital.services/rdap/",
+  live: "https://rdap.identitydigital.services/rdap/",
+  chat: "https://rdap.identitydigital.services/rdap/",
+  social: "https://rdap.identitydigital.services/rdap/",
+  community: "https://rdap.identitydigital.services/rdap/",
+  io: "https://rdap.nic.io/",
+  co: "https://rdap.nic.co/",
+  me: "https://rdap.nic.me/",
+  club: "https://rdap.nic.club/",
+  xyz: "https://rdap.centralnic.com/xyz/"
+};
+
 function tldOf(domain: string): string {
   const parts = domain.split(".");
   return parts[parts.length - 1] ?? "";
@@ -58,16 +81,24 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms: number): Pro
 // reports the domain is not registered (available) OR no RDAP server exists for
 // the TLD — the two are disambiguated by the caller using the DNS signal.
 async function rdapStatus(domain: string): Promise<"taken" | "notfound" | "unknown"> {
-  const res = await fetchWithTimeout(
-    `https://rdap.org/domain/${encodeURIComponent(domain)}`,
-    { headers: { accept: "application/rdap+json" }, redirect: "follow" },
-    4500
-  );
-  if (!res) return "unknown";
-  if (res.status === 200) return "taken";
-  if (res.status === 404) return "notfound";
-  if (res.status === 429 || res.status >= 500) return "unknown";
-  // Some registries answer 400/403 for malformed/embargoed — treat as unknown.
+  const headers = {
+    accept: "application/rdap+json, application/json",
+    "user-agent": "MyFenrir-DomainWizard/1.0 (+https://www.myfenrir.com)"
+  };
+  // Prefer the IANA-bootstrapped registry RDAP endpoint for known TLDs (direct,
+  // no aggregator hop); fall back to rdap.org (which redirects to the registry).
+  const direct = RDAP_BASE[tldOf(domain)];
+  const urls = direct
+    ? [`${direct}domain/${encodeURIComponent(domain)}`, `https://rdap.org/domain/${encodeURIComponent(domain)}`]
+    : [`https://rdap.org/domain/${encodeURIComponent(domain)}`];
+  for (const url of urls) {
+    const res = await fetchWithTimeout(url, { headers, redirect: "follow" }, 6500);
+    if (!res) continue;
+    if (res.status === 200) return "taken";
+    if (res.status === 404) return "notfound";
+    if (res.status === 422 || res.status === 400) continue; // malformed at this registry; try next
+    // 429/5xx/403 → try the next endpoint before giving up.
+  }
   return "unknown";
 }
 
