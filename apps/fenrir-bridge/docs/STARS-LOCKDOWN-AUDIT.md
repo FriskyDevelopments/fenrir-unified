@@ -30,7 +30,11 @@ The task brief (relayed via Frisky Claw) asserted five components as "live & ver
 
 ## 4. Changes staged on branch `feat/stars-entitlement-lockdown`
 
-All in `workers/fenrir-stars-payments.js` (syntax-checked, **not yet deployed**):
+All in `workers/fenrir-stars-payments.js` (syntax-checked, **not yet deployed**; commits `1f32103` + `0f57f5f`):
+
+- **Fail-closed webhook secret**: a missing `TELEGRAM_WEBHOOK_SECRET` now rejects updates instead of skipping validation.
+- **Order lifecycle enforcement**: `markPaid` requires a matching order in `pending` (idempotent replay of the same charge id allowed).
+- **Callback payer identity fix**: invoices from the inline "Stars" button were created under the *bot's* Telegram id (`callbackMessage.from` is the bot), so `pre_checkout` user-matching could never pass — a likely root cause of the stuck orders. Invoices now use `query.from` (the human).
 
 - **Hardened `markPaid`**: rejects foreign invoice payloads (non-`fenrir_stars:` prefix) and payer/order mismatches; logs anomalies; user gets a reconciliation message instead of a false "activated".
 - **`GET /health/stars`**: public dashboard (JSON, `?format=html` for HTML) — orders/entitlements/link-codes by status, identity-link count, last 5 orders with masked Telegram IDs.
