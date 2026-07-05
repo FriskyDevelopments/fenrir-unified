@@ -33,28 +33,65 @@ const PRICE_TIERS: Record<string, string> = {
   gold: "$$$", club: "$", live: "$", chat: "$$", social: "$$", community: "$$"
 };
 
-// IANA-bootstrapped RDAP base URLs for the TLDs the wizard/front-door set uses.
-// ccTLDs without RDAP (.ai Anguilla, .gg Guernsey) are intentionally absent —
-// they resolve via the DNS signal only.
-const RDAP_BASE: Record<string, string> = {
+// Verified RDAP overrides for TLDs the IANA bootstrap gets wrong or omits.
+// Each was confirmed to return 200 (taken) / 404 (available) from the edge.
+// - .io is not in the IANA bootstrap but Identity Digital serves it.
+// - .ai/.io/etc. run on Identity Digital's shared RDAP.
+// The IANA bootstrap (fetched below) covers everything else authoritatively —
+// including .app/.dev (→ pubapi.registry.google/rdap/, which the old hardcoded
+// www.registry.google/rdap/ got wrong and 404'd on).
+const RDAP_OVERRIDE: Record<string, string> = {
+  io: "https://rdap.identitydigital.services/rdap/",
+  ai: "https://rdap.identitydigital.services/rdap/"
+};
+
+// Static fallback used only if the IANA bootstrap fetch fails, so we never fully
+// lose authoritative RDAP for the majors. Verified-correct endpoints.
+const RDAP_STATIC: Record<string, string> = {
   com: "https://rdap.verisign.com/com/v1/",
   net: "https://rdap.verisign.com/net/v1/",
   org: "https://rdap.publicinterestregistry.org/rdap/",
-  app: "https://www.registry.google/rdap/",
-  dev: "https://www.registry.google/rdap/",
-  gold: "https://rdap.identitydigital.services/rdap/",
-  wolf: "https://rdap.identitydigital.services/rdap/",
-  pack: "https://rdap.identitydigital.services/rdap/",
-  live: "https://rdap.identitydigital.services/rdap/",
-  chat: "https://rdap.identitydigital.services/rdap/",
-  social: "https://rdap.identitydigital.services/rdap/",
-  community: "https://rdap.identitydigital.services/rdap/",
-  io: "https://rdap.nic.io/",
-  co: "https://rdap.nic.co/",
-  me: "https://rdap.nic.me/",
-  club: "https://rdap.nic.club/",
+  app: "https://pubapi.registry.google/rdap/",
+  dev: "https://pubapi.registry.google/rdap/",
   xyz: "https://rdap.centralnic.com/xyz/"
 };
+
+// IANA RDAP bootstrap (tld -> registry RDAP base). Fetched once per isolate and
+// cached; Workers reuse isolates so this is effectively memoized across requests.
+let bootstrapCache: Record<string, string> | null = null;
+let bootstrapPromise: Promise<Record<string, string>> | null = null;
+
+async function loadBootstrap(): Promise<Record<string, string>> {
+  if (bootstrapCache) return bootstrapCache;
+  if (!bootstrapPromise) {
+    bootstrapPromise = (async () => {
+      const res = await fetchWithTimeout(
+        "https://data.iana.org/rdap/dns.json",
+        { headers: { accept: "application/json" } },
+        4000
+      );
+      const map: Record<string, string> = {};
+      if (res && res.ok) {
+        const data = (await res.json().catch(() => null)) as { services?: Array<[string[], string[]]> } | null;
+        for (const svc of data?.services ?? []) {
+          const [tlds, urls] = svc;
+          const base = (urls ?? []).find((u) => u.startsWith("https://")) ?? urls?.[0];
+          if (!base) continue;
+          for (const t of tlds ?? []) map[t.toLowerCase()] = base.endsWith("/") ? base : `${base}/`;
+        }
+      }
+      bootstrapCache = map;
+      return map;
+    })();
+  }
+  return bootstrapPromise;
+}
+
+async function rdapBaseFor(tld: string): Promise<string | null> {
+  if (RDAP_OVERRIDE[tld]) return RDAP_OVERRIDE[tld];
+  const boot = await loadBootstrap().catch(() => ({} as Record<string, string>));
+  return boot[tld] ?? RDAP_STATIC[tld] ?? null;
+}
 
 function tldOf(domain: string): string {
   const parts = domain.split(".");
@@ -77,28 +114,32 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms: number): Pro
   }
 }
 
-// RDAP: authoritative registration status. 200 = registered, 404 = the registry
-// reports the domain is not registered (available) OR no RDAP server exists for
-// the TLD — the two are disambiguated by the caller using the DNS signal.
-async function rdapStatus(domain: string): Promise<"taken" | "notfound" | "unknown"> {
+// RDAP registration status. Returns:
+//   "taken"     — an RDAP server returned 200 (authoritatively registered)
+//   "available" — a KNOWN registry RDAP endpoint returned 404 (authoritatively
+//                 not registered). Only trusted from an endpoint resolved via the
+//                 IANA bootstrap / verified override — never from a bare aggregator
+//                 404, which can mean "no RDAP server for this TLD" (a guess).
+//   "unknown"   — no RDAP endpoint for the TLD, or the endpoint was unreachable.
+async function rdapStatus(domain: string): Promise<"taken" | "available" | "unknown"> {
   const headers = {
     accept: "application/rdap+json, application/json",
     "user-agent": "MyFenrir-DomainWizard/1.0 (+https://www.myfenrir.com)"
   };
-  // Prefer the IANA-bootstrapped registry RDAP endpoint for known TLDs (direct,
-  // no aggregator hop); fall back to rdap.org (which redirects to the registry).
-  const direct = RDAP_BASE[tldOf(domain)];
-  const urls = direct
-    ? [`${direct}domain/${encodeURIComponent(domain)}`, `https://rdap.org/domain/${encodeURIComponent(domain)}`]
-    : [`https://rdap.org/domain/${encodeURIComponent(domain)}`];
-  for (const url of urls) {
-    const res = await fetchWithTimeout(url, { headers, redirect: "follow" }, 6500);
-    if (!res) continue;
-    if (res.status === 200) return "taken";
-    if (res.status === 404) return "notfound";
-    if (res.status === 422 || res.status === 400) continue; // malformed at this registry; try next
-    // 429/5xx/403 → try the next endpoint before giving up.
+  const base = await rdapBaseFor(tldOf(domain));
+  if (base) {
+    const res = await fetchWithTimeout(`${base}domain/${encodeURIComponent(domain)}`, { headers, redirect: "follow" }, 6500);
+    if (res) {
+      if (res.status === 200) return "taken";
+      if (res.status === 404) return "available"; // authoritative: the registry has no such registration
+      // 429/5xx/403/malformed → fall through to the aggregator for a taken-confirm only.
+    }
   }
+  // Aggregator can only positively CONFIRM "taken" (a 200). We never infer
+  // availability from its 404, because that may just mean it has no RDAP server
+  // for the TLD — that path is left to the DNS signal / "couldn't check".
+  const agg = await fetchWithTimeout(`https://rdap.org/domain/${encodeURIComponent(domain)}`, { headers, redirect: "follow" }, 6000);
+  if (agg && agg.status === 200) return "taken";
   return "unknown";
 }
 
@@ -141,28 +182,26 @@ async function checkDomain(domain: string): Promise<AvailabilityResult> {
 
   const [rdap, dns] = await Promise.all([rdapStatus(domain), dnsSignal(domain)]);
 
-  // RDAP is authoritative when it returns a definite registered result.
+  // RDAP is authoritative for registration status.
   if (rdap === "taken") {
     return { ...base, verdict: "taken", confidence: "authoritative", source: dns.records.length ? "rdap+dns" : "rdap", taken: true, registrarConfirm: false, summary: "Registered. This domain is taken.", records: dns.records };
   }
 
-  if (rdap === "notfound") {
-    // Registry says not-registered. Corroborate with DNS: no records → strong
-    // available; records present → RDAP bootstrap gap, treat as taken.
-    if (dns.taken === true) {
-      return { ...base, verdict: "taken", confidence: "signal", source: "dns", taken: true, registrarConfirm: true, summary: "DNS is configured — likely registered. Confirm at a registrar.", records: dns.records };
-    }
-    return { ...base, verdict: "available", confidence: dns.taken === false ? "authoritative" : "signal", source: dns.taken === false ? "rdap+dns" : "rdap", taken: false, registrarConfirm: dns.taken !== false, summary: dns.taken === false ? "Not registered — available." : "No registration found — likely available. Confirm at a registrar.", records: [] };
+  if (rdap === "available") {
+    // The registry's own RDAP says the name is not registered. This is
+    // authoritative even if stale DNS lingers from a recently-dropped domain.
+    return { ...base, verdict: "available", confidence: "authoritative", source: dns.taken === false ? "rdap+dns" : "rdap", taken: false, registrarConfirm: false, summary: "Not registered — available.", records: [] };
   }
 
-  // RDAP unknown (no service for TLD, rate-limited, or unreachable) → DNS only.
+  // RDAP unavailable for this TLD (no endpoint or unreachable) → DNS signal only.
   if (dns.taken === true) {
     return { ...base, verdict: "taken", confidence: "signal", source: "dns", taken: true, registrarConfirm: true, summary: "DNS is configured — likely registered. Confirm at a registrar.", records: dns.records };
   }
   if (dns.taken === false) {
-    return { ...base, verdict: "available", confidence: "signal", source: "dns", taken: false, registrarConfirm: true, summary: "No DNS found — likely available. Confirm at a registrar.", records: [] };
+    return { ...base, verdict: "available", confidence: "signal", source: "dns", taken: false, registrarConfirm: true, summary: "No DNS record — likely available. Confirm at a registrar.", records: [] };
   }
-  return { ...base, verdict: "unknown", confidence: "none", source: "none", taken: null, registrarConfirm: true, summary: "Couldn't reach a live signal. Check at a registrar directly.", records: [] };
+  // Genuine lookup failure — say so, never guess.
+  return { ...base, verdict: "unknown", confidence: "none", source: "none", taken: null, registrarConfirm: true, summary: "Couldn't check right now — verify at a registrar.", records: [] };
 }
 
 function parseDomains(url: URL): string[] {
