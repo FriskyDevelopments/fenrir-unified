@@ -21,6 +21,147 @@ const botToken = (env, channel) => {
 const normalizeText = (value) => (value || "").trim();
 const BRIDGE_TARGET = "bridge.myfenrir.com";
 
+const ADMIN_HEADER = "x-fenrir-admin-token";
+
+const ALLOWED_WEBHOOK_TARGETS = [
+  "https://fenrir-bridge.pages.dev/api/telegram/webhook",
+  "https://www.myfenrir.com/api/telegram/webhook",
+  "https://fenrir-stars-payments.hrgrrtks2p.workers.dev/api/telegram/webhook"
+];
+
+// If FENRIR_ADMIN_TOKEN is set, admin routes require it. If unset, the routes stay
+// usable but constrained to read-only diagnostics and the idempotent canonical
+// webhook sync below — neither exposes secrets nor allows arbitrary targets.
+const adminAuthorized = (env, request) => {
+  const configured = normalizeText(env.FENRIR_ADMIN_TOKEN);
+  return !configured || request.headers.get(ADMIN_HEADER) === configured;
+};
+
+const CANONICAL_WEBHOOK_TARGET = "https://fenrir-bridge.pages.dev/api/telegram/webhook";
+
+const maskId = (value) => {
+  const s = String(value || "");
+  return s.length <= 4 ? "…" : `${s.slice(0, 2)}…${s.slice(-2)}`;
+};
+
+async function telegramDiag(env, channel) {
+  const token = botToken(env, channel);
+  if (!token) return { configured: false };
+  const call = async (method) => {
+    const response = await fetch(`https://api.telegram.org/bot${token}/${method}`);
+    return response.json().catch(() => null);
+  };
+  const me = await call("getMe");
+  const hook = await call("getWebhookInfo");
+  return {
+    configured: true,
+    bot: me?.ok
+      ? { id: me.result.id, username: me.result.username }
+      : { error: me?.description || "getMe_failed" },
+    webhook: hook?.ok
+      ? {
+          url: hook.result.url || "",
+          pending_update_count: hook.result.pending_update_count,
+          last_error_date: hook.result.last_error_date || null,
+          last_error_message: hook.result.last_error_message || null
+        }
+      : { error: hook?.description || "getWebhookInfo_failed" }
+  };
+}
+
+async function syncTelegramWebhook(env, channel, initialTargetUrl) {
+  let targetUrl = initialTargetUrl;
+  const token = botToken(env, channel);
+  if (!token) return { ok: false, error: "missing_telegram_token" };
+  const secret = normalizeText(env.TELEGRAM_WEBHOOK_SECRET);
+  if (!secret) return { ok: false, error: "missing_webhook_secret" };
+  if (!ALLOWED_WEBHOOK_TARGETS.some((allowed) => targetUrl.startsWith(allowed))) {
+    return { ok: false, error: "target_not_allowed" };
+  }
+  if (channel === "dev" && !targetUrl.includes("bot=dev")) {
+    targetUrl = `${targetUrl}?bot=dev`;
+  }
+
+  // The target must accept this worker's secret before Telegram is pointed at it,
+  // otherwise every real update would bounce with a 401.
+  const probe = await fetch(targetUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-telegram-bot-api-secret-token": secret },
+    body: JSON.stringify({ update_id: 0 })
+  });
+  if (probe.status !== 200) return { ok: false, error: "target_probe_failed", probeStatus: probe.status };
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      url: targetUrl,
+      secret_token: secret,
+      allowed_updates: ["message", "pre_checkout_query", "callback_query"]
+    })
+  });
+  const data = await response.json().catch(() => null);
+  if (!data?.ok) return { ok: false, error: data?.description || "setWebhook_failed" };
+  return { ok: true, url: targetUrl };
+}
+
+async function starsHealth(env) {
+  const [orders, lastOrders, entitlements, linkCodes, identityLinks] = await Promise.all([
+    env.DB.prepare(`SELECT status, COUNT(*) AS n FROM telegram_stars_orders GROUP BY status`).all(),
+    env.DB.prepare(
+      `SELECT telegram_user_id, status, amount, created_at, paid_at
+       FROM telegram_stars_orders ORDER BY created_at DESC LIMIT 5`
+    ).all(),
+    env.DB.prepare(`SELECT status, COUNT(*) AS n FROM telegram_stars_entitlements GROUP BY status`).all(),
+    env.DB.prepare(`SELECT status, COUNT(*) AS n FROM telegram_account_link_codes GROUP BY status`).all(),
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM telegram_identity_links`).first()
+  ]);
+  const tally = (rows) => Object.fromEntries((rows.results || []).map((r) => [r.status, r.n]));
+  return {
+    ok: true,
+    service: "fenrir-stars-payments",
+    generated_at: nowIso(),
+    orders: tally(orders),
+    entitlements: tally(entitlements),
+    link_codes: tally(linkCodes),
+    identity_links: identityLinks?.n ?? 0,
+    recent_orders: (lastOrders.results || []).map((r) => ({
+      telegram_user_id: maskId(r.telegram_user_id),
+      status: r.status,
+      amount: r.amount,
+      created_at: r.created_at,
+      paid_at: r.paid_at || null
+    }))
+  };
+}
+
+function starsHealthHtml(health) {
+  const row = (cells) => `<tr>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`;
+  const dict = (obj) =>
+    Object.entries(obj).length
+      ? Object.entries(obj)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ")
+      : "none";
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Fenrir Stars Health</title>
+<style>body{font-family:ui-monospace,monospace;background:#0b0e14;color:#e6e6e6;padding:24px}
+table{border-collapse:collapse;margin-top:12px}td,th{border:1px solid #333;padding:6px 12px;text-align:left}
+h1{font-size:18px}code{color:#7fd4ff}</style></head><body>
+<h1>Fenrir Stars — Entitlement Pipeline Health</h1>
+<p>Generated <code>${health.generated_at}</code></p>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+${row(["Orders by status", dict(health.orders)])}
+${row(["Entitlements by status", dict(health.entitlements)])}
+${row(["Link codes by status", dict(health.link_codes)])}
+${row(["Identity links (claimed)", health.identity_links])}
+</table>
+<h1>Last 5 orders</h1>
+<table><tr><th>User</th><th>Status</th><th>Stars</th><th>Created</th><th>Paid</th></tr>
+${health.recent_orders.map((o) => row([o.telegram_user_id, o.status, o.amount, o.created_at, o.paid_at || "—"])).join("")}
+</table></body></html>`;
+}
+
 const FENRIR_BOT_BRIEF = [
   "You are Fenrir Bot by Frisky.",
   "You are NOT Pupbot. You are NOT Gemini Pupbot. You are NOT a generic assistant.",
@@ -170,6 +311,31 @@ function linkCodeFromStart(text) {
 async function markPaid(env, payment, message, order) {
   const ts = nowIso();
   const telegramUserId = String(message.from?.id || order?.telegram_user_id || message.chat.id);
+  if (!payment.invoice_payload?.startsWith("fenrir_stars:")) {
+    console.error("stars_webhook_rejected_foreign_payload", { payload: String(payment.invoice_payload || "").slice(0, 40) });
+    return { ok: false, reason: "foreign_payload" };
+  }
+  if (!order) {
+    console.error("stars_webhook_order_not_found", { payload: String(payment.invoice_payload || "").slice(0, 40) });
+    return { ok: false, reason: "order_not_found" };
+  }
+  if (String(order.telegram_user_id) !== telegramUserId) {
+    console.error("stars_webhook_payer_order_mismatch", { payer: telegramUserId, order: String(order.telegram_user_id) });
+    return { ok: false, reason: "payer_mismatch" };
+  }
+  const replaySameCharge =
+    order.status === "paid" && order.telegram_payment_charge_id === payment.telegram_payment_charge_id;
+  if (order.status !== "pending" && !replaySameCharge) {
+    console.error("stars_webhook_order_not_pending", { payload: order.payload, status: order.status });
+    return { ok: false, reason: "order_not_pending" };
+  }
+  if (payment.currency !== "XTR" || payment.total_amount !== Number(order.amount)) {
+    console.error("stars_webhook_amount_mismatch", {
+      got: `${payment.total_amount} ${payment.currency}`,
+      expected: `${order.amount} XTR`
+    });
+    return { ok: false, reason: "amount_mismatch" };
+  }
   await env.DB.prepare(
     `UPDATE telegram_stars_orders
      SET status = 'paid', telegram_payment_charge_id = ?, paid_at = ?
@@ -203,6 +369,7 @@ async function markPaid(env, payment, message, order) {
       ts
     )
     .run();
+  return { ok: true };
 }
 
 async function sendStarsInvoice(env, channel, message) {
@@ -450,7 +617,10 @@ async function handleTelegramWebhook(request, env, url) {
   if (!botToken(env, channel)) return json({ ok: false, error: "missing_telegram_token" }, { status: 500 });
 
   const configuredSecret = normalizeText(env.TELEGRAM_WEBHOOK_SECRET);
-  if (configuredSecret && request.headers.get("x-telegram-bot-api-secret-token") !== configuredSecret) {
+  if (!configuredSecret) {
+    return json({ ok: false, error: "webhook_secret_not_configured" }, { status: 500 });
+  }
+  if (request.headers.get("x-telegram-bot-api-secret-token") !== configuredSecret) {
     return json({ ok: false, error: "invalid_telegram_webhook_secret" }, { status: 401 });
   }
 
@@ -490,7 +660,8 @@ async function handleTelegramWebhook(request, env, url) {
         chat_id: callbackMessage.chat.id,
         text: "Fenrir Protocol payment box opening. Telegram Stars handles the transaction; Fenrir verifies access after payment."
       });
-      await sendStarsInvoice(env, channel, callbackMessage);
+      // Payer must be the human who tapped the button; callbackMessage.from is the bot itself.
+      await sendStarsInvoice(env, channel, { chat: callbackMessage.chat, from: query.from });
       return json({ ok: true });
     }
 
@@ -511,10 +682,12 @@ async function handleTelegramWebhook(request, env, url) {
   if (message?.successful_payment) {
     const payment = message.successful_payment;
     const order = await getOrder(env, payment.invoice_payload);
-    await markPaid(env, payment, message, order);
+    const result = await markPaid(env, payment, message, order);
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
-      text: `Fenrir Protocol activated.\n\nAccess: active\nStars: ${payment.total_amount}\nPayment rail: Telegram Stars`
+      text: result.ok
+        ? `Fenrir Protocol activated.\n\nAccess: active\nStars: ${payment.total_amount}\nPayment rail: Telegram Stars`
+        : "We received a Stars payment signal that did not match an active Fenrir order, so access was not changed. It has been logged for review — run /subscribe if you need a fresh invoice."
     });
     return json({ ok: true });
   }
@@ -579,6 +752,37 @@ export default {
         stars: starsPrice(env),
         mode: "telegram_stars"
       });
+    }
+
+    if (url.pathname === "/health/stars" && request.method === "GET") {
+      if (!env.DB) return json({ ok: false, error: "db_not_configured" }, { status: 500 });
+      const health = await starsHealth(env);
+      if (url.searchParams.get("format") === "html" || (request.headers.get("accept") || "").includes("text/html")) {
+        return new Response(starsHealthHtml(health), { headers: { "content-type": "text/html; charset=utf-8" } });
+      }
+      return json(health);
+    }
+
+    if (url.pathname === "/api/admin/telegram/diagnostics" && request.method === "GET") {
+      if (!adminAuthorized(env, request)) return json({ ok: false, error: "unauthorized" }, { status: 401 });
+      return json({ ok: true, prod: await telegramDiag(env, "prod"), dev: await telegramDiag(env, "dev") });
+    }
+
+    if (url.pathname === "/api/admin/telegram/sync-webhook" && request.method === "POST") {
+      if (!adminAuthorized(env, request)) return json({ ok: false, error: "unauthorized" }, { status: 401 });
+      const body = await request.json().catch(() => ({}));
+      const channel = body.channel === "dev" ? "dev" : "prod";
+      const requested = normalizeText(body.target_url);
+      // Without an admin token only the canonical target is accepted, so the worst
+      // an unauthenticated caller can do is enforce the correct configuration.
+      const targetUrl = normalizeText(env.FENRIR_ADMIN_TOKEN) ? requested || CANONICAL_WEBHOOK_TARGET : CANONICAL_WEBHOOK_TARGET;
+      const current = (await telegramDiag(env, channel)).webhook;
+      if (current?.url === `${targetUrl}?bot=${channel}` || current?.url === targetUrl) {
+        return json({ ok: true, unchanged: true, webhook: current });
+      }
+      const result = await syncTelegramWebhook(env, channel, targetUrl);
+      if (!result.ok) return json(result, { status: 422 });
+      return json({ ...result, webhook: (await telegramDiag(env, channel)).webhook });
     }
 
     if (url.pathname === "/api/readiness" && request.method === "GET") {
