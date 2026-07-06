@@ -3476,14 +3476,13 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
             <span>{c.authTitle}</span>
           </h2>
           <div className="auth-actions">
-            {/* Only offer providers that complete end-to-end. Google jumps straight
-                to accounts.google.com (WorkOS connection jump — no AuthKit box).
-                Apple: WorkOS connection disabled (404) → dead-ends on the AuthKit box.
-                Microsoft: the Azure app behind the WorkOS connection is missing
-                WorkOS's redirect URI (invalid_request at login.microsoftonline.com)
-                → broken through the box too. Restore each button when its
-                connection is fixed in the WorkOS dashboard / Azure portal. */}
             <AuthProviderButton provider="google" label={c.continueGoogle} onClick={() => void signInWithProvider("google")} />
+            <AuthProviderButton provider="microsoft" label={c.continueMicrosoft} onClick={() => void signInWithProvider("microsoft")} />
+            {/* Apple: WorkOS "Sign in with Apple" connection not yet configured.
+                Owner must: WorkOS Dashboard → Auth → OAuth providers → Sign in with Apple → Enable,
+                then supply Apple Team ID / Service ID / Private Key / Key ID.
+                Once working, add "apple" to WORKOS_DIRECT_CONNECTIONS and restore:
+            <AuthProviderButton provider="apple" label={c.continueApple} onClick={() => void signInWithProvider("apple")} /> */}
           </div>
           <div className="auth-passkey-row">
             <button type="button" className="secondary" onClick={() => void signInWithPasskey()}>

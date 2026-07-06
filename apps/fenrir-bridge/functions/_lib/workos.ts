@@ -55,15 +55,22 @@ export async function buildAuthorizationUrl(
   // Jump straight to the provider's own sign-in (e.g. GoogleOAuth) instead of
   // the hosted AuthKit selector — the generic "WorkOS box". The jump stays
   // inside the WorkOS-brokered flow (WorkOS's own registered callback), so
-  // there is no redirect_uri_mismatch on OUR side. Hazards, verified live:
-  //   - a connection not enabled in this WorkOS env 404s (Apple);
-  //   - MicrosoftOAuth 302s to login.microsoftonline.com but the Azure app
-  //     behind the connection is missing WorkOS's redirect URI → Microsoft
-  //     rejects with invalid_request (broken through AuthKit too — fix is in
-  //     the Azure portal / WorkOS dashboard, not here).
-  // Gate on the works-end-to-end allow-list (default: google only).
+  // there is no redirect_uri_mismatch on OUR side.
+  //
+  // Default allow-list: google + microsoft. Google is fully wired end-to-end.
+  // Microsoft is wired in WorkOS but requires ONE owner action: add the WorkOS
+  // Redirect URI (visible in WorkOS Dashboard → Authentication → OAuth providers
+  // → Microsoft → Manage) to the Azure app's Redirect URIs (type = Web).
+  // Override via WORKOS_DIRECT_CONNECTIONS env var (comma list).
+  //
+  // Apple: WorkOS connection not yet configured. To enable:
+  //   1. WorkOS Dashboard → Authentication → OAuth providers → Sign in with Apple → Enable
+  //   2. Supply: Apple Team ID, Service ID, Private Key file, Key ID
+  //   3. In Apple Developer: add WorkOS Redirect URI to the Service ID Return URLs
+  //      and add api.workos.com to Domains and Subdomains
+  //   4. Once confirmed working, add "apple" here and restore the Apple button in App.tsx
   const enabled = new Set(
-    (env.WORKOS_DIRECT_CONNECTIONS ?? "google")
+    (env.WORKOS_DIRECT_CONNECTIONS ?? "google,microsoft")
       .split(",")
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean)
