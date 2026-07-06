@@ -52,13 +52,40 @@ export async function onRequestPost(context: any) {
   const brandConfigured = await communityBrandConfigured(context.env);
   const origin = siteOrigin(context.request, context.env);
   const devReturnLink = context.env.FENRIR_COMMUNITY_AUTH_DEV_RETURN_LINK === "true";
+  const consumeLink = `${origin}/api/community-auth/magic-link/consume?token=${encodeURIComponent(token)}`;
+
+  let delivery: "sent" | "pending_provider" = "pending_provider";
+  let message = "Magic-link token created in Neon. Email delivery provider is not wired yet.";
+  const resendKey = typeof context.env.RESEND_API_KEY === "string" ? context.env.RESEND_API_KEY.trim() : "";
+  if (resendKey) {
+    const from = typeof context.env.RESEND_FROM_EMAIL === "string" && context.env.RESEND_FROM_EMAIL.trim()
+      ? context.env.RESEND_FROM_EMAIL.trim()
+      : "Fenrir <noreply@myfenrir.com>";
+    const sendResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from,
+        to: [email],
+        subject: `Your sign-in link for ${brand.name}`,
+        text: `Tap to enter ${brand.name}:\n\n${consumeLink}\n\nThis link expires in 15 minutes. If you didn't request it, ignore this email.`
+      })
+    }).catch(() => null);
+    if (sendResponse?.ok) {
+      delivery = "sent";
+      message = "Check your inbox — your sign-in link is on the way.";
+    } else {
+      message = "Magic-link token created, but the email provider rejected the send. Try again or contact the community owner.";
+    }
+  }
+
   return noStoreJson({
     ok: true,
-    delivery: "pending_provider",
+    delivery,
     brandConfigured,
     linkId: link?.id,
     expiresAt: link?.expires_at,
-    message: "Magic-link token created in Neon. Email delivery provider is not wired yet.",
-    ...(devReturnLink ? { devLink: `${origin}/api/community-auth/magic-link/consume?token=${encodeURIComponent(token)}` } : {})
+    message,
+    ...(devReturnLink ? { devLink: consumeLink } : {})
   });
 }

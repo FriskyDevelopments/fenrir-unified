@@ -7150,3 +7150,26 @@ p {
     transition: none !important;
   }
 }
+
+/* ── Community Gate: Google OAuth button (anchor styled as button) ── */
+.community-google-button {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  border-radius: 12px;
+  padding: 0 16px;
+  margin-bottom: 12px;
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: .01em;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.community-google-button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}

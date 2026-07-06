@@ -3257,7 +3257,8 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
       trustA: "Private by design",
       trustB: "Invite-aware",
       trustC: "Every approval is audited",
-      guarded: "Guarded by Fenrir"
+      guarded: "Guarded by Fenrir",
+      googleButton: "Continue with Google"
     },
     es: {
       kicker: "Comunidad privada",
@@ -3273,7 +3274,8 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
       trustA: "Privado por diseño",
       trustB: "Reconoce invitaciones",
       trustC: "Cada aprobación queda auditada",
-      guarded: "Custodiado por Fenrir"
+      guarded: "Custodiado por Fenrir",
+      googleButton: "Continuar con Google"
     },
     fr: {
       kicker: "Communauté privée",
@@ -3289,7 +3291,8 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
       trustA: "Privé par conception",
       trustB: "Invitations reconnues",
       trustC: "Chaque approbation est auditée",
-      guarded: "Gardé par Fenrir"
+      guarded: "Gardé par Fenrir",
+      googleButton: "Continuer avec Google"
     },
     de: {
       kicker: "Private Community",
@@ -3305,7 +3308,8 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
       trustA: "Privat by Design",
       trustB: "Einladungen zählen",
       trustC: "Jede Freigabe wird auditiert",
-      guarded: "Bewacht von Fenrir"
+      guarded: "Bewacht von Fenrir",
+      googleButton: "Mit Google fortfahren"
     }
   }[locale];
 
@@ -3397,6 +3401,14 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
               <small>{gateText.stepSessionBody}</small>
             </section>
           </div>
+          {brand?.enabled_auth_providers?.includes("google") ? (
+            <a
+              className="apple-auth-button community-submit-button community-google-button"
+              href={`/api/community-auth/oauth/google?slug=${encodeURIComponent(slug)}`}
+            >
+              {gateText.googleButton}
+            </a>
+          ) : null}
           <form className="community-auth-form" onSubmit={requestLink}>
             <label>
               <span>{gateText.emailLabel}</span>
