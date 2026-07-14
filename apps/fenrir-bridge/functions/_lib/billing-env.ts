@@ -20,6 +20,20 @@ export type BillingEnv = AuthEnv & {
   FENRIR_STARS_LABEL?: string;
   /** Plan granted after Telegram Stars payment: starter | pro | operator (default starter). */
   FENRIR_STARS_PLAN?: string;
+  /* ── Wert.io card→crypto on-ramp (optional third processor beside Stripe/Stars).
+     Card button stays "coming soon" until WERT_PARTNER_ID + WERT_RECEIVING_WALLET
+     are both set. Values come from the Secret Center / wrangler secrets. */
+  WERT_PARTNER_ID?: string;
+  WERT_RECEIVING_WALLET?: string;
+  WERT_WEBHOOK_SECRET?: string;
+  /** https://widget.wert.io (default) | https://sandbox.wert.io */
+  WERT_ORIGIN?: string;
+  WERT_COMMODITY?: string;
+  WERT_NETWORK?: string;
+  /** One-time card price (USD) granted per plan. Defaults 3 / 7 / 15. */
+  WERT_STARTER_USD?: string;
+  WERT_PRO_USD?: string;
+  WERT_OPERATOR_USD?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   FENRIR_GOOGLE_OAUTH_CONFIGURED?: string;
   FENRIR_MICROSOFT_OAUTH_CONFIGURED?: string;

@@ -1516,6 +1516,44 @@ export function App() {
     }
   }
 
+  // Card→crypto on-ramp (Wert). Opens the @wert-io/widget-initializer modal bound
+  // to the buyer's org; the /api/wert/webhook callback credits the plan. Stays an
+  // honest "coming soon" until partner creds are configured server-side.
+  async function startWertCheckout(planLabel: string) {
+    const key = paidPlanFromProductLabel(planLabel);
+    if (!key) {
+      setNotice(planLabel.trim().toLowerCase() === "free" ? copy[locale].billingFreeTier : copy[locale].billingPaidPlanOnly);
+      return;
+    }
+    navigateActive("billing");
+    try {
+      const { options, sandbox } = await billingService.wertSession(key);
+      // Loaded from the Wert CDN (the published @wert-io/widget-initializer ESM),
+      // mirroring the ClipsFlow Mini-App. Kept as a runtime import so no build-time
+      // dependency/bundling is required.
+      const cdn = "https://unpkg.com/@wert-io/widget-initializer@7/dist/index.mjs";
+      const mod = (await import(/* @vite-ignore */ cdn)) as {
+        default: new (opts: Record<string, unknown>) => { open: () => void };
+      };
+      const WertWidget = mod.default;
+      const widget = new WertWidget({
+        ...options,
+        listeners: {
+          "payment-status": (data: { status?: string }) => {
+            if (data?.status === "success" || data?.status === "order_complete") {
+              setNotice(sandbox ? "Sandbox card payment complete — your plan will activate shortly." : "Payment received — your plan is activating.");
+              window.setTimeout(() => void refreshBilling(), 3000);
+            }
+          }
+        }
+      });
+      widget.open();
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      setNotice(code === "wert_not_configured" ? "Card payments (Wert) aren't enabled yet — use Stars or the Stripe upgrade for now." : copy[locale].checkoutErrorGeneric);
+    }
+  }
+
   async function linkTelegramIdentity() {
     try {
       const result = await telegramIdentityService.start();
@@ -2071,6 +2109,7 @@ export function App() {
                   <strong>{price}</strong>
                   <small>{body}</small>
                   {plan !== "Free" ? <button onClick={() => void startTelegramStars()}>{c.starsCheckout}</button> : null}
+                  {plan !== "Free" ? <button className="ghost" onClick={() => void startWertCheckout(plan)}>{c.payWithCard}</button> : null}
                   <button className="ghost" onClick={() => onPaidPlanPickedFromPricing(plan)}>{c.upgrade}</button>
                 </div>
               ))}

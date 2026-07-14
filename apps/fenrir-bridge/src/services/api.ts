@@ -523,6 +523,15 @@ export const billingService = {
   },
   async telegramStars(): Promise<{ ok: true; botUsername: string; url: string; stars: number; mode: "telegram_stars" }> {
     return apiRequest<{ ok: true; botUsername: string; url: string; stars: number; mode: "telegram_stars" }>("/api/telegram/stars");
+  },
+  /** Card→crypto on-ramp (Wert). Returns widget-initializer options bound to the
+   *  authenticated buyer's org. Rejects with error "wert_not_configured" (503)
+   *  until partner creds are set — the UI shows an honest "coming soon". */
+  async wertSession(plan: PaidPlan): Promise<{ ok: true; mode: "wert"; sandbox: boolean; options: Record<string, unknown> }> {
+    return apiRequest<{ ok: true; mode: "wert"; sandbox: boolean; options: Record<string, unknown> }>("/api/wert/session", {
+      method: "POST",
+      body: JSON.stringify({ plan })
+    });
   }
 };
 
