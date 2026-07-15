@@ -1,6 +1,6 @@
-import { readSession } from "../../_lib/auth";
-import { effectiveOrgBillingPlan } from "../../_lib/billing-db";
-import { noStoreJson } from "../../_lib/responses";
+import { readSession } from '../../_lib/auth';
+import { effectiveOrgBillingPlan } from '../../_lib/billing-db';
+import { noStoreJson } from '../../_lib/responses';
 
 export async function onRequestGet(context: any) {
   const session = await readSession(context.request, context.env);
@@ -15,11 +15,11 @@ export async function onRequestGet(context: any) {
       id: session.frisky_user_id,
       email: session.email,
       name: session.name,
-      authProvider: session.provider
+      authProvider: session.provider,
     },
     org: {
       id: session.frisky_org_id,
-      plan
-    }
+      plan,
+    },
   });
 }

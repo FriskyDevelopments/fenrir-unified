@@ -1,8 +1,48 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
-import { copy, detectLocale, languageNames, locales, type Copy, type Locale } from "./i18n";
-import { aiOpsService, appService, authService, billingService, bridgeService, commerceService, domainService, liveRoomService, readinessService, telegramIdentityService, telegramService, webauthnService, type AuthSession, type BillingStatusPayload, type PaidPlan, type ReadinessPayload, type TelegramIdentityLinkPayload } from "./services/api";
-import { friskyClientAuthEngine, type AuthProvider } from "./services/authGateway";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Home,
+  Settings,
+  Shield,
+  KeyRound,
+  Video,
+  CreditCard,
+  Globe,
+  BookOpen,
+  LogOut,
+} from 'lucide-react';
+import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
+import { copy, detectLocale, languageNames, locales, type Copy, type Locale } from './i18n';
+import {
+  aiOpsService,
+  appService,
+  authService,
+  billingService,
+  bridgeService,
+  commerceService,
+  domainService,
+  liveRoomService,
+  readinessService,
+  telegramIdentityService,
+  telegramService,
+  webauthnService,
+  type AuthSession,
+  type BillingStatusPayload,
+  type PaidPlan,
+  type ReadinessPayload,
+  type TelegramIdentityLinkPayload,
+} from './services/api';
+import { friskyClientAuthEngine, type AuthProvider } from './services/authGateway';
 import {
   getCommunityAuthBrandForAdmin,
   getCommunityAuthProposal,
@@ -12,824 +52,1001 @@ import {
   type CommunityAuthProposal,
   type CommunityBrandPayload,
   type CommunityBrandUpdatePayload,
-  type DefaultAccessState
-} from "./services/communityAuth";
-import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan } from "./services/types";
-import { AuthProviderButton } from "./components/AuthProviderButton";
-import { AuthSurface } from "./components/AuthSurface";
-import { GlowCard } from "./components/GlowCard";
-import { TelegramLoginWidget } from "./components/TelegramLoginWidget";
-import { brandThemes, themeClassName, themeCssVars } from "./theme/brandThemes";
+  type DefaultAccessState,
+} from './services/communityAuth';
+import type {
+  AppState,
+  FriskyBridge,
+  FriskyCommissionLink,
+  FriskyDomain,
+  FriskyLiveRoom,
+  FriskyTelegramInvite,
+  LiveRoomProvider,
+  Plan,
+} from './services/types';
+import { AdminLoginHero } from './components/AdminLoginHero';
+import { AuthProviderButton } from './components/AuthProviderButton';
+import { AuthSurface } from './components/AuthSurface';
+import { GlowCard } from './components/GlowCard';
+import { TelegramLoginWidget } from './components/TelegramLoginWidget';
+import { brandThemes, themeClassName, themeCssVars } from './theme/brandThemes';
 
-const defaultServiceOrg = (import.meta.env.VITE_DEFAULT_SERVICE_ORG ?? "Frisky Dev Workspace").trim();
-const defaultServiceSubdomain = (import.meta.env.VITE_DEFAULT_SERVICE_SUBDOMAIN ?? "vip.myfenrir.com").trim();
-const managedDashboardPath = "/main";
+const defaultServiceOrg = (
+  import.meta.env.VITE_DEFAULT_SERVICE_ORG ?? 'Frisky Dev Workspace'
+).trim();
+const defaultServiceSubdomain = (
+  import.meta.env.VITE_DEFAULT_SERVICE_SUBDOMAIN ?? 'vip.myfenrir.com'
+).trim();
+const managedDashboardPath = '/main';
 const telegramLoginBotUsername = (
   import.meta.env.VITE_FENRIR_TELEGRAM_BOT_USERNAME ??
   import.meta.env.VITE_MYFENRIR_TELEGRAM_BOT_USERNAME ??
-  ""
-).replace(/^@/, "").trim();
-const vercelPreviewWithoutApi = import.meta.env.VITE_VERCEL_API_MODE === "disabled";
+  ''
+)
+  .replace(/^@/, '')
+  .trim();
+const vercelPreviewWithoutApi = import.meta.env.VITE_VERCEL_API_MODE === 'disabled';
 
-const uiCopy: Record<Locale, {
-  friskyAccount: string;
-  secondaryGate: string;
-  routePrivateViaFenrir: string;
-  proCustomization: string;
-  proCustomizationBodyTitle: string;
-  proCustomizationBody: string;
-  telegramStatusCheck: string;
-  linked: string;
-  loginRequired: string;
-  telegramConnected: (username: string, id: string, isSignedIn: boolean) => string;
-  telegramSessionFoundNoLink: string;
-  telegramSignInFirst: string;
-  linkTelegramId: string;
-  telegramVerifyWhenNeeded: string;
-  telegramReaddButton: string;
-  telegramReaddNeedChat: string;
-  telegramReaddReady: string;
-  telegramReaddUnavailable: string;
-  devRequestViaSignal: string;
-  devRequestViaSignalShort: string;
-  setupRoute: string;
-  openingLaunchRoute: string;
-  setupPathReady: string;
-  openNow: string;
-  openFallback: string;
-  linkPathNotReady: string;
-  commandRouteNotMapped: string;
-  openFallbackPartnerRoute: string;
-  publicLockUnavailable: string;
-  noVaultLinks: string;
-  linkVaultLabel: string;
-  selectedLinksDescription: string;
-  selectedLinksSubtext: string;
-  selectedLinksPrompt: string;
-  myFenrirLinkVault: string;
-  selectedShareHeading: string;
-  selectedShareCopy: string;
-  shareableVault: string;
-  forSharingSelectedLinks: string;
-  publicVaultIncludes: string;
-  myFenrirLabel: string;
-  share: string;
-  hidden: string;
-  personalLinkHelp: string;
-  personalLinkTitleLabel: string;
-  personalLinkTitlePlaceholder: string;
-  personalLinkUrlLabel: string;
-  personalLinkUrlPlaceholder: string;
-  personalLinkKindLabel: string;
-  clientExplanation: string;
-  setupGoalHelp: string;
-  onePathAtATime: string;
-  assistantPrompt: string;
-  ready: string;
-  readiness: string;
-  routeLaunch: string;
-  linkConversion: string;
-  turnPrivateInvite: string;
-  pastePrivateLink: string;
-  fenrirSubdomain: string;
-  customerDomain: string;
-  privateTarget: string;
-  publicShareLink: string;
-  privateTargetHidden: string;
-  publicShareLinkReady: string;
-  rawLinkHidden: string;
-  cloudflareSsl: string;
-  publicUrlReady: string;
-  routeToPrivateDestination: string;
-  protectedLink: string;
-  stableUrl: string;
-  privateDestination: string;
-  resolvingLockState: string;
-  checkingRoute: string;
-  resolvingBridgeState: string;
-  roomWaitingBody: string;
-  roomBrandIntro: string;
-  roomSecondaryLabel: string;
-  roomChallengeDescription: string;
-  fenrirRoomGate: string;
-  protectedRedirectPending: string;
-  challengeLayer: string;
-  riskBasedPromptReady: string;
-  challengeDescription: string;
-  captchaLayer: string;
-  idleNormalPattern: string;
-  roomStableUrlLabel: string;
-  roomPrivateDestinationLabel: string;
-  walkthroughNodeMapLabel: string;
-  walkthroughModeLabel: string;
-  walkthroughPillsText: string;
-  walkthroughLabel: string;
-  walkthroughClientLabel: string;
-  walkthroughAdminLabel: string;
-  walkthroughLaunchLabel: string;
-  walkthroughClientTitle: string;
-  walkthroughClientBody: string;
-  walkthroughClientQuote: string;
-  walkthroughAdminTitle: string;
-  walkthroughAdminBody: string;
-  walkthroughAdminQuote: string;
-  walkthroughLaunchTitle: string;
-  walkthroughLaunchBody: string;
-  walkthroughLaunchQuote: string;
-  walkthroughStepsClient: [string, string, string, string];
-  walkthroughStepsAdmin: [string, string, string, string];
-  walkthroughStepsLaunch: [string, string, string, string];
-  ghostRouteTitle: string;
-  ghostRouteBody: string;
-  botOsRouteTitle: string;
-  botOsRouteSubtitle: string;
-  botOsRouteBody: string;
-  botOsRouteModulesTitle: string;
-  botOsRouteFooterGhost: string;
-  botOsRouteFooterCommunity: string;
-  botOsRouteFooterHome: string;
-  communityEmailPlaceholder: string;
-  neonMagicBusy: string;
-  neonMagicButton: string;
-  neonMagicSuccessMessage: string;
-  neonMagicDevLinkLabel: string;
-  fallbackPartnerLabel: string;
-  vaultLinkOpenLabelPrefix: string;
-  liveRoomSecondaryLabel: string;
-  liveRoomChallengeReady: string;
-  createPaidRoomTitle: string;
-  createPaidRoomBody: string;
+const uiCopy: Record<
+  Locale,
+  {
+    friskyAccount: string;
+    secondaryGate: string;
+    routePrivateViaFenrir: string;
+    proCustomization: string;
+    proCustomizationBodyTitle: string;
+    proCustomizationBody: string;
+    telegramStatusCheck: string;
+    linked: string;
+    loginRequired: string;
+    telegramConnected: (username: string, id: string, isSignedIn: boolean) => string;
+    telegramSessionFoundNoLink: string;
+    telegramSignInFirst: string;
+    linkTelegramId: string;
+    telegramVerifyWhenNeeded: string;
+    telegramReaddButton: string;
+    telegramReaddNeedChat: string;
+    telegramReaddReady: string;
+    telegramReaddUnavailable: string;
+    devRequestViaSignal: string;
+    devRequestViaSignalShort: string;
+    setupRoute: string;
+    openingLaunchRoute: string;
+    setupPathReady: string;
+    openNow: string;
+    openFallback: string;
+    linkPathNotReady: string;
+    commandRouteNotMapped: string;
+    openFallbackPartnerRoute: string;
+    publicLockUnavailable: string;
+    noVaultLinks: string;
+    linkVaultLabel: string;
+    selectedLinksDescription: string;
+    selectedLinksSubtext: string;
+    selectedLinksPrompt: string;
+    myFenrirLinkVault: string;
+    selectedShareHeading: string;
+    selectedShareCopy: string;
+    shareableVault: string;
+    forSharingSelectedLinks: string;
+    publicVaultIncludes: string;
+    myFenrirLabel: string;
+    share: string;
+    hidden: string;
+    personalLinkHelp: string;
+    personalLinkTitleLabel: string;
+    personalLinkTitlePlaceholder: string;
+    personalLinkUrlLabel: string;
+    personalLinkUrlPlaceholder: string;
+    personalLinkKindLabel: string;
+    clientExplanation: string;
+    setupGoalHelp: string;
+    onePathAtATime: string;
+    assistantPrompt: string;
+    ready: string;
+    readiness: string;
+    routeLaunch: string;
+    linkConversion: string;
+    turnPrivateInvite: string;
+    pastePrivateLink: string;
+    fenrirSubdomain: string;
+    customerDomain: string;
+    privateTarget: string;
+    publicShareLink: string;
+    privateTargetHidden: string;
+    publicShareLinkReady: string;
+    rawLinkHidden: string;
+    cloudflareSsl: string;
+    publicUrlReady: string;
+    routeToPrivateDestination: string;
+    protectedLink: string;
+    stableUrl: string;
+    privateDestination: string;
+    resolvingLockState: string;
+    checkingRoute: string;
+    resolvingBridgeState: string;
+    roomWaitingBody: string;
+    roomBrandIntro: string;
+    roomSecondaryLabel: string;
+    roomChallengeDescription: string;
+    fenrirRoomGate: string;
+    protectedRedirectPending: string;
+    challengeLayer: string;
+    riskBasedPromptReady: string;
+    challengeDescription: string;
+    captchaLayer: string;
+    idleNormalPattern: string;
+    roomStableUrlLabel: string;
+    roomPrivateDestinationLabel: string;
+    walkthroughNodeMapLabel: string;
+    walkthroughModeLabel: string;
+    walkthroughPillsText: string;
+    walkthroughLabel: string;
+    walkthroughClientLabel: string;
+    walkthroughAdminLabel: string;
+    walkthroughLaunchLabel: string;
+    walkthroughClientTitle: string;
+    walkthroughClientBody: string;
+    walkthroughClientQuote: string;
+    walkthroughAdminTitle: string;
+    walkthroughAdminBody: string;
+    walkthroughAdminQuote: string;
+    walkthroughLaunchTitle: string;
+    walkthroughLaunchBody: string;
+    walkthroughLaunchQuote: string;
+    walkthroughStepsClient: [string, string, string, string];
+    walkthroughStepsAdmin: [string, string, string, string];
+    walkthroughStepsLaunch: [string, string, string, string];
+    ghostRouteTitle: string;
+    ghostRouteBody: string;
+    botOsRouteTitle: string;
+    botOsRouteSubtitle: string;
+    botOsRouteBody: string;
+    botOsRouteModulesTitle: string;
+    botOsRouteFooterGhost: string;
+    botOsRouteFooterCommunity: string;
+    botOsRouteFooterHome: string;
+    communityEmailPlaceholder: string;
+    neonMagicBusy: string;
+    neonMagicButton: string;
+    neonMagicSuccessMessage: string;
+    neonMagicDevLinkLabel: string;
+    fallbackPartnerLabel: string;
+    vaultLinkOpenLabelPrefix: string;
+    liveRoomSecondaryLabel: string;
+    liveRoomChallengeReady: string;
+    createPaidRoomTitle: string;
+    createPaidRoomBody: string;
     createPaidRoomNeed: string;
     roomCoverImageInvalid: string;
-  setupInputTelegramSlug: string;
-  setupInputTelegramId: string;
-  setupInputGroupName: string;
-  setupInputGroupPhoto: string;
-  setupInputDomain: string;
-  setupInputRoomSlug: string;
-  setupInputRoomTitle: string;
-  setupInputRoomTarget: string;
-  setupInputRoomCover: string;
-  setupInputGroupEmail: string;
-  setupInputCommunityEmail: string;
-  setupInputCustomDomain: string;
-  setupInputLiveRoom: string;
-  liveRoomUrlHint: string;
-}> = {
+    setupInputTelegramSlug: string;
+    setupInputTelegramId: string;
+    setupInputGroupName: string;
+    setupInputGroupPhoto: string;
+    setupInputDomain: string;
+    setupInputRoomSlug: string;
+    setupInputRoomTitle: string;
+    setupInputRoomTarget: string;
+    setupInputRoomCover: string;
+    setupInputGroupEmail: string;
+    setupInputCommunityEmail: string;
+    setupInputCustomDomain: string;
+    setupInputLiveRoom: string;
+    liveRoomUrlHint: string;
+  }
+> = {
   en: {
-    friskyAccount: "Frisky Account",
-    secondaryGate: "Secondary gate",
-    routePrivateViaFenrir: "Route Zoom, Meet, Webex, or any room through Fenrir first.",
-    proCustomization: "Pro customization",
-    proCustomizationBodyTitle: "Starting at Pro, customers can add their logo and branded room visuals.",
-    proCustomizationBody: "Starter includes the clean Fenrir room gate. Pro and Operator unlock customer logo, custom room name styling, and a branded hero image on the secondary link.",
-    telegramStatusCheck: "Telegram status check",
-    linked: "linked",
-    loginRequired: "login required",
-    telegramConnected: (username, id) => `${username ? `@${username}` : id} is connected to this Frisky ID.`,
-    telegramSessionFoundNoLink: "Frisky session found. Telegram ID is not linked yet, so Fenrir cannot verify Telegram Stars or access status for this account.",
-    telegramSignInFirst: "Sign in with the unified Frisky login first so Fenrir can check whether this Telegram ID has active access.",
-    linkTelegramId: "Link Telegram ID",
-    telegramVerifyWhenNeeded: "Telegram is only verified when a Telegram action needs it.",
-    telegramReaddButton: "Re-add me",
-    telegramReaddNeedChat: "Enter the Telegram group ID first.",
-    telegramReaddReady: "Recovery invite ready. Fenrir opened a one-use Telegram link.",
-    telegramReaddUnavailable: "Recovery invite could not be created. Check bot admin invite permissions.",
-    devRequestViaSignal: "Dev request via Frisky Signal",
-    devRequestViaSignalShort: "Frisky Signal",
-    setupRoute: "Setup route",
-    openingLaunchRoute: "Opening launch route",
-    setupPathReady: "This setup path is ready. Fenrir opened it automatically; use the button if blocked.",
-    openNow: "Open now",
-    openFallback: "Open fallback",
-    linkPathNotReady: "Link path not ready",
-    commandRouteNotMapped: "This command route is not mapped to a destination yet.",
-    openFallbackPartnerRoute: "Open fallback partner route",
-    publicLockUnavailable: "Public lock unavailable",
-    noVaultLinks: "No vault links found.",
-    linkVaultLabel: "Shareable vault",
-    selectedLinksDescription: "For sharing your selected links with someone.",
-    selectedLinksSubtext: "Choose what to share or hide. The public vault includes only selected stable URLs, never raw invites or private room targets.",
-    selectedLinksPrompt: "Ask the admin to create a fresh share link from",
-    myFenrirLinkVault: "Frisky Dev Link Vault",
-    selectedShareHeading: "Selected links, one share page.",
-    selectedShareCopy: "This page is for sharing only the links the admin selected. Open the official public URLs for Telegram locks, room gates, payments, docs, booking, and support. Private targets stay behind Fenrir.",
-    shareableVault: "Shareable vault",
-    forSharingSelectedLinks: "For sharing your selected links with someone.",
-    publicVaultIncludes: "Choose what to share or hide. The public vault includes only selected stable URLs, never raw invites or private room targets.",
-    myFenrirLabel: "Fenrir Bridge",
-    share: "Share",
-    hidden: "Hidden",
-    personalLinkHelp: "Add a stable public URL to this vault. Fenrir stores the label, URL, and category so the box is readable before sharing.",
-    personalLinkTitleLabel: "Link label",
-    personalLinkTitlePlaceholder: "Mercado Pago checkout",
-    personalLinkUrlLabel: "Stable URL",
-    personalLinkUrlPlaceholder: "https://pay.example.com/fenrir",
-    personalLinkKindLabel: "Link type",
-    clientExplanation: "Client explanation",
-    setupGoalHelp: "Tell Fenrir your launch goal. It opens the right setup in sequence.",
-    onePathAtATime: "Walk one path at a time: lock, route, share, then launch.",
-    assistantPrompt: "I can open the right panel for you. Pick a launch outcome.",
-    ready: "Ready",
-    readiness: "Ready",
-    routeLaunch: "Turn a private invite into a branded public link.",
-    linkConversion: "Link conversion",
-    turnPrivateInvite: "Turn private invite",
-    pastePrivateLink: "Paste a Telegram, Zoom, Webex, Whereby, or Meet link. Fenrir keeps the target private and gives the admin a stable domain URL.",
-    fenrirSubdomain: "Fenrir subdomain",
-    customerDomain: "Customer domain",
-    privateTarget: "Private target",
-    publicShareLink: "Public share link",
-    privateTargetHidden: "Private target hidden",
-    publicShareLinkReady: "Ready after creation",
-    rawLinkHidden: "Raw link hidden",
-    cloudflareSsl: "Cloudflare SSL",
-    publicUrlReady: "Public URL ready",
-    routeToPrivateDestination: "Fenrir route from public link to private destination",
-    protectedLink: "Secondary protected link",
-    stableUrl: "Stable Fenrir URL",
-    privateDestination: "Private destination",
-    resolvingLockState: "Resolving Fenrir Lock",
-    checkingRoute: "Checking route",
-    resolvingBridgeState: "Fenrir is checking the live D1 bridge state.",
-    roomWaitingBody: "This call room is missing or paused. Ask the admin for a fresh room link.",
-    roomBrandIntro: "Fenrir hosts the branded front door first. If traffic looks unusual, this page can require a quick challenge before opening the private room.",
-    roomSecondaryLabel: "Secondary protected link",
-    roomChallengeDescription: "Unusual bursts can route through Turnstile or a similar check before redirect.",
-    fenrirRoomGate: "Fenrir room gate",
-    protectedRedirectPending: "Protected redirect coming online",
-    roomStableUrlLabel: "Stable Fenrir URL",
-    roomPrivateDestinationLabel: "Private destination",
-    walkthroughNodeMapLabel: "animated route",
-    walkthroughModeLabel: "Walkthrough modes",
-    walkthroughPillsText: "Fenrir route from public link to private destination",
-    walkthroughLabel: "Client-facing Fenrir walkthrough",
-    walkthroughClientLabel: "Client view",
-    walkthroughAdminLabel: "Admin view",
-    walkthroughLaunchLabel: "Launch walkthrough",
-    walkthroughClientTitle: "One clean link replaces messy private invites.",
-    walkthroughClientBody: "Your customer sees a branded Fenrir page, not a raw Telegram, Zoom, or payment URL. The private destination stays hidden until access is allowed.",
-    walkthroughClientQuote: "Send this link. Fenrir handles the gate.",
-    walkthroughAdminTitle: "The owner keeps control after the link is already public.",
-    walkthroughAdminBody: "If an invite leaks or a room changes, the admin rotates the hidden target. The flyer, bio link, QR code, and customer message keep the same public URL.",
-    walkthroughAdminQuote: "Change the back room. Keep the front door.",
-    walkthroughLaunchTitle: "The customer journey stays simple from click to entry.",
-    walkthroughLaunchBody: "Fenrir explains what is happening in plain language, confirms the right gate, and sends the approved visitor to the correct private room or group.",
-    walkthroughLaunchQuote: "Click, verify, enter. No exposed link trail.",
-    walkthroughStepsClient: ["Public link", "Branded gate", "Access check", "Private destination"],
-    walkthroughStepsAdmin: ["Stable URL", "Rotate target", "Revoke leak", "Audit action"],
-    walkthroughStepsLaunch: ["Customer clicks", "Fenrir explains", "Access unlocks", "Entry opens"],
-    ghostRouteTitle: "Ghost login belongs to the Bot OS surface.",
-    ghostRouteBody: "This route is intentionally separate from Fenrir Bridge. Use it for Frisky Ghost, ghost-styled onboarding, and Bot OS identity moments without touching client accounts.",
-    botOsRouteTitle: "Bot-of-bots command layer.",
-    botOsRouteSubtitle: "Modular command layer for Fenrir and Bot OS operators.",
-    botOsRouteBody: "Modular boxes are back. Ghost handles the playful login skin, Fenrir handles bridge operations, and Community Gate stays isolated on Neon.",
-    botOsRouteModulesTitle: "Bot OS modules",
-    botOsRouteFooterGhost: "Ghost login",
-    botOsRouteFooterCommunity: "Community Gate",
-    botOsRouteFooterHome: "Fenrir Bridge",
-    communityEmailPlaceholder: "you@community.com",
-    neonMagicBusy: "Sending your entry link...",
-    neonMagicButton: "Email me my entry link",
-    neonMagicSuccessMessage: "Entry link sent. Open your inbox and tap the newest link to continue.",
-    neonMagicDevLinkLabel: "Open dev auth link",
-    fallbackPartnerLabel: "Fallback links",
-    challengeLayer: "Challenge layer",
-    riskBasedPromptReady: "Risk-based prompt ready",
-    challengeDescription: "Unusual bursts can route through Turnstile or a similar check before redirect.",
-    captchaLayer: "Captcha layer",
-    idleNormalPattern: "Idle: normal pattern",
-    vaultLinkOpenLabelPrefix: "Open",
-    liveRoomSecondaryLabel: "Secondary link",
-    liveRoomChallengeReady: "Challenge-ready",
-    createPaidRoomTitle: "Protect a Telegram group",
-    createPaidRoomBody: "Paste group ID and image, then publish a stable locked link.",
-    createPaidRoomNeed: "Need: group access",
-    roomCoverImageInvalid: "Room logo or image URL is invalid.",
-    setupInputTelegramSlug: "main",
-    setupInputTelegramId: "Telegram group ID",
-    setupInputGroupName: "Group name",
-    setupInputGroupPhoto: "Auto from Telegram group photo",
-    setupInputDomain: "vip.myfenrir.com",
-    setupInputRoomSlug: "access-room",
-    setupInputRoomTitle: "Zoom room name / client title",
-    setupInputRoomTarget: "Private call URL",
-    setupInputRoomCover: "Pro logo / branded image URL",
-    setupInputGroupEmail: "you@community.com",
-    setupInputCommunityEmail: "you@community.com",
-    setupInputCustomDomain: "customer.myfenrir.com",
-    setupInputLiveRoom: "Room title",
-    liveRoomUrlHint: "Private call URL"
+    friskyAccount: 'Frisky Account',
+    secondaryGate: 'Secondary gate',
+    routePrivateViaFenrir: 'Route Zoom, Meet, Webex, or any room through Fenrir first.',
+    proCustomization: 'Pro customization',
+    proCustomizationBodyTitle:
+      'Starting at Pro, customers can add their logo and branded room visuals.',
+    proCustomizationBody:
+      'Starter includes the clean Fenrir room gate. Pro and Operator unlock customer logo, custom room name styling, and a branded hero image on the secondary link.',
+    telegramStatusCheck: 'Telegram status check',
+    linked: 'linked',
+    loginRequired: 'login required',
+    telegramConnected: (username, id) =>
+      `${username ? `@${username}` : id} is connected to this Frisky ID.`,
+    telegramSessionFoundNoLink:
+      'Frisky session found. Telegram ID is not linked yet, so Fenrir cannot verify Telegram Stars or access status for this account.',
+    telegramSignInFirst:
+      'Sign in with the unified Frisky login first so Fenrir can check whether this Telegram ID has active access.',
+    linkTelegramId: 'Link Telegram ID',
+    telegramVerifyWhenNeeded: 'Telegram is only verified when a Telegram action needs it.',
+    telegramReaddButton: 'Re-add me',
+    telegramReaddNeedChat: 'Enter the Telegram group ID first.',
+    telegramReaddReady: 'Recovery invite ready. Fenrir opened a one-use Telegram link.',
+    telegramReaddUnavailable:
+      'Recovery invite could not be created. Check bot admin invite permissions.',
+    devRequestViaSignal: 'Dev request via Frisky Signal',
+    devRequestViaSignalShort: 'Frisky Signal',
+    setupRoute: 'Setup route',
+    openingLaunchRoute: 'Opening launch route',
+    setupPathReady:
+      'This setup path is ready. Fenrir opened it automatically; use the button if blocked.',
+    openNow: 'Open now',
+    openFallback: 'Open fallback',
+    linkPathNotReady: 'Link path not ready',
+    commandRouteNotMapped: 'This command route is not mapped to a destination yet.',
+    openFallbackPartnerRoute: 'Open fallback partner route',
+    publicLockUnavailable: 'Public lock unavailable',
+    noVaultLinks: 'No vault links found.',
+    linkVaultLabel: 'Shareable vault',
+    selectedLinksDescription: 'For sharing your selected links with someone.',
+    selectedLinksSubtext:
+      'Choose what to share or hide. The public vault includes only selected stable URLs, never raw invites or private room targets.',
+    selectedLinksPrompt: 'Ask the admin to create a fresh share link from',
+    myFenrirLinkVault: 'Frisky Dev Link Vault',
+    selectedShareHeading: 'Selected links, one share page.',
+    selectedShareCopy:
+      'This page is for sharing only the links the admin selected. Open the official public URLs for Telegram locks, room gates, payments, docs, booking, and support. Private targets stay behind Fenrir.',
+    shareableVault: 'Shareable vault',
+    forSharingSelectedLinks: 'For sharing your selected links with someone.',
+    publicVaultIncludes:
+      'Choose what to share or hide. The public vault includes only selected stable URLs, never raw invites or private room targets.',
+    myFenrirLabel: 'Fenrir Bridge',
+    share: 'Share',
+    hidden: 'Hidden',
+    personalLinkHelp:
+      'Add a stable public URL to this vault. Fenrir stores the label, URL, and category so the box is readable before sharing.',
+    personalLinkTitleLabel: 'Link label',
+    personalLinkTitlePlaceholder: 'Mercado Pago checkout',
+    personalLinkUrlLabel: 'Stable URL',
+    personalLinkUrlPlaceholder: 'https://pay.example.com/fenrir',
+    personalLinkKindLabel: 'Link type',
+    clientExplanation: 'Client explanation',
+    setupGoalHelp: 'Tell Fenrir your launch goal. It opens the right setup in sequence.',
+    onePathAtATime: 'Walk one path at a time: lock, route, share, then launch.',
+    assistantPrompt: 'I can open the right panel for you. Pick a launch outcome.',
+    ready: 'Ready',
+    readiness: 'Ready',
+    routeLaunch: 'Turn a private invite into a branded public link.',
+    linkConversion: 'Link conversion',
+    turnPrivateInvite: 'Turn private invite',
+    pastePrivateLink:
+      'Paste a Telegram, Zoom, Webex, Whereby, or Meet link. Fenrir keeps the target private and gives the admin a stable domain URL.',
+    fenrirSubdomain: 'Fenrir subdomain',
+    customerDomain: 'Customer domain',
+    privateTarget: 'Private target',
+    publicShareLink: 'Public share link',
+    privateTargetHidden: 'Private target hidden',
+    publicShareLinkReady: 'Ready after creation',
+    rawLinkHidden: 'Raw link hidden',
+    cloudflareSsl: 'Cloudflare SSL',
+    publicUrlReady: 'Public URL ready',
+    routeToPrivateDestination: 'Fenrir route from public link to private destination',
+    protectedLink: 'Secondary protected link',
+    stableUrl: 'Stable Fenrir URL',
+    privateDestination: 'Private destination',
+    resolvingLockState: 'Resolving Fenrir Lock',
+    checkingRoute: 'Checking route',
+    resolvingBridgeState: 'Fenrir is checking the live D1 bridge state.',
+    roomWaitingBody: 'This call room is missing or paused. Ask the admin for a fresh room link.',
+    roomBrandIntro:
+      'Fenrir hosts the branded front door first. If traffic looks unusual, this page can require a quick challenge before opening the private room.',
+    roomSecondaryLabel: 'Secondary protected link',
+    roomChallengeDescription:
+      'Unusual bursts can route through Turnstile or a similar check before redirect.',
+    fenrirRoomGate: 'Fenrir room gate',
+    protectedRedirectPending: 'Protected redirect coming online',
+    roomStableUrlLabel: 'Stable Fenrir URL',
+    roomPrivateDestinationLabel: 'Private destination',
+    walkthroughNodeMapLabel: 'animated route',
+    walkthroughModeLabel: 'Walkthrough modes',
+    walkthroughPillsText: 'Fenrir route from public link to private destination',
+    walkthroughLabel: 'Client-facing Fenrir walkthrough',
+    walkthroughClientLabel: 'Client view',
+    walkthroughAdminLabel: 'Admin view',
+    walkthroughLaunchLabel: 'Launch walkthrough',
+    walkthroughClientTitle: 'One clean link replaces messy private invites.',
+    walkthroughClientBody:
+      'Your customer sees a branded Fenrir page, not a raw Telegram, Zoom, or payment URL. The private destination stays hidden until access is allowed.',
+    walkthroughClientQuote: 'Send this link. Fenrir handles the gate.',
+    walkthroughAdminTitle: 'The owner keeps control after the link is already public.',
+    walkthroughAdminBody:
+      'If an invite leaks or a room changes, the admin rotates the hidden target. The flyer, bio link, QR code, and customer message keep the same public URL.',
+    walkthroughAdminQuote: 'Change the back room. Keep the front door.',
+    walkthroughLaunchTitle: 'The customer journey stays simple from click to entry.',
+    walkthroughLaunchBody:
+      'Fenrir explains what is happening in plain language, confirms the right gate, and sends the approved visitor to the correct private room or group.',
+    walkthroughLaunchQuote: 'Click, verify, enter. No exposed link trail.',
+    walkthroughStepsClient: ['Public link', 'Branded gate', 'Access check', 'Private destination'],
+    walkthroughStepsAdmin: ['Stable URL', 'Rotate target', 'Revoke leak', 'Audit action'],
+    walkthroughStepsLaunch: ['Customer clicks', 'Fenrir explains', 'Access unlocks', 'Entry opens'],
+    ghostRouteTitle: 'Ghost login belongs to the Bot OS surface.',
+    ghostRouteBody:
+      'This route is intentionally separate from Fenrir Bridge. Use it for Frisky Ghost, ghost-styled onboarding, and Bot OS identity moments without touching client accounts.',
+    botOsRouteTitle: 'Bot-of-bots command layer.',
+    botOsRouteSubtitle: 'Modular command layer for Fenrir and Bot OS operators.',
+    botOsRouteBody:
+      'Modular boxes are back. Ghost handles the playful login skin, Fenrir handles bridge operations, and Community Gate stays isolated on Neon.',
+    botOsRouteModulesTitle: 'Bot OS modules',
+    botOsRouteFooterGhost: 'Ghost login',
+    botOsRouteFooterCommunity: 'Community Gate',
+    botOsRouteFooterHome: 'Fenrir Bridge',
+    communityEmailPlaceholder: 'you@community.com',
+    neonMagicBusy: 'Sending your entry link...',
+    neonMagicButton: 'Email me my entry link',
+    neonMagicSuccessMessage:
+      'Entry link sent. Open your inbox and tap the newest link to continue.',
+    neonMagicDevLinkLabel: 'Open dev auth link',
+    fallbackPartnerLabel: 'Fallback links',
+    challengeLayer: 'Challenge layer',
+    riskBasedPromptReady: 'Risk-based prompt ready',
+    challengeDescription:
+      'Unusual bursts can route through Turnstile or a similar check before redirect.',
+    captchaLayer: 'Captcha layer',
+    idleNormalPattern: 'Idle: normal pattern',
+    vaultLinkOpenLabelPrefix: 'Open',
+    liveRoomSecondaryLabel: 'Secondary link',
+    liveRoomChallengeReady: 'Challenge-ready',
+    createPaidRoomTitle: 'Protect a Telegram group',
+    createPaidRoomBody: 'Paste group ID and image, then publish a stable locked link.',
+    createPaidRoomNeed: 'Need: group access',
+    roomCoverImageInvalid: 'Room logo or image URL is invalid.',
+    setupInputTelegramSlug: 'main',
+    setupInputTelegramId: 'Telegram group ID',
+    setupInputGroupName: 'Group name',
+    setupInputGroupPhoto: 'Auto from Telegram group photo',
+    setupInputDomain: 'vip.myfenrir.com',
+    setupInputRoomSlug: 'access-room',
+    setupInputRoomTitle: 'Zoom room name / client title',
+    setupInputRoomTarget: 'Private call URL',
+    setupInputRoomCover: 'Pro logo / branded image URL',
+    setupInputGroupEmail: 'you@community.com',
+    setupInputCommunityEmail: 'you@community.com',
+    setupInputCustomDomain: 'customer.myfenrir.com',
+    setupInputLiveRoom: 'Room title',
+    liveRoomUrlHint: 'Private call URL',
   },
   es: {
-    friskyAccount: "Cuenta Frisky",
-    secondaryGate: "Segunda puerta",
-    routePrivateViaFenrir: "Ruta el Zoom, Meet, Webex o cualquier sala por Fenrir primero.",
-    proCustomization: "Personalizacion Pro",
-    proCustomizationBodyTitle: "Desde Pro, los clientes pueden agregar logo y portada de sala personalizada.",
-    proCustomizationBody: "Starter incluye la puerta limpia de sala. Pro y Operator habilitan logo del cliente, estilo de nombre y hero branding en el enlace secundario.",
-    telegramStatusCheck: "Estado de Telegram",
-    linked: "vinculado",
-    loginRequired: "requiere inicio de sesion",
-    telegramConnected: (username, id) => `${username ? `@${username}` : id} esta conectado a esta ID de Frisky.`,
-    telegramSessionFoundNoLink: "Sesion Frisky encontrada. El ID de Telegram aun no esta vinculado, asi que Fenrir no puede verificar Telegram Stars ni estado de acceso.",
-    telegramSignInFirst: "Inicia sesion con el login unificado de Frisky para que Fenrir pueda verificar si este Telegram ID tiene acceso activo.",
-    linkTelegramId: "Vincular Telegram ID",
-    telegramVerifyWhenNeeded: "Telegram solo se verifica cuando una accion de Telegram lo necesita.",
-    telegramReaddButton: "Reingresar",
-    telegramReaddNeedChat: "Ingresa primero el ID del grupo de Telegram.",
-    telegramReaddReady: "Invite de recuperacion listo. Fenrir abrio un link de Telegram de un solo uso.",
-    telegramReaddUnavailable: "No se pudo crear el invite de recuperacion. Revisa permisos admin del bot.",
-    devRequestViaSignal: "Pedido de soporte via Frisky Signal",
-    devRequestViaSignalShort: "Frisky Signal",
-    setupRoute: "Ruta de preparacion",
-    openingLaunchRoute: "Abriendo ruta de lanzamiento",
-    setupPathReady: "Esta ruta ya esta lista. Fenrir la abrio automaticamente; usa el boton si esta bloqueada.",
-    openNow: "Abrir ahora",
-    openFallback: "Abrir respaldo",
-    linkPathNotReady: "Ruta de link no esta lista",
-    commandRouteNotMapped: "Esta ruta de comando aun no esta asignada a un destino.",
-    openFallbackPartnerRoute: "Abrir ruta de respaldo",
-    publicLockUnavailable: "Candado publico no disponible",
-    noVaultLinks: "No se encontraron links de vault.",
-    linkVaultLabel: "Vault compartible",
-    selectedLinksDescription: "Para compartir los links que seleccionaste.",
-    selectedLinksSubtext: "Elige que compartir o ocultar. El vault publico incluye solo URLs estables seleccionadas, nunca invitados o targets privados.",
-    selectedLinksPrompt: "Pide al admin que cree un nuevo link compartible desde",
-    myFenrirLinkVault: "Boveda de links de Frisky Dev",
-    selectedShareHeading: "Links seleccionados, una sola pagina.",
-    selectedShareCopy: "Esta pagina es solo para compartir links que el admin selecciono. Abre los enlaces publicos oficiales de Telegram locks, salas, pagos, docs, reservas y soporte. Los objetivos privados quedan protegidos por Fenrir.",
-    shareableVault: "Vault compartible",
-    forSharingSelectedLinks: "Para compartir tus links seleccionados con alguien.",
-    publicVaultIncludes: "Elige que compartir u ocultar. El vault publico incluye solo enlaces estables seleccionados, nunca invites sin filtrar o targets privados.",
-    myFenrirLabel: "Fenrir Bridge",
-    share: "Compartir",
-    hidden: "Oculto",
-    personalLinkHelp: "Agrega una URL publica estable a este vault. Fenrir guarda etiqueta, URL y categoria para que la caja sea legible antes de compartir.",
-    personalLinkTitleLabel: "Etiqueta del link",
-    personalLinkTitlePlaceholder: "Checkout Mercado Pago",
-    personalLinkUrlLabel: "URL estable",
-    personalLinkUrlPlaceholder: "https://pay.example.com/fenrir",
-    personalLinkKindLabel: "Tipo de link",
-    clientExplanation: "Explicacion cliente",
-    setupGoalHelp: "Dile a Fenrir tu objetivo de lanzamiento. Abre el panel correcto en orden.",
-    onePathAtATime: "Avanza paso a paso: lock, ruta, comparti, y lanzar.",
-    assistantPrompt: "Puedo abrir el panel correcto por ti. Elige un objetivo de lanzamiento.",
-    ready: "Listo",
-    readiness: "Listo",
-    routeLaunch: "Convierte un link privado en un link publico con branding.",
-    linkConversion: "Conversion de links",
-    turnPrivateInvite: "Convertir invite privado",
-    pastePrivateLink: "Pega un link Telegram, Zoom, Webex, Whereby o Meet. Fenrir mantiene el target privado y da una URL de dominio estable.",
-    fenrirSubdomain: "Subdominio Fenrir",
-    customerDomain: "Dominio del cliente",
-    privateTarget: "Target privado",
-    publicShareLink: "Link publico para compartir",
-    privateTargetHidden: "Target privado oculto",
-    publicShareLinkReady: "Listo despues de crear",
-    rawLinkHidden: "Link sin revelar",
-    cloudflareSsl: "SSL Cloudflare",
-    publicUrlReady: "URL publica lista",
-    routeToPrivateDestination: "Ruta de Fenrir de link publico a destino privado",
-    protectedLink: "Enlace protegido",
-    stableUrl: "URL estable de Fenrir",
-    privateDestination: "Destino privado",
-    challengeLayer: "Capa de desafio",
-    riskBasedPromptReady: "Prompt por riesgo listo",
-    challengeDescription: "Picos inusuales pueden pasar por Turnstile o chequeo similar antes del redirect.",
-    captchaLayer: "Capa captcha",
-    idleNormalPattern: "Idle: patron normal",
-    vaultLinkOpenLabelPrefix: "Abrir",
-    liveRoomSecondaryLabel: "Enlace secundario",
-    liveRoomChallengeReady: "Desafio listo",
-    createPaidRoomTitle: "Proteger un grupo Telegram",
-    createPaidRoomBody: "Pega ID de grupo e imagen, luego publica un link estable con candado.",
-    createPaidRoomNeed: "Necesario: acceso al grupo",
-    roomCoverImageInvalid: "La imagen/logo de la sala no tiene una URL válida.",
-    setupInputTelegramSlug: "principal",
-    setupInputTelegramId: "ID del grupo Telegram",
-    setupInputGroupName: "Nombre del grupo",
-    setupInputGroupPhoto: "Foto del grupo de Telegram",
-    setupInputDomain: "vip.myfenrir.com",
-    setupInputRoomSlug: "sala-acceso",
-    setupInputRoomTitle: "Nombre de sala / cliente",
-    setupInputRoomTarget: "URL de llamada privada",
-    setupInputRoomCover: "Logo Pro / URL de portada",
-    setupInputGroupEmail: "tu@comunidad.com",
-    setupInputCommunityEmail: "tu@comunidad.com",
-    setupInputCustomDomain: "cliente.myfenrir.com",
-    setupInputLiveRoom: "Titulo de sala",
-    liveRoomUrlHint: "URL privada de llamada",
-    resolvingLockState: "Resolviendo la llave de Fenrir",
-    checkingRoute: "Verificando ruta",
-    resolvingBridgeState: "Fenrir está comprobando el estado en vivo del puente D1.",
-    roomWaitingBody: "Esta sala de llamada no existe o está pausada. Pide al administrador un enlace de sala actualizado.",
-    roomBrandIntro: "Fenrir muestra primero la puerta con marca. Si hay tráfico inusual, esta página puede pedir un desafío rápido antes de abrir la sala privada.",
-    roomSecondaryLabel: "Enlace protegido secundario",
-    roomChallengeDescription: "Picos inusuales pueden pasar por Turnstile o una verificación similar antes de redirigir.",
-    fenrirRoomGate: "Puerta de sala Fenrir",
-    protectedRedirectPending: "La redirección protegida está entrando en línea",
-    roomStableUrlLabel: "URL estable de Fenrir",
-    roomPrivateDestinationLabel: "Destino privado",
-    walkthroughNodeMapLabel: "ruta animada",
-    walkthroughModeLabel: "Modos de presentación",
-    walkthroughPillsText: "Ruta de Fenrir desde el enlace público al destino privado",
-    walkthroughLabel: "Guía de Fenrir orientada al cliente",
-    walkthroughClientLabel: "Vista de cliente",
-    walkthroughAdminLabel: "Vista de admin",
-    walkthroughLaunchLabel: "Guía de lanzamiento",
-    walkthroughClientTitle: "Un enlace limpio reemplaza invitaciones privadas desordenadas.",
-    walkthroughClientBody: "Tu cliente ve una página Fenrir con branding, no una URL privada de Telegram, Zoom o pago en crudo. El destino privado se mantiene oculto hasta que se autoriza el acceso.",
-    walkthroughClientQuote: "Comparte este enlace. Fenrir controla la puerta.",
-    walkthroughAdminTitle: "El propietario mantiene el control aunque el enlace ya sea público.",
-    walkthroughAdminBody: "Si una invitación se filtra o cambia una sala, el admin rota el destino oculto. El flyer, bio link, QR y mensaje al cliente conservan la misma URL pública.",
-    walkthroughAdminQuote: "Cambia la sala trasera. Mantén la puerta frontal.",
-    walkthroughLaunchTitle: "El viaje del cliente sigue siendo simple de clic a acceso.",
-    walkthroughLaunchBody: "Fenrir explica con lenguaje claro lo que pasa, valida la puerta correcta y envía al visitante aprobado al room o grupo privado correcto.",
-    walkthroughLaunchQuote: "Toca, verifica, entra. Sin trazas de enlace expuestas.",
-    walkthroughStepsClient: ["Enlace público", "Puerta con marca", "Chequeo de acceso", "Destino privado"],
-    walkthroughStepsAdmin: ["URL estable", "Rotar destino", "Revocar fuga", "Acción de auditoría"],
-    walkthroughStepsLaunch: ["Cliente hace clic", "Fenrir explica", "Acceso desbloqueado", "Entrada abierta"],
-    ghostRouteTitle: "El inicio de sesión de Ghost pertenece a Bot OS.",
-    ghostRouteBody: "Esta ruta está separada de Fenrir Bridge. Úsala para Frisky Ghost, onboarding con estilo Ghost y momentos de identidad de Bot OS sin tocar cuentas de cliente.",
-    botOsRouteTitle: "Capa de comandos de bots.",
-    botOsRouteSubtitle: "Capa de comandos modular para admins Fenrir y Bot OS.",
-    botOsRouteBody: "Las cajas modulares están de vuelta. Ghost maneja la piel de login lúdica, Fenrir maneja operaciones de puente, y Community Gate permanece aislado en Neon.",
-    botOsRouteModulesTitle: "Módulos de Bot OS",
-    botOsRouteFooterGhost: "Login de Ghost",
-    botOsRouteFooterCommunity: "Community Gate",
-    botOsRouteFooterHome: "Fenrir Bridge",
-    communityEmailPlaceholder: "tu@comunidad.com",
-    neonMagicBusy: "Enviando tu enlace de entrada...",
-    neonMagicButton: "Envíame mi enlace de entrada",
-    neonMagicSuccessMessage: "Enlace enviado. Abre tu correo y toca el enlace más reciente para continuar.",
-    neonMagicDevLinkLabel: "Abrir enlace de prueba Neon",
-    fallbackPartnerLabel: "Enlaces de respaldo"
+    friskyAccount: 'Cuenta Frisky',
+    secondaryGate: 'Segunda puerta',
+    routePrivateViaFenrir: 'Ruta el Zoom, Meet, Webex o cualquier sala por Fenrir primero.',
+    proCustomization: 'Personalizacion Pro',
+    proCustomizationBodyTitle:
+      'Desde Pro, los clientes pueden agregar logo y portada de sala personalizada.',
+    proCustomizationBody:
+      'Starter incluye la puerta limpia de sala. Pro y Operator habilitan logo del cliente, estilo de nombre y hero branding en el enlace secundario.',
+    telegramStatusCheck: 'Estado de Telegram',
+    linked: 'vinculado',
+    loginRequired: 'requiere inicio de sesion',
+    telegramConnected: (username, id) =>
+      `${username ? `@${username}` : id} esta conectado a esta ID de Frisky.`,
+    telegramSessionFoundNoLink:
+      'Sesion Frisky encontrada. El ID de Telegram aun no esta vinculado, asi que Fenrir no puede verificar Telegram Stars ni estado de acceso.',
+    telegramSignInFirst:
+      'Inicia sesion con el login unificado de Frisky para que Fenrir pueda verificar si este Telegram ID tiene acceso activo.',
+    linkTelegramId: 'Vincular Telegram ID',
+    telegramVerifyWhenNeeded:
+      'Telegram solo se verifica cuando una accion de Telegram lo necesita.',
+    telegramReaddButton: 'Reingresar',
+    telegramReaddNeedChat: 'Ingresa primero el ID del grupo de Telegram.',
+    telegramReaddReady:
+      'Invite de recuperacion listo. Fenrir abrio un link de Telegram de un solo uso.',
+    telegramReaddUnavailable:
+      'No se pudo crear el invite de recuperacion. Revisa permisos admin del bot.',
+    devRequestViaSignal: 'Pedido de soporte via Frisky Signal',
+    devRequestViaSignalShort: 'Frisky Signal',
+    setupRoute: 'Ruta de preparacion',
+    openingLaunchRoute: 'Abriendo ruta de lanzamiento',
+    setupPathReady:
+      'Esta ruta ya esta lista. Fenrir la abrio automaticamente; usa el boton si esta bloqueada.',
+    openNow: 'Abrir ahora',
+    openFallback: 'Abrir respaldo',
+    linkPathNotReady: 'Ruta de link no esta lista',
+    commandRouteNotMapped: 'Esta ruta de comando aun no esta asignada a un destino.',
+    openFallbackPartnerRoute: 'Abrir ruta de respaldo',
+    publicLockUnavailable: 'Candado publico no disponible',
+    noVaultLinks: 'No se encontraron links de vault.',
+    linkVaultLabel: 'Vault compartible',
+    selectedLinksDescription: 'Para compartir los links que seleccionaste.',
+    selectedLinksSubtext:
+      'Elige que compartir o ocultar. El vault publico incluye solo URLs estables seleccionadas, nunca invitados o targets privados.',
+    selectedLinksPrompt: 'Pide al admin que cree un nuevo link compartible desde',
+    myFenrirLinkVault: 'Boveda de links de Frisky Dev',
+    selectedShareHeading: 'Links seleccionados, una sola pagina.',
+    selectedShareCopy:
+      'Esta pagina es solo para compartir links que el admin selecciono. Abre los enlaces publicos oficiales de Telegram locks, salas, pagos, docs, reservas y soporte. Los objetivos privados quedan protegidos por Fenrir.',
+    shareableVault: 'Vault compartible',
+    forSharingSelectedLinks: 'Para compartir tus links seleccionados con alguien.',
+    publicVaultIncludes:
+      'Elige que compartir u ocultar. El vault publico incluye solo enlaces estables seleccionados, nunca invites sin filtrar o targets privados.',
+    myFenrirLabel: 'Fenrir Bridge',
+    share: 'Compartir',
+    hidden: 'Oculto',
+    personalLinkHelp:
+      'Agrega una URL publica estable a este vault. Fenrir guarda etiqueta, URL y categoria para que la caja sea legible antes de compartir.',
+    personalLinkTitleLabel: 'Etiqueta del link',
+    personalLinkTitlePlaceholder: 'Checkout Mercado Pago',
+    personalLinkUrlLabel: 'URL estable',
+    personalLinkUrlPlaceholder: 'https://pay.example.com/fenrir',
+    personalLinkKindLabel: 'Tipo de link',
+    clientExplanation: 'Explicacion cliente',
+    setupGoalHelp: 'Dile a Fenrir tu objetivo de lanzamiento. Abre el panel correcto en orden.',
+    onePathAtATime: 'Avanza paso a paso: lock, ruta, comparti, y lanzar.',
+    assistantPrompt: 'Puedo abrir el panel correcto por ti. Elige un objetivo de lanzamiento.',
+    ready: 'Listo',
+    readiness: 'Listo',
+    routeLaunch: 'Convierte un link privado en un link publico con branding.',
+    linkConversion: 'Conversion de links',
+    turnPrivateInvite: 'Convertir invite privado',
+    pastePrivateLink:
+      'Pega un link Telegram, Zoom, Webex, Whereby o Meet. Fenrir mantiene el target privado y da una URL de dominio estable.',
+    fenrirSubdomain: 'Subdominio Fenrir',
+    customerDomain: 'Dominio del cliente',
+    privateTarget: 'Target privado',
+    publicShareLink: 'Link publico para compartir',
+    privateTargetHidden: 'Target privado oculto',
+    publicShareLinkReady: 'Listo despues de crear',
+    rawLinkHidden: 'Link sin revelar',
+    cloudflareSsl: 'SSL Cloudflare',
+    publicUrlReady: 'URL publica lista',
+    routeToPrivateDestination: 'Ruta de Fenrir de link publico a destino privado',
+    protectedLink: 'Enlace protegido',
+    stableUrl: 'URL estable de Fenrir',
+    privateDestination: 'Destino privado',
+    challengeLayer: 'Capa de desafio',
+    riskBasedPromptReady: 'Prompt por riesgo listo',
+    challengeDescription:
+      'Picos inusuales pueden pasar por Turnstile o chequeo similar antes del redirect.',
+    captchaLayer: 'Capa captcha',
+    idleNormalPattern: 'Idle: patron normal',
+    vaultLinkOpenLabelPrefix: 'Abrir',
+    liveRoomSecondaryLabel: 'Enlace secundario',
+    liveRoomChallengeReady: 'Desafio listo',
+    createPaidRoomTitle: 'Proteger un grupo Telegram',
+    createPaidRoomBody: 'Pega ID de grupo e imagen, luego publica un link estable con candado.',
+    createPaidRoomNeed: 'Necesario: acceso al grupo',
+    roomCoverImageInvalid: 'La imagen/logo de la sala no tiene una URL válida.',
+    setupInputTelegramSlug: 'principal',
+    setupInputTelegramId: 'ID del grupo Telegram',
+    setupInputGroupName: 'Nombre del grupo',
+    setupInputGroupPhoto: 'Foto del grupo de Telegram',
+    setupInputDomain: 'vip.myfenrir.com',
+    setupInputRoomSlug: 'sala-acceso',
+    setupInputRoomTitle: 'Nombre de sala / cliente',
+    setupInputRoomTarget: 'URL de llamada privada',
+    setupInputRoomCover: 'Logo Pro / URL de portada',
+    setupInputGroupEmail: 'tu@comunidad.com',
+    setupInputCommunityEmail: 'tu@comunidad.com',
+    setupInputCustomDomain: 'cliente.myfenrir.com',
+    setupInputLiveRoom: 'Titulo de sala',
+    liveRoomUrlHint: 'URL privada de llamada',
+    resolvingLockState: 'Resolviendo la llave de Fenrir',
+    checkingRoute: 'Verificando ruta',
+    resolvingBridgeState: 'Fenrir está comprobando el estado en vivo del puente D1.',
+    roomWaitingBody:
+      'Esta sala de llamada no existe o está pausada. Pide al administrador un enlace de sala actualizado.',
+    roomBrandIntro:
+      'Fenrir muestra primero la puerta con marca. Si hay tráfico inusual, esta página puede pedir un desafío rápido antes de abrir la sala privada.',
+    roomSecondaryLabel: 'Enlace protegido secundario',
+    roomChallengeDescription:
+      'Picos inusuales pueden pasar por Turnstile o una verificación similar antes de redirigir.',
+    fenrirRoomGate: 'Puerta de sala Fenrir',
+    protectedRedirectPending: 'La redirección protegida está entrando en línea',
+    roomStableUrlLabel: 'URL estable de Fenrir',
+    roomPrivateDestinationLabel: 'Destino privado',
+    walkthroughNodeMapLabel: 'ruta animada',
+    walkthroughModeLabel: 'Modos de presentación',
+    walkthroughPillsText: 'Ruta de Fenrir desde el enlace público al destino privado',
+    walkthroughLabel: 'Guía de Fenrir orientada al cliente',
+    walkthroughClientLabel: 'Vista de cliente',
+    walkthroughAdminLabel: 'Vista de admin',
+    walkthroughLaunchLabel: 'Guía de lanzamiento',
+    walkthroughClientTitle: 'Un enlace limpio reemplaza invitaciones privadas desordenadas.',
+    walkthroughClientBody:
+      'Tu cliente ve una página Fenrir con branding, no una URL privada de Telegram, Zoom o pago en crudo. El destino privado se mantiene oculto hasta que se autoriza el acceso.',
+    walkthroughClientQuote: 'Comparte este enlace. Fenrir controla la puerta.',
+    walkthroughAdminTitle: 'El propietario mantiene el control aunque el enlace ya sea público.',
+    walkthroughAdminBody:
+      'Si una invitación se filtra o cambia una sala, el admin rota el destino oculto. El flyer, bio link, QR y mensaje al cliente conservan la misma URL pública.',
+    walkthroughAdminQuote: 'Cambia la sala trasera. Mantén la puerta frontal.',
+    walkthroughLaunchTitle: 'El viaje del cliente sigue siendo simple de clic a acceso.',
+    walkthroughLaunchBody:
+      'Fenrir explica con lenguaje claro lo que pasa, valida la puerta correcta y envía al visitante aprobado al room o grupo privado correcto.',
+    walkthroughLaunchQuote: 'Toca, verifica, entra. Sin trazas de enlace expuestas.',
+    walkthroughStepsClient: [
+      'Enlace público',
+      'Puerta con marca',
+      'Chequeo de acceso',
+      'Destino privado',
+    ],
+    walkthroughStepsAdmin: ['URL estable', 'Rotar destino', 'Revocar fuga', 'Acción de auditoría'],
+    walkthroughStepsLaunch: [
+      'Cliente hace clic',
+      'Fenrir explica',
+      'Acceso desbloqueado',
+      'Entrada abierta',
+    ],
+    ghostRouteTitle: 'El inicio de sesión de Ghost pertenece a Bot OS.',
+    ghostRouteBody:
+      'Esta ruta está separada de Fenrir Bridge. Úsala para Frisky Ghost, onboarding con estilo Ghost y momentos de identidad de Bot OS sin tocar cuentas de cliente.',
+    botOsRouteTitle: 'Capa de comandos de bots.',
+    botOsRouteSubtitle: 'Capa de comandos modular para admins Fenrir y Bot OS.',
+    botOsRouteBody:
+      'Las cajas modulares están de vuelta. Ghost maneja la piel de login lúdica, Fenrir maneja operaciones de puente, y Community Gate permanece aislado en Neon.',
+    botOsRouteModulesTitle: 'Módulos de Bot OS',
+    botOsRouteFooterGhost: 'Login de Ghost',
+    botOsRouteFooterCommunity: 'Community Gate',
+    botOsRouteFooterHome: 'Fenrir Bridge',
+    communityEmailPlaceholder: 'tu@comunidad.com',
+    neonMagicBusy: 'Enviando tu enlace de entrada...',
+    neonMagicButton: 'Envíame mi enlace de entrada',
+    neonMagicSuccessMessage:
+      'Enlace enviado. Abre tu correo y toca el enlace más reciente para continuar.',
+    neonMagicDevLinkLabel: 'Abrir enlace de prueba Neon',
+    fallbackPartnerLabel: 'Enlaces de respaldo',
   },
   fr: {
-    friskyAccount: "Compte Frisky",
-    secondaryGate: "Passerelle secondaire",
-    routePrivateViaFenrir: "Acheminer Zoom, Meet, Webex ou toute salle via Fenrir en premier.",
-    proCustomization: "Personnalisation Pro",
-    proCustomizationBodyTitle: "À partir de Pro, les clients peuvent ajouter logo et visuels personnalisés.",
-    proCustomizationBody: "Starter garde la passerelle Fenrir standard. Pro et Operator débloquent logo client, style de nom personnalisé et hero image sur le lien secondaire.",
-    telegramStatusCheck: "Etat Telegram",
-    linked: "lié",
-    loginRequired: "connexion requise",
-    telegramConnected: (username, id) => `${username ? `@${username}` : id} est connecté à cet ID Frisky.`,
-    telegramSessionFoundNoLink: "Session Frisky trouvee. L'ID Telegram n'est pas encore lie, donc Fenrir ne peut pas verifier Telegram Stars ni l'etat d'acces.",
-    telegramSignInFirst: "Connectez-vous avec le login Frisky unifie pour que Fenrir verifie l'acces actif de cet ID Telegram.",
-    linkTelegramId: "Lier Telegram ID",
-    telegramVerifyWhenNeeded: "Telegram est verifie seulement quand une action Telegram en a besoin.",
-    telegramReaddButton: "Me reinviter",
+    friskyAccount: 'Compte Frisky',
+    secondaryGate: 'Passerelle secondaire',
+    routePrivateViaFenrir: 'Acheminer Zoom, Meet, Webex ou toute salle via Fenrir en premier.',
+    proCustomization: 'Personnalisation Pro',
+    proCustomizationBodyTitle:
+      'À partir de Pro, les clients peuvent ajouter logo et visuels personnalisés.',
+    proCustomizationBody:
+      'Starter garde la passerelle Fenrir standard. Pro et Operator débloquent logo client, style de nom personnalisé et hero image sur le lien secondaire.',
+    telegramStatusCheck: 'Etat Telegram',
+    linked: 'lié',
+    loginRequired: 'connexion requise',
+    telegramConnected: (username, id) =>
+      `${username ? `@${username}` : id} est connecté à cet ID Frisky.`,
+    telegramSessionFoundNoLink:
+      "Session Frisky trouvee. L'ID Telegram n'est pas encore lie, donc Fenrir ne peut pas verifier Telegram Stars ni l'etat d'acces.",
+    telegramSignInFirst:
+      "Connectez-vous avec le login Frisky unifie pour que Fenrir verifie l'acces actif de cet ID Telegram.",
+    linkTelegramId: 'Lier Telegram ID',
+    telegramVerifyWhenNeeded:
+      'Telegram est verifie seulement quand une action Telegram en a besoin.',
+    telegramReaddButton: 'Me reinviter',
     telegramReaddNeedChat: "Entrez d'abord l'ID du groupe Telegram.",
-    telegramReaddReady: "Invitation de recuperation prete. Fenrir a ouvert un lien Telegram a usage unique.",
-    telegramReaddUnavailable: "Impossible de creer l'invitation de recuperation. Verifiez les droits admin du bot.",
-    devRequestViaSignal: "Demande support via Frisky Signal",
-    devRequestViaSignalShort: "Frisky Signal",
-    setupRoute: "Route de setup",
-    openingLaunchRoute: "Ouverture de la route de lancement",
-    setupPathReady: "Cette route est prête. Fenrir l'a ouverte automatiquement; utilisez le bouton si bloquée.",
-    openNow: "Ouvrir",
-    openFallback: "Ouverture secours",
-    linkPathNotReady: "Chemin de link non prêt",
+    telegramReaddReady:
+      'Invitation de recuperation prete. Fenrir a ouvert un lien Telegram a usage unique.',
+    telegramReaddUnavailable:
+      "Impossible de creer l'invitation de recuperation. Verifiez les droits admin du bot.",
+    devRequestViaSignal: 'Demande support via Frisky Signal',
+    devRequestViaSignalShort: 'Frisky Signal',
+    setupRoute: 'Route de setup',
+    openingLaunchRoute: 'Ouverture de la route de lancement',
+    setupPathReady:
+      "Cette route est prête. Fenrir l'a ouverte automatiquement; utilisez le bouton si bloquée.",
+    openNow: 'Ouvrir',
+    openFallback: 'Ouverture secours',
+    linkPathNotReady: 'Chemin de link non prêt',
     commandRouteNotMapped: "Cette route de commande n'est pas encore reliée à une destination.",
-    openFallbackPartnerRoute: "Ouvrir route secours",
-    publicLockUnavailable: "Verrou public indisponible",
-    noVaultLinks: "Aucun lien de vault.",
-    linkVaultLabel: "Vault partageable",
+    openFallbackPartnerRoute: 'Ouvrir route secours',
+    publicLockUnavailable: 'Verrou public indisponible',
+    noVaultLinks: 'Aucun lien de vault.',
+    linkVaultLabel: 'Vault partageable',
     selectedLinksDescription: "Pour partager les liens sélectionnés avec quelqu'un.",
-    selectedLinksSubtext: "Choisissez quoi partager ou masquer. Le vault public n'inclut que des URL stables sélectionnées, jamais d'invites brutes.",
+    selectedLinksSubtext:
+      "Choisissez quoi partager ou masquer. Le vault public n'inclut que des URL stables sélectionnées, jamais d'invites brutes.",
     selectedLinksPrompt: "Demandez à l'admin de créer un nouveau lien partagé depuis",
-    myFenrirLinkVault: "Tiroir de liens Frisky Dev",
-    selectedShareHeading: "Liens sélectionnés, une seule page.",
-    selectedShareCopy: "Cette page sert à partager seulement les liens choisis par l'admin. Ouvrez les URLs publiques pour Telegram, portes de salle, paiements, docs, réservations et support. Les cibles privées restent derrière Fenrir.",
-    shareableVault: "Vault partageable",
-    forSharingSelectedLinks: "Pour partager vos liens sélectionnés.",
-    publicVaultIncludes: "Choisissez de partager ou masquer. Le vault public inclut uniquement des URLs stables sélectionnées, jamais d'invitations brutes ou cibles de salle privées.",
-    myFenrirLabel: "Fenrir Bridge",
-    share: "Partager",
-    hidden: "Masqué",
-    personalLinkHelp: "Ajoutez une URL publique stable à ce vault. Fenrir garde le libellé, l'URL et la catégorie pour que la boîte reste lisible avant partage.",
-    personalLinkTitleLabel: "Libellé du lien",
-    personalLinkTitlePlaceholder: "Checkout Mercado Pago",
-    personalLinkUrlLabel: "URL stable",
-    personalLinkUrlPlaceholder: "https://pay.example.com/fenrir",
-    personalLinkKindLabel: "Type de lien",
-    clientExplanation: "Explication client",
-    setupGoalHelp: "Dites à Fenrir votre objectif de lancement. Il ouvre le bon setup en sequence.",
-    onePathAtATime: "Un seul chemin à la fois: lock, route, partage, puis lancement.",
-    assistantPrompt: "Je peux ouvrir le bon panneau pour vous. Choisissez un resultat de lancement.",
-    ready: "Pret",
-    readiness: "Pret",
-    routeLaunch: "Transformer une invitation privée en lien public brandé.",
-    linkConversion: "Conversion de liens",
-    turnPrivateInvite: "Transformer invitation privee",
-    pastePrivateLink: "Collez un lien Telegram, Zoom, Webex, Whereby ou Meet. Fenrir garde la cible privée et donne une URL de domaine stable.",
-    fenrirSubdomain: "Sous-domaine Fenrir",
-    customerDomain: "Domaine client",
-    privateTarget: "Cible privée",
-    publicShareLink: "Lien public de partage",
-    privateTargetHidden: "Cible privée cachée",
-    publicShareLinkReady: "Disponible après création",
-    rawLinkHidden: "Lien brut caché",
-    cloudflareSsl: "SSL Cloudflare",
-    publicUrlReady: "URL publique prête",
-    routeToPrivateDestination: "Fenrir route du lien public vers destination privée",
-    protectedLink: "Lien protégé",
-    stableUrl: "URL stable Fenrir",
-    privateDestination: "Destination privée",
-    challengeLayer: "Couche de challenge",
-    riskBasedPromptReady: "Déclencheur par risque prêt",
-    challengeDescription: "Des pics inhabituels peuvent passer par Turnstile ou un contrôle similaire avant la redirection.",
-    captchaLayer: "Couche captcha",
-    idleNormalPattern: "Idle: pattern normal",
-    vaultLinkOpenLabelPrefix: "Ouvrir",
-    liveRoomSecondaryLabel: "Lien secondaire",
-    liveRoomChallengeReady: "Challenge prêt",
-    createPaidRoomTitle: "Protéger un groupe Telegram",
+    myFenrirLinkVault: 'Tiroir de liens Frisky Dev',
+    selectedShareHeading: 'Liens sélectionnés, une seule page.',
+    selectedShareCopy:
+      "Cette page sert à partager seulement les liens choisis par l'admin. Ouvrez les URLs publiques pour Telegram, portes de salle, paiements, docs, réservations et support. Les cibles privées restent derrière Fenrir.",
+    shareableVault: 'Vault partageable',
+    forSharingSelectedLinks: 'Pour partager vos liens sélectionnés.',
+    publicVaultIncludes:
+      "Choisissez de partager ou masquer. Le vault public inclut uniquement des URLs stables sélectionnées, jamais d'invitations brutes ou cibles de salle privées.",
+    myFenrirLabel: 'Fenrir Bridge',
+    share: 'Partager',
+    hidden: 'Masqué',
+    personalLinkHelp:
+      "Ajoutez une URL publique stable à ce vault. Fenrir garde le libellé, l'URL et la catégorie pour que la boîte reste lisible avant partage.",
+    personalLinkTitleLabel: 'Libellé du lien',
+    personalLinkTitlePlaceholder: 'Checkout Mercado Pago',
+    personalLinkUrlLabel: 'URL stable',
+    personalLinkUrlPlaceholder: 'https://pay.example.com/fenrir',
+    personalLinkKindLabel: 'Type de lien',
+    clientExplanation: 'Explication client',
+    setupGoalHelp: 'Dites à Fenrir votre objectif de lancement. Il ouvre le bon setup en sequence.',
+    onePathAtATime: 'Un seul chemin à la fois: lock, route, partage, puis lancement.',
+    assistantPrompt:
+      'Je peux ouvrir le bon panneau pour vous. Choisissez un resultat de lancement.',
+    ready: 'Pret',
+    readiness: 'Pret',
+    routeLaunch: 'Transformer une invitation privée en lien public brandé.',
+    linkConversion: 'Conversion de liens',
+    turnPrivateInvite: 'Transformer invitation privee',
+    pastePrivateLink:
+      'Collez un lien Telegram, Zoom, Webex, Whereby ou Meet. Fenrir garde la cible privée et donne une URL de domaine stable.',
+    fenrirSubdomain: 'Sous-domaine Fenrir',
+    customerDomain: 'Domaine client',
+    privateTarget: 'Cible privée',
+    publicShareLink: 'Lien public de partage',
+    privateTargetHidden: 'Cible privée cachée',
+    publicShareLinkReady: 'Disponible après création',
+    rawLinkHidden: 'Lien brut caché',
+    cloudflareSsl: 'SSL Cloudflare',
+    publicUrlReady: 'URL publique prête',
+    routeToPrivateDestination: 'Fenrir route du lien public vers destination privée',
+    protectedLink: 'Lien protégé',
+    stableUrl: 'URL stable Fenrir',
+    privateDestination: 'Destination privée',
+    challengeLayer: 'Couche de challenge',
+    riskBasedPromptReady: 'Déclencheur par risque prêt',
+    challengeDescription:
+      'Des pics inhabituels peuvent passer par Turnstile ou un contrôle similaire avant la redirection.',
+    captchaLayer: 'Couche captcha',
+    idleNormalPattern: 'Idle: pattern normal',
+    vaultLinkOpenLabelPrefix: 'Ouvrir',
+    liveRoomSecondaryLabel: 'Lien secondaire',
+    liveRoomChallengeReady: 'Challenge prêt',
+    createPaidRoomTitle: 'Protéger un groupe Telegram',
     createPaidRoomBody: "Ajoutez l'ID groupe et l'image, puis publiez un lien bloqué stable.",
-    createPaidRoomNeed: "Nécessaire: accès groupe",
+    createPaidRoomNeed: 'Nécessaire: accès groupe',
     roomCoverImageInvalid: "L'URL du logo ou de l'image de salle est invalide.",
-    setupInputTelegramSlug: "principal",
-    setupInputTelegramId: "ID du groupe Telegram",
-    setupInputGroupName: "Nom du groupe",
-    setupInputGroupPhoto: "Image du groupe Telegram",
-    setupInputDomain: "vip.myfenrir.com",
-    setupInputRoomSlug: "acces-salle",
-    setupInputRoomTitle: "Nom de salle / client",
+    setupInputTelegramSlug: 'principal',
+    setupInputTelegramId: 'ID du groupe Telegram',
+    setupInputGroupName: 'Nom du groupe',
+    setupInputGroupPhoto: 'Image du groupe Telegram',
+    setupInputDomain: 'vip.myfenrir.com',
+    setupInputRoomSlug: 'acces-salle',
+    setupInputRoomTitle: 'Nom de salle / client',
     setupInputRoomTarget: "URL d'appel privée",
-    setupInputRoomCover: "Logo Pro / URL image de marque",
-    setupInputGroupEmail: "vous@communaute.com",
-    setupInputCommunityEmail: "vous@communaute.com",
-    setupInputCustomDomain: "client.myfenrir.com",
-    setupInputLiveRoom: "Titre de salle",
+    setupInputRoomCover: 'Logo Pro / URL image de marque',
+    setupInputGroupEmail: 'vous@communaute.com',
+    setupInputCommunityEmail: 'vous@communaute.com',
+    setupInputCustomDomain: 'client.myfenrir.com',
+    setupInputLiveRoom: 'Titre de salle',
     liveRoomUrlHint: "URL d'appel privée",
-    resolvingLockState: "Résolution du verrou Fenrir",
-    checkingRoute: "Vérification de la route",
+    resolvingLockState: 'Résolution du verrou Fenrir',
+    checkingRoute: 'Vérification de la route',
     resolvingBridgeState: "Fenrir vérifie l'état live du pont D1.",
-    roomWaitingBody: "Cette salle de réunion est manquante ou en pause. Demandez un nouveau lien de salle à l'admin.",
-    roomBrandIntro: "Fenrir affiche d'abord la porte de marque. Si le trafic est inhabituel, cette page peut demander un challenge rapide avant d'ouvrir la salle privée.",
-    roomSecondaryLabel: "Lien protégé secondaire",
-    roomChallengeDescription: "Des pics inhabituels peuvent passer par Turnstile ou un contrôle similaire avant la redirection.",
-    fenrirRoomGate: "Passerelle de salle Fenrir",
-    protectedRedirectPending: "Redirection protégée en ligne",
-    roomStableUrlLabel: "URL stable Fenrir",
-    roomPrivateDestinationLabel: "Destination privée",
-    walkthroughNodeMapLabel: "route animée",
-    walkthroughModeLabel: "Modes de démonstration",
-    walkthroughPillsText: "Route Fenrir du lien public vers la destination privée",
-    walkthroughLabel: "Parcours Fenrir client",
-    walkthroughClientLabel: "Vue client",
-    walkthroughAdminLabel: "Vue admin",
-    walkthroughLaunchLabel: "Parcours de lancement",
-    walkthroughClientTitle: "Un lien propre remplace des invitations privées brouillonnes.",
-    walkthroughClientBody: "Le client voit une page Fenrir brandée, pas une URL Telegram, Zoom ou paiement brute. La destination privée reste cachée jusqu'à l'autorisation d'accès.",
-    walkthroughClientQuote: "Envoie ce lien. Fenrir gère la porte.",
-    walkthroughAdminTitle: "Le propriétaire garde le contrôle même quand le lien est déjà public.",
-    walkthroughAdminBody: "Si une invitation fuit ou qu'une salle change, l'admin fait tourner la cible cachée. Flyer, bio link, QR et message client conservent la même URL publique.",
-    walkthroughAdminQuote: "Change la salle arrière. Garde la porte avant.",
+    roomWaitingBody:
+      "Cette salle de réunion est manquante ou en pause. Demandez un nouveau lien de salle à l'admin.",
+    roomBrandIntro:
+      "Fenrir affiche d'abord la porte de marque. Si le trafic est inhabituel, cette page peut demander un challenge rapide avant d'ouvrir la salle privée.",
+    roomSecondaryLabel: 'Lien protégé secondaire',
+    roomChallengeDescription:
+      'Des pics inhabituels peuvent passer par Turnstile ou un contrôle similaire avant la redirection.',
+    fenrirRoomGate: 'Passerelle de salle Fenrir',
+    protectedRedirectPending: 'Redirection protégée en ligne',
+    roomStableUrlLabel: 'URL stable Fenrir',
+    roomPrivateDestinationLabel: 'Destination privée',
+    walkthroughNodeMapLabel: 'route animée',
+    walkthroughModeLabel: 'Modes de démonstration',
+    walkthroughPillsText: 'Route Fenrir du lien public vers la destination privée',
+    walkthroughLabel: 'Parcours Fenrir client',
+    walkthroughClientLabel: 'Vue client',
+    walkthroughAdminLabel: 'Vue admin',
+    walkthroughLaunchLabel: 'Parcours de lancement',
+    walkthroughClientTitle: 'Un lien propre remplace des invitations privées brouillonnes.',
+    walkthroughClientBody:
+      "Le client voit une page Fenrir brandée, pas une URL Telegram, Zoom ou paiement brute. La destination privée reste cachée jusqu'à l'autorisation d'accès.",
+    walkthroughClientQuote: 'Envoie ce lien. Fenrir gère la porte.',
+    walkthroughAdminTitle: 'Le propriétaire garde le contrôle même quand le lien est déjà public.',
+    walkthroughAdminBody:
+      "Si une invitation fuit ou qu'une salle change, l'admin fait tourner la cible cachée. Flyer, bio link, QR et message client conservent la même URL publique.",
+    walkthroughAdminQuote: 'Change la salle arrière. Garde la porte avant.',
     walkthroughLaunchTitle: "Le parcours client reste simple du clic à l'entrée.",
-    walkthroughLaunchBody: "Fenrir explique ce qui se passe, confirme la bonne porte et envoie le visiteur approuvé vers la bonne salle ou le bon groupe privé.",
-    walkthroughLaunchQuote: "Clique, vérifie, entre. Sans piste de lien exposée.",
-    walkthroughStepsClient: ["Lien public", "Porte brandée", "Contrôle d'accès", "Destination privée"],
-    walkthroughStepsAdmin: ["URL stable", "Tourner la cible", "Révoquer la fuite", "Action d'audit"],
-    walkthroughStepsLaunch: ["Client clique", "Fenrir explique", "Déblocage d'accès", "Entrée ouverte"],
-    ghostRouteTitle: "La connexion Ghost appartient à la surface Bot OS.",
-    ghostRouteBody: "Cette route est séparée volontairement de Fenrir Bridge. Utilisez-la pour Frisky Ghost, l'onboarding Ghost et les moments d'identité Bot OS sans toucher les comptes clients Fenrir Bridge.",
-    botOsRouteTitle: "Couche de commandes de bots.",
-    botOsRouteSubtitle: "Couche de commande modulaire pour Fenrir et les ops Bot OS.",
-    botOsRouteBody: "Les blocs modulaires sont de retour. Ghost gère la skin de connexion, Fenrir gère les opérations de pont, et Community Gate reste isolé sur Neon.",
-    botOsRouteModulesTitle: "Modules Bot OS",
-    botOsRouteFooterGhost: "Connexion Ghost",
-    botOsRouteFooterCommunity: "Community Gate",
-    botOsRouteFooterHome: "Fenrir Bridge",
-    communityEmailPlaceholder: "vous@communaute.com",
+    walkthroughLaunchBody:
+      'Fenrir explique ce qui se passe, confirme la bonne porte et envoie le visiteur approuvé vers la bonne salle ou le bon groupe privé.',
+    walkthroughLaunchQuote: 'Clique, vérifie, entre. Sans piste de lien exposée.',
+    walkthroughStepsClient: [
+      'Lien public',
+      'Porte brandée',
+      "Contrôle d'accès",
+      'Destination privée',
+    ],
+    walkthroughStepsAdmin: [
+      'URL stable',
+      'Tourner la cible',
+      'Révoquer la fuite',
+      "Action d'audit",
+    ],
+    walkthroughStepsLaunch: [
+      'Client clique',
+      'Fenrir explique',
+      "Déblocage d'accès",
+      'Entrée ouverte',
+    ],
+    ghostRouteTitle: 'La connexion Ghost appartient à la surface Bot OS.',
+    ghostRouteBody:
+      "Cette route est séparée volontairement de Fenrir Bridge. Utilisez-la pour Frisky Ghost, l'onboarding Ghost et les moments d'identité Bot OS sans toucher les comptes clients Fenrir Bridge.",
+    botOsRouteTitle: 'Couche de commandes de bots.',
+    botOsRouteSubtitle: 'Couche de commande modulaire pour Fenrir et les ops Bot OS.',
+    botOsRouteBody:
+      'Les blocs modulaires sont de retour. Ghost gère la skin de connexion, Fenrir gère les opérations de pont, et Community Gate reste isolé sur Neon.',
+    botOsRouteModulesTitle: 'Modules Bot OS',
+    botOsRouteFooterGhost: 'Connexion Ghost',
+    botOsRouteFooterCommunity: 'Community Gate',
+    botOsRouteFooterHome: 'Fenrir Bridge',
+    communityEmailPlaceholder: 'vous@communaute.com',
     neonMagicBusy: "Envoi de votre lien d'entrée...",
     neonMagicButton: "Envoyez-moi mon lien d'entrée",
-    neonMagicSuccessMessage: "Lien envoyé. Ouvrez votre boîte mail et touchez le lien le plus récent pour continuer.",
-    neonMagicDevLinkLabel: "Ouvrir le lien développeur Neon",
-    fallbackPartnerLabel: "Liens de secours"
+    neonMagicSuccessMessage:
+      'Lien envoyé. Ouvrez votre boîte mail et touchez le lien le plus récent pour continuer.',
+    neonMagicDevLinkLabel: 'Ouvrir le lien développeur Neon',
+    fallbackPartnerLabel: 'Liens de secours',
   },
   de: {
-    friskyAccount: "Frisky Konto",
-    secondaryGate: "Sekundaere Tor",
-    routePrivateViaFenrir: "Routen Sie Zoom, Meet, Webex oder jede Room erst über Fenrir.",
-    proCustomization: "Pro Anpassung",
-    proCustomizationBodyTitle: "Ab Pro koennen Kunden eigenes Logo und gebrandete Raumvisuals nutzen.",
-    proCustomizationBody: "Starter enthaelt den clean Fenrir Raum-Gate. Pro und Operator aktivieren Kundenlogo, benutzerdefinierten Raumnamenstil und Hero-Bild auf dem Sekundaerlink.",
-    telegramStatusCheck: "Telegram-Status",
-    linked: "verknuepft",
-    loginRequired: "anmeldung erforderlich",
-    telegramConnected: (username, id) => `${username ? `@${username}` : id} ist mit dieser Frisky ID verknuepft.`,
-    telegramSessionFoundNoLink: "Frisky-Session gefunden. Telegram ID ist noch nicht verknuepft, daher kann Fenrir Telegram Stars oder Zugangsstatus fuer diesen Account nicht pruefen.",
-    telegramSignInFirst: "Bitte zuerst mit dem einheitlichen Frisky Login anmelden, damit Fenrir pruefen kann, ob diese Telegram ID aktiven Zugriff hat.",
-    linkTelegramId: "Telegram ID verknuepfen",
-    telegramVerifyWhenNeeded: "Telegram wird nur geprueft, wenn eine Telegram-Aktion es braucht.",
-    telegramReaddButton: "Neu einladen",
-    telegramReaddNeedChat: "Gib zuerst die Telegram Gruppen-ID ein.",
-    telegramReaddReady: "Recovery-Einladung bereit. Fenrir hat einen einmaligen Telegram-Link geoeffnet.",
-    telegramReaddUnavailable: "Recovery-Einladung konnte nicht erstellt werden. Bot-Adminrechte pruefen.",
-    devRequestViaSignal: "Support-Anfrage via Frisky Signal",
-    devRequestViaSignalShort: "Frisky Signal",
-    setupRoute: "Setup-Route",
-    openingLaunchRoute: "Launch-Route wird geoeffnet",
-    setupPathReady: "Dieser Setup-Pfad ist bereit. Fenrir öffnet ihn automatisch; falls blockiert, nutze den Knopf.",
-    openNow: "Jetzt öffnen",
-    openFallback: "Fallback öffnen",
-    linkPathNotReady: "Link-Pfad nicht bereit",
-    commandRouteNotMapped: "Dieser Kommandopfad ist noch keiner Destination zugeordnet.",
-    openFallbackPartnerRoute: "Fallback Partner-Route öffnen",
-    publicLockUnavailable: "Oeffentlicher Lock nicht verfügbar",
-    noVaultLinks: "Keine Vault Links gefunden.",
-    linkVaultLabel: "Teilbares Vault",
-    selectedLinksDescription: "Zum Teilen der ausgewählten Links.",
-    selectedLinksSubtext: "Wählen Sie aus, was freigegeben oder verborgen bleibt. Der öffentliche Vault enthält nur stabile URLs, nie Roh-Einladungen.",
-    selectedLinksPrompt: "Bitte den Admin, einen neuen Freigabe-Link von",
-    myFenrirLinkVault: "Frisky Dev Link Vault",
-    selectedShareHeading: "Ausgewaehlte Links, eine Seite.",
-    selectedShareCopy: "Diese Seite dient nur dem Teilen der vom Admin ausgewählten Links. Öffnen Sie offizielle öffentliche URLs für Telegram-Locks, Rooms, Zahlungen, Docs, Buchungen und Support. Private Ziele bleiben hinter Fenrir.",
-    shareableVault: "Teilbarer Vault",
-    forSharingSelectedLinks: "Zum Teilen der ausgewählten Links.",
-    publicVaultIncludes: "Wähle was geteilt oder verborgen wird. Der öffentliche Vault enthält nur ausgewählte stabile URLs, nie rohe Einladungen oder private Raumziele.",
-    myFenrirLabel: "Fenrir Bridge",
-    share: "Teilen",
-    hidden: "Ausgeblendet",
-    personalLinkHelp: "Fuege eine stabile oeffentliche URL zu diesem Vault hinzu. Fenrir speichert Label, URL und Kategorie, damit die Box vor dem Teilen lesbar bleibt.",
-    personalLinkTitleLabel: "Link-Label",
-    personalLinkTitlePlaceholder: "Mercado Pago Checkout",
-    personalLinkUrlLabel: "Stabile URL",
-    personalLinkUrlPlaceholder: "https://pay.example.com/fenrir",
-    personalLinkKindLabel: "Link-Typ",
-    clientExplanation: "Kunden-Erklaerung",
-    setupGoalHelp: "Teilen Sie Fenrir Ihr Launch-Ziel mit. Es öffnet den richtigen Setup-Pfad in Reihenfolge.",
-    onePathAtATime: "Schritt für Schritt vorgehen: lock, route, share, dann launch.",
-    assistantPrompt: "Ich kann das richtige Panel fuer dich oeffnen. Wähle ein Launch-Ergebnis.",
-    ready: "Bereit",
-    readiness: "Bereit",
-    routeLaunch: "Mache einen privaten Invite zu einem gebrandeten öffentlichen Link.",
-    linkConversion: "Link-Konvertierung",
-    turnPrivateInvite: "Privaten Invite umwandeln",
-    pastePrivateLink: "Füge einen Telegram, Zoom, Webex, Whereby oder Meet Link ein. Fenrir hält das Ziel privat und gibt eine stabile Domain-URL.",
-    fenrirSubdomain: "Fenrir Subdomain",
-    customerDomain: "Kunden-Domain",
-    privateTarget: "Privates Ziel",
-    publicShareLink: "Öffentlicher Share Link",
-    privateTargetHidden: "Privates Ziel verborgen",
-    publicShareLinkReady: "Nach Erstellung bereit",
-    rawLinkHidden: "Roher Link verborgen",
-    cloudflareSsl: "Cloudflare SSL",
-    publicUrlReady: "Öffentliche URL bereit",
-    routeToPrivateDestination: "Fenrir Route vom öffentlichen Link zum privaten Ziel",
-    protectedLink: "Sekundaerer geschützter Link",
-    stableUrl: "Stabile Fenrir URL",
-    privateDestination: "Privates Ziel",
-    challengeLayer: "Challenge Layer",
-    riskBasedPromptReady: "Risiko-basierter Prompt bereit",
-    challengeDescription: "Ungewoehnliche Lasten koennen vor dem Redirect ueber Turnstile oder aehnlichen Check laufen.",
-    captchaLayer: "Captcha Layer",
-    idleNormalPattern: "Idle: normales Muster",
-    vaultLinkOpenLabelPrefix: "Öffnen",
-    liveRoomSecondaryLabel: "Sekundaerer Link",
-    liveRoomChallengeReady: "Challenge-ready",
-    createPaidRoomTitle: "Telegram Gruppe schützen",
-    createPaidRoomBody: "Füge Gruppen-ID und Bild hinzu, danach publiziere einen stabilen, gesperrten Link.",
-    createPaidRoomNeed: "Erforderlich: Gruppen-Zugriff",
-    roomCoverImageInvalid: "Raumbild-/Logo-URL ist ungültig.",
-    setupInputTelegramSlug: "haupt",
-    setupInputTelegramId: "Telegram Gruppen-ID",
-    setupInputGroupName: "Gruppenname",
-    setupInputGroupPhoto: "Foto aus Telegram Gruppe",
-    setupInputDomain: "vip.myfenrir.com",
-    setupInputRoomSlug: "raum-zugang",
-    setupInputRoomTitle: "Raumname / Kunde",
-    setupInputRoomTarget: "Private Call URL",
-    setupInputRoomCover: "Pro Logo / Marken-Bild URL",
-    setupInputGroupEmail: "du@gemeinschaft.com",
-    setupInputCommunityEmail: "du@gemeinschaft.com",
-    setupInputCustomDomain: "kunde.myfenrir.com",
-    setupInputLiveRoom: "Raumtitel",
-    liveRoomUrlHint: "Private Call URL",
-    resolvingLockState: "Fenrir-Schloss wird aufgelöst",
-    checkingRoute: "Route wird geprüft",
-    resolvingBridgeState: "Fenrir prüft den D1-Bridge-Status in Echtzeit.",
-    roomWaitingBody: "Dieser Sprachraum fehlt oder ist pausiert. Bitte den Admin um einen neuen Raumlink.",
-    roomBrandIntro: "Fenrir zeigt zuerst die gebrandete Tür. Bei ungewöhnlichem Traffic kann diese Seite vor dem Öffnen des privaten Raums eine kurze Challenge auslösen.",
-    roomSecondaryLabel: "Sekundaerer geschützter Link",
-    roomChallengeDescription: "Ungewoehnliche Lasten können vor der Weiterleitung über Turnstile oder einen ähnlichen Check laufen.",
-    fenrirRoomGate: "Fenrir-Raumtor",
-    protectedRedirectPending: "Geschuetzte Weiterleitung wird aktiviert",
-    roomStableUrlLabel: "Stabile Fenrir URL",
-    roomPrivateDestinationLabel: "Privates Ziel",
-    walkthroughNodeMapLabel: "animierte Route",
-    walkthroughModeLabel: "Walkthrough-Modi",
-    walkthroughPillsText: "Fenrir-Route vom öffentlichen Link zum privaten Ziel",
-    walkthroughLabel: "Kundenorientierter Fenrir Walkthrough",
-    walkthroughClientLabel: "Kundenansicht",
-    walkthroughAdminLabel: "Admin-Ansicht",
-    walkthroughLaunchLabel: "Launch-Walkthrough",
-    walkthroughClientTitle: "Ein sauberer Link ersetzt chaotische private Einladungen.",
-    walkthroughClientBody: "Der Kunde sieht eine gebrandete Fenrir-Seite, keine rohe Telegram-, Zoom- oder Zahlungs-URL. Das private Ziel bleibt verborgen, bis der Zugriff freigeschaltet ist.",
-    walkthroughClientQuote: "Teile diesen Link. Fenrir regelt die Tür.",
-    walkthroughAdminTitle: "Der Owner behält die Kontrolle, auch wenn der Link bereits öffentlich ist.",
-    walkthroughAdminBody: "Wenn eine Einladung leakt oder eine Raum-Änderung passiert, rotiert der Admin das versteckte Ziel. Flyer, Bio-Link, QR und Kundennachricht behalten die gleiche öffentliche URL.",
-    walkthroughAdminQuote: "Hinteren Raum wechseln. Vordere Tür offenhalten.",
-    walkthroughLaunchTitle: "Die Customer Journey bleibt vom Klick bis zum Einstieg einfach.",
-    walkthroughLaunchBody: "Fenrir erklärt verständlich, welche Schritte passieren, bestätigt die richtige Gate-Ebene und sendet den freigegebenen Besucher in den richtigen privaten Raum oder die Gruppe.",
-    walkthroughLaunchQuote: "Klick, prüfen, eintreten. Keine sichtbaren Linkspuren.",
-    walkthroughStepsClient: ["Öffentlicher Link", "Gebānderte Tür", "Zugriffsprüfung", "Privates Ziel"],
-    walkthroughStepsAdmin: ["Stabile URL", "Ziel rotieren", "Leckung widerrufen", "Audit-Aktion"],
-    walkthroughStepsLaunch: ["Kunde klickt", "Fenrir erklärt", "Zugriff entsperrt", "Einstieg öffnet"],
-    ghostRouteTitle: "Ghost-Login gehört zur Bot OS Oberfläche.",
-    ghostRouteBody: "Diese Route ist absichtlich von Fenrir Bridge getrennt. Nutze sie für Frisky Ghost, Ghost-Onboarding und Bot-OS-Identitätsmomente ohne Berührung der Fenrir-Bridge-Kundenkonten.",
-    botOsRouteTitle: "Befehls-Schicht der Bots.",
-    botOsRouteSubtitle: "Modulare Befehls-Schicht für Fenrir- und Bot-OS-Operatoren.",
-    botOsRouteBody: "Modulare Boxen sind zurück. Ghost übernimmt die spielerische Login-Hülle, Fenrir die Bridge-Operationen, Community Gate bleibt isoliert auf Neon.",
-    botOsRouteModulesTitle: "Bot OS Module",
-    botOsRouteFooterGhost: "Ghost Login",
-    botOsRouteFooterCommunity: "Community Gate",
-    botOsRouteFooterHome: "Fenrir Bridge",
-    communityEmailPlaceholder: "du@gemeinschaft.com",
-    neonMagicBusy: "Dein Zugangslink wird gesendet...",
-    neonMagicButton: "Zugangslink an mich senden",
-    neonMagicSuccessMessage: "Link gesendet. Öffne dein Postfach und tippe auf den neuesten Link.",
-    neonMagicDevLinkLabel: "Neon-Entwicklerlink öffnen",
-    fallbackPartnerLabel: "Fallback-Links"
-  }
+    friskyAccount: 'Frisky Konto',
+    secondaryGate: 'Sekundaere Tor',
+    routePrivateViaFenrir: 'Routen Sie Zoom, Meet, Webex oder jede Room erst über Fenrir.',
+    proCustomization: 'Pro Anpassung',
+    proCustomizationBodyTitle:
+      'Ab Pro koennen Kunden eigenes Logo und gebrandete Raumvisuals nutzen.',
+    proCustomizationBody:
+      'Starter enthaelt den clean Fenrir Raum-Gate. Pro und Operator aktivieren Kundenlogo, benutzerdefinierten Raumnamenstil und Hero-Bild auf dem Sekundaerlink.',
+    telegramStatusCheck: 'Telegram-Status',
+    linked: 'verknuepft',
+    loginRequired: 'anmeldung erforderlich',
+    telegramConnected: (username, id) =>
+      `${username ? `@${username}` : id} ist mit dieser Frisky ID verknuepft.`,
+    telegramSessionFoundNoLink:
+      'Frisky-Session gefunden. Telegram ID ist noch nicht verknuepft, daher kann Fenrir Telegram Stars oder Zugangsstatus fuer diesen Account nicht pruefen.',
+    telegramSignInFirst:
+      'Bitte zuerst mit dem einheitlichen Frisky Login anmelden, damit Fenrir pruefen kann, ob diese Telegram ID aktiven Zugriff hat.',
+    linkTelegramId: 'Telegram ID verknuepfen',
+    telegramVerifyWhenNeeded: 'Telegram wird nur geprueft, wenn eine Telegram-Aktion es braucht.',
+    telegramReaddButton: 'Neu einladen',
+    telegramReaddNeedChat: 'Gib zuerst die Telegram Gruppen-ID ein.',
+    telegramReaddReady:
+      'Recovery-Einladung bereit. Fenrir hat einen einmaligen Telegram-Link geoeffnet.',
+    telegramReaddUnavailable:
+      'Recovery-Einladung konnte nicht erstellt werden. Bot-Adminrechte pruefen.',
+    devRequestViaSignal: 'Support-Anfrage via Frisky Signal',
+    devRequestViaSignalShort: 'Frisky Signal',
+    setupRoute: 'Setup-Route',
+    openingLaunchRoute: 'Launch-Route wird geoeffnet',
+    setupPathReady:
+      'Dieser Setup-Pfad ist bereit. Fenrir öffnet ihn automatisch; falls blockiert, nutze den Knopf.',
+    openNow: 'Jetzt öffnen',
+    openFallback: 'Fallback öffnen',
+    linkPathNotReady: 'Link-Pfad nicht bereit',
+    commandRouteNotMapped: 'Dieser Kommandopfad ist noch keiner Destination zugeordnet.',
+    openFallbackPartnerRoute: 'Fallback Partner-Route öffnen',
+    publicLockUnavailable: 'Oeffentlicher Lock nicht verfügbar',
+    noVaultLinks: 'Keine Vault Links gefunden.',
+    linkVaultLabel: 'Teilbares Vault',
+    selectedLinksDescription: 'Zum Teilen der ausgewählten Links.',
+    selectedLinksSubtext:
+      'Wählen Sie aus, was freigegeben oder verborgen bleibt. Der öffentliche Vault enthält nur stabile URLs, nie Roh-Einladungen.',
+    selectedLinksPrompt: 'Bitte den Admin, einen neuen Freigabe-Link von',
+    myFenrirLinkVault: 'Frisky Dev Link Vault',
+    selectedShareHeading: 'Ausgewaehlte Links, eine Seite.',
+    selectedShareCopy:
+      'Diese Seite dient nur dem Teilen der vom Admin ausgewählten Links. Öffnen Sie offizielle öffentliche URLs für Telegram-Locks, Rooms, Zahlungen, Docs, Buchungen und Support. Private Ziele bleiben hinter Fenrir.',
+    shareableVault: 'Teilbarer Vault',
+    forSharingSelectedLinks: 'Zum Teilen der ausgewählten Links.',
+    publicVaultIncludes:
+      'Wähle was geteilt oder verborgen wird. Der öffentliche Vault enthält nur ausgewählte stabile URLs, nie rohe Einladungen oder private Raumziele.',
+    myFenrirLabel: 'Fenrir Bridge',
+    share: 'Teilen',
+    hidden: 'Ausgeblendet',
+    personalLinkHelp:
+      'Fuege eine stabile oeffentliche URL zu diesem Vault hinzu. Fenrir speichert Label, URL und Kategorie, damit die Box vor dem Teilen lesbar bleibt.',
+    personalLinkTitleLabel: 'Link-Label',
+    personalLinkTitlePlaceholder: 'Mercado Pago Checkout',
+    personalLinkUrlLabel: 'Stabile URL',
+    personalLinkUrlPlaceholder: 'https://pay.example.com/fenrir',
+    personalLinkKindLabel: 'Link-Typ',
+    clientExplanation: 'Kunden-Erklaerung',
+    setupGoalHelp:
+      'Teilen Sie Fenrir Ihr Launch-Ziel mit. Es öffnet den richtigen Setup-Pfad in Reihenfolge.',
+    onePathAtATime: 'Schritt für Schritt vorgehen: lock, route, share, dann launch.',
+    assistantPrompt: 'Ich kann das richtige Panel fuer dich oeffnen. Wähle ein Launch-Ergebnis.',
+    ready: 'Bereit',
+    readiness: 'Bereit',
+    routeLaunch: 'Mache einen privaten Invite zu einem gebrandeten öffentlichen Link.',
+    linkConversion: 'Link-Konvertierung',
+    turnPrivateInvite: 'Privaten Invite umwandeln',
+    pastePrivateLink:
+      'Füge einen Telegram, Zoom, Webex, Whereby oder Meet Link ein. Fenrir hält das Ziel privat und gibt eine stabile Domain-URL.',
+    fenrirSubdomain: 'Fenrir Subdomain',
+    customerDomain: 'Kunden-Domain',
+    privateTarget: 'Privates Ziel',
+    publicShareLink: 'Öffentlicher Share Link',
+    privateTargetHidden: 'Privates Ziel verborgen',
+    publicShareLinkReady: 'Nach Erstellung bereit',
+    rawLinkHidden: 'Roher Link verborgen',
+    cloudflareSsl: 'Cloudflare SSL',
+    publicUrlReady: 'Öffentliche URL bereit',
+    routeToPrivateDestination: 'Fenrir Route vom öffentlichen Link zum privaten Ziel',
+    protectedLink: 'Sekundaerer geschützter Link',
+    stableUrl: 'Stabile Fenrir URL',
+    privateDestination: 'Privates Ziel',
+    challengeLayer: 'Challenge Layer',
+    riskBasedPromptReady: 'Risiko-basierter Prompt bereit',
+    challengeDescription:
+      'Ungewoehnliche Lasten koennen vor dem Redirect ueber Turnstile oder aehnlichen Check laufen.',
+    captchaLayer: 'Captcha Layer',
+    idleNormalPattern: 'Idle: normales Muster',
+    vaultLinkOpenLabelPrefix: 'Öffnen',
+    liveRoomSecondaryLabel: 'Sekundaerer Link',
+    liveRoomChallengeReady: 'Challenge-ready',
+    createPaidRoomTitle: 'Telegram Gruppe schützen',
+    createPaidRoomBody:
+      'Füge Gruppen-ID und Bild hinzu, danach publiziere einen stabilen, gesperrten Link.',
+    createPaidRoomNeed: 'Erforderlich: Gruppen-Zugriff',
+    roomCoverImageInvalid: 'Raumbild-/Logo-URL ist ungültig.',
+    setupInputTelegramSlug: 'haupt',
+    setupInputTelegramId: 'Telegram Gruppen-ID',
+    setupInputGroupName: 'Gruppenname',
+    setupInputGroupPhoto: 'Foto aus Telegram Gruppe',
+    setupInputDomain: 'vip.myfenrir.com',
+    setupInputRoomSlug: 'raum-zugang',
+    setupInputRoomTitle: 'Raumname / Kunde',
+    setupInputRoomTarget: 'Private Call URL',
+    setupInputRoomCover: 'Pro Logo / Marken-Bild URL',
+    setupInputGroupEmail: 'du@gemeinschaft.com',
+    setupInputCommunityEmail: 'du@gemeinschaft.com',
+    setupInputCustomDomain: 'kunde.myfenrir.com',
+    setupInputLiveRoom: 'Raumtitel',
+    liveRoomUrlHint: 'Private Call URL',
+    resolvingLockState: 'Fenrir-Schloss wird aufgelöst',
+    checkingRoute: 'Route wird geprüft',
+    resolvingBridgeState: 'Fenrir prüft den D1-Bridge-Status in Echtzeit.',
+    roomWaitingBody:
+      'Dieser Sprachraum fehlt oder ist pausiert. Bitte den Admin um einen neuen Raumlink.',
+    roomBrandIntro:
+      'Fenrir zeigt zuerst die gebrandete Tür. Bei ungewöhnlichem Traffic kann diese Seite vor dem Öffnen des privaten Raums eine kurze Challenge auslösen.',
+    roomSecondaryLabel: 'Sekundaerer geschützter Link',
+    roomChallengeDescription:
+      'Ungewoehnliche Lasten können vor der Weiterleitung über Turnstile oder einen ähnlichen Check laufen.',
+    fenrirRoomGate: 'Fenrir-Raumtor',
+    protectedRedirectPending: 'Geschuetzte Weiterleitung wird aktiviert',
+    roomStableUrlLabel: 'Stabile Fenrir URL',
+    roomPrivateDestinationLabel: 'Privates Ziel',
+    walkthroughNodeMapLabel: 'animierte Route',
+    walkthroughModeLabel: 'Walkthrough-Modi',
+    walkthroughPillsText: 'Fenrir-Route vom öffentlichen Link zum privaten Ziel',
+    walkthroughLabel: 'Kundenorientierter Fenrir Walkthrough',
+    walkthroughClientLabel: 'Kundenansicht',
+    walkthroughAdminLabel: 'Admin-Ansicht',
+    walkthroughLaunchLabel: 'Launch-Walkthrough',
+    walkthroughClientTitle: 'Ein sauberer Link ersetzt chaotische private Einladungen.',
+    walkthroughClientBody:
+      'Der Kunde sieht eine gebrandete Fenrir-Seite, keine rohe Telegram-, Zoom- oder Zahlungs-URL. Das private Ziel bleibt verborgen, bis der Zugriff freigeschaltet ist.',
+    walkthroughClientQuote: 'Teile diesen Link. Fenrir regelt die Tür.',
+    walkthroughAdminTitle:
+      'Der Owner behält die Kontrolle, auch wenn der Link bereits öffentlich ist.',
+    walkthroughAdminBody:
+      'Wenn eine Einladung leakt oder eine Raum-Änderung passiert, rotiert der Admin das versteckte Ziel. Flyer, Bio-Link, QR und Kundennachricht behalten die gleiche öffentliche URL.',
+    walkthroughAdminQuote: 'Hinteren Raum wechseln. Vordere Tür offenhalten.',
+    walkthroughLaunchTitle: 'Die Customer Journey bleibt vom Klick bis zum Einstieg einfach.',
+    walkthroughLaunchBody:
+      'Fenrir erklärt verständlich, welche Schritte passieren, bestätigt die richtige Gate-Ebene und sendet den freigegebenen Besucher in den richtigen privaten Raum oder die Gruppe.',
+    walkthroughLaunchQuote: 'Klick, prüfen, eintreten. Keine sichtbaren Linkspuren.',
+    walkthroughStepsClient: [
+      'Öffentlicher Link',
+      'Gebānderte Tür',
+      'Zugriffsprüfung',
+      'Privates Ziel',
+    ],
+    walkthroughStepsAdmin: ['Stabile URL', 'Ziel rotieren', 'Leckung widerrufen', 'Audit-Aktion'],
+    walkthroughStepsLaunch: [
+      'Kunde klickt',
+      'Fenrir erklärt',
+      'Zugriff entsperrt',
+      'Einstieg öffnet',
+    ],
+    ghostRouteTitle: 'Ghost-Login gehört zur Bot OS Oberfläche.',
+    ghostRouteBody:
+      'Diese Route ist absichtlich von Fenrir Bridge getrennt. Nutze sie für Frisky Ghost, Ghost-Onboarding und Bot-OS-Identitätsmomente ohne Berührung der Fenrir-Bridge-Kundenkonten.',
+    botOsRouteTitle: 'Befehls-Schicht der Bots.',
+    botOsRouteSubtitle: 'Modulare Befehls-Schicht für Fenrir- und Bot-OS-Operatoren.',
+    botOsRouteBody:
+      'Modulare Boxen sind zurück. Ghost übernimmt die spielerische Login-Hülle, Fenrir die Bridge-Operationen, Community Gate bleibt isoliert auf Neon.',
+    botOsRouteModulesTitle: 'Bot OS Module',
+    botOsRouteFooterGhost: 'Ghost Login',
+    botOsRouteFooterCommunity: 'Community Gate',
+    botOsRouteFooterHome: 'Fenrir Bridge',
+    communityEmailPlaceholder: 'du@gemeinschaft.com',
+    neonMagicBusy: 'Dein Zugangslink wird gesendet...',
+    neonMagicButton: 'Zugangslink an mich senden',
+    neonMagicSuccessMessage: 'Link gesendet. Öffne dein Postfach und tippe auf den neuesten Link.',
+    neonMagicDevLinkLabel: 'Neon-Entwicklerlink öffnen',
+    fallbackPartnerLabel: 'Fallback-Links',
+  },
 };
 
 const confettiPieces = Array.from({ length: 28 }, (_, index) => index);
-const pageKeys = ["command", "links", "domains", "dns", "locks", "rooms", "telegram", "revocations", "audit", "faq", "billing", "brands"] as const;
-const legalRoutes = new Set(["/legal", "/terms", "/privacy", "/acceptable-use"]);
-const friskySignalDevRequestUrl = "https://t.me/friskysignal";
-const liveRoomProviders: Array<{ id: LiveRoomProvider; name: string; icon: string; brand: string; hint: string; placeholder: string }> = [
+const pageKeys = [
+  'command',
+  'links',
+  'domains',
+  'dns',
+  'locks',
+  'rooms',
+  'telegram',
+  'revocations',
+  'audit',
+  'faq',
+  'billing',
+  'brands',
+] as const;
+const legalRoutes = new Set(['/legal', '/terms', '/privacy', '/acceptable-use']);
+const friskySignalDevRequestUrl = 'https://t.me/friskysignal';
+const liveRoomProviders: Array<{
+  id: LiveRoomProvider;
+  name: string;
+  icon: string;
+  brand: string;
+  hint: string;
+  placeholder: string;
+}> = [
   {
-    id: "zoom",
-    name: "Zoom",
-    icon: "Z",
-    brand: "Zoom",
-    hint: "Zoom Rooms, webinars, client calls",
-    placeholder: "https://zoom.us/j/..."
+    id: 'zoom',
+    name: 'Zoom',
+    icon: 'Z',
+    brand: 'Zoom',
+    hint: 'Zoom Rooms, webinars, client calls',
+    placeholder: 'https://zoom.us/j/...',
   },
   {
-    id: "google_meet",
-    name: "Google Meet",
-    icon: "M",
-    brand: "Google",
-    hint: "Google Workspace calls and classes",
-    placeholder: "https://meet.google.com/..."
+    id: 'google_meet',
+    name: 'Google Meet',
+    icon: 'M',
+    brand: 'Google',
+    hint: 'Google Workspace calls and classes',
+    placeholder: 'https://meet.google.com/...',
   },
   {
-    id: "whereby",
-    name: "Whereby",
-    icon: "W",
-    brand: "Whereby",
-    hint: "Simple browser rooms for customers",
-    placeholder: "https://whereby.com/..."
+    id: 'whereby',
+    name: 'Whereby',
+    icon: 'W',
+    brand: 'Whereby',
+    hint: 'Simple browser rooms for customers',
+    placeholder: 'https://whereby.com/...',
   },
   {
-    id: "webex",
-    name: "Microsoft Teams",
-    icon: "T",
-    brand: "Teams",
-    hint: "Teams calls, cohorts, and community events",
-    placeholder: "https://teams.microsoft.com/l/meetup-join/..."
+    id: 'webex',
+    name: 'Microsoft Teams',
+    icon: 'T',
+    brand: 'Teams',
+    hint: 'Teams calls, cohorts, and community events',
+    placeholder: 'https://teams.microsoft.com/l/meetup-join/...',
   },
   {
-    id: "other",
-    name: "Other room",
-    icon: "+",
-    brand: "Custom",
-    hint: "Teams, Calendly, custom portals, etc.",
-    placeholder: "https://your-room-link.example/..."
-  }
+    id: 'other',
+    name: 'Other room',
+    icon: '+',
+    brand: 'Custom',
+    hint: 'Teams, Calendly, custom portals, etc.',
+    placeholder: 'https://your-room-link.example/...',
+  },
 ];
 
-const domainTagPresets = ["launch", "client", "vip", "community", "paid", "internal"] as const;
-const domainSearchTlds = ["com", "io", "app", "gg", "dev", "ai"] as const;
+const domainTagPresets = ['launch', 'client', 'vip', 'community', 'paid', 'internal'] as const;
+const domainSearchTlds = ['com', 'io', 'app', 'gg', 'dev', 'ai'] as const;
+// Fuzzy live-search vocabulary. A registrar-style search: instead of only
+// base.<tld>, we suggest brandable variants — prefixes (getfrisky), suffixes
+// (friskyapp / friskyhq), and a spread of TLDs — so "frisky" surfaces frisky.dev,
+// getfrisky.com, friskyapp.io, friskyhq.co, and more. Availability is then checked
+// live (RDAP + DNS) per candidate on the edge.
+const fuzzyBaseTlds = ['com', 'dev', 'io', 'co', 'app', 'ai', 'xyz'] as const;
+const fuzzyPrefixes = ['get', 'try', 'use', 'join', 'my', 'go', 'hey'] as const;
+const fuzzySuffixes = ['app', 'hq', 'hub', 'labs', 'now', 'io', 'co'] as const;
 
 const providerLogoPresets: Record<LiveRoomProvider, string> = {
-  zoom: "/provider-logos/zoom.svg",
-  google_meet: "/provider-logos/google_meet.svg",
-  whereby: "/provider-logos/whereby.svg",
-  webex: "/provider-logos/webex.svg",
-  other: "/fenrir-splash-icon.svg"
+  zoom: '/provider-logos/zoom.svg',
+  google_meet: '/provider-logos/google_meet.svg',
+  whereby: '/provider-logos/whereby.svg',
+  webex: '/provider-logos/webex.svg',
+  other: '/fenrir-splash-icon.svg',
 };
 
 const twoFactorHelpLinks = {
-  google: "https://myaccount.google.com/signinoptions/two-step-verification",
-  microsoft: "https://account.microsoft.com/security",
-  apple: "https://support.apple.com/102661"
+  google: 'https://myaccount.google.com/signinoptions/two-step-verification',
+  microsoft: 'https://account.microsoft.com/security',
+  apple: 'https://support.apple.com/102661',
 } as const;
 
 function safeHttpUrl(value: string) {
   const trimmed = value.trim();
-  if (!trimmed) return "";
+  if (!trimmed) return '';
   try {
     const url = new URL(trimmed);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : "";
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : '';
   } catch {
-    return "";
+    return '';
   }
 }
 
@@ -843,19 +1060,19 @@ function openSafeUrl(value: string) {
 // present, so the feature always works — set the env vars once a program (Dynadot,
 // Namecheap/Impact, or a CJ deep-link) is approved and it starts earning with no
 // code change.
-const DOMAIN_REGISTRAR = (import.meta.env.VITE_DOMAIN_REGISTRAR ?? "dynadot").trim().toLowerCase();
-const DOMAIN_REFERRAL_TEMPLATE = (import.meta.env.VITE_DOMAIN_REFERRAL_TEMPLATE ?? "").trim();
-const DYNADOT_REFERRAL_CODE = (import.meta.env.VITE_DYNADOT_REFERRAL_CODE ?? "").trim();
-const NAMECHEAP_AFFILIATE_ID = (import.meta.env.VITE_NAMECHEAP_AFFILIATE_ID ?? "").trim();
+const DOMAIN_REGISTRAR = (import.meta.env.VITE_DOMAIN_REGISTRAR ?? 'dynadot').trim().toLowerCase();
+const DOMAIN_REFERRAL_TEMPLATE = (import.meta.env.VITE_DOMAIN_REFERRAL_TEMPLATE ?? '').trim();
+const DYNADOT_REFERRAL_CODE = (import.meta.env.VITE_DYNADOT_REFERRAL_CODE ?? '').trim();
+const NAMECHEAP_AFFILIATE_ID = (import.meta.env.VITE_NAMECHEAP_AFFILIATE_ID ?? '').trim();
 
 function registrarSearchUrl(domain: string) {
   const d = encodeURIComponent(domain);
   switch (DOMAIN_REGISTRAR) {
-    case "namecheap":
+    case 'namecheap':
       return `https://www.namecheap.com/domains/registration/results/?domain=${d}`;
-    case "porkbun":
+    case 'porkbun':
       return `https://porkbun.com/checkout/search?q=${d}`;
-    case "cloudflare":
+    case 'cloudflare':
       return `https://dash.cloudflare.com/?to=/:account/domains/register/${d}`;
     default:
       return `https://www.dynadot.com/domain/search?domain=${d}`;
@@ -865,14 +1082,14 @@ function registrarSearchUrl(domain: string) {
 function registrarPurchaseUrl(domain: string) {
   const base = registrarSearchUrl(domain);
   // Network deep link (Commission Junction / Impact): wrap the target URL.
-  if (DOMAIN_REFERRAL_TEMPLATE.includes("{target}")) {
-    return DOMAIN_REFERRAL_TEMPLATE.replace("{target}", encodeURIComponent(base));
+  if (DOMAIN_REFERRAL_TEMPLATE.includes('{target}')) {
+    return DOMAIN_REFERRAL_TEMPLATE.replace('{target}', encodeURIComponent(base));
   }
   // Direct referral params on the registrar's own domain.
-  if (DOMAIN_REGISTRAR === "dynadot" && DYNADOT_REFERRAL_CODE) {
+  if (DOMAIN_REGISTRAR === 'dynadot' && DYNADOT_REFERRAL_CODE) {
     return `${base}&s=${encodeURIComponent(DYNADOT_REFERRAL_CODE)}`;
   }
-  if (DOMAIN_REGISTRAR === "namecheap" && NAMECHEAP_AFFILIATE_ID) {
+  if (DOMAIN_REGISTRAR === 'namecheap' && NAMECHEAP_AFFILIATE_ID) {
     return `${base}&aff=${encodeURIComponent(NAMECHEAP_AFFILIATE_ID)}`;
   }
   return base;
@@ -881,14 +1098,14 @@ function registrarPurchaseUrl(domain: string) {
 function openAnyUrl(value: string) {
   const target = absoluteUrl(value);
   if (!target) return false;
-  window.open(target, "_blank", "noopener,noreferrer");
+  window.open(target, '_blank', 'noopener,noreferrer');
   return true;
 }
 
 function absoluteUrl(value: string) {
   const trimmed = value.trim();
-  if (!trimmed) return "";
-  if (trimmed.startsWith("/")) {
+  if (!trimmed) return '';
+  if (trimmed.startsWith('/')) {
     return new URL(trimmed, window.location.origin).toString();
   }
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) {
@@ -899,44 +1116,51 @@ function absoluteUrl(value: string) {
   }
   try {
     const url = new URL(trimmed, window.location.origin);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : "";
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : '';
   } catch {
-    return "";
+    return '';
   }
 }
 
 function commissionUrlSlug(value: string) {
   const trimmed = value.trim();
-  if (!trimmed) return "";
+  if (!trimmed) return '';
   try {
     const path = new URL(trimmed, window.location.origin).pathname;
-    return path.replace(/^\/+|\/+$/g, "").split("/").pop() ?? "";
+    return (
+      path
+        .replace(/^\/+|\/+$/g, '')
+        .split('/')
+        .pop() ?? ''
+    );
   } catch {
-    return "";
+    return '';
   }
 }
 
 function findCommissionLink(links: FriskyCommissionLink[] = [], slug: string) {
   const target = slug.trim().toLowerCase();
-  return links.find((link) => {
-    if (link.id.toLowerCase() === target) return true;
-    if (commissionUrlSlug(link.url).toLowerCase() === target) return true;
-    return false;
-  }) ?? null;
+  return (
+    links.find((link) => {
+      if (link.id.toLowerCase() === target) return true;
+      if (commissionUrlSlug(link.url).toLowerCase() === target) return true;
+      return false;
+    }) ?? null
+  );
 }
 
 function commissionFallbackBySlug(slug: string) {
   const target = slug.trim().toLowerCase();
-  if (!target) return "";
+  if (!target) return '';
   const map: Record<string, string> = {
-    dynadot: "https://www.dynadot.com/",
-    "dynadot-auctions": "https://www.dynadot.com/domains/auctions/",
-    "cj-dynadot": "https://www.dynadot.com/register/domains/search",
-    cloudflare: "https://www.cloudflare.com/",
-    porkbun: "https://porkbun.com/",
-    namecheap: "https://www.namecheap.com/"
+    dynadot: 'https://www.dynadot.com/',
+    'dynadot-auctions': 'https://www.dynadot.com/domains/auctions/',
+    'cj-dynadot': 'https://www.dynadot.com/register/domains/search',
+    cloudflare: 'https://www.cloudflare.com/',
+    porkbun: 'https://porkbun.com/',
+    namecheap: 'https://www.namecheap.com/',
   };
-  return map[target] ?? "";
+  return map[target] ?? '';
 }
 
 function resolveCommissionDestination(link: FriskyCommissionLink | null, slug: string) {
@@ -952,74 +1176,175 @@ function resolveCommissionDestination(link: FriskyCommissionLink | null, slug: s
 
 function trustedFenrirImageUrl(value: string) {
   const trimmed = value.trim();
-  if (!trimmed) return "";
-  if (trimmed.startsWith("/")) return trimmed;
-  if (trimmed.startsWith("/api/media/proxy?")) return trimmed;
+  if (!trimmed) return '';
+  if (trimmed.startsWith('/')) return trimmed;
+  if (trimmed.startsWith('/api/media/proxy?')) return trimmed;
   try {
     const url = new URL(trimmed, window.location.origin);
-    if (url.origin === window.location.origin && url.pathname.startsWith("/api/media/proxy")) {
+    if (url.origin === window.location.origin && url.pathname.startsWith('/api/media/proxy')) {
       return `${url.pathname}${url.search}`;
     }
-    if (url.protocol === "https:") return url.toString();
+    if (url.protocol === 'https:') return url.toString();
   } catch {
-    return "";
+    return '';
   }
-  return "";
+  return '';
 }
 
 function parseDomainTags(value: string) {
   const tags = value
     .split(/[,\s]+/)
-    .map((tag) => tag.trim().replace(/^#/, "").toLowerCase())
+    .map((tag) => tag.trim().replace(/^#/, '').toLowerCase())
     .filter(Boolean)
     .filter((tag, index, list) => list.indexOf(tag) === index)
     .slice(0, 8);
-  return tags.length ? tags : ["launch"];
+  return tags.length ? tags : ['launch'];
 }
 
 function addDomainTag(value: string, tag: string) {
-  return parseDomainTags(`${value}, ${tag}`).join(", ");
+  return parseDomainTags(`${value}, ${tag}`).join(', ');
 }
 
 function defaultDomainTags(domain: FriskyDomain) {
   const tags: string[] = [domain.status, domain.dnsProvider];
-  if (domain.certificateStatus === "active") tags.push("ssl");
-  if (domain.domain.includes("myfenrir")) tags.push("primary");
+  if (domain.certificateStatus === 'active') tags.push('ssl');
+  if (domain.domain.includes('myfenrir')) tags.push('primary');
   return tags;
 }
 
 type DomainSearchResult = {
   domain: string;
-  status: "ready" | "available" | "taken" | "unknown" | "invalid" | "error";
+  status: 'ready' | 'available' | 'taken' | 'unknown' | 'invalid' | 'error';
   summary: string;
   records: string[];
   priceTier?: string;
   registrarConfirm?: boolean;
-  confidence?: "authoritative" | "signal" | "none";
+  confidence?: 'authoritative' | 'signal' | 'none';
 };
 
 function cleanDomainSearchBase(value: string) {
   return value
     .trim()
     .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "")
-    .replace(/\/.*$/, "")
-    .replace(/[^a-z0-9.-]/g, "")
-    .replace(/^\.+|\.+$/g, "");
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '')
+    .replace(/[^a-z0-9.-]/g, '')
+    .replace(/^\.+|\.+$/g, '');
 }
 
+// Fuzzy candidate generation. If the user already typed a full domain we respect
+// it verbatim; otherwise we fan the brand/handle out into ranked, deduped
+// variants — exact base across premium TLDs first, then brandable prefix/suffix
+// combinations. Ordered so the strongest picks lead; the caller checks the first
+// ~14 for live availability.
 function domainSearchCandidates(value: string) {
   const base = cleanDomainSearchBase(value);
   if (!base) return [];
-  if (base.includes(".")) return [base];
-  return domainSearchTlds.map((tld) => `${base}.${tld}`);
+  if (base.includes('.')) return [base];
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const add = (domain: string) => {
+    const d = domain.toLowerCase();
+    if (
+      d.length <= 63 &&
+      !seen.has(d) &&
+      /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.[a-z0-9.]+$/.test(d)
+    ) {
+      seen.add(d);
+      out.push(d);
+    }
+  };
+
+  // Ordered so the strongest, most brandable picks lead and survive the caller's
+  // top-N slice — exact base on premium TLDs, then the marquee brandables
+  // (getfrisky.com, friskyapp.io, friskyhq.co), then the wider spread.
+  // 1. Exact base across premium TLDs (frisky.com, frisky.dev, frisky.io, ...).
+  for (const tld of fuzzyBaseTlds) add(`${base}.${tld}`);
+  // 2. Marquee brandable variants — prefix + suffix + alt-TLD combos.
+  add(`get${base}.com`);
+  add(`${base}app.io`);
+  add(`${base}hq.co`);
+  add(`${base}app.com`);
+  add(`${base}hq.com`);
+  add(`try${base}.com`);
+  add(`my${base}.com`);
+  // 3. Remaining suffix variants on .com (friskyhub.com, friskylabs.com, ...).
+  for (const suffix of fuzzySuffixes) {
+    if (suffix === base) continue;
+    add(`${base}${suffix}.com`);
+  }
+  // 4. Remaining prefix variants on .com (usefrisky.com, joinfrisky.com, ...).
+  for (const prefix of fuzzyPrefixes) add(`${prefix}${base}.com`);
+
+  return out;
+}
+
+// Rank a batch of availability results so genuinely-available, cheaper, shorter
+// options rise to the top and taken/invalid sink.
+function rankDomainResults(results: DomainSearchResult[]) {
+  const rank: Record<string, number> = {
+    available: 0,
+    ready: 1,
+    unknown: 2,
+    error: 3,
+    taken: 4,
+    invalid: 5,
+  };
+  const tierCost = (t?: string) => (t ? t.length : 2); // '$' < '$$' < '$$$'
+  return [...results].sort((a, b) => {
+    const byStatus = (rank[a.status] ?? 9) - (rank[b.status] ?? 9);
+    if (byStatus) return byStatus;
+    const byConf =
+      (a.confidence === 'authoritative' ? 0 : 1) - (b.confidence === 'authoritative' ? 0 : 1);
+    if (byConf) return byConf;
+    const byTier = tierCost(a.priceTier) - tierCost(b.priceTier);
+    if (byTier) return byTier;
+    return a.domain.length - b.domain.length;
+  });
+}
+
+// Batch availability lookup — one edge request for up to 16 candidates (the
+// endpoint accepts ?domains=a,b,c), instead of N parallel round-trips. Falls back
+// to per-domain lookups if the batch call fails so results still populate.
+async function lookupDomainsBatch(domains: string[]): Promise<DomainSearchResult[]> {
+  const list = domains.slice(0, 16);
+  if (!list.length) return [];
+  try {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 12000);
+    const response = await fetch(
+      `/api/domains/availability?domains=${encodeURIComponent(list.join(','))}`,
+      { headers: { accept: 'application/json' }, signal: controller.signal }
+    );
+    window.clearTimeout(timeout);
+    if (!response.ok) throw new Error('availability_batch_failed');
+    const payload = (await response.json().catch(() => null)) as {
+      ok?: boolean;
+      results?: AvailabilityApiResult[];
+    } | null;
+    if (!payload?.ok || !Array.isArray(payload.results)) throw new Error('availability_no_results');
+    const byDomain = new Map(payload.results.map((r) => [r.domain, mapAvailability(r)]));
+    return list.map(
+      (domain) =>
+        byDomain.get(domain) ?? {
+          domain,
+          status: 'unknown' as const,
+          summary: "Couldn't check this one — verify at a registrar.",
+          records: [],
+          registrarConfirm: true,
+        }
+    );
+  } catch {
+    return Promise.all(list.map(lookupDomainDns));
+  }
 }
 
 type AvailabilityApiResult = {
   domain: string;
-  verdict: "available" | "taken" | "unknown" | "invalid";
-  confidence: "authoritative" | "signal" | "none";
+  verdict: 'available' | 'taken' | 'unknown' | 'invalid';
+  confidence: 'authoritative' | 'signal' | 'none';
   taken: boolean | null;
   registrarConfirm: boolean;
   summary: string;
@@ -1028,7 +1353,7 @@ type AvailabilityApiResult = {
 };
 
 function mapAvailability(result: AvailabilityApiResult): DomainSearchResult {
-  const status = result.verdict === "invalid" ? "invalid" : result.verdict;
+  const status = result.verdict === 'invalid' ? 'invalid' : result.verdict;
   return {
     domain: result.domain,
     status,
@@ -1036,7 +1361,7 @@ function mapAvailability(result: AvailabilityApiResult): DomainSearchResult {
     records: result.records ?? [],
     priceTier: result.priceTier,
     registrarConfirm: result.registrarConfirm,
-    confidence: result.confidence
+    confidence: result.confidence,
   };
 }
 
@@ -1045,24 +1370,37 @@ function mapAvailability(result: AvailabilityApiResult): DomainSearchResult {
 // depends on the visitor's local DNS resolver — the cause of the "timed out"
 // failures when a VPN hijacked DNS on the client.
 async function lookupDomainDns(domain: string): Promise<DomainSearchResult> {
-  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain)) {
-    return { domain, status: "invalid", summary: "Use a valid domain name.", records: [] };
+  if (
+    !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(
+      domain
+    )
+  ) {
+    return { domain, status: 'invalid', summary: 'Use a valid domain name.', records: [] };
   }
   try {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 9000);
     const response = await fetch(`/api/domains/availability?domain=${encodeURIComponent(domain)}`, {
-      headers: { accept: "application/json" },
-      signal: controller.signal
+      headers: { accept: 'application/json' },
+      signal: controller.signal,
     });
     window.clearTimeout(timeout);
-    if (!response.ok) throw new Error("availability_lookup_failed");
-    const payload = (await response.json().catch(() => null)) as { ok?: boolean; results?: AvailabilityApiResult[] } | null;
+    if (!response.ok) throw new Error('availability_lookup_failed');
+    const payload = (await response.json().catch(() => null)) as {
+      ok?: boolean;
+      results?: AvailabilityApiResult[];
+    } | null;
     const first = payload?.results?.[0];
-    if (!payload?.ok || !first) throw new Error("availability_no_result");
+    if (!payload?.ok || !first) throw new Error('availability_no_result');
     return mapAvailability(first);
   } catch {
-    return { domain, status: "unknown", summary: "Couldn't reach the availability service. Check at a registrar directly.", records: [], registrarConfirm: true };
+    return {
+      domain,
+      status: 'unknown',
+      summary: "Couldn't reach the availability service. Check at a registrar directly.",
+      records: [],
+      registrarConfirm: true,
+    };
   }
 }
 
@@ -1070,7 +1408,7 @@ type Celebration = {
   id: number;
   title: string;
   detail: string;
-  tone: "dns" | "commerce";
+  tone: 'dns' | 'commerce';
 };
 
 type PageKey = (typeof pageKeys)[number];
@@ -1078,8 +1416,8 @@ type PersonalLink = {
   id: string;
   title: string;
   url: string;
-  kind: "payment" | "docs" | "booking" | "support" | "other";
-  status: "active" | "draft";
+  kind: 'payment' | 'docs' | 'booking' | 'support' | 'other';
+  status: 'active' | 'draft';
 };
 type VaultLink = {
   id: string;
@@ -1088,59 +1426,61 @@ type VaultLink = {
   kind: string;
   status: string;
 };
-type FenrirRole = "owner" | "admin" | "user";
+type FenrirRole = 'owner' | 'admin' | 'user';
 
 const dashboardPageAliases: Record<string, PageKey> = {
-  main: "command",
-  command: "command",
-  links: "links",
-  "all-links": "links",
-  vaults: "links",
-  domains: "domains",
-  dns: "dns",
-  "dns-wizard": "dns",
-  locks: "locks",
-  "telegram-locks": "locks",
-  rooms: "rooms",
-  "live-rooms": "rooms",
-  telegram: "telegram",
-  revocations: "revocations",
-  audit: "audit",
-  faq: "faq",
-  faqs: "faq",
-  billing: "billing",
-  brands: "brands",
-  "community-brands": "brands",
-  "neon-nexus": "brands"
+  main: 'command',
+  command: 'command',
+  links: 'links',
+  'all-links': 'links',
+  vaults: 'links',
+  domains: 'domains',
+  dns: 'dns',
+  'dns-wizard': 'dns',
+  locks: 'locks',
+  'telegram-locks': 'locks',
+  rooms: 'rooms',
+  'live-rooms': 'rooms',
+  telegram: 'telegram',
+  revocations: 'revocations',
+  audit: 'audit',
+  faq: 'faq',
+  faqs: 'faq',
+  billing: 'billing',
+  brands: 'brands',
+  'community-brands': 'brands',
+  'neon-nexus': 'brands',
 };
 
 function isAuthCallbackPath(pathname: string) {
-  const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  return normalizedPath === "/auth/callback" || 
-         normalizedPath === "/auth/v1/callback" || 
-         normalizedPath === "/login" ||
-         normalizedPath === (import.meta.env.VITE_AUTH_REDIRECT_PATH || "/auth/callback");
+  const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  return (
+    normalizedPath === '/auth/callback' ||
+    normalizedPath === '/auth/v1/callback' ||
+    normalizedPath === '/login' ||
+    normalizedPath === (import.meta.env.VITE_AUTH_REDIRECT_PATH || '/auth/callback')
+  );
 }
 
 function activePageFromLocation(path: string, hash: string): PageKey {
-  const routeKey = path.replace(/^\/+|\/+$/g, "");
-  const hashKey = hash.replace(/^#\/?/, "").replace(/^\/+|\/+$/g, "");
+  const routeKey = path.replace(/^\/+|\/+$/g, '');
+  const hashKey = hash.replace(/^#\/?/, '').replace(/^\/+|\/+$/g, '');
   const key = routeKey || hashKey;
-  if (path.startsWith("/admin")) return "locks";
-  if (path.startsWith("/portal")) return "links";
-  if (isAuthCallbackPath(path)) return "command";
-  return dashboardPageAliases[key] ?? "command";
+  if (path.startsWith('/admin')) return 'locks';
+  if (path.startsWith('/portal')) return 'links';
+  if (isAuthCallbackPath(path)) return 'command';
+  return dashboardPageAliases[key] ?? 'command';
 }
 
 function dashboardPathFor(page: PageKey) {
-  return page === "command" ? managedDashboardPath : `/${page}`;
+  return page === 'command' ? managedDashboardPath : `/${page}`;
 }
 
 function paidPlanFromProductLabel(label: string): PaidPlan | null {
   const p = label.trim().toLowerCase();
-  if (p === "starter") return "starter";
-  if (p === "pro") return "pro";
-  if (p === "operator") return "operator";
+  if (p === 'starter') return 'starter';
+  if (p === 'pro') return 'pro';
+  if (p === 'operator') return 'operator';
   return null;
 }
 
@@ -1151,55 +1491,64 @@ export function App() {
   const roomMatch = path.match(/^\/room\/([^/]+)/);
   const vaultMatch = path.match(/^\/vault\/?$/);
   const communityGateMatch = path.match(/^\/(?:community|gate)(?:\/group)?\/([^/]+)/);
-  const ghostRoute = host === "friskyghost.com" || path === "/ghost" || path.startsWith("/ghost/");
-  const botOsRoute = path === "/bot-os" || path.startsWith("/bot-os/") || path === "/bots" || path.startsWith("/bots/");
+  const ghostRoute = host === 'friskyghost.com' || path === '/ghost' || path.startsWith('/ghost/');
+  const botOsRoute =
+    path === '/bot-os' ||
+    path.startsWith('/bot-os/') ||
+    path === '/bots' ||
+    path.startsWith('/bots/');
   const legalMatch = legalRoutes.has(path);
   const [state, setState] = useState<AppState | null>(null);
   const [auth, setAuth] = useState<AuthSession | null>(null);
-  const [active, setActive] = useState<PageKey>(() => activePageFromLocation(path, window.location.hash));
-  const [domainInput, setDomainInput] = useState("");
-  const [domainTagsInput, setDomainTagsInput] = useState("launch, paid");
+  const [active, setActive] = useState<PageKey>(() =>
+    activePageFromLocation(path, window.location.hash)
+  );
+  const [domainInput, setDomainInput] = useState('');
+  const [domainTagsInput, setDomainTagsInput] = useState('launch, paid');
   const [domainTagsById, setDomainTagsById] = useState<Record<string, string[]>>({});
-  const [domainSearchInput, setDomainSearchInput] = useState("myfenrir");
+  const [domainSearchInput, setDomainSearchInput] = useState('myfenrir');
   const [domainSearchResults, setDomainSearchResults] = useState<DomainSearchResult[]>([]);
   const [domainSearchBusy, setDomainSearchBusy] = useState(false);
-  const [chatInput, setChatInput] = useState("");
-  const [slugInput, setSlugInput] = useState("");
-  const [groupNameInput, setGroupNameInput] = useState("");
-  const [groupImageInput, setGroupImageInput] = useState("");
-  const [roomTitleInput, setRoomTitleInput] = useState("");
-  const [roomSlugInput, setRoomSlugInput] = useState("");
-  const [roomProviderInput, setRoomProviderInput] = useState<LiveRoomProvider>("zoom");
-  const [roomTargetInput, setRoomTargetInput] = useState("");
-  const [roomCoverInput, setRoomCoverInput] = useState("");
-  const [serviceEmail, setServiceEmail] = useState("");
+  const [cloudflareBusy, setCloudflareBusy] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [slugInput, setSlugInput] = useState('');
+  const [groupNameInput, setGroupNameInput] = useState('');
+  const [groupImageInput, setGroupImageInput] = useState('');
+  const [roomTitleInput, setRoomTitleInput] = useState('');
+  const [roomSlugInput, setRoomSlugInput] = useState('');
+  const [roomProviderInput, setRoomProviderInput] = useState<LiveRoomProvider>('zoom');
+  const [roomTargetInput, setRoomTargetInput] = useState('');
+  const [roomCoverInput, setRoomCoverInput] = useState('');
+  const [serviceEmail, setServiceEmail] = useState('');
   const [serviceOrg, setServiceOrg] = useState(defaultServiceOrg);
-  const [serviceTelegram, setServiceTelegram] = useState("");
+  const [serviceTelegram, setServiceTelegram] = useState('');
   const [serviceSubdomain, setServiceSubdomain] = useState(defaultServiceSubdomain);
-  const [serviceMode, setServiceMode] = useState<"create" | "link" | null>(null);
-  const [checkoutPlan, setCheckoutPlan] = useState<PaidPlan>("starter");
+  const [serviceMode, setServiceMode] = useState<'create' | 'link' | null>(null);
+  const [checkoutPlan, setCheckoutPlan] = useState<PaidPlan>('starter');
   const [personalLinks, setPersonalLinks] = useState<PersonalLink[]>([]);
-  const [personalTitle, setPersonalTitle] = useState("");
-  const [personalUrl, setPersonalUrl] = useState("");
-  const [personalKind, setPersonalKind] = useState<PersonalLink["kind"]>("payment");
-  const [selectedDomain, setSelectedDomain] = useState("");
+  const [personalTitle, setPersonalTitle] = useState('');
+  const [personalUrl, setPersonalUrl] = useState('');
+  const [personalKind, setPersonalKind] = useState<PersonalLink['kind']>('payment');
+  const [selectedDomain, setSelectedDomain] = useState('');
   const [locale, setLocale] = useState<Locale>(detectLocale);
   const c = copy[locale];
   const ui = uiCopy[locale];
   const [notice, setNotice] = useState<string>(c.initialNotice);
   const [celebration, setCelebration] = useState<Celebration | null>(null);
   const [billingStatus, setBillingStatus] = useState<BillingStatusPayload | null>(null);
-  const [telegramIdentity, setTelegramIdentity] = useState<TelegramIdentityLinkPayload | null>(null);
+  const [telegramIdentity, setTelegramIdentity] = useState<TelegramIdentityLinkPayload | null>(
+    null
+  );
   const [readiness, setReadiness] = useState<ReadinessPayload | null>(null);
   const [readinessError, setReadinessError] = useState(false);
   const [activationVisible, setActivationVisible] = useState(true);
   const [fenrirRole, setFenrirRole] = useState<FenrirRole | null>(null);
 
-  function triggerCelebration(title: string, detail: string, tone: Celebration["tone"]) {
+  function triggerCelebration(title: string, detail: string, tone: Celebration['tone']) {
     const id = Date.now();
     setCelebration({ id, title, detail, tone });
     window.setTimeout(() => {
-      setCelebration((current) => current?.id === id ? null : current);
+      setCelebration((current) => (current?.id === id ? null : current));
     }, 2800);
   }
 
@@ -1225,7 +1574,7 @@ export function App() {
     try {
       const result = await appService.load();
       setState(result.data);
-      setSelectedDomain((current) => current || result.data.domains[0]?.id || "");
+      setSelectedDomain((current) => current || result.data.domains[0]?.id || '');
       if (auth?.authenticated) {
         await refreshBilling();
         await refreshTelegramIdentity();
@@ -1238,8 +1587,12 @@ export function App() {
   async function refreshAuth() {
     const result = await authService.me();
     setAuth(result.data);
-    if (result.data.authenticated && (isAuthCallbackPath(window.location.pathname) || window.location.hash.includes("access_token="))) {
-      window.history.replaceState({}, "", managedDashboardPath);
+    if (
+      result.data.authenticated &&
+      (isAuthCallbackPath(window.location.pathname) ||
+        window.location.hash.includes('access_token='))
+    ) {
+      window.history.replaceState({}, '', managedDashboardPath);
     }
   }
 
@@ -1256,12 +1609,16 @@ export function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const staleAuthError = params.get("auth_error");
+    const staleAuthError = params.get('auth_error');
     if (!staleAuthError) return;
-    if (staleAuthError.startsWith("missing_env:") || staleAuthError === "direct_oauth_disabled") {
-      params.delete("auth_error");
+    if (staleAuthError.startsWith('missing_env:') || staleAuthError === 'direct_oauth_disabled') {
+      params.delete('auth_error');
       const nextSearch = params.toString();
-      window.history.replaceState({}, "", `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`);
+      window.history.replaceState(
+        {},
+        '',
+        `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`
+      );
     }
   }, []);
 
@@ -1270,14 +1627,15 @@ export function App() {
   }, [auth?.authenticated]);
 
   useEffect(() => {
-    const onPopState = () => setActive(activePageFromLocation(window.location.pathname, window.location.hash));
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
+    const onPopState = () =>
+      setActive(activePageFromLocation(window.location.pathname, window.location.hash));
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   useEffect(() => {
     if (!auth?.authenticated || !auth.user || !auth.org) return;
-    setState((current) => current ? overlayAuthState(current, auth) : current);
+    setState((current) => (current ? overlayAuthState(current, auth) : current));
   }, [auth]);
 
   useEffect(() => {
@@ -1317,13 +1675,13 @@ export function App() {
   useEffect(() => {
     if (!auth?.authenticated) return;
     const params = new URLSearchParams(window.location.search);
-    const billing = params.get("billing");
+    const billing = params.get('billing');
     if (!billing) return;
-    if (billing === "success") setNotice(copy[locale].billingReturnSuccess);
-    if (billing === "cancel") setNotice(copy[locale].billingReturnCancel);
-    if (billing === "portal_return") setNotice(copy[locale].billingReturnPortal);
+    if (billing === 'success') setNotice(copy[locale].billingReturnSuccess);
+    if (billing === 'cancel') setNotice(copy[locale].billingReturnCancel);
+    if (billing === 'portal_return') setNotice(copy[locale].billingReturnPortal);
     void refresh();
-    window.history.replaceState({}, "", window.location.pathname);
+    window.history.replaceState({}, '', window.location.pathname);
   }, [auth?.authenticated, locale]);
 
   useEffect(() => {
@@ -1336,7 +1694,9 @@ export function App() {
     if (!state) return null;
     return state.domains.find((domain) => domain.id === selectedDomain) ?? state.domains[0];
   }, [state, selectedDomain]);
-  const selectedDomainTags = selectedDomainRecord ? domainTagsById[selectedDomainRecord.id] ?? defaultDomainTags(selectedDomainRecord) : [];
+  const selectedDomainTags = selectedDomainRecord
+    ? (domainTagsById[selectedDomainRecord.id] ?? defaultDomainTags(selectedDomainRecord))
+    : [];
 
   if (legalMatch) {
     return <LegalPage c={c} locale={locale} onLocale={(next) => setLocale(next)} />;
@@ -1356,23 +1716,47 @@ export function App() {
 
   if (communityGateMatch) {
     const slug = decodeURIComponent(communityGateMatch[1]);
-    return <CommunityNeonGateRoute slug={slug} locale={locale} onLocale={(next) => setLocale(next)} c={c} ui={ui} />;
+    return (
+      <CommunityNeonGateRoute
+        slug={slug}
+        locale={locale}
+        onLocale={(next) => setLocale(next)}
+        c={c}
+        ui={ui}
+      />
+    );
   }
 
   const goMatch = window.location.pathname.match(/^\/go\/([^/]+)/);
   if (goMatch) {
     const slug = decodeURIComponent(goMatch[1]);
     const link = state ? findCommissionLink(state.commissionLinks, slug) : null;
-    return <GoRoutePage c={c} ui={ui} slug={slug} link={link} onTrack={() => {
-      if (state) {
-        const clicked = commerceService.click(link?.id ?? slug);
-        if (clicked) {
-          setNotice(`Tracked setup click: ${clicked.label}.`);
-          triggerCelebration("Tracked click", `Link path ready for ${clicked.label}.`, "commerce");
-          void refresh();
-        }
-      }
-    }} />;
+    return (
+      <GoRoutePage
+        c={c}
+        ui={ui}
+        slug={slug}
+        link={link}
+        onTrack={() => {
+          if (state) {
+            const clicked = commerceService.click(link?.id ?? slug);
+            if (clicked) {
+              setNotice(`Tracked setup click: ${clicked.label}.`);
+              triggerCelebration(
+                'Tracked click',
+                `Link path ready for ${clicked.label}.`,
+                'commerce'
+              );
+              void refresh();
+            }
+          }
+        }}
+      />
+    );
+  }
+
+  if (path === '/admin-login') {
+    return <AdminLoginHero />;
   }
 
   if (joinMatch) {
@@ -1390,10 +1774,16 @@ export function App() {
   }
 
   if (!auth.authenticated) {
-    return <AuthGate c={c} locale={locale} onLocale={(next) => {
-      setLocale(next);
-      setNotice(copy[next].initialNotice);
-    }} />;
+    return (
+      <AuthGate
+        c={c}
+        locale={locale}
+        onLocale={(next) => {
+          setLocale(next);
+          setNotice(copy[next].initialNotice);
+        }}
+      />
+    );
   }
 
   if (!state) {
@@ -1406,8 +1796,8 @@ export function App() {
     const result = await domainService.create(domainInput.trim());
     if (result.ok) {
       setDomainTagsById((current) => ({ ...current, [result.data.id]: tags }));
-      setNotice(`Telegram Lock domain ${result.data.domain} added with tags: ${tags.join(", ")}.`);
-      setDomainInput("");
+      setNotice(`Telegram Lock domain ${result.data.domain} added with tags: ${tags.join(', ')}.`);
+      setDomainInput('');
       await refresh();
     }
   }
@@ -1415,25 +1805,91 @@ export function App() {
   async function runDomainSearch(seed = domainSearchInput) {
     const candidates = domainSearchCandidates(seed);
     if (!candidates.length) {
-      setNotice("Enter a domain or brand name before searching.");
+      setNotice('Enter a domain or brand name before searching.');
       return;
     }
     setDomainSearchBusy(true);
     setDomainSearchResults([]);
-    const results = await Promise.all(candidates.slice(0, 6).map(lookupDomainDns));
+    const results = rankDomainResults(await lookupDomainsBatch(candidates.slice(0, 14)));
     setDomainSearchResults(results);
     setDomainSearchBusy(false);
-    setNotice(`Live domain search checked ${results.length} option${results.length === 1 ? "" : "s"}.`);
+    const available = results.filter((r) => r.status === 'available').length;
+    setNotice(
+      `Live domain search checked ${results.length} option${results.length === 1 ? '' : 's'}` +
+        (available ? ` — ${available} available.` : '.')
+    );
   }
 
   async function checkDns(domain: FriskyDomain) {
-    setNotice("Checking live DNS propagation...");
+    setNotice('Checking live DNS propagation...');
     const result = await domainService.checkDns(domain.id);
-    setNotice(result.ok ? `${domain.domain} verified.` : result.error?.message ?? "DNS check failed.");
+    setNotice(
+      result.ok ? `${domain.domain} verified.` : (result.error?.message ?? 'DNS check failed.')
+    );
     if (result.ok) {
-      triggerCelebration("DNS verified", `${domain.domain} is ready for Telegram Lock traffic.`, "dns");
+      triggerCelebration(
+        'DNS verified',
+        `${domain.domain} is ready for Telegram Lock traffic.`,
+        'dns'
+      );
     }
     await refresh();
+  }
+
+  // Feature A — "Switch DNS to Cloudflare": create/identify the real zone so the
+  // Telegram Lock URLs get automatic Universal SSL. Populates the real nameservers
+  // the admin pastes at their registrar.
+  async function switchToCloudflare(domain: FriskyDomain) {
+    setCloudflareBusy(true);
+    setNotice(`Creating the Cloudflare zone for ${domain.domain}...`);
+    const result = await domainService.cloudflareZone(domain.id);
+    if (result.ok) {
+      const ns = result.zone?.nameservers ?? [];
+      setNotice(
+        ns.length
+          ? `Cloudflare zone ready. Set these nameservers at your registrar: ${ns.join(', ')}`
+          : `Cloudflare zone ready for ${domain.domain}. Point your registrar's nameservers to Cloudflare.`
+      );
+      await refresh();
+    } else {
+      setNotice(
+        result.error?.code === 'cloudflare_status_failed' ||
+          result.error?.message?.includes('not configured') ||
+          result.error?.code === 'cloudflare_zone_failed'
+          ? (result.error?.message ??
+              'Cloudflare automation is not enabled yet — follow the manual DNS records below.')
+          : (result.error?.message ?? 'Could not create the Cloudflare zone.')
+      );
+    }
+    setCloudflareBusy(false);
+  }
+
+  // Poll propagation + Universal SSL until the certificate is active.
+  async function checkCloudflare(domain: FriskyDomain) {
+    setCloudflareBusy(true);
+    setNotice(`Checking Cloudflare propagation + SSL for ${domain.domain}...`);
+    const result = await domainService.cloudflareStatus(domain.id);
+    if (result.ok) {
+      const active = result.zone?.active;
+      if (active && result.data.certificateStatus === 'active') {
+        triggerCelebration(
+          'SSL active',
+          `${domain.domain} is on Cloudflare with an automatic certificate. Telegram Lock URLs are secured.`,
+          'dns'
+        );
+        setNotice(`${domain.domain} is live on Cloudflare with an active certificate.`);
+      } else if (active) {
+        setNotice(`${domain.domain} is on Cloudflare — certificate is issuing, check again shortly.`);
+      } else {
+        setNotice(
+          `Nameservers haven't propagated to Cloudflare yet for ${domain.domain}. This can take up to a few hours after you change them at the registrar.`
+        );
+      }
+      await refresh();
+    } else {
+      setNotice(result.error?.message ?? 'Could not check Cloudflare status.');
+    }
+    setCloudflareBusy(false);
   }
 
   async function createBridge() {
@@ -1444,7 +1900,7 @@ export function App() {
       slug: slugInput.trim() || ui.setupInputTelegramSlug,
       telegramChatId: chatInput.trim(),
       telegramGroupName: groupNameInput.trim(),
-      telegramGroupImageUrl: groupImageInput.trim()
+      telegramGroupImageUrl: groupImageInput.trim(),
     });
     setNotice(`Telegram Lock ${result.data.publicUrl} ${ui.ready.toLowerCase()} to share.`);
     await refresh();
@@ -1465,8 +1921,8 @@ export function App() {
   async function createLiveRoom() {
     const domainId = selectedDomainRecord?.id;
     if (!domainId) {
-      setNotice(`${c.chooseDomain}. ${c.easyCloudflareBody ?? ""}`.trim());
-      navigateActive("dns");
+      setNotice(`${c.chooseDomain}. ${c.easyCloudflareBody ?? ''}`.trim());
+      navigateActive('dns');
       return;
     }
     if (!roomTargetInput.trim()) {
@@ -1475,7 +1931,7 @@ export function App() {
     }
     const targetUrl = safeHttpUrl(roomTargetInput);
     if (!targetUrl) {
-      setNotice(ui.liveRoomUrlHint + ".");
+      setNotice(ui.liveRoomUrlHint + '.');
       return;
     }
     const coverImageUrl = safeHttpUrl(roomCoverInput);
@@ -1485,14 +1941,14 @@ export function App() {
     }
     const result = await liveRoomService.create({
       domainId,
-      slug: roomSlugInput.trim() || "call",
+      slug: roomSlugInput.trim() || 'call',
       title: roomTitleInput.trim(),
       provider: roomProviderInput,
       targetUrl,
-      coverImageUrl: coverImageUrl || providerLogoPresets[roomProviderInput]
+      coverImageUrl: coverImageUrl || providerLogoPresets[roomProviderInput],
     });
     setNotice(`Live Room ${result.data.publicUrl} ${ui.routePrivateViaFenrir}`);
-    triggerCelebration("Live Room ready", `${result.data.title} is now behind your domain.`, "dns");
+    triggerCelebration('Live Room ready', `${result.data.title} is now behind your domain.`, 'dns');
     await refresh();
   }
 
@@ -1504,68 +1960,74 @@ export function App() {
 
   async function checkTelegram() {
     const result = await telegramService.checkPermissions(chatInput.trim());
-    setNotice(result.data.status === "ready" ? `${ui.readiness} ${ui.telegramStatusCheck.toLowerCase()}.` : "Missing Telegram permissions.");
+    setNotice(
+      result.data.status === 'ready'
+        ? `${ui.readiness} ${ui.telegramStatusCheck.toLowerCase()}.`
+        : 'Missing Telegram permissions.'
+    );
     await refresh();
   }
 
-  function startWizard(kind: "telegram" | "room" | "vault" | "domain" | "concierge") {
-    if (kind === "telegram") {
-      navigateActive("locks");
+  function startWizard(kind: 'telegram' | 'room' | 'vault' | 'domain' | 'concierge') {
+    if (kind === 'telegram') {
+      navigateActive('locks');
       setSlugInput((current) => current || ui.setupInputTelegramSlug);
       setGroupNameInput((current) => current || ui.setupInputGroupName);
       setNotice(c.inboxStepTelegramNeed);
     }
-    if (kind === "room") {
-      navigateActive("rooms");
+    if (kind === 'room') {
+      navigateActive('rooms');
       setRoomSlugInput((current) => current || ui.setupInputRoomSlug);
       setRoomTitleInput((current) => current || ui.setupInputLiveRoom);
       setNotice(c.inboxStepRoomNeed);
     }
-    if (kind === "vault") {
-      navigateActive("links");
+    if (kind === 'vault') {
+      navigateActive('links');
       setNotice(c.inboxStepVaultNeed);
     }
-    if (kind === "domain") {
-      navigateActive("dns");
+    if (kind === 'domain') {
+      navigateActive('dns');
       setDomainInput((current) => current || ui.setupInputCustomDomain);
       setNotice(c.inboxStepDomainNeed);
     }
-    if (kind === "concierge") {
-      navigateActive("billing");
-      setCheckoutPlan("pro");
+    if (kind === 'concierge') {
+      navigateActive('billing');
+      setCheckoutPlan('pro');
       setNotice(c.inboxStepConciergeNeed);
     }
   }
 
-  function runAiOps(kind: "jules" | "gemini" | "cursor") {
-    if (kind === "jules") {
+  function runAiOps(kind: 'jules' | 'gemini' | 'cursor') {
+    if (kind === 'jules') {
       aiOpsService.julesTicket();
-      setNotice("Support task prepared for backend hardening.");
+      setNotice('Support task prepared for backend hardening.');
     }
-    if (kind === "gemini") {
+    if (kind === 'gemini') {
       aiOpsService.geminiDnsExplanation();
-      setNotice("Gemini DNS assistant generated setup guidance.");
+      setNotice('Gemini DNS assistant generated setup guidance.');
     }
-    if (kind === "cursor") {
+    if (kind === 'cursor') {
       aiOpsService.cursorHandoff();
-      setNotice("Implementation note exported as an audit event.");
+      setNotice('Implementation note exported as an audit event.');
     }
     refresh();
   }
 
-  function startService(mode: "create" | "link") {
+  function startService(mode: 'create' | 'link') {
     setServiceMode(mode);
-    setNotice(mode === "create" ? c.accountCreated : c.accountLinked);
+    setNotice(mode === 'create' ? c.accountCreated : c.accountLinked);
     triggerCelebration(
-      mode === "create" ? c.serviceCelebrationCreateTitle : c.serviceCelebrationLinkTitle,
-      c.serviceCelebrationDetail.replace("{subdomain}", serviceSubdomain).replace("{email}", serviceEmail),
-      "commerce"
+      mode === 'create' ? c.serviceCelebrationCreateTitle : c.serviceCelebrationLinkTitle,
+      c.serviceCelebrationDetail
+        .replace('{subdomain}', serviceSubdomain)
+        .replace('{email}', serviceEmail),
+      'commerce'
     );
   }
 
   async function startStripeCheckout(plan: PaidPlan) {
     setCheckoutPlan(plan);
-    navigateActive("billing");
+    navigateActive('billing');
     try {
       const { url } = await billingService.checkout(plan);
       window.location.assign(url);
@@ -1575,7 +2037,7 @@ export function App() {
   }
 
   async function startTelegramStars() {
-    navigateActive("billing");
+    navigateActive('billing');
     try {
       const { url } = await billingService.telegramStars();
       window.location.assign(url);
@@ -1584,11 +2046,48 @@ export function App() {
     }
   }
 
+  // Card→crypto on-ramp via Wert. Opens the @wert-io/widget-initializer widget
+  // for the picked plan; the server computes the price and binds the payment to
+  // this workspace, and /api/wert/webhook grants PRO on success. Gated dark: a
+  // 200 with enabled:false means partner creds aren't set yet ("coming soon").
+  async function startWertCheckout(planLabel: string) {
+    const key = paidPlanFromProductLabel(planLabel);
+    if (!key) {
+      setNotice(copy[locale].billingPaidPlanOnly);
+      return;
+    }
+    setCheckoutPlan(key);
+    navigateActive('billing');
+    try {
+      const res = await billingService.wertCheckout(key);
+      if (!res.enabled || !res.wert) {
+        setNotice(copy[locale].cardComingSoon);
+        return;
+      }
+      const mod = await import('@wert-io/widget-initializer');
+      const WertWidget = (mod.default ?? mod) as unknown as new (
+        options: Record<string, unknown>
+      ) => { open: () => void };
+      new WertWidget({
+        ...res.wert,
+        listeners: {
+          'payment-status': (data: { status?: string }) => {
+            if (data?.status === 'success') setNotice(copy[locale].cardPaid);
+            else if (data?.status === 'failed') setNotice(copy[locale].cardFailed);
+          },
+        },
+      }).open();
+      if (res.sandbox) setNotice(copy[locale].cardSandbox);
+    } catch {
+      setNotice(copy[locale].checkoutErrorGeneric);
+    }
+  }
+
   async function linkTelegramIdentity() {
     try {
       const result = await telegramIdentityService.start();
       setNotice(ui.linkTelegramId);
-      window.open(result.url, "_blank", "noopener,noreferrer");
+      window.open(result.url, '_blank', 'noopener,noreferrer');
       window.setTimeout(() => void refreshTelegramIdentity(), 4000);
     } catch {
       setNotice(ui.telegramSignInFirst);
@@ -1602,7 +2101,10 @@ export function App() {
     }
 
     const requestedChatId = chatInput.trim();
-    const bridge = state?.bridges.find((item) => item.status === "active" && (!requestedChatId || item.telegramChatId === requestedChatId));
+    const bridge = state?.bridges.find(
+      (item) =>
+        item.status === 'active' && (!requestedChatId || item.telegramChatId === requestedChatId)
+    );
     if (!bridge) {
       setNotice(ui.telegramReaddNeedChat);
       return;
@@ -1620,11 +2122,15 @@ export function App() {
   function onPaidPlanPickedFromPricing(planLabel: string) {
     const key = paidPlanFromProductLabel(planLabel);
     if (!key) {
-      setNotice(planLabel.trim().toLowerCase() === "free" ? copy[locale].billingFreeTier : copy[locale].billingPaidPlanOnly);
+      setNotice(
+        planLabel.trim().toLowerCase() === 'free'
+          ? copy[locale].billingFreeTier
+          : copy[locale].billingPaidPlanOnly
+      );
       return;
     }
     setCheckoutPlan(key);
-    navigateActive("billing");
+    navigateActive('billing');
     void startStripeCheckout(key);
   }
 
@@ -1632,7 +2138,7 @@ export function App() {
     setActive(page);
     const nextPath = dashboardPathFor(page);
     if (window.location.pathname !== nextPath) {
-      window.history.pushState({}, "", nextPath);
+      window.history.pushState({}, '', nextPath);
     }
   }
 
@@ -1662,33 +2168,37 @@ export function App() {
     await authService.logout();
     setAuth({ authenticated: false });
     setFenrirRole(null);
-    window.history.replaceState({}, "", "/");
+    window.history.replaceState({}, '', '/');
     setNotice(c.signedOut);
   }
 
   function addPersonalLink() {
     const url = safeHttpUrl(personalUrl);
     if (!url) {
-      setNotice("Use a valid http or https URL before adding a link.");
+      setNotice('Use a valid http or https URL before adding a link.');
       return;
     }
     const item: PersonalLink = {
       id: `personal_${Date.now()}`,
-      title: personalTitle.trim() || "Fenrir link",
+      title: personalTitle.trim() || 'Fenrir link',
       url,
       kind: personalKind,
-      status: "active"
+      status: 'active',
     };
     setPersonalLinks((current) => [item, ...current]);
     setNotice(`Non-Telegram link added: ${item.title}.`);
-      triggerCelebration("Link vault updated", `${item.url} is now tracked in Fenrir Bridge.`, "commerce");
+    triggerCelebration(
+      'Link vault updated',
+      `${item.url} is now tracked in Fenrir Bridge.`,
+      'commerce'
+    );
   }
 
   async function shareLinkVault(links?: VaultLink[]) {
     if (!state) return;
     const shareLinks = links ?? buildVaultLinks(state.bridges, state.liveRooms, personalLinks);
     if (!shareLinks.length) {
-      setNotice("Select at least one public link before sharing the vault.");
+      setNotice('Select at least one public link before sharing the vault.');
       return;
     }
     const shareUrl = createVaultShareUrl(shareLinks);
@@ -1696,16 +2206,20 @@ export function App() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Fenrir Link Vault",
-          text: "Stable public links routed through Fenrir.",
-          url: shareUrl
+          title: 'Fenrir Link Vault',
+          text: 'Stable public links routed through Fenrir.',
+          url: shareUrl,
         });
       } catch {
         // Clipboard copy above is the fallback when native share is dismissed.
       }
     }
-    setNotice("Shareable Link Vault copied. It only includes public stable URLs.");
-      triggerCelebration("Vault share link ready", "Your public Fenrir vault is ready to send.", "commerce");
+    setNotice('Shareable Link Vault copied. It only includes public stable URLs.');
+    triggerCelebration(
+      'Vault share link ready',
+      'Your public Fenrir vault is ready to send.',
+      'commerce'
+    );
   }
 
   const show = (...pages: PageKey[]) => pages.includes(active);
@@ -1722,11 +2236,30 @@ export function App() {
           </div>
         </div>
         <nav>
-          {c.nav.map((item, index) => (
-            <button className={active === pageKeys[index] ? "active" : ""} onClick={() => navigateActive(pageKeys[index])} key={item}>
-              {item}
-            </button>
-          ))}
+          {c.nav.map((item, index) => {
+            const icons = [
+              <Home size={18} />,
+              <Settings size={18} />,
+              <Shield size={18} />,
+              <KeyRound size={18} />,
+              <Video size={18} />,
+              <CreditCard size={18} />,
+              <Globe size={18} />,
+              <BookOpen size={18} />
+            ];
+            return (
+              <motion.button
+                whileHover={{ scale: 1.02, x: 4 }}
+                whileTap={{ scale: 0.98 }}
+                className={active === pageKeys[index] ? 'active' : ''}
+                onClick={() => navigateActive(pageKeys[index])}
+                key={item}
+              >
+                <span className="nav-icon">{icons[index]}</span>
+                {item}
+              </motion.button>
+            );
+          })}
         </nav>
         <div className="operator-card">
           <span>Frisky Account</span>
@@ -1772,12 +2305,16 @@ export function App() {
               aria-label="Language"
             >
               {locales.map((item) => (
-                <option value={item} key={item}>{languageNames[item]}</option>
+                <option value={item} key={item}>
+                  {languageNames[item]}
+                </option>
               ))}
             </select>
-          <span className="status good">{state.user.authProvider} OAuth</span>
-          <span className="status amber">{state.org.plan}</span>
-            <button className="ghost compact-button" onClick={signOut}>{c.signOut}</button>
+            <span className="status good">{state.user.authProvider} OAuth</span>
+            <span className="status amber">{state.org.plan}</span>
+            <button className="ghost compact-button" onClick={signOut}>
+              {c.signOut}
+            </button>
           </div>
         </header>
 
@@ -1800,365 +2337,632 @@ export function App() {
 
         <ProtocolLivingSystem state={state} c={c} />
 
-        {show("command") && (
+        {show('command') && (
           <LaunchWowConsole
             state={state}
             locale={locale}
             selectedDomain={selectedDomainRecord}
             selectedDomainTags={selectedDomainTags}
             roomProvider={roomProviderInput}
-            onDomain={() => navigateActive("domains")}
-            onRoom={() => navigateActive("rooms")}
-            onCommunity={() => navigateActive("brands")}
+            onDomain={() => navigateActive('domains')}
+            onRoom={() => navigateActive('rooms')}
+            onCommunity={() => navigateActive('brands')}
           />
         )}
 
-      {show("command", "faq") && <ClientWalkthroughPanel c={c} ui={ui} />}
+        {show('command', 'faq') && <ClientWalkthroughPanel c={c} ui={ui} />}
 
-        {show("command") && <SetupInboxWizard onStart={startWizard} c={c} ui={ui} />}
+        {show('command') && <SetupInboxWizard onStart={startWizard} c={c} ui={ui} />}
 
-        {show("command") && (
-          <ExampleDiagramCard c={c} ui={ui} />
+        {show('command') && <ExampleDiagramCard c={c} ui={ui} />}
+
+        {show('command', 'links') && (
+          <LinkVaultPanel
+            c={c}
+            ui={ui}
+            bridges={state.bridges}
+            rooms={state.liveRooms}
+            personalLinks={personalLinks}
+            commissionLinks={state.commissionLinks}
+            title={personalTitle}
+            url={personalUrl}
+            kind={personalKind}
+            onTitle={setPersonalTitle}
+            onUrl={setPersonalUrl}
+            onKind={setPersonalKind}
+            onAdd={addPersonalLink}
+            onShare={shareLinkVault}
+            onOpen={(link) => {
+              if (!openAnyUrl(link.url)) {
+                setNotice(`Link "${link.title}" is not openable from here.`);
+                return;
+              }
+              const commission = state.commissionLinks.find(
+                (item) =>
+                  item.id === link.id || commissionUrlSlug(item.url) === commissionUrlSlug(link.url)
+              );
+              const clicked = commission ? commerceService.click(commission.id) : null;
+              if (clicked) {
+                setNotice(`Tracked setup click: ${clicked.label}.`);
+                triggerCelebration(
+                  'Setup path unlocked',
+                  `${clicked.label} is now open in your browser.`,
+                  'commerce'
+                );
+                void refresh();
+              }
+            }}
+          />
         )}
 
-        {show("command", "links") && <LinkVaultPanel
-          c={c}
-          ui={ui}
-          bridges={state.bridges}
-          rooms={state.liveRooms}
-          personalLinks={personalLinks}
-          commissionLinks={state.commissionLinks}
-          title={personalTitle}
-          url={personalUrl}
-          kind={personalKind}
-          onTitle={setPersonalTitle}
-          onUrl={setPersonalUrl}
-          onKind={setPersonalKind}
-          onAdd={addPersonalLink}
-          onShare={shareLinkVault}
-          onOpen={(link) => {
-            if (!openAnyUrl(link.url)) {
-              setNotice(`Link "${link.title}" is not openable from here.`);
-              return;
-            }
-            const commission = state.commissionLinks.find((item) => item.id === link.id || commissionUrlSlug(item.url) === commissionUrlSlug(link.url));
-            const clicked = commission ? commerceService.click(commission.id) : null;
-            if (clicked) {
-              setNotice(`Tracked setup click: ${clicked.label}.`);
-              triggerCelebration("Setup path unlocked", `${clicked.label} is now open in your browser.`, "commerce");
-              void refresh();
-            }
-          }}
-        />}
+        {show('command', 'billing') && (
+          <CashoutPipeline c={c} onStars={() => void startTelegramStars()} />
+        )}
 
-        {show("command", "billing") && <CashoutPipeline c={c} onStars={() => void startTelegramStars()} />}
-
-      <section className="hero-grid">
-          <Metric label={c.activeLocks} value={String(state.bridges.filter((bridge) => bridge.status === "active").length)} tone="good" />
-          <Metric label={c.liveRooms} value={String(state.liveRooms.filter((room) => room.status === "active").length)} tone="blue" />
-          <Metric label={c.sslActive} value={String(state.domains.filter((domain) => domain.certificateStatus === "active").length)} tone="blue" />
-          <Metric label={c.revokedInvites} value={String(state.invites.filter((invite) => invite.status === "revoked").length)} tone="danger" />
+        <section className="hero-grid">
+          <Metric
+            label={c.activeLocks}
+            value={String(state.bridges.filter((bridge) => bridge.status === 'active').length)}
+            tone="good"
+          />
+          <Metric
+            label={c.liveRooms}
+            value={String(state.liveRooms.filter((room) => room.status === 'active').length)}
+            tone="blue"
+          />
+          <Metric
+            label={c.sslActive}
+            value={String(
+              state.domains.filter((domain) => domain.certificateStatus === 'active').length
+            )}
+            tone="blue"
+          />
+          <Metric
+            label={c.revokedInvites}
+            value={String(state.invites.filter((invite) => invite.status === 'revoked').length)}
+            tone="danger"
+          />
         </section>
 
-        {show("billing") && <ProductionReadinessPanel c={c} readiness={readiness} loadFailed={readinessError} />}
-        {show("command", "brands") && <CommunityBrandWizardPanel locale={locale} onNotice={setNotice} />}
+        {show('billing') && (
+          <ProductionReadinessPanel c={c} readiness={readiness} loadFailed={readinessError} />
+        )}
+        {show('command', 'brands') && (
+          <CommunityBrandWizardPanel locale={locale} onNotice={setNotice} />
+        )}
 
-        <div className="content-grid">
-          {show("command", "locks", "telegram") && <section className="panel wide">
-            <PanelTitle title={c.activeTelegramLocks} subtitle={c.activeTelegramLocksSub} />
-            <div className="form-row lock-form">
-              <select value={selectedDomain} onChange={(event) => setSelectedDomain(event.target.value)}>
-                <option value="" disabled>{c.chooseDomain}</option>
-                {state.domains.map((domain) => (
-                  <option key={domain.id} value={domain.id}>
-                    {domain.domain}
+        <AnimatePresence mode="wait">
+          <motion.div 
+            key={active}
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            className="content-grid"
+          >
+          {show('command', 'locks', 'telegram') && (
+            <section className="panel wide">
+              <PanelTitle title={c.activeTelegramLocks} subtitle={c.activeTelegramLocksSub} />
+              <div className="form-row lock-form">
+                <select
+                  value={selectedDomain}
+                  onChange={(event) => setSelectedDomain(event.target.value)}
+                >
+                  <option value="" disabled>
+                    {c.chooseDomain}
                   </option>
-                ))}
-              </select>
-              <input value={slugInput} onChange={(event) => setSlugInput(event.target.value)} aria-label="Telegram lock slug" placeholder={ui.setupInputTelegramSlug} />
-              <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} aria-label="Telegram chat id" placeholder={ui.setupInputTelegramId} />
-              <input value={groupNameInput} onChange={(event) => setGroupNameInput(event.target.value)} aria-label="Telegram group name" placeholder={ui.setupInputGroupName} />
-              <input value={groupImageInput} onChange={(event) => setGroupImageInput(event.target.value)} aria-label="Telegram group image url" placeholder={ui.setupInputGroupPhoto} />
-              <button onClick={createBridge}>{c.createLock}</button>
-            </div>
-            <BridgeGallery bridges={state.bridges} invites={state.invites} onRotate={rotateBridge} onRevoke={revokeBridge} c={c} />
-          </section>}
+                  {state.domains.map((domain) => (
+                    <option key={domain.id} value={domain.id}>
+                      {domain.domain}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={slugInput}
+                  onChange={(event) => setSlugInput(event.target.value)}
+                  aria-label="Telegram lock slug"
+                  placeholder={ui.setupInputTelegramSlug}
+                />
+                <input
+                  value={chatInput}
+                  onChange={(event) => setChatInput(event.target.value)}
+                  aria-label="Telegram chat id"
+                  placeholder={ui.setupInputTelegramId}
+                />
+                <input
+                  value={groupNameInput}
+                  onChange={(event) => setGroupNameInput(event.target.value)}
+                  aria-label="Telegram group name"
+                  placeholder={ui.setupInputGroupName}
+                />
+                <input
+                  value={groupImageInput}
+                  onChange={(event) => setGroupImageInput(event.target.value)}
+                  aria-label="Telegram group image url"
+                  placeholder={ui.setupInputGroupPhoto}
+                />
+                <button onClick={createBridge}>{c.createLock}</button>
+              </div>
+              <BridgeGallery
+                bridges={state.bridges}
+                invites={state.invites}
+                onRotate={rotateBridge}
+                onRevoke={revokeBridge}
+                c={c}
+              />
+            </section>
+          )}
 
-          {show("command", "billing") && <section className="panel">
-            <PanelTitle title={c.friskyAccount} subtitle={c.accountSub} />
-            <KeyValue label={c.userId} value={friendlyAccountLabel(state.user.id, "User")} title={state.user.id} />
-            <KeyValue label={c.orgId} value={friendlyAccountLabel(state.org.id, "Workspace")} title={state.org.id} />
-            <KeyValue label={c.provider} value={state.user.authProvider} />
-            <KeyValue label={c.billing} value={billingStatus?.stripeCustomerId ? "Stripe" : c.stripePlaceholder} />
-            <KeyValue label={c.billingStatusLabel} value={billingStatus?.subscriptionStatus ?? c.billingStatusPlaceholder} />
-            {billingStatus && (
-              <p className="muted">
-                Limits: {billingStatus.limits.maxTelegramLocks ?? "∞"} locks · custom domain {billingStatus.limits.customDomainSupported ? "yes" : "no"}
-                {" · "}live rooms {billingStatus.limits.liveRoomsSupported ? "yes" : "no"}
-              </p>
-            )}
-            <div className="row-actions">
-              <button type="button" className="ghost compact-button" onClick={() => void openBillingPortal()}>
-                {c.billingPortalButton}
-              </button>
-              <button type="button" className="ghost compact-button" onClick={() => void registerPasskey()}>
-                {c.passkeyRegister}
-              </button>
-            </div>
-            <p className="muted">{c.passkeyRegisterHint}</p>
-          </section>}
+          {show('command', 'billing') && (
+            <section className="panel">
+              <PanelTitle title={c.friskyAccount} subtitle={c.accountSub} />
+              <KeyValue
+                label={c.userId}
+                value={friendlyAccountLabel(state.user.id, 'User')}
+                title={state.user.id}
+              />
+              <KeyValue
+                label={c.orgId}
+                value={friendlyAccountLabel(state.org.id, 'Workspace')}
+                title={state.org.id}
+              />
+              <KeyValue label={c.provider} value={state.user.authProvider} />
+              <KeyValue
+                label={c.billing}
+                value={billingStatus?.stripeCustomerId ? 'Stripe' : c.stripePlaceholder}
+              />
+              <KeyValue
+                label={c.billingStatusLabel}
+                value={billingStatus?.subscriptionStatus ?? c.billingStatusPlaceholder}
+              />
+              {billingStatus && (
+                <p className="muted">
+                  Limits: {billingStatus.limits.maxTelegramLocks ?? '∞'} locks · custom domain{' '}
+                  {billingStatus.limits.customDomainSupported ? 'yes' : 'no'}
+                  {' · '}live rooms {billingStatus.limits.liveRoomsSupported ? 'yes' : 'no'}
+                </p>
+              )}
+              <div className="row-actions">
+                <button
+                  type="button"
+                  className="ghost compact-button"
+                  onClick={() => void openBillingPortal()}
+                >
+                  {c.billingPortalButton}
+                </button>
+                <button
+                  type="button"
+                  className="ghost compact-button"
+                  onClick={() => void registerPasskey()}
+                >
+                  {c.passkeyRegister}
+                </button>
+              </div>
+              <p className="muted">{c.passkeyRegisterHint}</p>
+            </section>
+          )}
 
-          {show("command", "billing") && <AccountServicePanel
-            c={c}
-            email={serviceEmail}
-            org={serviceOrg}
-            telegram={serviceTelegram}
-            subdomain={serviceSubdomain}
-            mode={serviceMode}
-            checkoutPlan={checkoutPlan}
-            onEmail={setServiceEmail}
-            onOrg={setServiceOrg}
-            onTelegram={setServiceTelegram}
-            onSubdomain={setServiceSubdomain}
-            onStart={startService}
-            onStars={() => void startTelegramStars()}
-          />}
-
-          {show("command", "domains", "dns") && <section className="panel wide">
-            <PanelTitle title={c.dnsWizard} subtitle={c.dnsWizardSub} />
-            <LiveDomainSearchPanel
-              value={domainSearchInput}
-              results={domainSearchResults}
-              busy={domainSearchBusy}
-              onValue={setDomainSearchInput}
-              onSearch={() => void runDomainSearch()}
-              onPick={(domain) => {
-                setDomainInput(domain);
-                setDomainTagsInput(addDomainTag(domainTagsInput, "launch"));
-                setNotice(`${domain} moved into the Fenrir domain wizard.`);
-              }}
-              onOpenRegistrar={(domain) => {
-                openSafeUrl(registrarPurchaseUrl(domain));
-              }}
+          {show('command', 'billing') && (
+            <AccountServicePanel
+              c={c}
+              email={serviceEmail}
+              org={serviceOrg}
+              telegram={serviceTelegram}
+              subdomain={serviceSubdomain}
+              mode={serviceMode}
+              checkoutPlan={checkoutPlan}
+              onEmail={setServiceEmail}
+              onOrg={setServiceOrg}
+              onTelegram={setServiceTelegram}
+              onSubdomain={setServiceSubdomain}
+              onStart={startService}
+              onStars={() => void startTelegramStars()}
             />
-            <div className="domain-builder-layout">
-              <div className="domain-builder-form">
-                <input value={domainInput} onChange={(event) => setDomainInput(event.target.value)} aria-label="Domain input" placeholder={ui.setupInputDomain} />
-                <input value={domainTagsInput} onChange={(event) => setDomainTagsInput(event.target.value)} aria-label="Domain tags" placeholder="launch, client, paid" />
-                <div className="domain-tag-presets" aria-label="Domain tag presets">
-                  {domainTagPresets.map((tag) => (
-                    <button type="button" className="compact-button ghost" key={tag} onClick={() => setDomainTagsInput(addDomainTag(domainTagsInput, tag))}>
-                      #{tag}
+          )}
+
+          {show('command', 'domains', 'dns') && (
+            <section className="panel wide">
+              <PanelTitle title={c.dnsWizard} subtitle={c.dnsWizardSub} />
+              <LiveDomainSearchPanel
+                value={domainSearchInput}
+                results={domainSearchResults}
+                busy={domainSearchBusy}
+                onValue={setDomainSearchInput}
+                onSearch={() => void runDomainSearch()}
+                onPick={(domain) => {
+                  setDomainInput(domain);
+                  setDomainTagsInput(addDomainTag(domainTagsInput, 'launch'));
+                  setNotice(`${domain} moved into the Fenrir domain wizard.`);
+                }}
+                onOpenRegistrar={(domain) => {
+                  openSafeUrl(registrarPurchaseUrl(domain));
+                }}
+              />
+              <div className="domain-builder-layout">
+                <div className="domain-builder-form">
+                  <input
+                    value={domainInput}
+                    onChange={(event) => setDomainInput(event.target.value)}
+                    aria-label="Domain input"
+                    placeholder={ui.setupInputDomain}
+                  />
+                  <input
+                    value={domainTagsInput}
+                    onChange={(event) => setDomainTagsInput(event.target.value)}
+                    aria-label="Domain tags"
+                    placeholder="launch, client, paid"
+                  />
+                  <div className="domain-tag-presets" aria-label="Domain tag presets">
+                    {domainTagPresets.map((tag) => (
+                      <button
+                        type="button"
+                        className="compact-button ghost"
+                        key={tag}
+                        onClick={() => setDomainTagsInput(addDomainTag(domainTagsInput, tag))}
+                      >
+                        #{tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="domain-builder-actions">
+                  <button onClick={addNewDomain}>{c.addDomain}</button>
+                  {selectedDomainRecord && (
+                    <button className="secondary" onClick={() => checkDns(selectedDomainRecord)}>
+                      {c.checkDns}
                     </button>
+                  )}
+                </div>
+              </div>
+              {selectedDomainRecord && (
+                <div className="domain-tag-strip" aria-label="Selected domain tags">
+                  <b>{selectedDomainRecord.domain}</b>
+                  {selectedDomainTags.map((tag) => (
+                    <span key={tag}>#{tag}</span>
                   ))}
                 </div>
-              </div>
-              <div className="domain-builder-actions">
-              <button onClick={addNewDomain}>{c.addDomain}</button>
-              {selectedDomainRecord && <button className="secondary" onClick={() => checkDns(selectedDomainRecord)}>{c.checkDns}</button>}
-              </div>
-            </div>
-            {selectedDomainRecord && (
-              <div className="domain-tag-strip" aria-label="Selected domain tags">
-                <b>{selectedDomainRecord.domain}</b>
-                {selectedDomainTags.map((tag) => <span key={tag}>#{tag}</span>)}
-              </div>
-            )}
-            <div className="domain-wow-steps" aria-label="Domain launch steps">
-              <span className="active"><b>1</b> Name</span>
-              <span className={domainInput.trim() || selectedDomainRecord ? "active" : ""}><b>2</b> Tags</span>
-              <span className={selectedDomainRecord ? "active" : ""}><b>3</b> DNS</span>
-              <span className={selectedDomainRecord?.certificateStatus === "active" ? "active" : ""}><b>4</b> Live</span>
-            </div>
-            <DomainChoice c={c} />
-            <DnsWizard domains={state.domains} selected={selectedDomainRecord} onSelect={setSelectedDomain} c={c} />
-            <RecommendedTools state={state} c={c} onOpen={(slug) => {
-              const link = commerceService.click(slug);
-              const label = link?.label ?? slug;
-              setNotice(`Tracked setup click: ${label}. Purchase/setup path opened.`);
-              triggerCelebration("Setup path unlocked", `${label} is tracked for the Telegram Lock setup flow.`, "commerce");
-              refresh();
-            }} />
-          </section>}
-
-        {show("command", "rooms", "billing") && <section className="panel wide live-room-panel">
-            <PanelTitle title={c.liveRoomsTitle} subtitle={c.liveRoomsSub} />
-            <div className="paid-feature-strip">
-              <span className="status amber">{c.paidFeature}</span>
-              <b>{c.notFree}</b>
-              <small>{c.paidFeatureBody}</small>
-            </div>
-            <div className="room-offer-strip">
-              <span className="status good">{ui.secondaryGate}</span>
-              <b>{ui.routePrivateViaFenrir}</b>
-              <small>{c.liveRoomsSub}</small>
-            </div>
-            <div className="room-customization-strip">
-              <span className="status amber">{ui.proCustomization}</span>
-              <b>{ui.proCustomizationBodyTitle}</b>
-              <small>{ui.proCustomizationBody}</small>
-            </div>
-            <div className="provider-component-grid" aria-label="Common room providers">
-              {liveRoomProviders.map((provider) => (
-                <button
-                  className={roomProviderInput === provider.id ? "provider-component active" : "provider-component"}
-                  key={provider.id}
-                  onClick={() => setRoomProviderInput(provider.id)}
-                  type="button"
+              )}
+              <div className="domain-wow-steps" aria-label="Domain launch steps">
+                <span className="active">
+                  <b>1</b> Name
+                </span>
+                <span className={domainInput.trim() || selectedDomainRecord ? 'active' : ''}>
+                  <b>2</b> Tags
+                </span>
+                <span className={selectedDomainRecord ? 'active' : ''}>
+                  <b>3</b> DNS
+                </span>
+                <span
+                  className={selectedDomainRecord?.certificateStatus === 'active' ? 'active' : ''}
                 >
-                  <span className={`provider-brand provider-brand-${provider.id}`} aria-hidden="true">
-                    <span className="provider-logo-mark">{provider.icon}</span>
-                    <span className="provider-logo-word">{provider.brand}</span>
-                  </span>
-                  <b>{provider.name}</b>
-                  <small>{provider.hint}</small>
-                </button>
-              ))}
-            </div>
-            <div className="form-row room-form">
-              <select value={selectedDomain} onChange={(event) => setSelectedDomain(event.target.value)}>
-                <option value="" disabled>{c.chooseDomain}</option>
-                {state.domains.map((domain) => (
-                  <option key={domain.id} value={domain.id}>
-                    {domain.domain}
-                  </option>
-                ))}
-              </select>
-              <select value={roomProviderInput} onChange={(event) => setRoomProviderInput(event.target.value as LiveRoomProvider)}>
-                {liveRoomProviders.map((provider) => (
-                  <option key={provider.id} value={provider.id}>
-                    {provider.name}
-                  </option>
-                ))}
-              </select>
-              <input value={roomSlugInput} onChange={(event) => setRoomSlugInput(event.target.value)} aria-label="Live room slug" placeholder={ui.setupInputRoomSlug} />
-              <input value={roomTitleInput} onChange={(event) => setRoomTitleInput(event.target.value)} aria-label="Live room title" placeholder={ui.setupInputRoomTitle} />
-              <input value={roomTargetInput} onChange={(event) => setRoomTargetInput(event.target.value)} aria-label="Call target URL" placeholder={roomProviderPlaceholder(roomProviderInput)} />
-              <input value={roomCoverInput} onChange={(event) => setRoomCoverInput(event.target.value)} aria-label="Pro logo or room image URL" placeholder={ui.setupInputRoomCover} />
-              <button onClick={createLiveRoom}>{c.createPaidRoom}</button>
-            </div>
-            <div className="room-logo-actions" aria-label="Live room logo presets">
-              <span>Room logo presets</span>
-              {liveRoomProviders.map((provider) => (
-                <button type="button" className="compact-button ghost" key={provider.id} onClick={() => {
-                  setRoomProviderInput(provider.id);
-                  setRoomCoverInput(providerLogoPresets[provider.id]);
-                  setNotice(`${provider.name} logo preset applied.`);
-                }}>
-                  <ProviderBadge provider={provider.id} c={c} compact />
-                </button>
-              ))}
-            </div>
-            <div className="room-wow-preview" aria-label="Live room preview">
-              <img
-                className="room-logo-preview"
-                src={safeHttpUrl(roomCoverInput) || providerLogoPresets[roomProviderInput]}
-                alt="Room logo preview"
-                style={{ height: 40, width: "auto", maxWidth: 160, objectFit: "contain", borderRadius: 8 }}
-                onError={(event) => { (event.currentTarget as HTMLImageElement).src = providerLogoPresets[roomProviderInput]; }}
+                  <b>4</b> Live
+                </span>
+              </div>
+              <DomainChoice c={c} />
+              <DnsWizard
+                domains={state.domains}
+                selected={selectedDomainRecord}
+                onSelect={setSelectedDomain}
+                c={c}
+                cloudflareBusy={cloudflareBusy}
+                onSwitchCloudflare={switchToCloudflare}
+                onCheckCloudflare={checkCloudflare}
               />
-              <div className="room-wow-link">
-                <ProviderBadge provider={roomProviderInput} c={c} />
-                <span>{selectedDomainRecord?.domain ?? "vip.myfenrir.com"}/{roomSlugInput.trim() || "studio"}</span>
+              <RecommendedTools
+                state={state}
+                c={c}
+                onOpen={(slug) => {
+                  const link = commerceService.click(slug);
+                  const label = link?.label ?? slug;
+                  setNotice(`Tracked setup click: ${label}. Purchase/setup path opened.`);
+                  triggerCelebration(
+                    'Setup path unlocked',
+                    `${label} is tracked for the Telegram Lock setup flow.`,
+                    'commerce'
+                  );
+                  refresh();
+                }}
+              />
+            </section>
+          )}
+
+          {show('command', 'rooms', 'billing') && (
+            <section className="panel wide live-room-panel">
+              <PanelTitle title={c.liveRoomsTitle} subtitle={c.liveRoomsSub} />
+              <div className="paid-feature-strip">
+                <span className="status amber">{c.paidFeature}</span>
+                <b>{c.notFree}</b>
+                <small>{c.paidFeatureBody}</small>
               </div>
-              <div>
-                <b>{roomTitleInput.trim() || "Private live room"}</b>
-                <small>{roomTargetInput.trim() || roomProviderPlaceholder(roomProviderInput)}</small>
+              <div className="room-offer-strip">
+                <span className="status good">{ui.secondaryGate}</span>
+                <b>{ui.routePrivateViaFenrir}</b>
+                <small>{c.liveRoomsSub}</small>
               </div>
-              <button type="button" className="secondary compact-button" onClick={() => setRoomCoverInput(providerLogoPresets[roomProviderInput])}>
-                Use selected logo
-              </button>
-            </div>
-            <div className="cloudflare-easy">
-              <b>{c.easyCloudflare}</b>
-              <span>{c.easyCloudflareBody}</span>
-            </div>
-            <LiveRoomGallery rooms={state.liveRooms} onPause={pauseRoom} c={c} ui={ui} />
-          </section>}
-
-          {show("locks", "telegram") && <section className="panel">
-            <PanelTitle title={c.telegramGroups} subtitle={c.telegramGroupsSub} />
-            <div className="check telegram-status-check">
-              <b>{ui.telegramStatusCheck}</b>
-              <span className={telegramIdentity?.linked ? "status good" : "status amber"}>
-                {telegramIdentity?.linked ? ui.linked : ui.loginRequired}
-            </span>
-            <small>
-              {telegramIdentity?.linked
-                ? ui.telegramConnected(telegramIdentity.telegramUsername ?? "", telegramIdentity.telegramUserId ?? "Telegram", auth?.authenticated ?? false)
-                : telegramIdentity
-                  ? `${ui.telegramSessionFoundNoLink}`
-                  : `${ui.telegramSignInFirst}`}
-            </small>
-            <small>{ui.telegramVerifyWhenNeeded}</small>
-              <div className="row-actions">
-                {!telegramIdentity?.linked ? <button type="button" onClick={() => void linkTelegramIdentity()}>{ui.linkTelegramId}</button> : null}
-                {telegramIdentity?.linked ? <button type="button" onClick={() => void requestTelegramReadd()}>{ui.telegramReaddButton}</button> : null}
-                <a className="button-link ghost" href={friskySignalDevRequestUrl} target="_blank" rel="noreferrer">{ui.devRequestViaSignal}</a>
+              <div className="room-customization-strip">
+                <span className="status amber">{ui.proCustomization}</span>
+                <b>{ui.proCustomizationBodyTitle}</b>
+                <small>{ui.proCustomizationBody}</small>
               </div>
-            </div>
-            <div className="form-column">
-              <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} aria-label="Telegram permission chat id" />
-              <button onClick={checkTelegram}>{c.checkBotPermissions}</button>
-            </div>
-            <div className="checks">
-              {state.telegramChecks.map((check) => (
-                <div className="check" key={check.chatId}>
-                  <b>{check.chatId}</b>
-                  <span className={check.status === "ready" ? "status good" : "status danger"}>{check.status}</span>
-                  <small>admin: {check.botIsAdmin ? "yes" : "no"} · invite: {check.canInviteUsers ? "yes" : "no"}</small>
+              <div className="provider-component-grid" aria-label="Common room providers">
+                {liveRoomProviders.map((provider) => (
+                  <button
+                    className={
+                      roomProviderInput === provider.id
+                        ? 'provider-component active'
+                        : 'provider-component'
+                    }
+                    key={provider.id}
+                    onClick={() => setRoomProviderInput(provider.id)}
+                    type="button"
+                  >
+                    <span
+                      className={`provider-brand provider-brand-${provider.id}`}
+                      aria-hidden="true"
+                    >
+                      <span className="provider-logo-mark">{provider.icon}</span>
+                      <span className="provider-logo-word">{provider.brand}</span>
+                    </span>
+                    <b>{provider.name}</b>
+                    <small>{provider.hint}</small>
+                  </button>
+                ))}
+              </div>
+              <div className="form-row room-form">
+                <select
+                  value={selectedDomain}
+                  onChange={(event) => setSelectedDomain(event.target.value)}
+                >
+                  <option value="" disabled>
+                    {c.chooseDomain}
+                  </option>
+                  {state.domains.map((domain) => (
+                    <option key={domain.id} value={domain.id}>
+                      {domain.domain}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={roomProviderInput}
+                  onChange={(event) => setRoomProviderInput(event.target.value as LiveRoomProvider)}
+                >
+                  {liveRoomProviders.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={roomSlugInput}
+                  onChange={(event) => setRoomSlugInput(event.target.value)}
+                  aria-label="Live room slug"
+                  placeholder={ui.setupInputRoomSlug}
+                />
+                <input
+                  value={roomTitleInput}
+                  onChange={(event) => setRoomTitleInput(event.target.value)}
+                  aria-label="Live room title"
+                  placeholder={ui.setupInputRoomTitle}
+                />
+                <input
+                  value={roomTargetInput}
+                  onChange={(event) => setRoomTargetInput(event.target.value)}
+                  aria-label="Call target URL"
+                  placeholder={roomProviderPlaceholder(roomProviderInput)}
+                />
+                <input
+                  value={roomCoverInput}
+                  onChange={(event) => setRoomCoverInput(event.target.value)}
+                  aria-label="Pro logo or room image URL"
+                  placeholder={ui.setupInputRoomCover}
+                />
+                <button onClick={createLiveRoom}>{c.createPaidRoom}</button>
+              </div>
+              <div className="room-logo-actions" aria-label="Live room logo presets">
+                <span>Room logo presets</span>
+                {liveRoomProviders.map((provider) => (
+                  <button
+                    type="button"
+                    className="compact-button ghost"
+                    key={provider.id}
+                    onClick={() => {
+                      setRoomProviderInput(provider.id);
+                      setRoomCoverInput(providerLogoPresets[provider.id]);
+                      setNotice(`${provider.name} logo preset applied.`);
+                    }}
+                  >
+                    <ProviderBadge provider={provider.id} c={c} compact />
+                  </button>
+                ))}
+              </div>
+              <div className="room-wow-preview" aria-label="Live room preview">
+                <img
+                  className="room-logo-preview"
+                  src={safeHttpUrl(roomCoverInput) || providerLogoPresets[roomProviderInput]}
+                  alt="Room logo preview"
+                  style={{
+                    height: 40,
+                    width: 'auto',
+                    maxWidth: 160,
+                    objectFit: 'contain',
+                    borderRadius: 8,
+                  }}
+                  onError={(event) => {
+                    (event.currentTarget as HTMLImageElement).src =
+                      providerLogoPresets[roomProviderInput];
+                  }}
+                />
+                <div className="room-wow-link">
+                  <ProviderBadge provider={roomProviderInput} c={c} />
+                  <span>
+                    {selectedDomainRecord?.domain ?? 'vip.myfenrir.com'}/
+                    {roomSlugInput.trim() || 'studio'}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </section>}
-
-          {show("command") && <section className="panel">
-            <PanelTitle title={c.opsStack} subtitle={c.opsStackSub} />
-            <div className="ai-stack">
-              <button onClick={() => runAiOps("jules")}>{c.julesTicket}</button>
-              <button className="secondary" onClick={() => runAiOps("gemini")}>{c.geminiDnsGuide}</button>
-              <button className="ghost" onClick={() => runAiOps("cursor")}>{c.cursorHandoff}</button>
-            <a className="button-link ghost" href={friskySignalDevRequestUrl} target="_blank" rel="noreferrer">
-              {ui.devRequestViaSignal}
-            </a>
-            </div>
-            <p className="muted">{c.opsStackBody}</p>
-          </section>}
-
-          {show("locks", "revocations") && <section className="panel">
-            <PanelTitle title={c.revocations} subtitle={c.revocationsSub} />
-            <div className="timeline">
-              {state.invites.filter((invite) => invite.status === "revoked").map((invite) => (
-                <div className="timeline-item" key={invite.id}>
-                  <b>{invite.id}</b>
-                  <small>revoked at {invite.revokedAt}</small>
+                <div>
+                  <b>{roomTitleInput.trim() || 'Private live room'}</b>
+                  <small>
+                    {roomTargetInput.trim() || roomProviderPlaceholder(roomProviderInput)}
+                  </small>
                 </div>
-              ))}
-            </div>
-          </section>}
+                <button
+                  type="button"
+                  className="secondary compact-button"
+                  onClick={() => setRoomCoverInput(providerLogoPresets[roomProviderInput])}
+                >
+                  Use selected logo
+                </button>
+              </div>
+              <div className="cloudflare-easy">
+                <b>{c.easyCloudflare}</b>
+                <span>{c.easyCloudflareBody}</span>
+              </div>
+              <LiveRoomGallery rooms={state.liveRooms} onPause={pauseRoom} c={c} ui={ui} />
+            </section>
+          )}
 
-          {show("billing") && <section className="panel">
-            <PanelTitle title={c.billing} subtitle={c.pricingSub} />
-            <div className="pricing">
-              {c.plans.map(([plan, price, body]) => (
-                <div className="price" key={plan}>
-                  <b>{plan}</b>
-                  <strong>{price}</strong>
-                  <small>{body}</small>
-                  {plan !== "Free" ? <button onClick={() => void startTelegramStars()}>{c.starsCheckout}</button> : null}
-                  <button className="ghost" onClick={() => onPaidPlanPickedFromPricing(plan)}>{c.upgrade}</button>
+          {show('locks', 'telegram') && (
+            <section className="panel">
+              <PanelTitle title={c.telegramGroups} subtitle={c.telegramGroupsSub} />
+              <div className="check telegram-status-check">
+                <b>{ui.telegramStatusCheck}</b>
+                <span className={telegramIdentity?.linked ? 'status good' : 'status amber'}>
+                  {telegramIdentity?.linked ? ui.linked : ui.loginRequired}
+                </span>
+                <small>
+                  {telegramIdentity?.linked
+                    ? ui.telegramConnected(
+                        telegramIdentity.telegramUsername ?? '',
+                        telegramIdentity.telegramUserId ?? 'Telegram',
+                        auth?.authenticated ?? false
+                      )
+                    : telegramIdentity
+                      ? `${ui.telegramSessionFoundNoLink}`
+                      : `${ui.telegramSignInFirst}`}
+                </small>
+                <small>{ui.telegramVerifyWhenNeeded}</small>
+                <div className="row-actions">
+                  {!telegramIdentity?.linked ? (
+                    <button type="button" onClick={() => void linkTelegramIdentity()}>
+                      {ui.linkTelegramId}
+                    </button>
+                  ) : null}
+                  {telegramIdentity?.linked ? (
+                    <button type="button" onClick={() => void requestTelegramReadd()}>
+                      {ui.telegramReaddButton}
+                    </button>
+                  ) : null}
+                  <a
+                    className="button-link ghost"
+                    href={friskySignalDevRequestUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {ui.devRequestViaSignal}
+                  </a>
                 </div>
-              ))}
-            </div>
-          </section>}
+              </div>
+              <div className="form-column">
+                <input
+                  value={chatInput}
+                  onChange={(event) => setChatInput(event.target.value)}
+                  aria-label="Telegram permission chat id"
+                />
+                <button onClick={checkTelegram}>{c.checkBotPermissions}</button>
+              </div>
+              <div className="checks">
+                {state.telegramChecks.map((check) => (
+                  <div className="check" key={check.chatId}>
+                    <b>{check.chatId}</b>
+                    <span className={check.status === 'ready' ? 'status good' : 'status danger'}>
+                      {check.status}
+                    </span>
+                    <small>
+                      admin: {check.botIsAdmin ? 'yes' : 'no'} · invite:{' '}
+                      {check.canInviteUsers ? 'yes' : 'no'}
+                    </small>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
-          {show("audit", "revocations") && <section className="panel wide">
-            <PanelTitle title={c.auditLog} subtitle={c.auditLogSub} />
-            <AuditLog state={state} />
-          </section>}
+          {show('command') && (
+            <section className="panel">
+              <PanelTitle title={c.opsStack} subtitle={c.opsStackSub} />
+              <div className="ai-stack">
+                <button onClick={() => runAiOps('jules')}>{c.julesTicket}</button>
+                <button className="secondary" onClick={() => runAiOps('gemini')}>
+                  {c.geminiDnsGuide}
+                </button>
+                <button className="ghost" onClick={() => runAiOps('cursor')}>
+                  {c.cursorHandoff}
+                </button>
+                <a
+                  className="button-link ghost"
+                  href={friskySignalDevRequestUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {ui.devRequestViaSignal}
+                </a>
+              </div>
+              <p className="muted">{c.opsStackBody}</p>
+            </section>
+          )}
 
-          {show("command", "faq") && <FaqPanel c={c} />}
-        </div>
+          {show('locks', 'revocations') && (
+            <section className="panel">
+              <PanelTitle title={c.revocations} subtitle={c.revocationsSub} />
+              <div className="timeline">
+                {state.invites
+                  .filter((invite) => invite.status === 'revoked')
+                  .map((invite) => (
+                    <div className="timeline-item" key={invite.id}>
+                      <b>{invite.id}</b>
+                      <small>revoked at {invite.revokedAt}</small>
+                    </div>
+                  ))}
+              </div>
+            </section>
+          )}
+
+          {show('billing') && (
+            <section className="panel">
+              <PanelTitle title={c.billing} subtitle={c.pricingSub} />
+              <div className="pricing">
+                {c.plans.map(([plan, price, body]) => (
+                  <div className="price" key={plan}>
+                    <b>{plan}</b>
+                    <strong>{price}</strong>
+                    <small>{body}</small>
+                    {plan !== 'Free' ? (
+                      <>
+                        <button onClick={() => void startTelegramStars()}>{c.starsCheckout}</button>
+                        <button className="secondary" onClick={() => void startWertCheckout(plan)}>
+                          {c.payWithCard}
+                        </button>
+                      </>
+                    ) : null}
+                    <button className="ghost" onClick={() => onPaidPlanPickedFromPricing(plan)}>
+                      {c.upgrade}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {show('audit', 'revocations') && (
+            <section className="panel wide">
+              <PanelTitle title={c.auditLog} subtitle={c.auditLogSub} />
+              <AuditLog state={state} />
+            </section>
+          )}
+
+          {show('command', 'faq') && <FaqPanel c={c} />}
+          </motion.div>
+        </AnimatePresence>
         <BrandSignature c={c} compact />
       </main>
       {celebration && (
@@ -2177,10 +2981,10 @@ function GoRoutePage({
   ui,
   slug,
   link,
-  onTrack
+  onTrack,
 }: {
   c: Copy;
-  ui: typeof uiCopy[Locale];
+  ui: (typeof uiCopy)[Locale];
   slug: string;
   link: FriskyCommissionLink | null;
   onTrack: () => void;
@@ -2216,7 +3020,11 @@ function GoRoutePage({
                 {ui.openNow}
               </button>
               {fallback ? (
-                <button className="ghost compact-button" type="button" onClick={() => openAnyUrl(fallback)}>
+                <button
+                  className="ghost compact-button"
+                  type="button"
+                  onClick={() => openAnyUrl(fallback)}
+                >
                   {ui.openFallback}
                 </button>
               ) : null}
@@ -2248,43 +3056,43 @@ function overlayAuthState(state: AppState, auth: AuthSession): AppState {
       id: auth.user.id,
       email: auth.user.email,
       name: auth.user.name,
-      authProvider: auth.user.authProvider
+      authProvider: auth.user.authProvider,
     },
     org: {
       ...state.org,
       id: auth.org.id,
       ownerUserId: auth.user.id,
-      plan: auth.org.plan
-    }
+      plan: auth.org.plan,
+    },
   };
 }
 
 function planLabel(plan: Plan) {
   const labels: Record<Plan, string> = {
-    free: "Free",
-    starter: "Starter",
-    pro: "Pro",
-    operator: "Operator"
+    free: 'Free',
+    starter: 'Starter',
+    pro: 'Pro',
+    operator: 'Operator',
   };
   return labels[plan];
 }
 
 function authProviderLabel(provider: string) {
   const value = provider.toLowerCase();
-  if (value.includes("apple")) return "Apple";
-  if (value.includes("google")) return "Google";
-  if (value.includes("microsoft") || value.includes("azure")) return "Microsoft";
-  if (value.includes("telegram")) return "Telegram";
-  if (value.includes("passkey")) return "Passkey";
-  return provider || "OAuth";
+  if (value.includes('apple')) return 'Apple';
+  if (value.includes('google')) return 'Google';
+  if (value.includes('microsoft') || value.includes('azure')) return 'Microsoft';
+  if (value.includes('telegram')) return 'Telegram';
+  if (value.includes('passkey')) return 'Passkey';
+  return provider || 'OAuth';
 }
 
 function planLockLimit(plan: Plan) {
   const limits: Record<Plan, string> = {
-    free: "1",
-    starter: "3",
-    pro: "10",
-    operator: "unlimited"
+    free: '1',
+    starter: '3',
+    pro: '10',
+    operator: 'unlimited',
   };
   return limits[plan];
 }
@@ -2296,7 +3104,7 @@ function SessionLabels({
   telegramIdentity,
   onLinkTelegram,
   c,
-  ui
+  ui,
 }: {
   state: AppState;
   role: FenrirRole | null;
@@ -2304,23 +3112,24 @@ function SessionLabels({
   telegramIdentity: TelegramIdentityLinkPayload | null;
   onLinkTelegram: () => void;
   c: Copy;
-  ui: typeof uiCopy[Locale];
+  ui: (typeof uiCopy)[Locale];
 }) {
-  const activeLocks = state.bridges.filter((bridge) => bridge.status === "active").length;
+  const activeLocks = state.bridges.filter((bridge) => bridge.status === 'active').length;
   const backendLimit = billingStatus?.limits.maxTelegramLocks;
-  const lockLimit = backendLimit === null ? "unlimited" : backendLimit ?? planLockLimit(state.org.plan);
+  const lockLimit =
+    backendLimit === null ? 'unlimited' : (backendLimit ?? planLockLimit(state.org.plan));
   const labels = [
-    [c.sessionRole, role === "owner" ? c.sessionOwner : role === "admin" ? c.sessionAdmin : "User"],
+    [c.sessionRole, role === 'owner' ? c.sessionOwner : role === 'admin' ? c.sessionAdmin : 'User'],
     [c.sessionPlan, planLabel(state.org.plan)],
     [c.sessionSubscription, billingStatus?.subscriptionStatus ?? c.sessionPendingMode],
     [c.sessionProvider, authProviderLabel(state.user.authProvider)],
-      [c.sessionLocks, `${activeLocks}/${lockLimit}`],
-      [
-        ui.telegramStatusCheck,
-        telegramIdentity?.linked
-          ? `@${telegramIdentity.telegramUsername ?? telegramIdentity.telegramUserId}`
-          : ui.loginRequired
-      ]
+    [c.sessionLocks, `${activeLocks}/${lockLimit}`],
+    [
+      ui.telegramStatusCheck,
+      telegramIdentity?.linked
+        ? `@${telegramIdentity.telegramUsername ?? telegramIdentity.telegramUserId}`
+        : ui.loginRequired,
+    ],
   ];
 
   return (
@@ -2334,7 +3143,9 @@ function SessionLabels({
       <button className="session-label telegram-link-button" type="button" onClick={onLinkTelegram}>
         <span>{ui.telegramStatusCheck}</span>
         <b>{telegramIdentity?.linked ? ui.linked : ui.linkTelegramId}</b>
-        <small>{telegramIdentity?.linked ? "Telegram identity ready" : "Opens the Fenrir bot handoff"}</small>
+        <small>
+          {telegramIdentity?.linked ? 'Telegram identity ready' : 'Opens the Fenrir bot handoff'}
+        </small>
       </button>
     </section>
   );
@@ -2344,7 +3155,7 @@ function BetaPreviewControls({
   role,
   plan,
   onRole,
-  onPlan
+  onPlan,
 }: {
   role: FenrirRole | null;
   plan: PaidPlan;
@@ -2354,7 +3165,12 @@ function BetaPreviewControls({
   return (
     <section className="beta-preview-controls" aria-label="Beta preview controls">
       <span>Beta preview</span>
-      <select value={role ?? "user"} onChange={(event) => onRole(event.target.value === "user" ? null : event.target.value as FenrirRole)}>
+      <select
+        value={role ?? 'user'}
+        onChange={(event) =>
+          onRole(event.target.value === 'user' ? null : (event.target.value as FenrirRole))
+        }
+      >
         <option value="user">User view</option>
         <option value="admin">Admin view</option>
         <option value="owner">Owner view</option>
@@ -2369,14 +3185,26 @@ function BetaPreviewControls({
   );
 }
 
-function PublicBridgeRoute({ slug, c, ui }: { slug: string; c: Copy; ui: typeof uiCopy[Locale] }) {
-  const [resolved, setResolved] = useState<{ bridge: FriskyBridge; invite: FriskyTelegramInvite | null } | null>(null);
+function PublicBridgeRoute({
+  slug,
+  c,
+  ui,
+}: {
+  slug: string;
+  c: Copy;
+  ui: (typeof uiCopy)[Locale];
+}) {
+  const [resolved, setResolved] = useState<{
+    bridge: FriskyBridge;
+    invite: FriskyTelegramInvite | null;
+  } | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoaded(false);
-    void bridgeService.publicRedirect(slug)
+    void bridgeService
+      .publicRedirect(slug)
       .then((result) => {
         if (!cancelled) setResolved({ bridge: result.bridge, invite: result.invite });
       })
@@ -2400,9 +3228,13 @@ function PublicBridgeRoute({ slug, c, ui }: { slug: string; c: Copy; ui: typeof 
           <h1>{resolved.bridge.telegramGroupName}</h1>
           <p>{c.publicLockBody}</p>
           {resolved.invite?.inviteLink ? (
-            <a className="join-button" href={resolved.invite.inviteLink}>{c.continueTelegram}</a>
+            <a className="join-button" href={resolved.invite.inviteLink}>
+              {c.continueTelegram}
+            </a>
           ) : (
-            <button className="join-button" type="button" disabled>{ui.loginRequired}</button>
+            <button className="join-button" type="button" disabled>
+              {ui.loginRequired}
+            </button>
           )}
           <code>{resolved.bridge.publicUrl}</code>
         </section>
@@ -2418,14 +3250,15 @@ function PublicBridgeRoute({ slug, c, ui }: { slug: string; c: Copy; ui: typeof 
   );
 }
 
-function PublicRoomRoute({ slug, c, ui }: { slug: string; c: Copy; ui: typeof uiCopy[Locale] }) {
+function PublicRoomRoute({ slug, c, ui }: { slug: string; c: Copy; ui: (typeof uiCopy)[Locale] }) {
   const [room, setRoom] = useState<FriskyLiveRoom | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoaded(false);
-    void liveRoomService.publicRedirect(slug)
+    void liveRoomService
+      .publicRedirect(slug)
       .then((result) => {
         if (!cancelled) setRoom(result.room);
       })
@@ -2440,21 +3273,26 @@ function PublicRoomRoute({ slug, c, ui }: { slug: string; c: Copy; ui: typeof ui
     };
   }, [slug]);
 
-  const roomCoverUrl = room ? trustedFenrirImageUrl(room.coverImageUrl) : "";
+  const roomCoverUrl = room ? trustedFenrirImageUrl(room.coverImageUrl) : '';
   return (
     <main className="join-page">
       {room ? (
         <section className="join-card live-room-public gated-room">
           <div className="room-gate-brand">
-            <span>{roomCoverUrl ? <img src={roomCoverUrl} alt="" /> : null} {ui.fenrirRoomGate}</span>
+            <span>
+              {roomCoverUrl ? <img src={roomCoverUrl} alt="" /> : null} {ui.fenrirRoomGate}
+            </span>
             <b>{providerLabel(room.provider, c)} access</b>
           </div>
-          <div className="public-room-cover" style={roomCoverUrl ? { backgroundImage: `url("${roomCoverUrl}")` } : undefined}>
+          <div
+            className="public-room-cover"
+            style={roomCoverUrl ? { backgroundImage: `url("${roomCoverUrl}")` } : undefined}
+          >
             <span>{ui.roomSecondaryLabel}</span>
           </div>
           <p className="label">{c.publicRoomActive}</p>
           <h1 className="room-gate-title">{room.title}</h1>
-            <p>{ui.roomBrandIntro}</p>
+          <p>{ui.roomBrandIntro}</p>
           <div className="room-gate-grid" aria-label="Fenrir room routing status">
             <span>{ui.roomStableUrlLabel}</span>
             <code>{room.publicUrl}</code>
@@ -2500,72 +3338,84 @@ function ProtocolActivated() {
   );
 }
 
-function FriskyGhostRoute({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] }) {
+function FriskyGhostRoute({ c, ui }: { c: Copy; ui: (typeof uiCopy)[Locale] }) {
   const theme = brandThemes.friskyGhost;
   return (
-    <main className={`product-route ghost-route ${themeClassName(theme)}`} style={themeCssVars(theme)} data-theme={theme.key}>
+    <main
+      className={`product-route ghost-route ${themeClassName(theme)}`}
+      style={themeCssVars(theme)}
+      data-theme={theme.key}
+    >
       <GlowCard className="product-route-card">
         <span className="status good">Frisky Ghost</span>
         <h1>{ui.ghostRouteTitle}</h1>
         <p>{ui.ghostRouteBody}</p>
         <div className="product-route-actions">
-          <a className="button-link" href="/bot-os">{ui.botOsRouteFooterGhost}</a>
-          <a className="button-link ghost" href="/">{ui.botOsRouteFooterHome}</a>
+          <a className="button-link" href="/bot-os">
+            {ui.botOsRouteFooterGhost}
+          </a>
+          <a className="button-link ghost" href="/">
+            {ui.botOsRouteFooterHome}
+          </a>
         </div>
       </GlowCard>
     </main>
   );
 }
 
-function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] }) {
+function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: (typeof uiCopy)[Locale] }) {
   const theme = brandThemes.friskyGhost;
   const botModules = [
     {
-      code: "MOD 01",
-      title: "Identity Router",
-      status: "Ghost login",
-      body: "Routes Frisky Ghost, Fenrir, and future product skins without mixing auth scopes.",
-      actions: ["Brand skin", "Product landing", "Safe redirect"]
+      code: 'MOD 01',
+      title: 'Identity Router',
+      status: 'Ghost login',
+      body: 'Routes Frisky Ghost, Fenrir, and future product skins without mixing auth scopes.',
+      actions: ['Brand skin', 'Product landing', 'Safe redirect'],
     },
     {
-      code: "MOD 02",
-      title: "Fenrir Bot",
-      status: "Telegram ops",
-      body: "Guides admins through stable links, invite rotation, Stars checkout, and DNS setup.",
-      actions: ["/setup", "/plans", "/status"]
+      code: 'MOD 02',
+      title: 'Fenrir Bot',
+      status: 'Telegram ops',
+      body: 'Guides admins through stable links, invite rotation, Stars checkout, and DNS setup.',
+      actions: ['/setup', '/plans', '/status'],
     },
     {
-      code: "MOD 03",
-      title: "Payment Box",
-      status: "Stars first",
-      body: "Opens the official Telegram Stars payment box and waits for backend entitlement truth.",
-      actions: ["/subscribe", "Pro", "Operator"]
+      code: 'MOD 03',
+      title: 'Payment Box',
+      status: 'Stars first',
+      body: 'Opens the official Telegram Stars payment box and waits for backend entitlement truth.',
+      actions: ['/subscribe', 'Pro', 'Operator'],
     },
     {
-      code: "MOD 04",
-      title: "DNS Wizard",
-      status: "Fenrir Bridge DNS",
-      body: "Keeps registrar choice open while routing CNAME records through Fenrir Bridge infrastructure.",
-      actions: ["TXT _fenrir", "CNAME join", "SSL"]
+      code: 'MOD 04',
+      title: 'DNS Wizard',
+      status: 'Fenrir Bridge DNS',
+      body: 'Keeps registrar choice open while routing CNAME records through Fenrir Bridge infrastructure.',
+      actions: ['TXT _fenrir', 'CNAME join', 'SSL'],
     },
     {
-      code: "MOD 05",
-      title: "Community Gate",
-      status: "Neon scope",
-      body: "Separate realauth for community gates. Different database, tables, and session cookie.",
-      actions: ["/community/fenrir", "Invite codes", "Neon"]
+      code: 'MOD 05',
+      title: 'Community Gate',
+      status: 'Neon scope',
+      body: 'Separate realauth for community gates. Different database, tables, and session cookie.',
+      actions: ['/community/fenrir', 'Invite codes', 'Neon'],
     },
     {
-      code: "MOD 06",
-      title: "Operator Console",
-      status: "Bot of bots",
-      body: "A modular command layer for setup, support, routing, billing state, and handoffs.",
-      actions: ["Cursor", "Gemini", "Frisky Signal"]
-    }
+      code: 'MOD 06',
+      title: 'Operator Console',
+      status: 'Bot of bots',
+      body: 'A modular command layer for setup, support, routing, billing state, and handoffs.',
+      actions: ['Cursor', 'Gemini', 'Frisky Signal'],
+    },
   ];
 
   return (
-    <main className={`product-route bot-route ${themeClassName(theme)}`} style={themeCssVars(theme)} data-theme={theme.key}>
+    <main
+      className={`product-route bot-route ${themeClassName(theme)}`}
+      style={themeCssVars(theme)}
+      data-theme={theme.key}
+    >
       <section className="bot-os-shell">
         <div className="bot-os-header">
           <div>
@@ -2602,16 +3452,25 @@ function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] }) {
         </div>
 
         <div className="product-route-actions">
-          <a className="button-link" href="/ghost">{ui.botOsRouteFooterGhost}</a>
-          <a className="button-link" href="/community/fenrir">{ui.botOsRouteFooterCommunity}</a>
-          <a className="button-link ghost" href="/">{ui.botOsRouteFooterHome}</a>
+          <a className="button-link" href="/ghost">
+            {ui.botOsRouteFooterGhost}
+          </a>
+          <a className="button-link" href="/community/fenrir">
+            {ui.botOsRouteFooterCommunity}
+          </a>
+          <a className="button-link ghost" href="/">
+            {ui.botOsRouteFooterHome}
+          </a>
         </div>
       </section>
     </main>
   );
 }
 
-function mergeNeonBrandTheme(base: typeof brandThemes.neonNexus, brand: CommunityBrandPayload | null) {
+function mergeNeonBrandTheme(
+  base: typeof brandThemes.neonNexus,
+  brand: CommunityBrandPayload | null
+) {
   if (!brand) return base;
   return {
     ...base,
@@ -2620,59 +3479,62 @@ function mergeNeonBrandTheme(base: typeof brandThemes.neonNexus, brand: Communit
     subheadline: brand.subheadline || base.subheadline,
     primary: brand.primary_color || base.primary,
     secondary: brand.secondary_color || base.secondary,
-    accent: brand.accent_color || base.accent
+    accent: brand.accent_color || base.accent,
   };
 }
 
-const brandWizardSteps = ["Address", "Name", "Images", "Colors", "Words", "Access"] as const;
+const brandWizardSteps = ['Address', 'Name', 'Images', 'Colors', 'Words', 'Access'] as const;
 type BrandWizardStep = (typeof brandWizardSteps)[number];
 
-const brandWizardStepDetails: Record<BrandWizardStep, { title: string; body: string; outcome: string }> = {
+const brandWizardStepDetails: Record<
+  BrandWizardStep,
+  { title: string; body: string; outcome: string }
+> = {
   Address: {
-    title: "Choose the public address",
-    body: "This becomes the short URL people visit before they ask to join.",
-    outcome: "Visitors will land on this route."
+    title: 'Choose the public address',
+    body: 'This becomes the short URL people visit before they ask to join.',
+    outcome: 'Visitors will land on this route.',
   },
   Name: {
-    title: "Name the community",
-    body: "Use the name members already recognize. This is the main label on the gate.",
-    outcome: "The preview headline and dashboard listing use this name."
+    title: 'Name the community',
+    body: 'Use the name members already recognize. This is the main label on the gate.',
+    outcome: 'The preview headline and dashboard listing use this name.',
   },
   Images: {
-    title: "Add logo and atmosphere",
-    body: "Start with a preset, then replace assets later when the final brand files are ready.",
-    outcome: "Logo, mascot, and background affect the public gate."
+    title: 'Add logo and atmosphere',
+    body: 'Start with a preset, then replace assets later when the final brand files are ready.',
+    outcome: 'Logo, mascot, and background affect the public gate.',
   },
   Colors: {
-    title: "Pick the visual mood",
-    body: "Choose three colors: primary for action, secondary for support, accent for highlights.",
-    outcome: "Buttons, badges, and glow states follow these colors."
+    title: 'Pick the visual mood',
+    body: 'Choose three colors: primary for action, secondary for support, accent for highlights.',
+    outcome: 'Buttons, badges, and glow states follow these colors.',
   },
   Words: {
-    title: "Write the welcome message",
-    body: "Say who the gate is for and what happens after people enter.",
-    outcome: "These lines are what visitors read before signing in."
+    title: 'Write the welcome message',
+    body: 'Say who the gate is for and what happens after people enter.',
+    outcome: 'These lines are what visitors read before signing in.',
   },
   Access: {
-    title: "Set the entry rules",
-    body: "Decide whether people enter immediately, need an invite, or wait for review.",
-    outcome: "Member state and the audit trail are stored in the community's own vault."
-  }
+    title: 'Set the entry rules',
+    body: 'Decide whether people enter immediately, need an invite, or wait for review.',
+    outcome: "Member state and the audit trail are stored in the community's own vault.",
+  },
 };
 
 const accessStateHelp: Record<DefaultAccessState, string> = {
-  provisional: "New members wait for review before full access.",
-  open: "Approved identity can enter immediately.",
-  invite_only: "Only people with a valid invite code can proceed.",
-  disabled: "The gate stays closed while you finish setup."
+  provisional: 'New members wait for review before full access.',
+  open: 'Approved identity can enter immediately.',
+  invite_only: 'Only people with a valid invite code can proceed.',
+  disabled: 'The gate stays closed while you finish setup.',
 };
 
 function communityAuthProviderLabel(provider: string) {
-  if (provider === "magic_link") return "Magic link";
+  if (provider === 'magic_link') return 'Magic link';
   return provider[0]?.toUpperCase() + provider.slice(1);
 }
 
-const legacyNeonPromoAsset = "/mj-neon-hero.gif";
+const legacyNeonPromoAsset = '/mj-neon-hero.gif';
 
 function cleanCommunityAssetUrl(value?: string | null) {
   const trimmed = value?.trim();
@@ -2683,16 +3545,21 @@ function cleanCommunityAssetUrl(value?: string | null) {
 // Builds a self-contained SVG monogram (data: URI) from the community name and
 // palette — a real logo in one click, no file hosting required. Small (~1 KB),
 // stored in logo_url like any other URL and rendered via <img>, so it is inert.
-function monogramLogoDataUri(name: string, primary: string, accent: string, secondary: string): string {
-  const trimmed = (name || "").trim();
+function monogramLogoDataUri(
+  name: string,
+  primary: string,
+  accent: string,
+  secondary: string
+): string {
+  const trimmed = (name || '').trim();
   const emojiMatch = trimmed.match(/^\p{Extended_Pictographic}/u);
   const glyph = emojiMatch
     ? emojiMatch[0]
     : trimmed
         .split(/\s+/)
         .slice(0, 2)
-        .map((word) => word[0]?.toUpperCase() ?? "")
-        .join("") || "F";
+        .map((word) => word[0]?.toUpperCase() ?? '')
+        .join('') || 'F';
   const fontSize = emojiMatch ? 30 : glyph.length > 1 ? 24 : 30;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
@@ -2705,111 +3572,209 @@ function monogramLogoDataUri(name: string, primary: string, accent: string, seco
   <rect x="2" y="2" width="60" height="60" rx="16" fill="#0b0e10"/>
   <rect x="2" y="2" width="60" height="60" rx="16" fill="none" stroke="url(#ring)" stroke-width="2.5"/>
   <path d="M14 20l6-8 3 7zM50 20l-6-8-3 7z" fill="url(#ring)" opacity="0.9"/>
-  <text x="32" y="${emojiMatch ? 42 : 41}" text-anchor="middle" font-family="'Space Grotesk','Inter',system-ui,sans-serif" font-weight="700" font-size="${fontSize}" fill="url(#ring)">${glyph.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>
+  <text x="32" y="${emojiMatch ? 42 : 41}" text-anchor="middle" font-family="'Space Grotesk','Inter',system-ui,sans-serif" font-weight="700" font-size="${fontSize}" fill="url(#ring)">${glyph.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>
 </svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 const brandImageFields = [
   {
-    key: "logo_url",
-    icon: "◇",
-    title: "Logo mark",
-    placeholder: "/fenrir-cut-wordmark.svg",
-    help: "Use an SVG/PNG in /public, Cloudflare R2, or another public HTTPS URL. This appears in the gate header."
+    key: 'logo_url',
+    icon: '◇',
+    title: 'Logo mark',
+    placeholder: '/fenrir-cut-wordmark.svg',
+    help: 'Use an SVG/PNG in /public, Cloudflare R2, or another public HTTPS URL. This appears in the gate header.',
   },
   {
-    key: "mascot_url",
-    icon: "✦",
-    title: "Mascot or product visual",
-    placeholder: "https://cdn.example.com/community-mascot.png",
-    help: "Optional. Add a character, product shot, or community symbol. Leave blank for a cleaner gate."
+    key: 'mascot_url',
+    icon: '✦',
+    title: 'Mascot or product visual',
+    placeholder: 'https://cdn.example.com/community-mascot.png',
+    help: 'Optional. Add a character, product shot, or community symbol. Leave blank for a cleaner gate.',
   },
   {
-    key: "background_url",
-    icon: "▣",
-    title: "Background image",
-    placeholder: "https://cdn.example.com/community-background.jpg",
-    help: "Use a wide high-contrast image. The gate adds a dark overlay automatically."
-  }
+    key: 'background_url',
+    icon: '▣',
+    title: 'Background image',
+    placeholder: 'https://cdn.example.com/community-background.jpg',
+    help: 'Use a wide high-contrast image. The gate adds a dark overlay automatically.',
+  },
 ] as const;
 
 const brandStylePresets = [
-  { name: "Neon Nexus", primary: "#22c7a8", secondary: "#8cb9ff", accent: "#9b8cff", note: "Electric teal, blue, violet." },
-  { name: "Fenrir Core", primary: "#ff334e", secondary: "#22c7a8", accent: "#f1b75c", note: "Red action, teal signal, amber highlight." },
-  { name: "Midnight Ops", primary: "#111111", secondary: "#666666", accent: "#c9d1d9", note: "Quiet operator mode." },
-  { name: "Solar Gate", primary: "#f59e0b", secondary: "#fb7185", accent: "#22d3ee", note: "Warm launch page with cyan edge." },
-  { name: "Arcade Pulse", primary: "#a855f7", secondary: "#06b6d4", accent: "#f472b6", note: "More playful, obvious community flavor." }
+  {
+    name: 'Neon Nexus',
+    primary: '#22c7a8',
+    secondary: '#8cb9ff',
+    accent: '#9b8cff',
+    note: 'Electric teal, blue, violet.',
+  },
+  {
+    name: 'Fenrir Core',
+    primary: '#ff334e',
+    secondary: '#22c7a8',
+    accent: '#f1b75c',
+    note: 'Red action, teal signal, amber highlight.',
+  },
+  {
+    name: 'Midnight Ops',
+    primary: '#111111',
+    secondary: '#666666',
+    accent: '#c9d1d9',
+    note: 'Quiet operator mode.',
+  },
+  {
+    name: 'Solar Gate',
+    primary: '#f59e0b',
+    secondary: '#fb7185',
+    accent: '#22d3ee',
+    note: 'Warm launch page with cyan edge.',
+  },
+  {
+    name: 'Arcade Pulse',
+    primary: '#a855f7',
+    secondary: '#06b6d4',
+    accent: '#f472b6',
+    note: 'More playful, obvious community flavor.',
+  },
 ] as const;
 
 const communityGateWalkthrough = [
   {
-    label: "What it is",
-    icon: "gate",
-    title: "A branded front door for your community.",
-    body: "Visitors land on your public gate, see your brand, prove who they are — and your rules decide who gets in."
+    label: 'What it is',
+    icon: 'gate',
+    title: 'A branded front door for your community.',
+    body: 'Visitors land on your public gate, see your brand, prove who they are — and your rules decide who gets in.',
   },
   {
-    label: "How to set it",
-    icon: "wand",
-    title: "Address, look, words, and door rules. Minutes, not hours.",
-    body: "Pick the short URL, drop in a logo or generate one, choose colors and welcome copy, then set the entry mode: open, review-first, invite-only, or closed."
+    label: 'How to set it',
+    icon: 'wand',
+    title: 'Address, look, words, and door rules. Minutes, not hours.',
+    body: 'Pick the short URL, drop in a logo or generate one, choose colors and welcome copy, then set the entry mode: open, review-first, invite-only, or closed.',
   },
   {
-    label: "How it works",
-    icon: "vault",
-    title: "Fenrir guards the door. Members live in their own vault.",
-    body: "The gate handles identity and routing. Membership, invites, review status, and the audit trail stay in the community's own isolated records."
+    label: 'How it works',
+    icon: 'vault',
+    title: 'Fenrir guards the door. Members live in their own vault.',
+    body: "The gate handles identity and routing. Membership, invites, review status, and the audit trail stay in the community's own isolated records.",
   },
   {
-    label: "Why subscribe",
-    icon: "crown",
-    title: "A real access system, not another loose link.",
-    body: "Subscription unlocks branded gates, safer onboarding, isolated member records, review workflows, and a clean path to paid or private communities."
-  }
+    label: 'Why subscribe',
+    icon: 'crown',
+    title: 'A real access system, not another loose link.',
+    body: 'Subscription unlocks branded gates, safer onboarding, isolated member records, review workflows, and a clean path to paid or private communities.',
+  },
 ] as const;
 
-function WalkthroughIcon({ name }: { name: "gate" | "wand" | "vault" | "crown" }) {
+function WalkthroughIcon({ name }: { name: 'gate' | 'wand' | 'vault' | 'crown' }) {
   const paths: Record<string, ReactNode> = {
-    gate: <path d="M4 20V8l8-4 8 4v12M4 12h16M9 20v-5a3 3 0 0 1 6 0v5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />,
-    wand: <path d="M5 19L15 9m1.5-4.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7zM19 14l.5 1.4L21 16l-1.5.6L19 18l-.6-1.4L17 16l1.4-.6zM8 4l.6 1.6L10 6l-1.4.6L8 8l-.6-1.4L6 6l1.4-.4z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />,
-    vault: <><rect x="4" y="5" width="16" height="14" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.7" /><circle cx="12" cy="12" r="3.4" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="M12 8.6v-1.4M12 16.8v-1.4M8.6 12H7.2M16.8 12h-1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></>,
-    crown: <path d="M4 17h16M5 16l-1-8 4.5 3L12 5l3.5 6L20 8l-1 8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    gate: (
+      <path
+        d="M4 20V8l8-4 8 4v12M4 12h16M9 20v-5a3 3 0 0 1 6 0v5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
+    wand: (
+      <path
+        d="M5 19L15 9m1.5-4.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7zM19 14l.5 1.4L21 16l-1.5.6L19 18l-.6-1.4L17 16l1.4-.6zM8 4l.6 1.6L10 6l-1.4.6L8 8l-.6-1.4L6 6l1.4-.4z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
+    vault: (
+      <>
+        <rect
+          x="4"
+          y="5"
+          width="16"
+          height="14"
+          rx="2.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+        />
+        <circle cx="12" cy="12" r="3.4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path
+          d="M12 8.6v-1.4M12 16.8v-1.4M8.6 12H7.2M16.8 12h-1.4"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+        />
+      </>
+    ),
+    crown: (
+      <path
+        d="M4 17h16M5 16l-1-8 4.5 3L12 5l3.5 6L20 8l-1 8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
   };
-  return <svg viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      {paths[name]}
+    </svg>
+  );
 }
 
-function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNotice: (message: string) => void }) {
-  const [step, setStep] = useState<BrandWizardStep>("Address");
-  const [slug, setSlug] = useState("neon-nexus");
+function CommunityBrandWizardPanel({
+  locale,
+  onNotice,
+}: {
+  locale: Locale;
+  onNotice: (message: string) => void;
+}) {
+  const [step, setStep] = useState<BrandWizardStep>('Address');
+  const [slug, setSlug] = useState('neon-nexus');
   const [draft, setDraft] = useState<CommunityBrandUpdatePayload>({});
   const [loadedBrand, setLoadedBrand] = useState<CommunityBrandPayload | null>(null);
   const [authorizationReason, setAuthorizationReason] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const previewBrand = useMemo<CommunityBrandPayload>(() => ({
-    slug,
-    name: draft.name ?? loadedBrand?.name ?? "Neon Nexus",
-    logo_url: cleanCommunityAssetUrl(draft.logo_url ?? loadedBrand?.logo_url),
-    mascot_url: cleanCommunityAssetUrl(draft.mascot_url ?? loadedBrand?.mascot_url),
-    background_url: cleanCommunityAssetUrl(draft.background_url ?? loadedBrand?.background_url),
-    primary_color: draft.primary_color ?? loadedBrand?.primary_color ?? brandThemes.neonNexus.primary,
-    secondary_color: draft.secondary_color ?? loadedBrand?.secondary_color ?? brandThemes.neonNexus.secondary,
-    accent_color: draft.accent_color ?? loadedBrand?.accent_color ?? brandThemes.neonNexus.accent,
-    headline: draft.headline ?? loadedBrand?.headline ?? brandThemes.neonNexus.headline,
-    subheadline: draft.subheadline ?? loadedBrand?.subheadline ?? brandThemes.neonNexus.subheadline,
-    invite_prefix: draft.invite_prefix ?? loadedBrand?.invite_prefix ?? slug,
-    enabled_auth_providers: Array.isArray(draft.enabled_auth_providers)
-      ? (draft.enabled_auth_providers as string[])
-      : loadedBrand?.enabled_auth_providers ?? ["magic_link"],
-    default_access_state: (draft.default_access_state ?? loadedBrand?.default_access_state ?? "provisional") as DefaultAccessState,
-    communityOrgId: loadedBrand?.communityOrgId ?? null,
-    communityId: loadedBrand?.communityId ?? "",
-    fallbackUsed: loadedBrand?.fallbackUsed ?? false
-  }), [draft, loadedBrand, slug]);
+  const previewBrand = useMemo<CommunityBrandPayload>(
+    () => ({
+      slug,
+      name: draft.name ?? loadedBrand?.name ?? 'Neon Nexus',
+      logo_url: cleanCommunityAssetUrl(draft.logo_url ?? loadedBrand?.logo_url),
+      mascot_url: cleanCommunityAssetUrl(draft.mascot_url ?? loadedBrand?.mascot_url),
+      background_url: cleanCommunityAssetUrl(draft.background_url ?? loadedBrand?.background_url),
+      primary_color:
+        draft.primary_color ?? loadedBrand?.primary_color ?? brandThemes.neonNexus.primary,
+      secondary_color:
+        draft.secondary_color ?? loadedBrand?.secondary_color ?? brandThemes.neonNexus.secondary,
+      accent_color: draft.accent_color ?? loadedBrand?.accent_color ?? brandThemes.neonNexus.accent,
+      headline: draft.headline ?? loadedBrand?.headline ?? brandThemes.neonNexus.headline,
+      subheadline:
+        draft.subheadline ?? loadedBrand?.subheadline ?? brandThemes.neonNexus.subheadline,
+      invite_prefix: draft.invite_prefix ?? loadedBrand?.invite_prefix ?? slug,
+      enabled_auth_providers: Array.isArray(draft.enabled_auth_providers)
+        ? (draft.enabled_auth_providers as string[])
+        : (loadedBrand?.enabled_auth_providers ?? ['google']),
+      default_access_state: (draft.default_access_state ??
+        loadedBrand?.default_access_state ??
+        'provisional') as DefaultAccessState,
+      communityOrgId: loadedBrand?.communityOrgId ?? null,
+      communityId: loadedBrand?.communityId ?? '',
+      fallbackUsed: loadedBrand?.fallbackUsed ?? false,
+    }),
+    [draft, loadedBrand, slug]
+  );
 
-  const previewTheme = useMemo(() => mergeNeonBrandTheme(brandThemes.neonNexus, previewBrand), [previewBrand]);
+  const previewTheme = useMemo(
+    () => mergeNeonBrandTheme(brandThemes.neonNexus, previewBrand),
+    [previewBrand]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -2817,32 +3782,35 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
     if (!normalized) return undefined;
     setBusy(true);
     setLoadError(null);
-    void getCommunityAuthBrandForAdmin(normalized).then((result) => {
-      if (cancelled) return;
-      setLoadedBrand(result.brand);
-      setAuthorizationReason(result.authorization.reason);
-      setDraft({
-        name: result.brand.name,
-        logo_url: cleanCommunityAssetUrl(result.brand.logo_url),
-        mascot_url: cleanCommunityAssetUrl(result.brand.mascot_url),
-        background_url: cleanCommunityAssetUrl(result.brand.background_url),
-        primary_color: result.brand.primary_color,
-        secondary_color: result.brand.secondary_color,
-        accent_color: result.brand.accent_color,
-        headline: result.brand.headline,
-        subheadline: result.brand.subheadline,
-        invite_prefix: result.brand.invite_prefix,
-        enabled_auth_providers: result.brand.enabled_auth_providers,
-        default_access_state: result.brand.default_access_state
+    void getCommunityAuthBrandForAdmin(normalized)
+      .then((result) => {
+        if (cancelled) return;
+        setLoadedBrand(result.brand);
+        setAuthorizationReason(result.authorization.reason);
+        setDraft({
+          name: result.brand.name,
+          logo_url: cleanCommunityAssetUrl(result.brand.logo_url),
+          mascot_url: cleanCommunityAssetUrl(result.brand.mascot_url),
+          background_url: cleanCommunityAssetUrl(result.brand.background_url),
+          primary_color: result.brand.primary_color,
+          secondary_color: result.brand.secondary_color,
+          accent_color: result.brand.accent_color,
+          headline: result.brand.headline,
+          subheadline: result.brand.subheadline,
+          invite_prefix: result.brand.invite_prefix,
+          enabled_auth_providers: result.brand.enabled_auth_providers,
+          default_access_state: result.brand.default_access_state,
+        });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setLoadError(communityBrandAdminErrorMessage(error));
+        setLoadedBrand(null);
+        setAuthorizationReason(null);
+      })
+      .finally(() => {
+        if (!cancelled) setBusy(false);
       });
-    }).catch((error) => {
-      if (cancelled) return;
-      setLoadError(communityBrandAdminErrorMessage(error));
-      setLoadedBrand(null);
-      setAuthorizationReason(null);
-    }).finally(() => {
-      if (!cancelled) setBusy(false);
-    });
     return () => {
       cancelled = true;
     };
@@ -2851,14 +3819,14 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
   async function saveBrand() {
     const normalized = slug.trim().toLowerCase();
     if (!normalized) {
-      onNotice("Enter a valid community slug before saving.");
+      onNotice('Enter a valid community slug before saving.');
       return;
     }
     setBusy(true);
     const saved = await saveCommunityBrand(normalized, draft);
     setBusy(false);
     if (!saved) {
-      onNotice("Brand save failed. Phase 0 requires an internal admin override.");
+      onNotice('Brand save failed. Phase 0 requires an internal admin override.');
       return;
     }
     setLoadedBrand(saved.brand);
@@ -2868,30 +3836,42 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
 
   const stepIndex = brandWizardSteps.indexOf(step);
   const stepDetail = brandWizardStepDetails[step];
-  const selectedProviders = previewBrand.enabled_auth_providers.map(communityAuthProviderLabel).join(", ");
-  const publicGatePath = `/community/${slug.trim().toLowerCase() || "your-community"}`;
+  const selectedProviders = previewBrand.enabled_auth_providers
+    .map(communityAuthProviderLabel)
+    .join(', ');
+  const publicGatePath = `/community/${slug.trim().toLowerCase() || 'your-community'}`;
 
   return (
     <section className="panel wide community-brand-wizard">
-      <PanelTitle title="Community Gate Builder" subtitle="Brand and personalize your community's front door — live preview on the right, done in minutes." />
+      <PanelTitle
+        title="Community Gate Builder"
+        subtitle="Brand and personalize your community's front door — live preview on the right, done in minutes."
+      />
       <div className="community-gate-walkthrough" aria-label="Community Gate walkthrough">
         <div className="community-gate-walkthrough-head">
           <span className="walkthrough-kicker">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="none" stroke="currentColor" strokeWidth="1.7" /></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+              />
+            </svg>
             Community Gate walkthrough
           </span>
           <h3>How the gate protects and grows the community.</h3>
           <p>
-            One guarded URL: your brand on the door, your rules on the lock,
-            and every member decision recorded.
+            One guarded URL: your brand on the door, your rules on the lock, and every member
+            decision recorded.
           </p>
         </div>
         <div className="community-gate-walkthrough-grid">
           {communityGateWalkthrough.map((item, index) => (
-            <article key={item.label} style={{ "--stagger": index } as CSSProperties}>
+            <article key={item.label} style={{ '--stagger': index } as CSSProperties}>
               <span className="walkthrough-orb" aria-hidden="true">
                 <WalkthroughIcon name={item.icon} />
-                <i>{String(index + 1).padStart(2, "0")}</i>
+                <i>{String(index + 1).padStart(2, '0')}</i>
               </span>
               <b>{item.label}</b>
               <h4>{item.title}</h4>
@@ -2902,33 +3882,35 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
         <div className="community-gate-flow" aria-label="Community Gate access flow">
           <span className="flow-signal" aria-hidden="true" />
           {[
-            "Visitor opens your gate",
-            "Proves identity",
-            "Rules check",
-            "Approve, review, or block",
-            "Audit trail recorded"
+            'Visitor opens your gate',
+            'Proves identity',
+            'Rules check',
+            'Approve, review, or block',
+            'Audit trail recorded',
           ].map((item, index) => (
-            <span className="flow-node" key={item} style={{ "--stagger": index } as CSSProperties}>
+            <span className="flow-node" key={item} style={{ '--stagger': index } as CSSProperties}>
               <i>{index + 1}</i>
               {item}
             </span>
           ))}
         </div>
         <div className="community-gate-wow" aria-label="Community Gate subscription value">
-          <div style={{ "--stagger": 0 } as CSSProperties}>
+          <div style={{ '--stagger': 0 } as CSSProperties}>
             <span>Gate</span>
             <b>Branded entry</b>
             <small>Logo, colors, copy, and trusted login in one public URL.</small>
           </div>
-          <div style={{ "--stagger": 1 } as CSSProperties}>
+          <div style={{ '--stagger': 1 } as CSSProperties}>
             <span>Vault</span>
             <b>Member truth</b>
             <small>Membership, invite status, review state, and audit history stay isolated.</small>
           </div>
-          <div style={{ "--stagger": 2 } as CSSProperties}>
+          <div style={{ '--stagger': 2 } as CSSProperties}>
             <span>Subscribe</span>
             <b>Paid community ready</b>
-            <small>Unlock private gates, review workflows, safer onboarding, and upgrade paths.</small>
+            <small>
+              Unlock private gates, review workflows, safer onboarding, and upgrade paths.
+            </small>
           </div>
         </div>
       </div>
@@ -2941,11 +3923,11 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
             </div>
             <div>
               <span>Entry mode</span>
-              <b>{previewBrand.default_access_state.replace("_", " ")}</b>
+              <b>{previewBrand.default_access_state.replace('_', ' ')}</b>
             </div>
             <div>
               <span>Login methods</span>
-              <b>{selectedProviders || "Magic link"}</b>
+              <b>{selectedProviders || 'Magic link'}</b>
             </div>
           </div>
 
@@ -2954,7 +3936,7 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
               <li key={label}>
                 <button
                   type="button"
-                  className={step === label ? "active" : index < stepIndex ? "done" : ""}
+                  className={step === label ? 'active' : index < stepIndex ? 'done' : ''}
                   onClick={() => setStep(label)}
                 >
                   <span>{index + 1}</span>
@@ -2967,40 +3949,76 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
           {loadError ? <p className="muted brand-wizard-error">{loadError}</p> : null}
           {authorizationReason ? (
             <p className="brand-wizard-authorized">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+                <path
+                  d="M9 12l2 2 4-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
               You can edit this gate
             </p>
           ) : null}
 
           <div className="brand-wizard-step-header">
-            <span>Step {stepIndex + 1} of {brandWizardSteps.length}</span>
+            <span>
+              Step {stepIndex + 1} of {brandWizardSteps.length}
+            </span>
             <h3>{stepDetail.title}</h3>
             <p>{stepDetail.body}</p>
             <small>{stepDetail.outcome}</small>
           </div>
 
-          {step === "Address" && (
+          {step === 'Address' && (
             <label className="brand-wizard-field">
               <span>Short URL name</span>
-              <input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="neon-nexus" />
-              <small>Use lowercase letters, numbers, and dashes. This creates {publicGatePath}.</small>
+              <input
+                value={slug}
+                onChange={(event) => setSlug(event.target.value)}
+                placeholder="neon-nexus"
+              />
+              <small>
+                Use lowercase letters, numbers, and dashes. This creates {publicGatePath}.
+              </small>
             </label>
           )}
 
-          {step === "Name" && (
+          {step === 'Name' && (
             <label className="brand-wizard-field">
               <span>Community name</span>
-              <input value={draft.name ?? ""} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Neon Nexus" />
-              <small>This is the name visitors see on the gate and admins see in the brand workspace.</small>
+              <input
+                value={draft.name ?? ''}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, name: event.target.value }))
+                }
+                placeholder="Neon Nexus"
+              />
+              <small>
+                This is the name visitors see on the gate and admins see in the brand workspace.
+              </small>
             </label>
           )}
 
-          {step === "Images" && (
+          {step === 'Images' && (
             <div className="brand-wizard-image-builder">
               <div className="brand-monogram-card">
                 <img
                   className="brand-monogram-preview"
-                  src={monogramLogoDataUri(previewBrand.name, previewBrand.primary_color, previewBrand.accent_color, previewBrand.secondary_color)}
+                  src={monogramLogoDataUri(
+                    previewBrand.name,
+                    previewBrand.primary_color,
+                    previewBrand.accent_color,
+                    previewBrand.secondary_color
+                  )}
                   alt={`Generated monogram for ${previewBrand.name}`}
                 />
                 <div>
@@ -3016,7 +4034,12 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
                   onClick={() =>
                     setDraft((current) => ({
                       ...current,
-                      logo_url: monogramLogoDataUri(previewBrand.name, previewBrand.primary_color, previewBrand.accent_color, previewBrand.secondary_color)
+                      logo_url: monogramLogoDataUri(
+                        previewBrand.name,
+                        previewBrand.primary_color,
+                        previewBrand.accent_color,
+                        previewBrand.secondary_color
+                      ),
                     }))
                   }
                 >
@@ -3027,14 +4050,21 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
                 <span className="brand-asset-help-icon">＋</span>
                 <div>
                   <b>Or add your own art</b>
-                  <small>Upload the file to /public, Cloudflare R2, Supabase Storage, or any public HTTPS CDN. Then paste that final URL below. Local files cannot be served to visitors until they are hosted.</small>
+                  <small>
+                    Upload the file to /public, Cloudflare R2, Supabase Storage, or any public HTTPS
+                    CDN. Then paste that final URL below. Local files cannot be served to visitors
+                    until they are hosted.
+                  </small>
                 </div>
               </div>
               <div className="brand-asset-grid">
                 {brandImageFields.map((field) => {
-                  const value = String(draft[field.key] ?? "");
+                  const value = String(draft[field.key] ?? '');
                   return (
-                    <label className={value ? "brand-asset-card filled" : "brand-asset-card"} key={field.key}>
+                    <label
+                      className={value ? 'brand-asset-card filled' : 'brand-asset-card'}
+                      key={field.key}
+                    >
                       <span className="brand-asset-icon">{field.icon}</span>
                       <span className="brand-asset-copy">
                         <b>{field.title}</b>
@@ -3042,7 +4072,12 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
                       </span>
                       <input
                         value={value}
-                        onChange={(event) => setDraft((current) => ({ ...current, [field.key]: event.target.value || null }))}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            [field.key]: event.target.value || null,
+                          }))
+                        }
                         placeholder={field.placeholder}
                       />
                     </label>
@@ -3052,15 +4087,55 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
               <div className="brand-wizard-suggestions brand-asset-actions">
                 <span>Quick art actions</span>
                 <div>
-                  <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: "/fenrir-cut-wordmark.svg", mascot_url: null, background_url: null }))}>Use clean Fenrir mark</button>
-                  <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: "/fenrir-splash-icon.svg", mascot_url: null, background_url: "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop" }))}>Abstract background</button>
-                  <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: null, mascot_url: null, background_url: null }))}>Clear all images</button>
+                  <button
+                    type="button"
+                    className="compact-button ghost"
+                    onClick={() =>
+                      setDraft((c) => ({
+                        ...c,
+                        logo_url: '/fenrir-cut-wordmark.svg',
+                        mascot_url: null,
+                        background_url: null,
+                      }))
+                    }
+                  >
+                    Use clean Fenrir mark
+                  </button>
+                  <button
+                    type="button"
+                    className="compact-button ghost"
+                    onClick={() =>
+                      setDraft((c) => ({
+                        ...c,
+                        logo_url: '/fenrir-splash-icon.svg',
+                        mascot_url: null,
+                        background_url:
+                          'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop',
+                      }))
+                    }
+                  >
+                    Abstract background
+                  </button>
+                  <button
+                    type="button"
+                    className="compact-button ghost"
+                    onClick={() =>
+                      setDraft((c) => ({
+                        ...c,
+                        logo_url: null,
+                        mascot_url: null,
+                        background_url: null,
+                      }))
+                    }
+                  >
+                    Clear all images
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
-          {step === "Colors" && (
+          {step === 'Colors' && (
             <div className="brand-wizard-color-grid">
               <div className="brand-style-preset-grid">
                 {brandStylePresets.map((preset) => (
@@ -3068,7 +4143,14 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
                     type="button"
                     className="brand-style-preset"
                     key={preset.name}
-                    onClick={() => setDraft(c => ({ ...c, primary_color: preset.primary, secondary_color: preset.secondary, accent_color: preset.accent }))}
+                    onClick={() =>
+                      setDraft((c) => ({
+                        ...c,
+                        primary_color: preset.primary,
+                        secondary_color: preset.secondary,
+                        accent_color: preset.accent,
+                      }))
+                    }
                   >
                     <span className="brand-style-swatches" aria-hidden="true">
                       <i style={{ background: preset.primary }} />
@@ -3080,13 +4162,15 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
                   </button>
                 ))}
               </div>
-              {(["primary_color", "secondary_color", "accent_color"] as const).map((key) => (
+              {(['primary_color', 'secondary_color', 'accent_color'] as const).map((key) => (
                 <label className="brand-wizard-color" key={key}>
-                  <span>{key.replace("_color", "")}</span>
+                  <span>{key.replace('_color', '')}</span>
                   <input
                     type="color"
                     value={String(draft[key] ?? previewBrand[key])}
-                    onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, [key]: event.target.value }))
+                    }
                   />
                   <code>{String(draft[key] ?? previewBrand[key])}</code>
                 </label>
@@ -3094,81 +4178,123 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
             </div>
           )}
 
-          {step === "Words" && (
+          {step === 'Words' && (
             <div className="brand-wizard-grid">
               <label className="brand-wizard-field">
                 <span>Main welcome line</span>
-                <input value={draft.headline ?? ""} onChange={(event) => setDraft((current) => ({ ...current, headline: event.target.value }))} placeholder="Enter Neon Nexus" />
+                <input
+                  value={draft.headline ?? ''}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, headline: event.target.value }))
+                  }
+                  placeholder="Enter Neon Nexus"
+                />
                 <small>Keep it short. This is the first thing visitors read.</small>
               </label>
               <label className="brand-wizard-field">
                 <span>What happens here</span>
-                <textarea value={draft.subheadline ?? ""} onChange={(event) => setDraft((current) => ({ ...current, subheadline: event.target.value }))} rows={3} placeholder="Verify your identity and request access to the community." />
+                <textarea
+                  value={draft.subheadline ?? ''}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, subheadline: event.target.value }))
+                  }
+                  rows={3}
+                  placeholder="Verify your identity and request access to the community."
+                />
                 <small>Explain the next step without mentioning internal systems.</small>
               </label>
               <label className="brand-wizard-field">
                 <span>Invite code prefix</span>
-                <input value={draft.invite_prefix ?? ""} onChange={(event) => setDraft((current) => ({ ...current, invite_prefix: event.target.value }))} placeholder={slug} />
+                <input
+                  value={draft.invite_prefix ?? ''}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, invite_prefix: event.target.value }))
+                  }
+                  placeholder={slug}
+                />
                 <small>Useful when generating codes like {slug.toUpperCase()}-FOUNDERS-001.</small>
               </label>
               <div className="brand-wizard-note">
                 <b>Optional promo layer</b>
-                <span>Remotion can render a teaser later, but this gate should work without video.</span>
+                <span>
+                  Remotion can render a teaser later, but this gate should work without video.
+                </span>
               </div>
             </div>
           )}
 
-          {step === "Access" && (
+          {step === 'Access' && (
             <div className="brand-wizard-grid">
               <label className="brand-wizard-field">
                 <span>Default access state</span>
                 <select
                   value={draft.default_access_state ?? previewBrand.default_access_state}
-                  onChange={(event) => setDraft((current) => ({ ...current, default_access_state: event.target.value as DefaultAccessState }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      default_access_state: event.target.value as DefaultAccessState,
+                    }))
+                  }
                 >
                   <option value="provisional">Provisional (Manual Review)</option>
                   <option value="open">Open (Instant Access)</option>
                   <option value="invite_only">Invite only (Private)</option>
                   <option value="disabled">Disabled (Gate Closed)</option>
                 </select>
-                <small>{accessStateHelp[(draft.default_access_state ?? previewBrand.default_access_state) as DefaultAccessState]}</small>
+                <small>
+                  {
+                    accessStateHelp[
+                      (draft.default_access_state ??
+                        previewBrand.default_access_state) as DefaultAccessState
+                    ]
+                  }
+                </small>
               </label>
               <div className="brand-wizard-field">
-                <span>Login methods</span>
+                <span>Login methods (SSO only)</span>
                 <div className="brand-wizard-provider-grid">
-                  {["magic_link", "google", "apple", "microsoft"].map((provider) => {
-                    const providers = Array.isArray(draft.enabled_auth_providers) ? draft.enabled_auth_providers : (previewBrand.enabled_auth_providers || []);
+                  {['google', 'apple', 'microsoft'].map((provider) => {
+                    const providers = Array.isArray(draft.enabled_auth_providers)
+                      ? draft.enabled_auth_providers
+                      : previewBrand.enabled_auth_providers || [];
                     const checked = providers.includes(provider);
-                    const live = provider === "magic_link";
+                    const live = provider === 'google';
                     return (
-                      <label className={live ? "live" : "planned"} key={provider}>
+                      <label className={live ? 'live' : 'planned'} key={provider}>
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={!live}
                           onChange={(e) => {
                             const next = e.target.checked
-                              ? [...providers, provider]
-                              : providers.filter((p: string) => p !== provider);
+                              ? [...providers.filter((p: string) => p !== 'magic_link'), provider]
+                              : providers.filter((p: string) => p !== provider && p !== 'magic_link');
                             setDraft((current) => ({
                               ...current,
-                              enabled_auth_providers: next.length > 0 ? next : ["magic_link"]
+                              enabled_auth_providers: next.length > 0 ? next : ['google'],
                             }));
                           }}
                         />
                         <span>{communityAuthProviderLabel(provider)}</span>
-                        <small>{live ? "Live now" : "Requires OAuth bridge"}</small>
+                        <small>{live ? 'Live now' : 'Needs APPLE_*/MICROSOFT_* env'}</small>
                       </label>
                     );
                   })}
                 </div>
-                <small>Magic link is the live Community Gate method today. OAuth providers stay visible as planned options until their session bridge is wired.</small>
+                <small>
+                  Community Gate is SSO-only (Google / Apple / Microsoft). Email magic-link is
+                  disabled.
+                </small>
               </div>
             </div>
           )}
 
           <div className="brand-wizard-actions">
-            <button type="button" className="secondary" disabled={stepIndex === 0} onClick={() => setStep(brandWizardSteps[Math.max(0, stepIndex - 1)]!)}>
+            <button
+              type="button"
+              className="secondary"
+              disabled={stepIndex === 0}
+              onClick={() => setStep(brandWizardSteps[Math.max(0, stepIndex - 1)]!)}
+            >
               Back
             </button>
             {stepIndex < brandWizardSteps.length - 1 ? (
@@ -3177,7 +4303,7 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
               </button>
             ) : (
               <button type="button" disabled={busy} onClick={() => void saveBrand()}>
-                {busy ? "Saving..." : "Save Community Gate"}
+                {busy ? 'Saving...' : 'Save Community Gate'}
               </button>
             )}
           </div>
@@ -3213,8 +4339,8 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
                 <span style={{ background: previewBrand.accent_color }} />
               </div>
               <div className="brand-wizard-preview-meta">
-                <span>{previewBrand.default_access_state.replace("_", " ")}</span>
-                <span>{selectedProviders || "Magic link"}</span>
+                <span>{previewBrand.default_access_state.replace('_', ' ')}</span>
+                <span>{selectedProviders || 'Magic link'}</span>
               </div>
             </GlowCard>
           </AuthSurface>
@@ -3224,89 +4350,108 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
   );
 }
 
-function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
+function CommunityNeonGateRoute({
+  slug,
+  locale,
+  onLocale,
+  c,
+  ui,
+}: {
   slug: string;
   locale: Locale;
   onLocale: (locale: Locale) => void;
   c: Copy;
-  ui: typeof uiCopy[Locale];
+  ui: (typeof uiCopy)[Locale];
 }) {
-  type GateMessageTone = "info" | "success" | "error";
   const [brand, setBrand] = useState<CommunityBrandPayload | null>(null);
   const theme = useMemo(() => mergeNeonBrandTheme(brandThemes.neonNexus, brand), [brand]);
   const [proposal, setProposal] = useState<CommunityAuthProposal | null>(null);
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [messageTone, setMessageTone] = useState<GateMessageTone>("info");
-  const [devLink, setDevLink] = useState<string | null>(null);
-  const trimmedEmail = email.trim();
   const communityName = brand?.name || theme.productName;
+  // SSO-only standard (Apple / Microsoft / Google). The brand's enabled_auth_providers
+  // is already sanitized to SSO providers server-side; fall back to Google, whose
+  // credentials are always configured in prod.
+  const gateSsoLabels: Record<AuthProvider, string> = {
+    google: 'Continue with Google',
+    microsoft: 'Continue with Microsoft',
+    apple: 'Continue with Apple',
+  };
+  const gateProviders = ((): AuthProvider[] => {
+    const enabled = (brand?.enabled_auth_providers ?? []).filter(
+      (p): p is AuthProvider => p === 'google' || p === 'apple' || p === 'microsoft'
+    );
+    return enabled.length ? enabled : ['google'];
+  })();
+  function startCommunitySso(provider: AuthProvider) {
+    const returnTo = `/community/${slug}`;
+    window.location.href = `/api/community-auth/oauth/${provider}?slug=${encodeURIComponent(
+      slug
+    )}&return_to=${encodeURIComponent(returnTo)}`;
+  }
   const gateText = {
     en: {
-      kicker: "Private community",
+      kicker: 'Private community',
       body: "This is the guarded entrance. Prove it's really you, and the community's own rules decide the door.",
-      stepIdentity: "Verify",
-      stepIdentityBody: "Confirm your email with one tap.",
-      stepInvite: "Rules",
-      stepInviteBody: "Invites and membership rules pick your door.",
-      stepSession: "Enter",
-      stepSessionBody: "Your access opens, private to this community.",
-      emailLabel: "Your email",
-      emailHint: "Use the email tied to your invite or membership request.",
-      trustA: "Private by design",
-      trustB: "Invite-aware",
-      trustC: "Every approval is audited",
-      guarded: "Guarded by Fenrir"
+      stepIdentity: 'Verify',
+      stepIdentityBody: 'Sign in with Google, Apple, or Microsoft.',
+      stepInvite: 'Rules',
+      stepInviteBody: 'Invites and membership rules pick your door.',
+      stepSession: 'Enter',
+      stepSessionBody: 'Your access opens, private to this community.',
+      emailLabel: 'Your email',
+      emailHint: 'Use the SSO account tied to your invite or membership request.',
+      trustA: 'Private by design',
+      trustB: 'Invite-aware',
+      trustC: 'Every approval is audited',
+      guarded: 'Guarded by Fenrir',
     },
     es: {
-      kicker: "Comunidad privada",
-      body: "Esta es la entrada custodiada. Demuestra que eres tú, y las reglas de la comunidad deciden la puerta.",
-      stepIdentity: "Verifica",
-      stepIdentityBody: "Confirma tu correo con un toque.",
-      stepInvite: "Reglas",
-      stepInviteBody: "Invites y reglas de membresía eligen tu puerta.",
-      stepSession: "Entra",
-      stepSessionBody: "Tu acceso se abre, privado para esta comunidad.",
-      emailLabel: "Tu correo",
-      emailHint: "Usa el correo ligado a tu invite o solicitud.",
-      trustA: "Privado por diseño",
-      trustB: "Reconoce invitaciones",
-      trustC: "Cada aprobación queda auditada",
-      guarded: "Custodiado por Fenrir"
+      kicker: 'Comunidad privada',
+      body: 'Esta es la entrada custodiada. Demuestra que eres tú, y las reglas de la comunidad deciden la puerta.',
+      stepIdentity: 'Verifica',
+      stepIdentityBody: 'Entra con Google, Apple o Microsoft.',
+      stepInvite: 'Reglas',
+      stepInviteBody: 'Invites y reglas de membresía eligen tu puerta.',
+      stepSession: 'Entra',
+      stepSessionBody: 'Tu acceso se abre, privado para esta comunidad.',
+      emailLabel: 'Tu correo',
+      emailHint: 'Usa la cuenta SSO ligada a tu invite o solicitud.',
+      trustA: 'Privado por diseño',
+      trustB: 'Reconoce invitaciones',
+      trustC: 'Cada aprobación queda auditada',
+      guarded: 'Custodiado por Fenrir',
     },
     fr: {
-      kicker: "Communauté privée",
+      kicker: 'Communauté privée',
       body: "Voici l'entrée gardée. Prouvez que c'est bien vous, et les règles de la communauté décident de la porte.",
-      stepIdentity: "Vérifiez",
-      stepIdentityBody: "Confirmez votre e-mail d'un geste.",
-      stepInvite: "Règles",
+      stepIdentity: 'Vérifiez',
+      stepIdentityBody: 'Connectez-vous avec Google, Apple ou Microsoft.',
+      stepInvite: 'Règles',
       stepInviteBody: "Invitations et règles d'adhésion choisissent votre porte.",
-      stepSession: "Entrez",
+      stepSession: 'Entrez',
       stepSessionBody: "Votre accès s'ouvre, privé à cette communauté.",
-      emailLabel: "Votre e-mail",
-      emailHint: "Utilisez l'email lié à votre invitation ou demande.",
-      trustA: "Privé par conception",
-      trustB: "Invitations reconnues",
-      trustC: "Chaque approbation est auditée",
-      guarded: "Gardé par Fenrir"
+      emailLabel: 'Votre e-mail',
+      emailHint: "Utilisez le compte SSO lié à votre invitation ou demande.",
+      trustA: 'Privé par conception',
+      trustB: 'Invitations reconnues',
+      trustC: 'Chaque approbation est auditée',
+      guarded: 'Gardé par Fenrir',
     },
     de: {
-      kicker: "Private Community",
-      body: "Das ist der bewachte Eingang. Zeig, dass du es bist — die Regeln der Community entscheiden über die Tür.",
-      stepIdentity: "Bestätigen",
-      stepIdentityBody: "Bestätige deine E-Mail mit einem Tipp.",
-      stepInvite: "Regeln",
-      stepInviteBody: "Einladungen und Mitgliedsregeln wählen deine Tür.",
-      stepSession: "Eintreten",
-      stepSessionBody: "Dein Zugang öffnet sich, privat für diese Community.",
-      emailLabel: "Deine E-Mail",
-      emailHint: "Nutze die E-Mail deiner Einladung oder Anfrage.",
-      trustA: "Privat by Design",
-      trustB: "Einladungen zählen",
-      trustC: "Jede Freigabe wird auditiert",
-      guarded: "Bewacht von Fenrir"
-    }
+      kicker: 'Private Community',
+      body: 'Das ist der bewachte Eingang. Zeig, dass du es bist — die Regeln der Community entscheiden über die Tür.',
+      stepIdentity: 'Bestätigen',
+      stepIdentityBody: 'Bestätige deine E-Mail mit einem Tipp.',
+      stepInvite: 'Regeln',
+      stepInviteBody: 'Einladungen und Mitgliedsregeln wählen deine Tür.',
+      stepSession: 'Eintreten',
+      stepSessionBody: 'Dein Zugang öffnet sich, privat für diese Community.',
+      emailLabel: 'Deine E-Mail',
+      emailHint: 'Nutze die E-Mail deiner Einladung oder Anfrage.',
+      trustA: 'Privat by Design',
+      trustB: 'Einladungen zählen',
+      trustC: 'Jede Freigabe wird auditiert',
+      guarded: 'Bewacht von Fenrir',
+    },
   }[locale];
 
   useEffect(() => {
@@ -3322,32 +4467,6 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
     };
   }, [slug]);
 
-  async function requestLink(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    setMessage(null);
-    setMessageTone("info");
-    setDevLink(null);
-    try {
-      const response = await fetch("/api/community-auth/magic-link/request", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmedEmail, slug })
-      });
-      const body = await response.json().catch(() => null) as { message?: string; devLink?: string; error?: string; detail?: string | { message?: string } } | null;
-      if (!response.ok) throw new Error(readableCommunityError(body?.detail, body?.error));
-      setMessage(body?.message || ui.neonMagicSuccessMessage);
-      setMessageTone("success");
-      setDevLink(body?.devLink || null);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : ui.neonMagicBusy);
-      setMessageTone("error");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <AuthSurface
       theme={theme}
@@ -3357,90 +4476,127 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
       logoUrl={brand?.logo_url}
       backgroundUrl={cleanCommunityAssetUrl(brand?.background_url)}
     >
-        <GlowCard className="auth-card community-gate-card" aria-label="Fenrir Community Gate auth">
-          <span className="gate-aura" aria-hidden="true" />
-          <div className="auth-card-header">
-            <span className="status good">Community Gate</span>
-            <span className="auth-card-kicker">/{slug}</span>
-          </div>
-          <div className="community-gate-intro">
-            <p className="label">{gateText.kicker}</p>
-            <h2 className="auth-enter-title" data-text={communityName}>
-              <span>{communityName}</span>
-            </h2>
-            <p>{gateText.body}</p>
-          </div>
-          <CommunityAuthProposalPanel proposal={proposal} locale={locale} />
-          {vercelPreviewWithoutApi ? (
-            <div className="auth-disclosure community-preview-warning" role="status">
-              <div>
-                <b>Preview mode</b>
-                <small>API actions are disabled on this Vercel preview so it cannot write to production Community Gate data.</small>
-              </div>
-              <span className="status amber">Safe preview</span>
+      <GlowCard className="auth-card community-gate-card" aria-label="Fenrir Community Gate auth">
+        <span className="gate-aura" aria-hidden="true" />
+        <div className="auth-card-header">
+          <span className="status good">Community Gate</span>
+          <span className="auth-card-kicker">/{slug}</span>
+        </div>
+        <div className="community-gate-intro">
+          <p className="label">{gateText.kicker}</p>
+          <h2 className="auth-enter-title" data-text={communityName}>
+            <span>{communityName}</span>
+          </h2>
+          <p>{gateText.body}</p>
+        </div>
+        <CommunityAuthProposalPanel proposal={proposal} locale={locale} />
+        {vercelPreviewWithoutApi ? (
+          <div className="auth-disclosure community-preview-warning" role="status">
+            <div>
+              <b>Preview mode</b>
+              <small>
+                API actions are disabled on this Vercel preview so it cannot write to production
+                Community Gate data.
+              </small>
             </div>
-          ) : null}
-          <div className="community-gate-steps" aria-label="Community access steps">
-            <section>
-              <b>01</b>
-              <span>{gateText.stepIdentity}</span>
-              <small>{gateText.stepIdentityBody}</small>
-            </section>
-            <section>
-              <b>02</b>
-              <span>{gateText.stepInvite}</span>
-              <small>{gateText.stepInviteBody}</small>
-            </section>
-            <section>
-              <b>03</b>
-              <span>{gateText.stepSession}</span>
-              <small>{gateText.stepSessionBody}</small>
-            </section>
+            <span className="status amber">Safe preview</span>
           </div>
-          <form className="community-auth-form" onSubmit={requestLink}>
-            <label>
-              <span>{gateText.emailLabel}</span>
-              <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required placeholder={ui.communityEmailPlaceholder} autoComplete="email" />
-              <small>{gateText.emailHint}</small>
-            </label>
-            <button className="apple-auth-button community-submit-button" type="submit" disabled={busy || !trimmedEmail}>
-              {busy ? ui.neonMagicBusy : ui.neonMagicButton}
-            </button>
-          </form>
-          {message ? <small className={`community-auth-message ${messageTone}`} role="status">{message}</small> : null}
-          {devLink ? <a className="button-link ghost community-dev-link" href={devLink}>{ui.neonMagicDevLinkLabel}</a> : null}
-          <div className="community-trust-strip" aria-label="Community gate assurances">
-            <span>{gateText.trustA}</span>
-            <span>{gateText.trustB}</span>
-            <span>{gateText.trustC}</span>
-          </div>
-          <div className="community-guarded-chip" aria-label={gateText.guarded}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="M8.5 10.2l2.6 4.6 1.4-2.4 1.5 1.1 1.5-3.3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            <span>{gateText.guarded}</span>
-          </div>
-        </GlowCard>
+        ) : null}
+        <div className="community-gate-steps" aria-label="Community access steps">
+          <section>
+            <b>01</b>
+            <span>{gateText.stepIdentity}</span>
+            <small>{gateText.stepIdentityBody}</small>
+          </section>
+          <section>
+            <b>02</b>
+            <span>{gateText.stepInvite}</span>
+            <small>{gateText.stepInviteBody}</small>
+          </section>
+          <section>
+            <b>03</b>
+            <span>{gateText.stepSession}</span>
+            <small>{gateText.stepSessionBody}</small>
+          </section>
+        </div>
+        <div className="auth-actions community-auth-actions">
+          {gateProviders.map((provider) => (
+            <AuthProviderButton
+              key={provider}
+              provider={provider}
+              label={gateSsoLabels[provider]}
+              onClick={() => startCommunitySso(provider)}
+            />
+          ))}
+        </div>
+        <div className="community-trust-strip" aria-label="Community gate assurances">
+          <span>{gateText.trustA}</span>
+          <span>{gateText.trustB}</span>
+          <span>{gateText.trustC}</span>
+        </div>
+        <div className="community-guarded-chip" aria-label={gateText.guarded}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+            />
+            <path
+              d="M8.5 10.2l2.6 4.6 1.4-2.4 1.5 1.1 1.5-3.3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span>{gateText.guarded}</span>
+        </div>
+      </GlowCard>
     </AuthSurface>
   );
 }
 
 function readableCommunityError(detail: unknown, fallback?: string) {
-  if (detail && typeof detail === "object" && "message" in detail && typeof detail.message === "string") return detail.message;
-  if (typeof detail === "string") return detail;
-  return fallback || "Community Gate is not ready yet.";
+  if (
+    detail &&
+    typeof detail === 'object' &&
+    'message' in detail &&
+    typeof detail.message === 'string'
+  )
+    return detail.message;
+  if (typeof detail === 'string') return detail;
+  return fallback || 'Community Gate is not ready yet.';
 }
 
 function communityBrandAdminErrorMessage(error: unknown) {
   if (!(error instanceof CommunityBrandRequestError)) {
-    return "Network/API failure. The brand workspace could not be loaded.";
+    return 'Network/API failure. The brand workspace could not be loaded.';
   }
-  if (error.status === 401 || error.error === "authentication_required") return "Not signed in. Sign in to the Fenrir admin before customizing this Community Gate.";
-  if (error.status === 403 || error.error === "forbidden") return "Forbidden. Your account is not an owner or allowlisted admin for this Community Gate.";
-  if (error.status === 503 || error.error === "community_auth_not_configured") return readableCommunityError(error.detail, "Missing Community Gate config. Firebase Auth handles sign-in; Neon is only the gate data plane.");
-  if (error.error === "community_gate_schema_missing") return "Missing Neon schema. Apply the Community Gate schema before customizing this gate.";
+  if (error.status === 401 || error.error === 'authentication_required')
+    return 'Not signed in. Sign in to the Fenrir admin before customizing this Community Gate.';
+  if (error.status === 403 || error.error === 'forbidden')
+    return 'Forbidden. Your account is not an owner or allowlisted admin for this Community Gate.';
+  if (error.status === 503 || error.error === 'community_auth_not_configured')
+    return readableCommunityError(
+      error.detail,
+      'Missing Community Gate config. Firebase Auth handles sign-in; Neon is only the gate data plane.'
+    );
+  if (error.error === 'community_gate_schema_missing')
+    return 'Missing Neon schema. Apply the Community Gate schema before customizing this gate.';
   return `Community Gate load failed: ${error.error || `HTTP ${error.status}`}.`;
 }
 
-function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
+function AuthGate({
+  c,
+  locale,
+  onLocale,
+}: {
+  c: Copy;
+  locale: Locale;
+  onLocale: (locale: Locale) => void;
+}) {
   const theme = brandThemes.fenrir;
   const [passkeyNote, setPasskeyNote] = useState<string | null>(() => authErrorMessage());
 
@@ -3466,136 +4622,157 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
   }
 
   return (
-    <AuthSurface theme={{ ...theme, subheadline: c.authSub }} locale={locale} onLocale={onLocale} railLabel="Fenrir ecosystem">
-        <GlowCard className="auth-card" aria-label="Fenrir sign-in">
-          <div className="auth-card-header">
-            <span className="status good">{c.realAuth}</span>
-            <span className="auth-card-kicker">{theme.authKicker}</span>
-          </div>
-          <h2 className="auth-enter-title" data-text={c.authTitle}>
-            <span>{c.authTitle}</span>
-          </h2>
-          <div className="auth-actions">
-            {/* Only offer providers that complete end-to-end. Google jumps straight
-                to accounts.google.com (WorkOS connection jump — no AuthKit box).
-                Apple: WorkOS connection disabled (404) → dead-ends on the AuthKit box.
-                Microsoft: the Azure app behind the WorkOS connection is missing
-                WorkOS's redirect URI (invalid_request at login.microsoftonline.com)
-                → broken through the box too. Restore each button when its
-                connection is fixed in the WorkOS dashboard / Azure portal. */}
-            <AuthProviderButton provider="google" label={c.continueGoogle} onClick={() => void signInWithProvider("google")} />
-          </div>
-          <div className="auth-passkey-row">
-            <button type="button" className="secondary" onClick={() => void signInWithPasskey()}>
-              {c.passkeySignIn}
-            </button>
-            {passkeyNote ? <small className="muted">{passkeyNote}</small> : null}
-          </div>
-          <div className="auth-2fa-recommend">
-            <p className="label">{c.twoFactorRecommendTitle}</p>
-            <p className="muted">{c.twoFactorRecommendBody}</p>
-            <nav className="two-factor-links" aria-label="2FA provider help">
-              <a href={twoFactorHelpLinks.google} target="_blank" rel="noreferrer noopener">
-                {c.twoFactorGoogleLinkLabel}
-              </a>
-              <a href={twoFactorHelpLinks.microsoft} target="_blank" rel="noreferrer noopener">
-                {c.twoFactorMicrosoftLinkLabel}
-              </a>
-              <a href={twoFactorHelpLinks.apple} target="_blank" rel="noreferrer noopener">
-                {c.twoFactorAppleLinkLabel}
-              </a>
+    <AuthSurface
+      theme={{ ...theme, subheadline: c.authSub }}
+      locale={locale}
+      onLocale={onLocale}
+      railLabel="Fenrir ecosystem"
+    >
+      <GlowCard className="auth-card" aria-label="Fenrir sign-in">
+        <div className="auth-card-header">
+          <span className="status good">{c.realAuth}</span>
+          <span className="auth-card-kicker">{theme.authKicker}</span>
+        </div>
+        <h2 className="auth-enter-title" data-text={c.authTitle}>
+          <span>{c.authTitle}</span>
+        </h2>
+        <div className="auth-actions">
+          <AuthProviderButton
+            provider="google"
+            label={c.continueGoogle}
+            onClick={() => void signInWithProvider('google')}
+          />
+          <AuthProviderButton
+            provider="microsoft"
+            label={c.continueMicrosoft}
+            onClick={() => void signInWithProvider('microsoft')}
+          />
+          {/* Apple: WorkOS "Sign in with Apple" connection not yet configured.
+                Owner must: WorkOS Dashboard → Auth → OAuth providers → Sign in with Apple → Enable,
+                then supply Apple Team ID / Service ID / Private Key / Key ID. */}
+          <AuthProviderButton
+            provider="apple"
+            label={c.continueApple}
+            onClick={() => void signInWithProvider("apple")}
+          />
+        </div>
+        <div className="auth-passkey-row">
+          <button type="button" className="secondary" onClick={() => void signInWithPasskey()}>
+            {c.passkeySignIn}
+          </button>
+          {passkeyNote ? <small className="muted">{passkeyNote}</small> : null}
+        </div>
+        <div className="auth-2fa-recommend">
+          <p className="label">{c.twoFactorRecommendTitle}</p>
+          <p className="muted">{c.twoFactorRecommendBody}</p>
+          <nav className="two-factor-links" aria-label="2FA provider help">
+            <a href={twoFactorHelpLinks.google} target="_blank" rel="noreferrer noopener">
+              {c.twoFactorGoogleLinkLabel}
+            </a>
+            <a href={twoFactorHelpLinks.microsoft} target="_blank" rel="noreferrer noopener">
+              {c.twoFactorMicrosoftLinkLabel}
+            </a>
+            <a href={twoFactorHelpLinks.apple} target="_blank" rel="noreferrer noopener">
+              {c.twoFactorAppleLinkLabel}
+            </a>
+          </nav>
+        </div>
+        <div className="auth-node-status" aria-label="Fenrir node status">
+          <b>FENRIR NODE STATUS</b>
+          {theme.nodeStatus.map((item) => (
+            <span key={item}>{item}</span>
+          ))}
+        </div>
+        <div className="auth-foot">
+          <div>
+            <small>{c.authEnvHint}</small>
+            <nav className="legal-links" aria-label="Legal links">
+              <a href="/legal">{c.legal}</a>
+              <a href="/terms">{c.terms}</a>
+              <a href="/privacy">{c.privacy}</a>
             </nav>
           </div>
-          <div className="auth-node-status" aria-label="Fenrir node status">
-            <b>FENRIR NODE STATUS</b>
-            {theme.nodeStatus.map((item) => (
-              <span key={item}>{item}</span>
-            ))}
-          </div>
-          <div className="auth-foot">
-            <div>
-              <small>{c.authEnvHint}</small>
-              <nav className="legal-links" aria-label="Legal links">
-                <a href="/legal">{c.legal}</a>
-                <a href="/terms">{c.terms}</a>
-                <a href="/privacy">{c.privacy}</a>
-              </nav>
-            </div>
-          </div>
-          <BrandSignature c={c} compact />
-        </GlowCard>
+        </div>
+        <BrandSignature c={c} compact />
+      </GlowCard>
     </AuthSurface>
   );
 }
 
 function authErrorMessage() {
-  const error = new URLSearchParams(window.location.search).get("auth_error");
+  const error = new URLSearchParams(window.location.search).get('auth_error');
   if (!error) return null;
-  const [errorCode, errorDetail] = error.split(":", 2);
-  const detail = errorDetail ? decodeURIComponent(errorDetail) : "";
+  const [errorCode, errorDetail] = error.split(':', 2);
+  const detail = errorDetail ? decodeURIComponent(errorDetail) : '';
 
-  if (error.startsWith("missing_env:")) {
-    return "This provider is not live yet. Use an enabled sign-in option, or refresh to return to the clean Fenrir gate.";
+  if (error.startsWith('missing_env:')) {
+    return 'This provider is not live yet. Use an enabled sign-in option, or refresh to return to the clean Fenrir gate.';
   }
-  if (error === "direct_oauth_disabled") {
-    return "That old sign-in route was retired. Use the provider buttons on this Fenrir gate.";
+  if (error === 'direct_oauth_disabled') {
+    return 'That old sign-in route was retired. Use the provider buttons on this Fenrir gate.';
   }
-  if (errorCode === "oauth_access_denied") {
-    return "The provider denied access. Try again and confirm consent to continue with this account.";
+  if (errorCode === 'oauth_access_denied') {
+    return 'The provider denied access. Try again and confirm consent to continue with this account.';
   }
-  if (errorCode === "oauth_callback_error") {
-    return `Provider error while returning from sign-in.${detail ? ` ${detail}` : ""}`;
+  if (errorCode === 'oauth_callback_error') {
+    return `Provider error while returning from sign-in.${detail ? ` ${detail}` : ''}`;
   }
-  if (errorCode === "code_exchange_failed") {
-    return `Could not exchange the OAuth callback code. ${detail ? `(${detail})` : "Please try again."}`;
+  if (errorCode === 'code_exchange_failed') {
+    return `Could not exchange the OAuth callback code. ${detail ? `(${detail})` : 'Please try again.'}`;
   }
-  if (errorCode === "session_lookup_failed") {
-    return `Could not read the Frisky login session after login. ${detail ? `(${detail})` : "Please retry from the sign-in screen."}`;
+  if (errorCode === 'session_lookup_failed') {
+    return `Could not read the Frisky login session after login. ${detail ? `(${detail})` : 'Please retry from the sign-in screen.'}`;
   }
-  if (errorCode === "supabase_session_failed") {
-    return `Could not open a Fenrir admin session.${detail ? ` (${detail})` : ""}`;
+  if (errorCode === 'supabase_session_failed') {
+    return `Could not open a Fenrir admin session.${detail ? ` (${detail})` : ''}`;
   }
-  if (errorCode === "workos_not_configured" || errorCode === "workos_login_init_failed") {
-    return "Sign-in is not fully configured yet. Please try again shortly or contact support.";
+  if (errorCode === 'workos_not_configured' || errorCode === 'workos_login_init_failed') {
+    return 'Sign-in is not fully configured yet. Please try again shortly or contact support.';
   }
-  if (errorCode === "workos_state_invalid") {
-    return "Your sign-in attempt expired or could not be verified. Please start sign-in again.";
+  if (errorCode === 'workos_state_invalid') {
+    return 'Your sign-in attempt expired or could not be verified. Please start sign-in again.';
   }
-  if (errorCode === "workos_exchange_failed" || errorCode === "workos_token_exchange_failed") {
-    return `Could not finish sign-in with the provider.${detail ? ` (${detail})` : " Please try again."}`;
+  if (errorCode === 'workos_exchange_failed' || errorCode === 'workos_token_exchange_failed') {
+    return `Could not finish sign-in with the provider.${detail ? ` (${detail})` : ' Please try again.'}`;
   }
-  if (errorCode === "missing_code") {
-    return "The provider did not return a sign-in code. Please try again.";
+  if (errorCode === 'missing_code') {
+    return 'The provider did not return a sign-in code. Please try again.';
   }
-  return "Sign-in could not finish. Try another provider or refresh the page.";
+  return 'Sign-in could not finish. Try another provider or refresh the page.';
 }
 
-function CommunityAuthProposalPanel({ proposal, locale }: { proposal: CommunityAuthProposal | null; locale: Locale }) {
+function CommunityAuthProposalPanel({
+  proposal,
+  locale,
+}: {
+  proposal: CommunityAuthProposal | null;
+  locale: Locale;
+}) {
   const text = {
     en: {
-      title: "Your privacy here",
-      body: "This community keeps its own member records, sign-in, and audit log. Nothing is shared with other accounts or communities.",
-      configured: "Gate online",
-      missing: "Gate warming up"
+      title: 'Your privacy here',
+      body: 'This community keeps its own member records, sign-in, and audit log. Nothing is shared with other accounts or communities.',
+      configured: 'Gate online',
+      missing: 'Gate warming up',
     },
     es: {
-      title: "Tu privacidad aquí",
-      body: "Esta comunidad guarda sus propios registros de miembros, acceso y auditoría. Nada se comparte con otras cuentas o comunidades.",
-      configured: "Puerta en línea",
-      missing: "Puerta preparándose"
+      title: 'Tu privacidad aquí',
+      body: 'Esta comunidad guarda sus propios registros de miembros, acceso y auditoría. Nada se comparte con otras cuentas o comunidades.',
+      configured: 'Puerta en línea',
+      missing: 'Puerta preparándose',
     },
     fr: {
-      title: "Votre confidentialité ici",
+      title: 'Votre confidentialité ici',
       body: "Cette communauté garde ses propres registres de membres, connexions et audits. Rien n'est partagé avec d'autres comptes ou communautés.",
-      configured: "Porte en ligne",
-      missing: "Porte en préparation"
+      configured: 'Porte en ligne',
+      missing: 'Porte en préparation',
     },
     de: {
-      title: "Deine Privatsphäre hier",
-      body: "Diese Community führt eigene Mitgliederdaten, Logins und Audit-Logs. Nichts wird mit anderen Konten oder Communities geteilt.",
-      configured: "Tor online",
-      missing: "Tor startet"
-    }
+      title: 'Deine Privatsphäre hier',
+      body: 'Diese Community führt eigene Mitgliederdaten, Logins und Audit-Logs. Nichts wird mit anderen Konten oder Communities geteilt.',
+      configured: 'Tor online',
+      missing: 'Tor startet',
+    },
   }[locale];
 
   return (
@@ -3604,7 +4781,7 @@ function CommunityAuthProposalPanel({ proposal, locale }: { proposal: CommunityA
         <b>{text.title}</b>
         <small>{text.body}</small>
       </div>
-      <span className={`status ${proposal?.configured ? "good" : "amber"}`}>
+      <span className={`status ${proposal?.configured ? 'good' : 'amber'}`}>
         {proposal?.configured ? text.configured : text.missing}
       </span>
     </div>
@@ -3613,7 +4790,7 @@ function CommunityAuthProposalPanel({ proposal, locale }: { proposal: CommunityA
 
 function BrandSignature({ c, compact = false }: { c: Copy; compact?: boolean }) {
   return (
-    <div className={compact ? "brand-signature compact" : "brand-signature"}>
+    <div className={compact ? 'brand-signature compact' : 'brand-signature'}>
       <span>{c.friskyForged}</span>
       <span>
         {c.friskyMagicPrefix} <strong>Fenrir Protocol</strong> {c.friskyMagicSuffix}
@@ -3623,8 +4800,16 @@ function BrandSignature({ c, compact = false }: { c: Copy; compact?: boolean }) 
   );
 }
 
-function LegalPage({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
-  const updated = "May 7, 2026";
+function LegalPage({
+  c,
+  locale,
+  onLocale,
+}: {
+  c: Copy;
+  locale: Locale;
+  onLocale: (locale: Locale) => void;
+}) {
+  const updated = 'May 7, 2026';
   return (
     <main className="legal-page">
       <section className="legal-hero">
@@ -3636,11 +4821,20 @@ function LegalPage({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale:
           <h1>{c.legalTitle}</h1>
           <p>{c.legalSub}</p>
           <BrandSignature c={c} compact />
-          <small>{c.lastUpdated}: {updated}</small>
+          <small>
+            {c.lastUpdated}: {updated}
+          </small>
         </div>
-        <select className="language-select" value={locale} onChange={(event) => onLocale(event.target.value as Locale)} aria-label="Language">
+        <select
+          className="language-select"
+          value={locale}
+          onChange={(event) => onLocale(event.target.value as Locale)}
+          aria-label="Language"
+        >
           {locales.map((item) => (
-            <option value={item} key={item}>{languageNames[item]}</option>
+            <option value={item} key={item}>
+              {languageNames[item]}
+            </option>
           ))}
         </select>
       </section>
@@ -3657,27 +4851,37 @@ function LegalPage({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale:
         <div className="legal-doc">
           <article id="terms">
             <h2>{c.terms}</h2>
-            {c.legalTermsBody.map((text) => <p key={text}>{text}</p>)}
+            {c.legalTermsBody.map((text) => (
+              <p key={text}>{text}</p>
+            ))}
           </article>
 
           <article id="privacy">
             <h2>{c.privacy}</h2>
-            {c.legalPrivacyBody.map((text) => <p key={text}>{text}</p>)}
+            {c.legalPrivacyBody.map((text) => (
+              <p key={text}>{text}</p>
+            ))}
           </article>
 
           <article id="acceptable-use">
             <h2>{c.acceptableUse}</h2>
-            {c.legalAcceptableUseBody.map((text) => <p key={text}>{text}</p>)}
+            {c.legalAcceptableUseBody.map((text) => (
+              <p key={text}>{text}</p>
+            ))}
           </article>
 
           <article id="payments">
             <h2>{c.paymentsRefunds}</h2>
-            {c.legalPaymentsBody.map((text) => <p key={text}>{text}</p>)}
+            {c.legalPaymentsBody.map((text) => (
+              <p key={text}>{text}</p>
+            ))}
           </article>
 
           <article id="contact">
             <h2>{c.legalContact}</h2>
-            {c.legalContactBody.map((text) => <p key={text}>{text}</p>)}
+            {c.legalContactBody.map((text) => (
+              <p key={text}>{text}</p>
+            ))}
             <p className="legal-note">{c.legalNote}</p>
           </article>
         </div>
@@ -3690,17 +4894,38 @@ function FenrirSilhouette({ className }: { className: string }) {
   return (
     <svg className={className} viewBox="0 0 640 520" role="img" aria-label="Fenrir silhouette">
       <defs>
-        <linearGradient id="fenrirFur" x1="120" y1="80" x2="520" y2="480" gradientUnits="userSpaceOnUse">
+        <linearGradient
+          id="fenrirFur"
+          x1="120"
+          y1="80"
+          x2="520"
+          y2="480"
+          gradientUnits="userSpaceOnUse"
+        >
           <stop stopColor="#050607" />
           <stop offset="0.48" stopColor="#16080c" />
           <stop offset="1" stopColor="#331018" />
         </linearGradient>
-        <linearGradient id="fenrirEdge" x1="118" y1="80" x2="530" y2="430" gradientUnits="userSpaceOnUse">
+        <linearGradient
+          id="fenrirEdge"
+          x1="118"
+          y1="80"
+          x2="530"
+          y2="430"
+          gradientUnits="userSpaceOnUse"
+        >
           <stop stopColor="#ff1744" stopOpacity="0.88" />
           <stop offset="0.48" stopColor="#f1b75c" stopOpacity="0.55" />
           <stop offset="1" stopColor="#22c7a8" stopOpacity="0.42" />
         </linearGradient>
-        <filter id="fenrirShadow" x="-20%" y="-20%" width="140%" height="150%" colorInterpolationFilters="sRGB">
+        <filter
+          id="fenrirShadow"
+          x="-20%"
+          y="-20%"
+          width="140%"
+          height="150%"
+          colorInterpolationFilters="sRGB"
+        >
           <feDropShadow dx="0" dy="34" stdDeviation="24" floodColor="#000000" floodOpacity="0.62" />
           <feDropShadow dx="0" dy="0" stdDeviation="12" floodColor="#ff1744" floodOpacity="0.26" />
         </filter>
@@ -3725,18 +4950,33 @@ function FenrirSilhouette({ className }: { className: string }) {
       />
       <path d="M443 235l42 8-35 15-28-2 21-21Z" fill="#ff334e" opacity="0.94" />
       <path d="M483 250c10 9 18 22 22 38-20-14-41-19-64-15l42-23Z" fill="#050607" opacity="0.9" />
-      <path d="M189 370c41 24 86 33 136 26 47-7 90-26 128-56" stroke="url(#fenrirEdge)" strokeWidth="8" strokeLinecap="round" opacity="0.48" />
-      <path d="M268 91c15 43 27 77 35 103" stroke="url(#fenrirEdge)" strokeWidth="6" strokeLinecap="round" opacity="0.46" />
+      <path
+        d="M189 370c41 24 86 33 136 26 47-7 90-26 128-56"
+        stroke="url(#fenrirEdge)"
+        strokeWidth="8"
+        strokeLinecap="round"
+        opacity="0.48"
+      />
+      <path
+        d="M268 91c15 43 27 77 35 103"
+        stroke="url(#fenrirEdge)"
+        strokeWidth="6"
+        strokeLinecap="round"
+        opacity="0.46"
+      />
     </svg>
   );
 }
 
 function ProtocolLivingSystem({ state, c }: { state: AppState; c: Copy }) {
-  const activeLocks = state.bridges.filter((bridge) => bridge.status === "active").length;
-  const verifiedDomains = state.domains.filter((domain) => domain.status === "verified").length;
-  const activeRooms = state.liveRooms.filter((room) => room.status === "active").length;
-  const readyChecks = state.telegramChecks.filter((check) => check.status === "ready").length;
-  const protocolScore = Math.min(100, 42 + activeLocks * 14 + verifiedDomains * 16 + activeRooms * 10 + readyChecks * 8);
+  const activeLocks = state.bridges.filter((bridge) => bridge.status === 'active').length;
+  const verifiedDomains = state.domains.filter((domain) => domain.status === 'verified').length;
+  const activeRooms = state.liveRooms.filter((room) => room.status === 'active').length;
+  const readyChecks = state.telegramChecks.filter((check) => check.status === 'ready').length;
+  const protocolScore = Math.min(
+    100,
+    42 + activeLocks * 14 + verifiedDomains * 16 + activeRooms * 10 + readyChecks * 8
+  );
 
   return (
     <section className="living-system" aria-label="Fenrir Protocol living system">
@@ -3748,7 +4988,11 @@ function ProtocolLivingSystem({ state, c }: { state: AppState; c: Copy }) {
         </div>
         <div className="node-row">
           {c.protocolNodes.map((node, index) => (
-            <span className="protocol-node" style={{ animationDelay: `${index * 160}ms` }} key={node}>
+            <span
+              className="protocol-node"
+              style={{ animationDelay: `${index * 160}ms` }}
+              key={node}
+            >
               {node}
             </span>
           ))}
@@ -3769,7 +5013,9 @@ function ProtocolLivingSystem({ state, c }: { state: AppState; c: Copy }) {
             <span>{c.protocolHeat}</span>
             <b>{protocolScore}%</b>
           </div>
-          <meter min="0" max="100" value={protocolScore}>{protocolScore}%</meter>
+          <meter min="0" max="100" value={protocolScore}>
+            {protocolScore}%
+          </meter>
         </div>
       </div>
 
@@ -3785,37 +5031,37 @@ function ProtocolLivingSystem({ state, c }: { state: AppState; c: Copy }) {
   );
 }
 
-function ClientWalkthroughPanel({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] }) {
+function ClientWalkthroughPanel({ c, ui }: { c: Copy; ui: (typeof uiCopy)[Locale] }) {
   const flows = [
     {
-      id: "visitor",
+      id: 'visitor',
       label: ui.walkthroughClientLabel,
       title: ui.walkthroughClientTitle,
       body: ui.walkthroughClientBody,
       quote: ui.walkthroughClientQuote,
       steps: ui.walkthroughStepsClient,
-      active: 1
+      active: 1,
     },
     {
-      id: "admin",
+      id: 'admin',
       label: ui.walkthroughAdminLabel,
       title: ui.walkthroughAdminTitle,
       body: ui.walkthroughAdminBody,
       quote: ui.walkthroughAdminQuote,
       steps: ui.walkthroughStepsAdmin,
-      active: 2
+      active: 2,
     },
     {
-      id: "launch",
+      id: 'launch',
       label: ui.walkthroughLaunchLabel,
       title: ui.walkthroughLaunchTitle,
       body: ui.walkthroughLaunchBody,
       quote: ui.walkthroughLaunchQuote,
       steps: ui.walkthroughStepsLaunch,
-      active: 3
-    }
+      active: 3,
+    },
   ] as const;
-  const [activeFlow, setActiveFlow] = useState<(typeof flows)[number]["id"]>("visitor");
+  const [activeFlow, setActiveFlow] = useState<(typeof flows)[number]['id']>('visitor');
   const flow = flows.find((item) => item.id === activeFlow) ?? flows[0];
 
   return (
@@ -3824,7 +5070,7 @@ function ClientWalkthroughPanel({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] 
         {flows.map((item) => (
           <button
             aria-selected={item.id === flow.id}
-            className={item.id === flow.id ? "active" : ""}
+            className={item.id === flow.id ? 'active' : ''}
             key={item.id}
             onClick={() => setActiveFlow(item.id)}
             role="tab"
@@ -3843,8 +5089,16 @@ function ClientWalkthroughPanel({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] 
           <blockquote>{flow.quote}</blockquote>
         </div>
 
-          <div className={`walkthrough-map flow-${flow.id}`} aria-label={`${flow.label} ${ui.walkthroughNodeMapLabel}`}>
-          <svg className="walkthrough-lines" viewBox="0 0 760 300" role="img" aria-label="Fenrir route from public link to private destination">
+        <div
+          className={`walkthrough-map flow-${flow.id}`}
+          aria-label={`${flow.label} ${ui.walkthroughNodeMapLabel}`}
+        >
+          <svg
+            className="walkthrough-lines"
+            viewBox="0 0 760 300"
+            role="img"
+            aria-label="Fenrir route from public link to private destination"
+          >
             <defs>
               <linearGradient id={`walkthroughGradient-${flow.id}`} x1="0" x2="1" y1="0" y2="0">
                 <stop offset="0%" stopColor="#ff334e" />
@@ -3852,15 +5106,25 @@ function ClientWalkthroughPanel({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] 
                 <stop offset="100%" stopColor="#22c7a8" />
               </linearGradient>
             </defs>
-            <path className="walkthrough-path shadow" d="M90 150 C190 76 260 222 374 150 S560 70 672 150" />
-            <path className="walkthrough-path signal" d="M90 150 C190 76 260 222 374 150 S560 70 672 150" stroke={`url(#walkthroughGradient-${flow.id})`} />
+            <path
+              className="walkthrough-path shadow"
+              d="M90 150 C190 76 260 222 374 150 S560 70 672 150"
+            />
+            <path
+              className="walkthrough-path signal"
+              d="M90 150 C190 76 260 222 374 150 S560 70 672 150"
+              stroke={`url(#walkthroughGradient-${flow.id})`}
+            />
             <circle className="walkthrough-packet packet-a" cx="90" cy="150" r="5" />
             <circle className="walkthrough-packet packet-b" cx="90" cy="150" r="4" />
           </svg>
 
           {flow.steps.map((step, index) => (
-            <div className={`walkthrough-node walkthrough-node-${index} ${index === flow.active ? "current" : ""}`} key={step}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
+            <div
+              className={`walkthrough-node walkthrough-node-${index} ${index === flow.active ? 'current' : ''}`}
+              key={step}
+            >
+              <span>{String(index + 1).padStart(2, '0')}</span>
               <b>{step}</b>
             </div>
           ))}
@@ -3879,67 +5143,76 @@ function ClientWalkthroughPanel({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] 
 function SetupInboxWizard({
   onStart,
   c,
-  ui
+  ui,
 }: {
-  onStart: (kind: "telegram" | "room" | "vault" | "domain" | "concierge") => void;
+  onStart: (kind: 'telegram' | 'room' | 'vault' | 'domain' | 'concierge') => void;
   c: Copy;
-  ui: typeof uiCopy[Locale];
+  ui: (typeof uiCopy)[Locale];
 }) {
-  const options: Array<{ id: "telegram" | "room" | "vault" | "domain" | "concierge"; title: string; body: string; step: string }> = [
+  const options: Array<{
+    id: 'telegram' | 'room' | 'vault' | 'domain' | 'concierge';
+    title: string;
+    body: string;
+    step: string;
+  }> = [
     {
-      id: "telegram",
+      id: 'telegram',
       title: c.inboxStepTelegram,
       body: c.inboxStepTelegramBody,
-      step: c.inboxStepTelegramNeed
+      step: c.inboxStepTelegramNeed,
     },
     {
-      id: "room",
+      id: 'room',
       title: c.inboxStepRoom,
       body: c.inboxStepRoomBody,
-      step: c.inboxStepRoomNeed
+      step: c.inboxStepRoomNeed,
     },
     {
-      id: "vault",
+      id: 'vault',
       title: c.inboxStepVault,
       body: c.inboxStepVaultBody,
-      step: c.inboxStepVaultNeed
+      step: c.inboxStepVaultNeed,
     },
     {
-      id: "domain",
+      id: 'domain',
       title: c.inboxStepDomain,
       body: c.inboxStepDomainBody,
-      step: c.inboxStepDomainNeed
+      step: c.inboxStepDomainNeed,
     },
     {
-      id: "concierge",
+      id: 'concierge',
       title: c.inboxStepConcierge,
       body: c.inboxStepConciergeBody,
-      step: c.inboxStepConciergeNeed
-    }
+      step: c.inboxStepConciergeNeed,
+    },
   ];
   const [active, setActive] = useState<string | null>(null);
 
   return (
-      <section className="panel wide frictionless-wizard inbox-wizard">
-        <div className="wizard-copy">
-          <span className="status good">{ui.clientExplanation}</span>
+    <section className="panel wide frictionless-wizard inbox-wizard">
+      <div className="wizard-copy">
+        <span className="status good">{ui.clientExplanation}</span>
         <h2>{c.inboxHeading}</h2>
         <p>{c.inboxBody}</p>
       </div>
       <div className="inbox-thread">
-        <span className="inbox-bubble assistant">
-          {ui.assistantPrompt}
-        </span>
+        <span className="inbox-bubble assistant">{ui.assistantPrompt}</span>
         {active ? (
-          <span className="inbox-bubble user">Start: {options.find((option) => option.id === active)?.title}</span>
+          <span className="inbox-bubble user">
+            Start: {options.find((option) => option.id === active)?.title}
+          </span>
         ) : null}
       </div>
       <div className="wizard-options">
         {options.map((option) => (
-          <button key={option.id} type="button" onClick={() => {
-            setActive(option.id);
-            onStart(option.id);
-          }}>
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => {
+              setActive(option.id);
+              onStart(option.id);
+            }}
+          >
             <span>{option.step}</span>
             <b>{option.title}</b>
             <small>{option.body}</small>
@@ -3950,12 +5223,12 @@ function SetupInboxWizard({
   );
 }
 
-function ExampleDiagramCard({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] }) {
+function ExampleDiagramCard({ c, ui }: { c: Copy; ui: (typeof uiCopy)[Locale] }) {
   const nodes = [
-    ["Private target", "Telegram invite / room link stays hidden"],
-    ["Fenrir Bridge", "Checks identity, payment state, and revocation rules"],
-    ["Public front door", "your-domain.com/client-launch"],
-    ["Client path", "Allowed users continue, blocked users stop"]
+    ['Private target', 'Telegram invite / room link stays hidden'],
+    ['Fenrir Bridge', 'Checks identity, payment state, and revocation rules'],
+    ['Public front door', 'your-domain.com/client-launch'],
+    ['Client path', 'Allowed users continue, blocked users stop'],
   ];
 
   return (
@@ -3969,7 +5242,7 @@ function ExampleDiagramCard({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] }) {
       <div className="diagram-flow">
         {nodes.map(([label, detail], index) => (
           <div className="diagram-node" key={label}>
-            <span>{String(index + 1).padStart(2, "0")}</span>
+            <span>{String(index + 1).padStart(2, '0')}</span>
             <b>{label}</b>
             <small>{detail}</small>
           </div>
@@ -3977,12 +5250,14 @@ function ExampleDiagramCard({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] }) {
       </div>
 
       <div className="diagram-steps">
-        {[ui.rawLinkHidden, c.chooseDomain, ui.cloudflareSsl, ui.publicUrlReady].map((step, index) => (
-          <div className="complete" key={step}>
-            <span>{index + 1}</span>
-            <b>{step}</b>
-          </div>
-        ))}
+        {[ui.rawLinkHidden, c.chooseDomain, ui.cloudflareSsl, ui.publicUrlReady].map(
+          (step, index) => (
+            <div className="complete" key={step}>
+              <span>{index + 1}</span>
+              <b>{step}</b>
+            </div>
+          )
+        )}
       </div>
     </section>
   );
@@ -3991,14 +5266,14 @@ function ExampleDiagramCard({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] }) {
 function CashoutPipeline({ c, onStars }: { c: Copy; onStars: () => void }) {
   return (
     <section className="cashout-panel" aria-label="Cashout pipeline">
-        <div className="cashout-copy">
-          <span className="status good">{c.cashoutLabel}</span>
-          <h2>{c.cashoutTitle}</h2>
-          <p>{c.cashoutSub}</p>
-          <div className="cashout-actions">
-            <button onClick={onStars}>{c.starsCheckout}</button>
-          </div>
+      <div className="cashout-copy">
+        <span className="status good">{c.cashoutLabel}</span>
+        <h2>{c.cashoutTitle}</h2>
+        <p>{c.cashoutSub}</p>
+        <div className="cashout-actions">
+          <button onClick={onStars}>{c.starsCheckout}</button>
         </div>
+      </div>
       <div className="cashout-flow">
         {c.cashoutSteps.map((step, index) => (
           <div className="cashout-step" key={step[0]}>
@@ -4025,20 +5300,20 @@ function AccountServicePanel({
   onTelegram,
   onSubdomain,
   onStart,
-  onStars
+  onStars,
 }: {
   c: Copy;
   email: string;
   org: string;
   telegram: string;
   subdomain: string;
-  mode: "create" | "link" | null;
+  mode: 'create' | 'link' | null;
   checkoutPlan: PaidPlan;
   onEmail: (value: string) => void;
   onOrg: (value: string) => void;
   onTelegram: (value: string) => void;
   onSubdomain: (value: string) => void;
-  onStart: (mode: "create" | "link") => void;
+  onStart: (mode: 'create' | 'link') => void;
   onStars: () => void;
 }) {
   return (
@@ -4073,17 +5348,23 @@ function AccountServicePanel({
             <p>{c.starsCheckoutBody}</p>
           </div>
           <div className="service-actions">
-            <button onClick={() => onStart("create")}>{c.createAccount}</button>
-            <button className="secondary" onClick={() => onStart("link")}>{c.linkAccount}</button>
+            <button onClick={() => onStart('create')}>{c.createAccount}</button>
+            <button className="secondary" onClick={() => onStart('link')}>
+              {c.linkAccount}
+            </button>
             <button onClick={onStars}>{c.starsCheckout}</button>
           </div>
-          <small>{mode ? `${mode === "create" ? c.createAccount : c.linkAccount}: ${email}` : c.serviceWaitingAction}</small>
+          <small>
+            {mode
+              ? `${mode === 'create' ? c.createAccount : c.linkAccount}: ${email}`
+              : c.serviceWaitingAction}
+          </small>
         </div>
       </div>
 
       <div className="service-steps">
         {c.serviceSteps.map((step, index) => (
-          <div className={mode || index === 0 ? "complete" : ""} key={step}>
+          <div className={mode || index === 0 ? 'complete' : ''} key={step}>
             <span>{index + 1}</span>
             <b>{step}</b>
           </div>
@@ -4108,26 +5389,31 @@ function buildVaultLinks(
       id: bridge.id,
       title: bridge.telegramGroupName,
       url: bridge.publicUrl,
-      kind: "telegram",
-      status: bridge.status
+      kind: 'telegram',
+      status: bridge.status,
     })),
     ...rooms.map((room) => ({
       id: room.id,
       title: room.title,
       url: room.publicUrl,
       kind: room.provider,
-      status: room.status
+      status: room.status,
     })),
     ...commissionLinks
-      .filter((link) => link.status === "active" || link.partnerStatus === "recommended" || link.partnerStatus === "approved")
+      .filter(
+        (link) =>
+          link.status === 'active' ||
+          link.partnerStatus === 'recommended' ||
+          link.partnerStatus === 'approved'
+      )
       .map((link) => ({
         id: link.id,
         title: link.label,
         url: absoluteVaultUrl(link.url),
         kind: link.category,
-        status: link.partnerStatus
+        status: link.partnerStatus,
       })),
-    ...personalLinks
+    ...personalLinks,
   ].filter((link) => Boolean(absoluteVaultUrl(link.url)));
 }
 
@@ -4144,33 +5430,33 @@ function encodeVaultLinks(links: VaultLink[]) {
       title: link.title,
       url: absoluteUrl(link.url),
       kind: link.kind,
-      status: link.status
-    }))
+      status: link.status,
+    })),
   });
   const bytes = new TextEncoder().encode(payload);
-  let binary = "";
+  let binary = '';
   bytes.forEach((byte) => {
     binary += String.fromCharCode(byte);
   });
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 function decodeVaultLinks() {
-  const payload = new URLSearchParams(window.location.search).get("v");
+  const payload = new URLSearchParams(window.location.search).get('v');
   if (!payload) return [];
   try {
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const binary = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="));
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const binary = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='));
     const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
     const parsed = JSON.parse(new TextDecoder().decode(bytes)) as { links?: VaultLink[] };
-      return (parsed.links ?? [])
+    return (parsed.links ?? [])
       .slice(0, 40)
       .map((link) => ({
         id: String(link.id || `vault_${link.url}`),
-        title: String(link.title || "Fenrir link").slice(0, 90),
-        url: absoluteUrl(String(link.url || "")),
-        kind: String(link.kind || "link").slice(0, 32),
-        status: String(link.status || "active").slice(0, 32)
+        title: String(link.title || 'Fenrir link').slice(0, 90),
+        url: absoluteUrl(String(link.url || '')),
+        kind: String(link.kind || 'link').slice(0, 32),
+        status: String(link.status || 'active').slice(0, 32),
       }))
       .filter((link) => link.url);
   } catch {
@@ -4178,7 +5464,15 @@ function decodeVaultLinks() {
   }
 }
 
-function PublicVaultPage({ links, c, ui }: { links: VaultLink[]; c: Copy; ui: typeof uiCopy[Locale] }) {
+function PublicVaultPage({
+  links,
+  c,
+  ui,
+}: {
+  links: VaultLink[];
+  c: Copy;
+  ui: (typeof uiCopy)[Locale];
+}) {
   return (
     <main className="join-page vault-public-page">
       <section className="join-card vault-public-card">
@@ -4191,7 +5485,11 @@ function PublicVaultPage({ links, c, ui }: { links: VaultLink[]; c: Copy; ui: ty
         {links.length ? (
           <div className="vault-public-grid">
             {links.map((link) => (
-              <a className={`vault-public-link ${link.kind}`} href={link.url} key={`${link.id}-${link.url}`}>
+              <a
+                className={`vault-public-link ${link.kind}`}
+                href={link.url}
+                key={`${link.id}-${link.url}`}
+              >
                 <span>{link.kind}</span>
                 <b>{link.title}</b>
                 <code>{link.url}</code>
@@ -4225,20 +5523,20 @@ function LinkVaultPanel({
   onKind,
   onAdd,
   onShare,
-  onOpen
+  onOpen,
 }: {
   c: Copy;
-  ui: typeof uiCopy[Locale];
+  ui: (typeof uiCopy)[Locale];
   bridges: FriskyBridge[];
   rooms: FriskyLiveRoom[];
   personalLinks: PersonalLink[];
   commissionLinks: FriskyCommissionLink[];
   title: string;
   url: string;
-  kind: PersonalLink["kind"];
+  kind: PersonalLink['kind'];
   onTitle: (value: string) => void;
   onUrl: (value: string) => void;
-  onKind: (value: PersonalLink["kind"]) => void;
+  onKind: (value: PersonalLink['kind']) => void;
   onAdd: () => void;
   onShare: (links: VaultLink[]) => void;
   onOpen: (link: VaultLink) => void;
@@ -4251,7 +5549,7 @@ function LinkVaultPanel({
     onOpen(link);
   };
   const onOpenKey = (event: KeyboardEvent<HTMLElement>, link: VaultLink) => {
-    if (event.key === "Enter" || event.key === " ") {
+    if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onOpen(link);
     }
@@ -4263,10 +5561,12 @@ function LinkVaultPanel({
       const next = current.filter((id) => availableIds.has(id));
       return next.length ? next : allLinks.map((link) => link.id);
     });
-  }, [allLinks.map((link) => link.id).join("|")]);
+  }, [allLinks.map((link) => link.id).join('|')]);
 
   function toggleVaultLink(id: string) {
-    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    );
   }
 
   return (
@@ -4286,21 +5586,21 @@ function LinkVaultPanel({
             <img src="/fenrir-splash-icon.svg" alt="" />
             <b>{ui.myFenrirLabel}</b>
           </div>
-            {allLinks.slice(0, 8).map((link, index) => (
-                <div
-                  role="button"
-                tabIndex={0}
-                className={`link-node node-${index} click-target`}
-                onClick={() => openVaultLink(link)}
-                onKeyDown={(event) => onOpenKey(event, link)}
-                aria-label={`${c.openCall} ${link.title}`}
-                key={link.id}
-              >
-                <span>{link.kind}</span>
-                <b>{link.title}</b>
-              </div>
-            ))}
-          </div>
+          {allLinks.slice(0, 8).map((link, index) => (
+            <div
+              role="button"
+              tabIndex={0}
+              className={`link-node node-${index} click-target`}
+              onClick={() => openVaultLink(link)}
+              onKeyDown={(event) => onOpenKey(event, link)}
+              aria-label={`${c.openCall} ${link.title}`}
+              key={link.id}
+            >
+              <span>{link.kind}</span>
+              <b>{link.title}</b>
+            </div>
+          ))}
+        </div>
 
         <div className="personal-link-form">
           <h3>{c.addAnyLink}</h3>
@@ -4325,7 +5625,11 @@ function LinkVaultPanel({
           </label>
           <label className="field-stack">
             <span>{ui.personalLinkKindLabel}</span>
-            <select value={kind} onChange={(event) => onKind(event.target.value as PersonalLink["kind"])} aria-label={ui.personalLinkKindLabel}>
+            <select
+              value={kind}
+              onChange={(event) => onKind(event.target.value as PersonalLink['kind'])}
+              aria-label={ui.personalLinkKindLabel}
+            >
               <option value="payment">{c.linkKinds.payment}</option>
               <option value="docs">{c.linkKinds.docs}</option>
               <option value="booking">{c.linkKinds.booking}</option>
@@ -4346,7 +5650,7 @@ function LinkVaultPanel({
             tabIndex={0}
             onClick={() => openVaultLink(link)}
             onKeyDown={(event) => onOpenKey(event, link)}
-                aria-label={`${c.openCall} ${link.title}`}
+            aria-label={`${c.openCall} ${link.title}`}
           >
             <label className="vault-share-toggle">
               <input
@@ -4375,7 +5679,7 @@ function FaqPanel({ c }: { c: Copy }) {
         {c.faqs.map((item, index) => (
           <details className="faq-item" key={item[0]} open={index < 2}>
             <summary>
-              <span>{String(index + 1).padStart(2, "0")}</span>
+              <span>{String(index + 1).padStart(2, '0')}</span>
               <b>{item[0]}</b>
             </summary>
             <p>{item[1]}</p>
@@ -4389,31 +5693,32 @@ function FaqPanel({ c }: { c: Copy }) {
 function operatorReadinessBanner(
   c: Copy,
   r: ReadinessPayload
-): { text: string; tone: "good" | "danger" } {
+): { text: string; tone: 'good' | 'danger' } {
   if (r.app.readyForPaidUsers) {
-    return { text: c.operatorReadyForPaidUsers, tone: "good" };
+    return { text: c.operatorReadyForPaidUsers, tone: 'good' };
   }
   const { auth, billing } = r;
   if (!auth.googleConfigured || !auth.microsoftConfigured || !auth.appleConfigured) {
-    return { text: c.operatorOAuthMissing, tone: "danger" };
+    return { text: c.operatorOAuthMissing, tone: 'danger' };
   }
   if (!billing.d1Configured) {
-    return { text: c.operatorMissingSecrets, tone: "danger" };
+    return { text: c.operatorMissingSecrets, tone: 'danger' };
   }
   if (!billing.neonConfigured) {
-    return { text: c.operatorMissingSecrets, tone: "danger" };
+    return { text: c.operatorMissingSecrets, tone: 'danger' };
   }
-  const telegramRailReady = billing.telegramStarsConfigured && billing.telegramWebhookSecretConfigured;
+  const telegramRailReady =
+    billing.telegramStarsConfigured && billing.telegramWebhookSecretConfigured;
   if (!telegramRailReady) {
-    return { text: c.operatorMissingSecrets, tone: "danger" };
+    return { text: c.operatorMissingSecrets, tone: 'danger' };
   }
-  return { text: c.operatorMissingSecrets, tone: "danger" };
+  return { text: c.operatorMissingSecrets, tone: 'danger' };
 }
 
 function ProductionReadinessPanel({
   c,
   readiness,
-  loadFailed
+  loadFailed,
 }: {
   c: Copy;
   readiness: ReadinessPayload | null;
@@ -4436,7 +5741,7 @@ function ProductionReadinessPanel({
     { ok: readiness.billing.telegramStarsConfigured, label: c.checklistTelegramStars },
     { ok: readiness.billing.telegramWebhookSecretConfigured, label: c.checklistTelegramWebhook },
     { ok: readiness.billing.d1Configured, label: c.checklistD1 },
-    { ok: readiness.billing.neonConfigured, label: c.checklistNeon }
+    { ok: readiness.billing.neonConfigured, label: c.checklistNeon },
   ];
   return (
     <section className="panel wide readiness-panel" aria-label={c.adminSetupTitle}>
@@ -4448,7 +5753,9 @@ function ProductionReadinessPanel({
         {rows.map((row) => (
           <li key={row.label}>
             <span>{row.label}</span>
-            <span className={`status ${row.ok ? "good" : "danger"}`}>{row.ok ? c.readinessRowOk : c.readinessRowMissing}</span>
+            <span className={`status ${row.ok ? 'good' : 'danger'}`}>
+              {row.ok ? c.readinessRowOk : c.readinessRowMissing}
+            </span>
           </li>
         ))}
       </ul>
@@ -4482,7 +5789,7 @@ function LaunchWowConsole({
   roomProvider,
   onDomain,
   onRoom,
-  onCommunity
+  onCommunity,
 }: {
   state: AppState;
   locale: Locale;
@@ -4493,75 +5800,76 @@ function LaunchWowConsole({
   onRoom: () => void;
   onCommunity: () => void;
 }) {
-  const verifiedDomains = state.domains.filter((domain) => domain.status === "verified").length;
-  const activeRooms = state.liveRooms.filter((room) => room.status === "active").length;
-  const activeLocks = state.bridges.filter((bridge) => bridge.status === "active").length;
-  const provider = liveRoomProviders.find((item) => item.id === roomProvider) ?? liveRoomProviders[0];
+  const verifiedDomains = state.domains.filter((domain) => domain.status === 'verified').length;
+  const activeRooms = state.liveRooms.filter((room) => room.status === 'active').length;
+  const activeLocks = state.bridges.filter((bridge) => bridge.status === 'active').length;
+  const provider =
+    liveRoomProviders.find((item) => item.id === roomProvider) ?? liveRoomProviders[0];
   const copyByLocale = {
     en: {
-      title: "Launch Command Center",
-      body: "Three fast actions turn Fenrir from setup screen into a branded access product.",
-      domain: "Publish a smart domain",
-      domainBody: "Add tags, verification records, and a clear DNS path in one pass.",
-      room: "Brand a live room",
-      roomBody: "Pick a meeting provider, logo preset, and stable Fenrir room link.",
-      community: "Shape community login",
-      communityBody: "Edit the public gate while the preview shows exactly what visitors see.",
-      actionDomain: "Open Domain Wizard",
-      actionRoom: "Open Live Rooms",
-      actionCommunity: "Open Login Builder",
-      verified: "verified",
-      locks: "locks",
-      rooms: "rooms"
+      title: 'Launch Command Center',
+      body: 'Three fast actions turn Fenrir from setup screen into a branded access product.',
+      domain: 'Publish a smart domain',
+      domainBody: 'Add tags, verification records, and a clear DNS path in one pass.',
+      room: 'Brand a live room',
+      roomBody: 'Pick a meeting provider, logo preset, and stable Fenrir room link.',
+      community: 'Shape community login',
+      communityBody: 'Edit the public gate while the preview shows exactly what visitors see.',
+      actionDomain: 'Open Domain Wizard',
+      actionRoom: 'Open Live Rooms',
+      actionCommunity: 'Open Login Builder',
+      verified: 'verified',
+      locks: 'locks',
+      rooms: 'rooms',
     },
     es: {
-      title: "Launch Command Center",
-      body: "Tres acciones convierten Fenrir de setup tecnico a producto de acceso con marca.",
-      domain: "Publica un dominio inteligente",
-      domainBody: "Agrega tags, records de verificacion y una ruta DNS clara en un solo paso.",
-      room: "Dale marca a una live room",
-      roomBody: "Elige provider, logo preset y link estable de Fenrir para la sala.",
-      community: "Disena el login comunitario",
-      communityBody: "Edita la puerta publica mientras el preview muestra lo que ve la gente.",
-      actionDomain: "Abrir Domain Wizard",
-      actionRoom: "Abrir Live Rooms",
-      actionCommunity: "Abrir Login Builder",
-      verified: "verificados",
-      locks: "locks",
-      rooms: "salas"
+      title: 'Launch Command Center',
+      body: 'Tres acciones convierten Fenrir de setup tecnico a producto de acceso con marca.',
+      domain: 'Publica un dominio inteligente',
+      domainBody: 'Agrega tags, records de verificacion y una ruta DNS clara en un solo paso.',
+      room: 'Dale marca a una live room',
+      roomBody: 'Elige provider, logo preset y link estable de Fenrir para la sala.',
+      community: 'Disena el login comunitario',
+      communityBody: 'Edita la puerta publica mientras el preview muestra lo que ve la gente.',
+      actionDomain: 'Abrir Domain Wizard',
+      actionRoom: 'Abrir Live Rooms',
+      actionCommunity: 'Abrir Login Builder',
+      verified: 'verificados',
+      locks: 'locks',
+      rooms: 'salas',
     },
     fr: {
-      title: "Launch Command Center",
+      title: 'Launch Command Center',
       body: "Trois actions transforment Fenrir en produit d'acces marque.",
-      domain: "Publier un domaine intelligent",
-      domainBody: "Ajoutez tags, verification DNS et chemin clair en une seule passe.",
-      room: "Marquer une live room",
-      roomBody: "Choisissez provider, logo et lien Fenrir stable.",
-      community: "Personnaliser le login communaute",
-      communityBody: "Editez la porte publique avec un apercu visiteur.",
-      actionDomain: "Ouvrir Domain Wizard",
-      actionRoom: "Ouvrir Live Rooms",
-      actionCommunity: "Ouvrir Login Builder",
-      verified: "verifies",
-      locks: "locks",
-      rooms: "rooms"
+      domain: 'Publier un domaine intelligent',
+      domainBody: 'Ajoutez tags, verification DNS et chemin clair en une seule passe.',
+      room: 'Marquer une live room',
+      roomBody: 'Choisissez provider, logo et lien Fenrir stable.',
+      community: 'Personnaliser le login communaute',
+      communityBody: 'Editez la porte publique avec un apercu visiteur.',
+      actionDomain: 'Ouvrir Domain Wizard',
+      actionRoom: 'Ouvrir Live Rooms',
+      actionCommunity: 'Ouvrir Login Builder',
+      verified: 'verifies',
+      locks: 'locks',
+      rooms: 'rooms',
     },
     de: {
-      title: "Launch Command Center",
-      body: "Drei Aktionen machen Fenrir vom Setup zum gebrandeten Access-Produkt.",
-      domain: "Smart Domain veroeffentlichen",
-      domainBody: "Tags, DNS-Verifikation und klarer Setup-Pfad in einem Schritt.",
-      room: "Live Room branden",
-      roomBody: "Provider, Logo-Preset und stabilen Fenrir-Room-Link waehlen.",
-      community: "Community Login gestalten",
-      communityBody: "Public Gate bearbeiten und Besucher-Preview sehen.",
-      actionDomain: "Domain Wizard oeffnen",
-      actionRoom: "Live Rooms oeffnen",
-      actionCommunity: "Login Builder oeffnen",
-      verified: "verifiziert",
-      locks: "locks",
-      rooms: "rooms"
-    }
+      title: 'Launch Command Center',
+      body: 'Drei Aktionen machen Fenrir vom Setup zum gebrandeten Access-Produkt.',
+      domain: 'Smart Domain veroeffentlichen',
+      domainBody: 'Tags, DNS-Verifikation und klarer Setup-Pfad in einem Schritt.',
+      room: 'Live Room branden',
+      roomBody: 'Provider, Logo-Preset und stabilen Fenrir-Room-Link waehlen.',
+      community: 'Community Login gestalten',
+      communityBody: 'Public Gate bearbeiten und Besucher-Preview sehen.',
+      actionDomain: 'Domain Wizard oeffnen',
+      actionRoom: 'Live Rooms oeffnen',
+      actionCommunity: 'Login Builder oeffnen',
+      verified: 'verifiziert',
+      locks: 'locks',
+      rooms: 'rooms',
+    },
   }[locale];
 
   return (
@@ -4571,9 +5879,18 @@ function LaunchWowConsole({
         <h2>{copyByLocale.title}</h2>
         <p>{copyByLocale.body}</p>
         <div className="launch-wow-kpis" aria-label="Launch metrics">
-          <span><b>{verifiedDomains}</b>{copyByLocale.verified}</span>
-          <span><b>{activeLocks}</b>{copyByLocale.locks}</span>
-          <span><b>{activeRooms}</b>{copyByLocale.rooms}</span>
+          <span>
+            <b>{verifiedDomains}</b>
+            {copyByLocale.verified}
+          </span>
+          <span>
+            <b>{activeLocks}</b>
+            {copyByLocale.locks}
+          </span>
+          <span>
+            <b>{activeRooms}</b>
+            {copyByLocale.rooms}
+          </span>
         </div>
       </div>
       <div className="launch-wow-actions">
@@ -4581,9 +5898,13 @@ function LaunchWowConsole({
           <span className="launch-wow-icon">DNS</span>
           <b>{copyByLocale.domain}</b>
           <small>{copyByLocale.domainBody}</small>
-          <em>{selectedDomain?.domain ?? "your-domain.com"}</em>
+          <em>{selectedDomain?.domain ?? 'your-domain.com'}</em>
           <span className="launch-wow-tags">
-            {(selectedDomainTags.length ? selectedDomainTags : ["launch", "vip"]).slice(0, 3).map((tag) => <i key={tag}>#{tag}</i>)}
+            {(selectedDomainTags.length ? selectedDomainTags : ['launch', 'vip'])
+              .slice(0, 3)
+              .map((tag) => (
+                <i key={tag}>#{tag}</i>
+              ))}
           </span>
           <strong>{copyByLocale.actionDomain}</strong>
         </button>
@@ -4626,7 +5947,7 @@ function LiveDomainSearchPanel({
   onValue,
   onSearch,
   onPick,
-  onOpenRegistrar
+  onOpenRegistrar,
 }: {
   value: string;
   results: DomainSearchResult[];
@@ -4642,39 +5963,58 @@ function LiveDomainSearchPanel({
         <div>
           <span className="launch-wow-status">Live domain search</span>
           <h3>Search your name, grab the domain.</h3>
-          <p>Type any brand or handle — we check live availability (RDAP + DNS) across TLDs, then you register the one you want in a click.</p>
+          <p>
+            Type any brand or handle — we check live availability (RDAP + DNS) across TLDs, then you
+            register the one you want in a click.
+          </p>
         </div>
         <div className="live-domain-search-form">
           <input
             value={value}
             onChange={(event) => onValue(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") onSearch();
+              if (event.key === 'Enter') onSearch();
             }}
             aria-label="Search domains live"
             placeholder="brand, community, or full domain"
           />
           <button type="button" disabled={busy} onClick={onSearch}>
-            {busy ? "Searching..." : "Search live"}
+            {busy ? 'Searching...' : 'Search live'}
           </button>
         </div>
       </div>
       <div className="live-domain-results" aria-label="Domain search results">
-        {(results.length ? results : domainSearchCandidates(value).slice(0, 6).map((domain) => ({
-          domain,
-          status: "ready" as const,
-          summary: "Ready to check availability.",
-          records: []
-        }))).map((result) => {
-          const tone = result.status === "available" ? "good"
-            : result.status === "taken" ? "danger"
-            : result.status === "ready" ? "blue"
-            : "amber";
-          const label = result.status === "available" ? "Available"
-            : result.status === "taken" ? "Taken"
-            : result.status === "ready" ? "Ready"
-            : result.status === "unknown" ? "Check registrar"
-            : result.status === "invalid" ? "Invalid" : result.status;
+        {(results.length
+          ? results
+          : domainSearchCandidates(value)
+              .slice(0, 6)
+              .map((domain) => ({
+                domain,
+                status: 'ready' as const,
+                summary: 'Ready to check availability.',
+                records: [],
+              }))
+        ).map((result) => {
+          const tone =
+            result.status === 'available'
+              ? 'good'
+              : result.status === 'taken'
+                ? 'danger'
+                : result.status === 'ready'
+                  ? 'blue'
+                  : 'amber';
+          const label =
+            result.status === 'available'
+              ? 'Available'
+              : result.status === 'taken'
+                ? 'Taken'
+                : result.status === 'ready'
+                  ? 'Ready'
+                  : result.status === 'unknown'
+                    ? 'Check registrar'
+                    : result.status === 'invalid'
+                      ? 'Invalid'
+                      : result.status;
           return (
             <article className={`live-domain-result ${result.status}`} key={result.domain}>
               <div>
@@ -4683,22 +6023,42 @@ function LiveDomainSearchPanel({
               </div>
               <p>{result.summary}</p>
               <div className="live-domain-meta">
-                {result.priceTier ? <small className="price-tier" title="Rough first-year price tier">{result.priceTier}</small> : null}
-                {result.confidence === "authoritative" ? <small className="conf-badge">RDAP verified</small> : null}
-                {result.registrarConfirm ? <small className="confirm-note">Confirm at registrar before buying</small> : null}
-                {result.records?.length ? <small>DNS: {result.records.join(" / ")}</small> : null}
+                {'priceTier' in result && result.priceTier ? (
+                  <small className="price-tier" title="Rough first-year price tier">
+                    {(result as any).priceTier}
+                  </small>
+                ) : null}
+                {'confidence' in result && result.confidence === 'authoritative' ? (
+                  <small className="conf-badge">RDAP verified</small>
+                ) : null}
+                {'registrarConfirm' in result && result.registrarConfirm ? (
+                  <small className="confirm-note">Confirm at registrar before buying</small>
+                ) : null}
+                {result.records?.length ? <small>DNS: {result.records.join(' / ')}</small> : null}
               </div>
               <div className="row-actions">
-                {result.status === "available" ? (
-                  <button type="button" className="compact-button register-cta" onClick={() => onOpenRegistrar(result.domain)}>
+                {result.status === 'available' ? (
+                  <button
+                    type="button"
+                    className="compact-button register-cta"
+                    onClick={() => onOpenRegistrar(result.domain)}
+                  >
                     Register →
                   </button>
                 ) : (
-                  <button type="button" className="ghost compact-button" onClick={() => onOpenRegistrar(result.domain)}>
-                    {result.status === "taken" ? "Who owns it" : "Check registrar"}
+                  <button
+                    type="button"
+                    className="ghost compact-button"
+                    onClick={() => onOpenRegistrar(result.domain)}
+                  >
+                    {result.status === 'taken' ? 'Who owns it' : 'Check registrar'}
                   </button>
                 )}
-                <button type="button" className="secondary compact-button" onClick={() => onPick(result.domain)}>
+                <button
+                  type="button"
+                  className="secondary compact-button"
+                  onClick={() => onPick(result.domain)}
+                >
                   Use in wizard
                 </button>
               </div>
@@ -4712,20 +6072,31 @@ function LiveDomainSearchPanel({
 
 function providerLabel(provider: LiveRoomProvider, c: Copy) {
   const labels: Record<LiveRoomProvider, string> = {
-    zoom: "Zoom",
-    webex: "Microsoft Teams",
-    whereby: "Whereby",
-    google_meet: "Google Meet",
-    other: c.openCall.toLowerCase()
+    zoom: 'Zoom',
+    webex: 'Microsoft Teams',
+    whereby: 'Whereby',
+    google_meet: 'Google Meet',
+    other: c.openCall.toLowerCase(),
   };
   return labels[provider];
 }
 
-function ProviderBadge({ provider, c, compact = false }: { provider: LiveRoomProvider; c: Copy; compact?: boolean }) {
+function ProviderBadge({
+  provider,
+  c,
+  compact = false,
+}: {
+  provider: LiveRoomProvider;
+  c: Copy;
+  compact?: boolean;
+}) {
   const meta = liveRoomProviders.find((item) => item.id === provider);
   const label = providerLabel(provider, c);
   return (
-    <span className={`provider-brand provider-brand-${provider} ${compact ? "compact-provider-brand" : ""}`} aria-label={`${label} logo`}>
+    <span
+      className={`provider-brand provider-brand-${provider} ${compact ? 'compact-provider-brand' : ''}`}
+      aria-label={`${label} logo`}
+    >
       <span className="provider-logo-mark">{meta?.icon ?? label[0]}</span>
       <span className="provider-logo-word">{meta?.brand ?? label}</span>
     </span>
@@ -4733,12 +6104,18 @@ function ProviderBadge({ provider, c, compact = false }: { provider: LiveRoomPro
 }
 
 function friendlyAccountLabel(value: string, fallback: string) {
-  const suffix = value.replace(/[^a-z0-9]/gi, "").slice(-6).toUpperCase();
-  return `${fallback} ${suffix || "active"}`;
+  const suffix = value
+    .replace(/[^a-z0-9]/gi, '')
+    .slice(-6)
+    .toUpperCase();
+  return `${fallback} ${suffix || 'active'}`;
 }
 
 function roomProviderPlaceholder(provider: LiveRoomProvider) {
-  return liveRoomProviders.find((item) => item.id === provider)?.placeholder ?? "https://your-room-link.example/...";
+  return (
+    liveRoomProviders.find((item) => item.id === provider)?.placeholder ??
+    'https://your-room-link.example/...'
+  );
 }
 
 function BridgeGallery({
@@ -4746,10 +6123,10 @@ function BridgeGallery({
   invites,
   onRotate,
   onRevoke,
-  c
+  c,
 }: {
-  bridges: AppState["bridges"];
-  invites: AppState["invites"];
+  bridges: AppState['bridges'];
+  invites: AppState['invites'];
   onRotate: (bridge: FriskyBridge) => void;
   onRevoke: (bridge: FriskyBridge) => void;
   c: Copy;
@@ -4765,8 +6142,19 @@ function BridgeGallery({
         const photoUrl = bridgeGroupPhotoUrl(bridge);
         return (
           <article className="lock-card" key={bridge.id}>
-            <div className="lock-cover" style={photoUrl ? { backgroundImage: `linear-gradient(180deg, rgba(18,23,21,.16), rgba(18,23,21,.74)), url("${photoUrl}")` } : undefined}>
-              <span className={`status ${bridge.status === "active" ? "good" : "danger"}`}>{invite?.status ?? bridge.status}</span>
+            <div
+              className="lock-cover"
+              style={
+                photoUrl
+                  ? {
+                      backgroundImage: `linear-gradient(180deg, rgba(18,23,21,.16), rgba(18,23,21,.74)), url("${photoUrl}")`,
+                    }
+                  : undefined
+              }
+            >
+              <span className={`status ${bridge.status === 'active' ? 'good' : 'danger'}`}>
+                {invite?.status ?? bridge.status}
+              </span>
               <span className="lock-shield">◈</span>
             </div>
             <div className="lock-body">
@@ -4782,9 +6170,16 @@ function BridgeGallery({
                 <code>{bridge.publicUrl}</code>
               </div>
               <div className="row-actions">
-                <button className="secondary" onClick={() => navigator.clipboard?.writeText(bridge.publicUrl)}>{c.copyUrl}</button>
+                <button
+                  className="secondary"
+                  onClick={() => navigator.clipboard?.writeText(bridge.publicUrl)}
+                >
+                  {c.copyUrl}
+                </button>
                 <button onClick={() => onRotate(bridge)}>{c.rotate}</button>
-                <button className="danger-button" onClick={() => onRevoke(bridge)}>{c.revoke}</button>
+                <button className="danger-button" onClick={() => onRevoke(bridge)}>
+                  {c.revoke}
+                </button>
               </div>
             </div>
           </article>
@@ -4797,7 +6192,10 @@ function BridgeGallery({
 function GroupAvatar({ bridge }: { bridge: FriskyBridge }) {
   const photoUrl = bridgeGroupPhotoUrl(bridge);
   return (
-    <span className="group-avatar" style={photoUrl ? { backgroundImage: `url("${photoUrl}")` } : undefined}>
+    <span
+      className="group-avatar"
+      style={photoUrl ? { backgroundImage: `url("${photoUrl}")` } : undefined}
+    >
       <span>🐺</span>
     </span>
   );
@@ -4807,7 +6205,7 @@ function bridgeGroupPhotoUrl(bridge: FriskyBridge) {
   const explicitPhoto = bridge.telegramGroupImageUrl.trim();
   if (explicitPhoto) return explicitPhoto;
   const chatId = bridge.telegramChatId.trim();
-  if (!chatId) return "";
+  if (!chatId) return '';
   return `/api/telegram/chat-photo?chat_id=${encodeURIComponent(chatId)}`;
 }
 
@@ -4840,56 +6238,99 @@ function LiveRoomGallery({
   rooms,
   onPause,
   c,
-  ui
+  ui,
 }: {
-  rooms: AppState["liveRooms"];
+  rooms: AppState['liveRooms'];
   onPause: (room: FriskyLiveRoom) => void;
   c: Copy;
-  ui: typeof uiCopy[Locale];
+  ui: (typeof uiCopy)[Locale];
 }) {
   return (
     <div className="room-gallery">
       {rooms.map((room) => {
-        const coverUrl = trustedFenrirImageUrl(room.coverImageUrl) || providerLogoPresets[room.provider];
+        const coverUrl =
+          trustedFenrirImageUrl(room.coverImageUrl) || providerLogoPresets[room.provider];
         return (
-        <article className="room-card" key={room.id}>
-          <div className="room-cover" style={coverUrl ? { backgroundImage: `url("${coverUrl}")` } : undefined}>
-            <span className={room.status === "active" ? "status good" : "status amber"}>{room.status}</span>
-            <span className="room-provider"><ProviderBadge provider={room.provider} c={c} compact /></span>
-          </div>
-          <div className="room-body">
-            <div>
-              <b>{room.title}</b>
-              <small>{room.id}</small>
+          <article className="room-card" key={room.id}>
+            <div
+              className="room-cover"
+              style={coverUrl ? { backgroundImage: `url("${coverUrl}")` } : undefined}
+            >
+              <span className={room.status === 'active' ? 'status good' : 'status amber'}>
+                {room.status}
+              </span>
+              <span className="room-provider">
+                <ProviderBadge provider={room.provider} c={c} compact />
+              </span>
             </div>
-            <code>{room.publicUrl}</code>
-            <div className="gate-badges">
-              <span>{ui.liveRoomSecondaryLabel}</span>
-              <span>{ui.liveRoomChallengeReady}</span>
+            <div className="room-body">
+              <div>
+                <b>{room.title}</b>
+                <small>{room.id}</small>
+              </div>
+              <code>{room.publicUrl}</code>
+              <div className="gate-badges">
+                <span>{ui.liveRoomSecondaryLabel}</span>
+                <span>{ui.liveRoomChallengeReady}</span>
+              </div>
+              <small className="muted">
+                {c.targetPrivate} {room.targetUrl}
+              </small>
+              <div className="row-actions">
+                <button
+                  className="secondary"
+                  onClick={() => navigator.clipboard?.writeText(room.publicUrl)}
+                >
+                  {c.copyRoom}
+                </button>
+                <button onClick={() => openSafeUrl(room.targetUrl)}>{c.openCall}</button>
+                <button className="danger-button" onClick={() => onPause(room)}>
+                  {c.pause}
+                </button>
+              </div>
             </div>
-            <small className="muted">{c.targetPrivate} {room.targetUrl}</small>
-            <div className="row-actions">
-              <button className="secondary" onClick={() => navigator.clipboard?.writeText(room.publicUrl)}>{c.copyRoom}</button>
-              <button onClick={() => openSafeUrl(room.targetUrl)}>{c.openCall}</button>
-              <button className="danger-button" onClick={() => onPause(room)}>{c.pause}</button>
-            </div>
-          </div>
-        </article>
-      );
+          </article>
+        );
       })}
     </div>
   );
 }
 
-function DnsWizard({ domains, selected, onSelect, c }: { domains: FriskyDomain[]; selected: FriskyDomain | null | undefined; onSelect: (id: string) => void; c: Copy }) {
+function DnsWizard({
+  domains,
+  selected,
+  onSelect,
+  c,
+  cloudflareBusy,
+  onSwitchCloudflare,
+  onCheckCloudflare,
+}: {
+  domains: FriskyDomain[];
+  selected: FriskyDomain | null | undefined;
+  onSelect: (id: string) => void;
+  c: Copy;
+  cloudflareBusy: boolean;
+  onSwitchCloudflare: (domain: FriskyDomain) => void;
+  onCheckCloudflare: (domain: FriskyDomain) => void;
+}) {
   if (!selected) return null;
+  const hasZone = Boolean(selected.cloudflareHostnameId);
+  const nsReady = (selected.cloudflareNameservers?.length ?? 0) > 0;
   return (
     <div className="dns-layout">
       <div className="domain-list">
         {domains.map((domain) => (
-          <button className={domain.id === selected.id ? "active-line" : ""} key={domain.id} onClick={() => onSelect(domain.id)}>
+          <button
+            className={domain.id === selected.id ? 'active-line' : ''}
+            key={domain.id}
+            onClick={() => onSelect(domain.id)}
+          >
             <b>{domain.domain}</b>
-            <span className={`status ${domain.status === "verified" ? "good" : domain.status === "failed" ? "danger" : "amber"}`}>{domain.status}</span>
+            <span
+              className={`status ${domain.status === 'verified' ? 'good' : domain.status === 'failed' ? 'danger' : 'amber'}`}
+            >
+              {domain.status}
+            </span>
           </button>
         ))}
       </div>
@@ -4897,19 +6338,87 @@ function DnsWizard({ domains, selected, onSelect, c }: { domains: FriskyDomain[]
         <div className="cloudflare-recommendation">
           <b>{c.recommendedPath}</b>
           <p>{c.recommendedPathBody}</p>
-          <p className="frisky-tip"><b>{c.friskyTip}</b> {c.friskyTipBody}</p>
+          <p className="frisky-tip">
+            <b>{c.friskyTip}</b> {c.friskyTipBody}
+          </p>
           <div className="step-line">
             <span className="status good">{c.steps[0]}</span>
-            <span className={selected.status === "verified" ? "status good" : "status amber"}>{c.steps[1]}</span>
-            <span className={selected.certificateStatus === "active" ? "status good" : "status amber"}>{c.steps[2]} {selected.certificateStatus}</span>
-            <span className={selected.status === "verified" && selected.certificateStatus === "active" ? "status good" : "status amber"}>{c.steps[3]}</span>
+            <span className={selected.status === 'verified' ? 'status good' : 'status amber'}>
+              {c.steps[1]}
+            </span>
+            <span
+              className={selected.certificateStatus === 'active' ? 'status good' : 'status amber'}
+            >
+              {c.steps[2]} {selected.certificateStatus}
+            </span>
+            <span
+              className={
+                selected.status === 'verified' && selected.certificateStatus === 'active'
+                  ? 'status good'
+                  : 'status amber'
+              }
+            >
+              {c.steps[3]}
+            </span>
           </div>
+          <div className="cloudflare-switch-actions" aria-label="Switch DNS to Cloudflare">
+            <button
+              type="button"
+              disabled={cloudflareBusy}
+              onClick={() => onSwitchCloudflare(selected)}
+            >
+              {cloudflareBusy
+                ? 'Working with Cloudflare...'
+                : hasZone
+                  ? 'Re-sync Cloudflare zone'
+                  : 'Switch DNS to Cloudflare'}
+            </button>
+            {hasZone && (
+              <button
+                type="button"
+                className="secondary"
+                disabled={cloudflareBusy}
+                onClick={() => onCheckCloudflare(selected)}
+              >
+                {cloudflareBusy ? 'Checking...' : 'Check propagation & SSL'}
+              </button>
+            )}
+          </div>
+          {hasZone && (
+            <p className="cloudflare-switch-note">
+              {nsReady
+                ? selected.certificateStatus === 'active'
+                  ? '✅ Cloudflare zone active with an automatic certificate. Telegram Lock URLs are secured over HTTPS.'
+                  : 'Zone created. Set the nameservers below at your registrar, then run “Check propagation & SSL”. The certificate issues automatically once nameservers point to Cloudflare.'
+                : 'Zone created — waiting on Cloudflare to assign nameservers.'}
+            </p>
+          )}
         </div>
-        <DnsRecord type="NS" name="@" value={selected.cloudflareNameservers?.join(" / ") ?? "Cloudflare assigned nameservers"} purpose={c.nsPurpose} />
-        <DnsRecord type="TXT" name={selected.txtRecordName} value={selected.txtRecordValue} purpose={c.txtPurpose} />
-        <DnsRecord type="CNAME" name={selected.cnameHost} value={selected.cnameTarget} purpose={c.cnamePurpose} />
+        <DnsRecord
+          type="NS"
+          name="@"
+          value={selected.cloudflareNameservers?.join(' / ') ?? 'Cloudflare assigned nameservers'}
+          purpose={c.nsPurpose}
+        />
+        <DnsRecord
+          type="TXT"
+          name={selected.txtRecordName}
+          value={selected.txtRecordValue}
+          purpose={c.txtPurpose}
+        />
+        <DnsRecord
+          type="CNAME"
+          name={selected.cnameHost}
+          value={selected.cnameTarget}
+          purpose={c.cnamePurpose}
+        />
         <div className="provider-tabs">
-          {["Cloudflare recommended", "Dynadot registrar", "Namecheap registrar", "Generic registrar"].map((provider) => (
+          {[
+            'Cloudflare recommended',
+            'Dynadot registrar',
+            'Namecheap registrar',
+            'Generic registrar',
+          ].map((provider) => (
             <div className="provider" key={provider}>
               <b>{provider}</b>
               <small>{c.friskyTipBody}</small>
@@ -4921,7 +6430,17 @@ function DnsWizard({ domains, selected, onSelect, c }: { domains: FriskyDomain[]
   );
 }
 
-function DnsRecord({ type, name, value, purpose }: { type: string; name: string; value: string; purpose: string }) {
+function DnsRecord({
+  type,
+  name,
+  value,
+  purpose,
+}: {
+  type: string;
+  name: string;
+  value: string;
+  purpose: string;
+}) {
   return (
     <div className="dns-record">
       <span>{type}</span>
@@ -4932,7 +6451,15 @@ function DnsRecord({ type, name, value, purpose }: { type: string; name: string;
   );
 }
 
-function RecommendedTools({ state, onOpen, c }: { state: AppState; onOpen: (slug: string) => void; c: Copy }) {
+function RecommendedTools({
+  state,
+  onOpen,
+  c,
+}: {
+  state: AppState;
+  onOpen: (slug: string) => void;
+  c: Copy;
+}) {
   return (
     <div className="commerce-panel">
       <div>
@@ -4942,18 +6469,22 @@ function RecommendedTools({ state, onOpen, c }: { state: AppState; onOpen: (slug
       <div className="commerce-grid">
         {state.commissionLinks.map((link) => (
           <a
-            href={absoluteUrl(link.url) || "#"}
+            href={absoluteUrl(link.url) || '#'}
             className={`commerce-card ${link.status}`}
             key={link.id}
             onClick={(event) => {
               event.preventDefault();
-              onOpen(link.url.split("/").pop() ?? link.id);
+              onOpen(link.url.split('/').pop() ?? link.id);
               openAnyUrl(link.url);
             }}
           >
             <b>{link.label}</b>
-            <span>{link.provider} · {link.partnerStatus}</span>
-            <small>{link.commissionNote} {link.clicks} tracked clicks.</small>
+            <span>
+              {link.provider} · {link.partnerStatus}
+            </span>
+            <small>
+              {link.commissionNote} {link.clicks} tracked clicks.
+            </small>
           </a>
         ))}
         <div className="commerce-card pending">
@@ -4964,8 +6495,15 @@ function RecommendedTools({ state, onOpen, c }: { state: AppState; onOpen: (slug
         <div className="commerce-card badge-card">
           <b>{c.digitalOceanBadge}</b>
           <span>{c.referralReady}</span>
-          <a href="https://www.digitalocean.com/?refcode=e31bed76086e&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge" target="_blank" rel="noreferrer">
-            <img src="https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%201.svg" alt="DigitalOcean Referral Badge" />
+          <a
+            href="https://www.digitalocean.com/?refcode=e31bed76086e&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <img
+              src="https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%201.svg"
+              alt="DigitalOcean Referral Badge"
+            />
           </a>
         </div>
       </div>
@@ -4976,7 +6514,7 @@ function RecommendedTools({ state, onOpen, c }: { state: AppState; onOpen: (slug
 function CelebrationBurst({
   celebration,
   dnsLabel,
-  commerceLabel
+  commerceLabel,
 }: {
   celebration: Celebration;
   dnsLabel: string;
@@ -4994,7 +6532,7 @@ function CelebrationBurst({
           <img src="/fenrir-splash-icon.svg" alt="" />
         </span>
         <div>
-          <p className="label">{celebration.tone === "dns" ? dnsLabel : commerceLabel}</p>
+          <p className="label">{celebration.tone === 'dns' ? dnsLabel : commerceLabel}</p>
           <h2>{celebration.title}</h2>
           <p>{celebration.detail}</p>
         </div>

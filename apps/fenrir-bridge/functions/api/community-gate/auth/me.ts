@@ -4,9 +4,9 @@ import {
   communityGateDataConfigured,
   communityGateNotConfigured,
   loadOrCreateProfile,
-  requireCommunityGateUser
-} from "../../../_lib/community-gate";
-import { noStoreJson } from "../../../_lib/responses";
+  requireCommunityGateUser,
+} from '../../../_lib/community-gate';
+import { noStoreJson } from '../../../_lib/responses';
 
 export async function onRequestGet(context: any) {
   if (!communityGateAuthConfigured(context.env)) return communityGateNotConfigured(context.env);
@@ -14,30 +14,34 @@ export async function onRequestGet(context: any) {
   try {
     const user = await requireCommunityGateUser(context.request, context.env);
     if (!communityGateDataConfigured(context.env)) {
-      return noStoreJson({
-        ok: false,
-        authenticated: true,
-        product: "fenrir-community-gate",
-        error: "community_gate_data_not_configured",
-        detail: {
-          message: "Firebase Auth accepted the user, but the Community Gate data plane still needs NEON_DATABASE_URL and docs/neon-community-gate-schema.sql.",
-          missing: ["NEON_DATABASE_URL"]
+      return noStoreJson(
+        {
+          ok: false,
+          authenticated: true,
+          product: 'fenrir-community-gate',
+          error: 'community_gate_data_not_configured',
+          detail: {
+            message:
+              'Firebase Auth accepted the user, but the Community Gate data plane still needs NEON_DATABASE_URL and docs/neon-community-gate-schema.sql.',
+            missing: ['NEON_DATABASE_URL'],
+          },
+          user: {
+            authSubject: user.authSubject,
+            authProvider: user.authProvider,
+            email: user.email,
+            displayName: user.displayName,
+            role: user.role,
+            accessStatus: user.accessStatus,
+          },
         },
-        user: {
-          authSubject: user.authSubject,
-          authProvider: user.authProvider,
-          email: user.email,
-          displayName: user.displayName,
-          role: user.role,
-          accessStatus: user.accessStatus
-        }
-      }, { status: 503 });
+        { status: 503 }
+      );
     }
     const profile = await loadOrCreateProfile(context.env, user);
     return noStoreJson({
       ok: true,
       authenticated: true,
-      product: "fenrir-community-gate",
+      product: 'fenrir-community-gate',
       user: {
         id: profile.id,
         authSubject: profile.auth_subject,
@@ -46,10 +50,10 @@ export async function onRequestGet(context: any) {
         displayName: profile.display_name,
         role: profile.role,
         status: profile.status,
-        accessStatus: user.accessStatus
+        accessStatus: user.accessStatus,
       },
       communitySlug: user.communitySlug,
-      communityOrgId: user.communityOrgId
+      communityOrgId: user.communityOrgId,
     });
   } catch (error) {
     return authErrorResponse(error);

@@ -10,9 +10,9 @@
       :root {
         color-scheme: dark;
         --bg: #030607;
-        --panel: rgba(11, 18, 20, .86);
-        --panel-strong: rgba(16, 25, 28, .94);
-        --line: rgba(156, 235, 220, .16);
+        --panel: rgba(11, 18, 20, 0.86);
+        --panel-strong: rgba(16, 25, 28, 0.94);
+        --line: rgba(156, 235, 220, 0.16);
         --text: #f7fffc;
         --muted: #9fb8b3;
         --muted-2: #7a928d;
@@ -20,34 +20,45 @@
         --teal: #22c7a8;
         --amber: #f1b75c;
         --blue: #8cb9ff;
-        --shadow: 0 28px 90px rgba(0, 0, 0, .42);
+        --shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
         --muted-2: #7f9691;
       }
 
-      * { box-sizing: border-box; }
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
         color: var(--text);
         background:
-          radial-gradient(circle at 50% 0%, rgba(255,51,78,.16), transparent 34rem),
-          radial-gradient(circle at 92% 18%, rgba(34,199,168,.14), transparent 30rem),
+          radial-gradient(circle at 50% 0%, rgba(255, 51, 78, 0.16), transparent 34rem),
+          radial-gradient(circle at 92% 18%, rgba(34, 199, 168, 0.14), transparent 30rem),
           linear-gradient(180deg, #05090b, var(--bg) 34rem);
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
       }
 
       body::before {
-        content: "";
+        content: '';
         position: fixed;
         inset: 0;
         pointer-events: none;
         background-image:
-          linear-gradient(rgba(156,235,220,.055) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(156,235,220,.055) 1px, transparent 1px);
+          linear-gradient(rgba(156, 235, 220, 0.055) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(156, 235, 220, 0.055) 1px, transparent 1px);
         background-size: 64px 64px;
-        mask-image: linear-gradient(180deg, rgba(0,0,0,.78), transparent 70%);
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.78), transparent 70%);
       }
 
-      a { color: #a8fff0; }
+      a {
+        color: #a8fff0;
+      }
       .page {
         width: min(1180px, calc(100% - 32px));
         margin: 0 auto;
@@ -94,7 +105,7 @@
       .hero {
         min-height: 88svh;
         display: grid;
-        grid-template-columns: minmax(0, 1.1fr) minmax(340px, .9fr);
+        grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
         align-items: center;
         gap: clamp(28px, 5vw, 72px);
         padding: 12px 0 28px;
@@ -104,7 +115,7 @@
         margin: 18px 0 14px;
         max-width: 780px;
         font-size: clamp(52px, 8vw, 112px);
-        line-height: .88;
+        line-height: 0.88;
         letter-spacing: 0;
         text-transform: uppercase;
       }
@@ -132,19 +143,28 @@
 
       .badge,
       .chip {
-        border: 1px solid rgba(255,255,255,.12);
+        border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 999px;
         padding: 7px 10px;
         color: #dffcf6;
-        background: rgba(255,255,255,.045);
+        background: rgba(255, 255, 255, 0.045);
         font-size: 12px;
         font-weight: 800;
         text-transform: uppercase;
       }
 
-      .badge.red { color: #ffd7dd; border-color: rgba(255,51,78,.34); }
-      .badge.teal { color: #cffff6; border-color: rgba(34,199,168,.34); }
-      .badge.amber { color: #ffe2aa; border-color: rgba(241,183,92,.34); }
+      .badge.red {
+        color: #ffd7dd;
+        border-color: rgba(255, 51, 78, 0.34);
+      }
+      .badge.teal {
+        color: #cffff6;
+        border-color: rgba(34, 199, 168, 0.34);
+      }
+      .badge.amber {
+        color: #ffe2aa;
+        border-color: rgba(241, 183, 92, 0.34);
+      }
 
       .stack {
         display: grid;
@@ -158,7 +178,7 @@
         border: 1px solid var(--line);
         border-radius: 10px;
         background:
-          linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.025)),
+          linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025)),
           var(--panel);
         box-shadow: var(--shadow);
         backdrop-filter: blur(18px);
@@ -206,7 +226,7 @@
         width: 100%;
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: rgba(8, 12, 14, .95);
+        background: rgba(8, 12, 14, 0.95);
         color: var(--text);
         min-height: 42px;
         padding: 10px 12px;
@@ -215,13 +235,15 @@
         outline: none;
       }
 
-      textarea { min-height: 106px; }
+      textarea {
+        min-height: 106px;
+      }
 
       input:focus,
       select:focus,
       textarea:focus {
-        border-color: rgba(15,159,135,.65);
-        box-shadow: 0 0 0 3px rgba(15,159,135,.12);
+        border-color: rgba(15, 159, 135, 0.65);
+        box-shadow: 0 0 0 3px rgba(15, 159, 135, 0.12);
       }
 
       .grid {
@@ -247,10 +269,10 @@
 
       .callout {
         padding: 18px;
-        border-color: rgba(241,183,92,.3);
+        border-color: rgba(241, 183, 92, 0.3);
         background:
-          radial-gradient(circle at 0% 0%, rgba(241,183,92,.15), transparent 30%),
-          rgba(21, 18, 12, .82);
+          radial-gradient(circle at 0% 0%, rgba(241, 183, 92, 0.15), transparent 30%),
+          rgba(21, 18, 12, 0.82);
         color: #ffe7bd;
       }
 
@@ -258,7 +280,7 @@
         border: 1px solid var(--line);
         border-radius: 16px;
         padding: 20px;
-        background: linear-gradient(180deg, rgba(12,18,20,.96), rgba(8,12,14,.96));
+        background: linear-gradient(180deg, rgba(12, 18, 20, 0.96), rgba(8, 12, 14, 0.96));
         box-shadow: var(--shadow);
       }
 
@@ -288,7 +310,7 @@
 
       button,
       .button-link {
-        border: 1px solid rgba(255, 87, 87, .42);
+        border: 1px solid rgba(255, 87, 87, 0.42);
         border-radius: 8px;
         min-height: 42px;
         padding: 10px 14px;
@@ -298,7 +320,9 @@
         font-weight: 800;
         cursor: pointer;
         text-decoration: none;
-        box-shadow: 0 12px 28px rgba(255,23,68,.16), inset 0 0 0 1px rgba(255,255,255,.08);
+        box-shadow:
+          0 12px 28px rgba(255, 23, 68, 0.16),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.08);
       }
 
       .button-link.ghost {
@@ -373,15 +397,36 @@
             <span class="badge red">Limited review</span>
           </div>
           <h1><span class="gradient-text">Request Alpha Access</span></h1>
-          <p class="lede">Join the Fenrir Bridge waitlist for Telegram access gates, protected community entry, and the volunteer-admin review flow around MyFenrir and Neon Nexus.</p>
+          <p class="lede">
+            Join the Fenrir Bridge waitlist for Telegram access gates, protected community entry,
+            and the volunteer-admin review flow around MyFenrir and Neon Nexus.
+          </p>
           <div class="stack">
             <div class="callout">
-              <strong>What happens next:</strong> we review requests in order, confirm the right access path, and reply with the next step when the queue opens.
+              <strong>What happens next:</strong> we review requests in order, confirm the right
+              access path, and reply with the next step when the queue opens.
             </div>
             <div class="grid">
-              <article class="card"><h3>Clear access</h3><p>We keep the front door calm and readable, so the right people get in without noisy invite chaos.</p></article>
-              <article class="card"><h3>Protected rooms</h3><p>Early adopters help test the real flow while volunteer admins keep the group useful and safe.</p></article>
-              <article class="card"><h3>Separate layers</h3><p>MyFenrir, Telegram, and Neon Nexus each keep their own identity and review state.</p></article>
+              <article class="card">
+                <h3>Clear access</h3>
+                <p>
+                  We keep the front door calm and readable, so the right people get in without noisy
+                  invite chaos.
+                </p>
+              </article>
+              <article class="card">
+                <h3>Protected rooms</h3>
+                <p>
+                  Early adopters help test the real flow while volunteer admins keep the group
+                  useful and safe.
+                </p>
+              </article>
+              <article class="card">
+                <h3>Separate layers</h3>
+                <p>
+                  MyFenrir, Telegram, and Neon Nexus each keep their own identity and review state.
+                </p>
+              </article>
             </div>
           </div>
         </div>
@@ -397,7 +442,13 @@
               </label>
               <label>
                 Email
-                <input name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+                <input
+                  name="email"
+                  type="email"
+                  autocomplete="email"
+                  placeholder="you@example.com"
+                  required
+                />
               </label>
             </div>
             <div class="form-row">
@@ -419,16 +470,26 @@
             </div>
             <label>
               Anything we should know?
-              <textarea name="message" placeholder="Short note about your use case, team, or what you want to try first."></textarea>
+              <textarea
+                name="message"
+                placeholder="Short note about your use case, team, or what you want to try first."
+              ></textarea>
             </label>
-            <input name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;" />
+            <input
+              name="company"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              style="position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0"
+            />
             <div class="form-actions">
               <button type="submit">Request Alpha Access</button>
               <a class="button-link ghost" href="./admin-guide.html">Read the admin guide</a>
             </div>
             <div id="waitlist-status" class="status" aria-live="polite"></div>
             <div class="fineprint">
-              By submitting, you agree that Fenrir Bridge may review this request for alpha access. No public launch promises yet.
+              By submitting, you agree that Fenrir Bridge may review this request for alpha access.
+              No public launch promises yet.
             </div>
           </form>
         </aside>
@@ -449,7 +510,7 @@
         invalid_name: 'Please enter your name.',
         invalid_email: 'Please enter a valid email address.',
         invalid_interest: 'Please choose what you want to test.',
-        d1_not_configured: 'Waitlist is not available right now. Please try again later.'
+        d1_not_configured: 'Waitlist is not available right now. Please try again later.',
       };
 
       form.addEventListener('submit', async (event) => {
@@ -466,7 +527,8 @@
         submitButton.disabled = true;
 
         if (localPreview) {
-          status.textContent = 'Local preview mode. Open the deployed waitlist page to submit a real request.';
+          status.textContent =
+            'Local preview mode. Open the deployed waitlist page to submit a real request.';
           submitButton.disabled = false;
           return;
         }
@@ -483,13 +545,15 @@
               message: data.message,
               source: 'waitlist-page',
               pagePath: location.pathname,
-              referrer: document.referrer || ''
-            })
+              referrer: document.referrer || '',
+            }),
           });
 
           const payload = await response.json().catch(() => null);
           if (!response.ok || !payload?.ok) {
-            status.textContent = errorMessages[payload?.error] || 'We could not save the request yet. Please try again.';
+            status.textContent =
+              errorMessages[payload?.error] ||
+              'We could not save the request yet. Please try again.';
             return;
           }
 

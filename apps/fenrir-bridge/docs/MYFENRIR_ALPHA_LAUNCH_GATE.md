@@ -34,16 +34,16 @@ Do not sell the product as a broad security platform yet. Keep the promise speci
 
 ## Go / No-Go Table
 
-| Area | Alpha status | Paid public status | Evidence needed |
-| --- | --- | --- | --- |
-| Domain live | GO | GO | `https://www.myfenrir.com` loads the current build |
-| Brand clarity | GO | GO | Public copy uses `Fenrir Bridge by Frisky` or a related searchable phrase |
-| SEO uniqueness | WATCH | WATCH | Search terms favor `Fenrir Bridge`, not plain `Fenrir` |
-| Trust/legal pages | GO if visible | BLOCKER if absent | `/legal`, `/terms`, `/privacy`, `/acceptable-use` load publicly |
-| Support path | GO if staffed | BLOCKER if unclear | Support email, Telegram support channel, or admin contact path is visible |
-| Security explanation | GO if plain | BLOCKER if overclaimed | No fake or unexplained claims such as broad encryption promises |
-| Payment readiness | TELEGRAM STARS ONLY | GO when tested | Telegram Stars invoice, webhook, D1 entitlement status, refund/support path, and plan gating verified |
-| Telegram bot flow | CONTROLLED TEST | NO-GO until tested | Join request, identity check, approval/denial, admin override, and error fallback verified |
+| Area                 | Alpha status        | Paid public status     | Evidence needed                                                                                       |
+| -------------------- | ------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| Domain live          | GO                  | GO                     | `https://www.myfenrir.com` loads the current build                                                    |
+| Brand clarity        | GO                  | GO                     | Public copy uses `Fenrir Bridge by Frisky` or a related searchable phrase                             |
+| SEO uniqueness       | WATCH               | WATCH                  | Search terms favor `Fenrir Bridge`, not plain `Fenrir`                                                |
+| Trust/legal pages    | GO if visible       | BLOCKER if absent      | `/legal`, `/terms`, `/privacy`, `/acceptable-use` load publicly                                       |
+| Support path         | GO if staffed       | BLOCKER if unclear     | Support email, Telegram support channel, or admin contact path is visible                             |
+| Security explanation | GO if plain         | BLOCKER if overclaimed | No fake or unexplained claims such as broad encryption promises                                       |
+| Payment readiness    | TELEGRAM STARS ONLY | GO when tested         | Telegram Stars invoice, webhook, D1 entitlement status, refund/support path, and plan gating verified |
+| Telegram bot flow    | CONTROLLED TEST     | NO-GO until tested     | Join request, identity check, approval/denial, admin override, and error fallback verified            |
 
 ## Alpha Requirements
 

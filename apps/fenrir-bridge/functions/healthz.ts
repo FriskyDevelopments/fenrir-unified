@@ -4,11 +4,11 @@
  * path in monitoring instead of `/`.
  */
 export const onRequestGet: PagesFunction = async () => {
-  return new Response("ok\n", {
+  return new Response('ok\n', {
     status: 200,
     headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Cache-Control": "no-store",
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-store',
     },
   });
 };
@@ -17,7 +17,7 @@ export const onRequestHead: PagesFunction = async () => {
   return new Response(null, {
     status: 200,
     headers: {
-      "Cache-Control": "no-store",
+      'Cache-Control': 'no-store',
     },
   });
 };

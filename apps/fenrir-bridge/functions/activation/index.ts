@@ -1,12 +1,15 @@
 export async function onRequest(context: any) {
   const url = new URL(context.request.url);
-  
+
   // Check if a bot parameter is specified to allow direct redirect
-  const botParam = url.searchParams.get("bot");
-  if (botParam === "security") {
-    return Response.redirect(new URL("/activation/security" + url.search, url.origin).toString(), 302);
-  } else if (botParam === "core") {
-    return Response.redirect(new URL("/activation/core" + url.search, url.origin).toString(), 302);
+  const botParam = url.searchParams.get('bot');
+  if (botParam === 'security') {
+    return Response.redirect(
+      new URL('/activation/security' + url.search, url.origin).toString(),
+      302
+    );
+  } else if (botParam === 'core') {
+    return Response.redirect(new URL('/activation/core' + url.search, url.origin).toString(), 302);
   }
 
   const html = `<!DOCTYPE html>
@@ -179,9 +182,10 @@ export async function onRequest(context: any) {
 
   return new Response(html, {
     headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "public, max-age=60",
-      "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com https://telegram.org https://oauth.telegram.org https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://esm.run https://*.esm.run; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; object-src 'none'; connect-src 'self' https://yqevglppbhuoxxfsfnih.supabase.co https://cloudflareinsights.com https://*.supabase.co https://api.workos.com https://auth.workos.com https://*.telegram.org; frame-src https://oauth.telegram.org https://telegram.org; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://auth.workos.com; upgrade-insecure-requests"
-    }
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'public, max-age=60',
+      'Content-Security-Policy':
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com https://telegram.org https://oauth.telegram.org https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://esm.run https://*.esm.run; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; object-src 'none'; connect-src 'self' https://yqevglppbhuoxxfsfnih.supabase.co https://cloudflareinsights.com https://*.supabase.co https://api.workos.com https://auth.workos.com https://*.telegram.org; frame-src https://oauth.telegram.org https://telegram.org; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://auth.workos.com; upgrade-insecure-requests",
+    },
   });
 }

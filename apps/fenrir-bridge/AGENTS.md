@@ -1,16 +1,19 @@
 # AGENTS.md — Fenrir Bridge (frisky-spark-lab)
 
 ## Project
+
 - **Name**: Fenrir Bridge by Frisky
 - **Domain**: myfenrir.com
 - **Stack**: React 19 + TypeScript + Vite + TailwindCSS v4 + Cloudflare Pages + Pages Functions + D1
 
 ## Quick Context
+
 This is the **production monorepo** for Fenrir Bridge. The app is deployed to Cloudflare Pages
 (`fenrir-bridge` project) at `myfenrir.com`. All secrets are already set in Cloudflare Pages
 production environment (SUPABASE_URL, SUPABASE_ANON_KEY, SESSION_SECRET, TELEGRAM_BOT_TOKEN, etc.).
 
 ## Setup
+
 ```bash
 cd apps/fenrir-bridge
 npm install
@@ -21,11 +24,13 @@ npm run deploy     # wrangler pages deploy dist/ --project-name fenrir-bridge
 ```
 
 ## Deploy
+
 ```bash
 npm run build && wrangler pages deploy dist/ --project-name fenrir-bridge
 ```
 
 ## Code Map
+
 - `src/App.tsx` — root component, Supabase auth session management
 - `src/components/` — UI components (sections, shared)
 - `src/services/` — API client layer
@@ -39,6 +44,7 @@ npm run build && wrangler pages deploy dist/ --project-name fenrir-bridge
 - `wrangler.fenrir-gate-router.toml` — Worker route config for `myfenrir.com/gate/*` and `www.myfenrir.com/gate/*`
 
 ## D1 Database
+
 - **Name**: `fenrir-bridge`
 - **ID**: `1238059e-2638-4317-982e-e74dda046ccb`
 - **Tables (17)**: app_users, billing_customers, billing_subscriptions, frisky_audit_logs,
@@ -48,6 +54,7 @@ npm run build && wrangler pages deploy dist/ --project-name fenrir-bridge
   workspace_members, workspaces
 
 ## Current Status (2026-05-23)
+
 - ✅ `myfenrir.com` is live and returning HTTP 200
 - ✅ D1 database has 17 tables (schema applied)
 - ✅ All required secrets set in Cloudflare Pages production env
@@ -55,12 +62,14 @@ npm run build && wrangler pages deploy dist/ --project-name fenrir-bridge
 - ⚠️ Stripe/card billing is optional standby and must not block this launch path
 
 ## Immediate Tasks for AI Agents
+
 1. **BUILD & DEPLOY** — Run `npm run build` then `wrangler pages deploy dist/ --project-name fenrir-bridge`
 2. **TELEGRAM STARS SECRETS** — Required for this launch: TELEGRAM_BOT_TOKEN or TELEGRAM_PROD_BOT_TOKEN, FENRIR_TELEGRAM_BOT_USERNAME or MYFENRIR_TELEGRAM_BOT_USERNAME, TELEGRAM_WEBHOOK_SECRET
 3. **VERIFY /api/readiness** — After deploy, authenticated `curl https://myfenrir.com/api/readiness` should return JSON with `readyForPaidUsers: true` when OAuth, D1, and Telegram Stars are configured
 4. **GOOGLE OAUTH REDIRECT** — Ensure `https://myfenrir.com/auth/callback` is added to Google Cloud Console OAuth client
 
 ## Working Rules
+
 - Keep changes minimal and scoped
 - Never commit secrets or .env files
 - Prefer existing patterns in `functions/_lib/`

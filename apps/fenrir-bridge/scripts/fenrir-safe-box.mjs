@@ -1,91 +1,98 @@
 #!/usr/bin/env node
-import { createCipheriv, pbkdf2Sync, randomBytes } from "node:crypto";
-import { createServer } from "node:http";
-import { readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { createCipheriv, pbkdf2Sync, randomBytes } from 'node:crypto';
+import { createServer } from 'node:http';
+import { readFile, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-const host = "127.0.0.1";
+const host = '127.0.0.1';
 const port = Number(process.env.FENRIR_SAFE_BOX_PORT || 17654);
-const envPath = resolve(".env.local");
-const encryptedPath = resolve(".fenrir-safe-box.enc");
+const envPath = resolve('.env.local');
+const encryptedPath = resolve('.fenrir-safe-box.enc');
 
 const secretGroups = [
   {
-    title: "Automation tokens",
-    fields: [
-      ["BUGBUG_API_TOKEN", "BugBug project API token from Integrations"]
-    ]
+    title: 'Automation tokens',
+    fields: [['BUGBUG_API_TOKEN', 'BugBug project API token from Integrations']],
   },
   {
-    title: "BugBug trial suites",
+    title: 'BugBug trial suites',
     fields: [
-      ["BUGBUG_FENRIR_SUITE_ID", "Fenrir smoke suite ID"],
-      ["BUGBUG_CLIPSFLOW_SUITE_ID", "ClipsFlow smoke suite ID"],
-      ["BUGBUG_HOSTOS_SUITE_ID", "HostOS/Lupita smoke suite ID"],
-      ["BUGBUG_FRISKY_GHOST_SUITE_ID", "Frisky Ghost smoke suite ID"],
-      ["BUGBUG_PROFILE_NAME", "Optional BugBug profile name"]
-    ]
+      ['BUGBUG_FENRIR_SUITE_ID', 'Fenrir smoke suite ID'],
+      ['BUGBUG_CLIPSFLOW_SUITE_ID', 'ClipsFlow smoke suite ID'],
+      ['BUGBUG_HOSTOS_SUITE_ID', 'HostOS/Lupita smoke suite ID'],
+      ['BUGBUG_FRISKY_GHOST_SUITE_ID', 'Frisky Ghost smoke suite ID'],
+      ['BUGBUG_PROFILE_NAME', 'Optional BugBug profile name'],
+    ],
   },
   {
-    title: "WorkOS auth (primary login broker)",
+    title: 'WorkOS auth (primary login broker)',
     fields: [
-      ["WORKOS_CLIENT_ID", "WorkOS AuthKit client ID (client_...)"],
-      ["WORKOS_API_KEY", "WorkOS API key (sk_...). Used server-side for the code exchange."]
-    ]
+      ['WORKOS_CLIENT_ID', 'WorkOS AuthKit client ID (client_...)'],
+      ['WORKOS_API_KEY', 'WorkOS API key (sk_...). Used server-side for the code exchange.'],
+    ],
   },
   {
-    title: "Supabase (optional profile store only)",
+    title: 'Supabase (optional profile store only)',
     fields: [
-      ["SUPABASE_URL", "Server Supabase project URL (optional; profile upserts only)"],
-      ["SUPABASE_SERVICE_ROLE_KEY", "Server-only service role key (optional; profile upserts only)"]
-    ]
+      ['SUPABASE_URL', 'Server Supabase project URL (optional; profile upserts only)'],
+      [
+        'SUPABASE_SERVICE_ROLE_KEY',
+        'Server-only service role key (optional; profile upserts only)',
+      ],
+    ],
   },
   {
-    title: "Neon community gate",
+    title: 'Neon community gate',
     fields: [
-      ["NEON_DATABASE_URL", "Runtime database URL only if Fenrir Community Gate needs direct DB access. Neon management uses OAuth connector."],
-      ["FENRIR_COMMUNITY_AUTH_SECRET", "Community auth signing secret"]
-    ]
+      [
+        'NEON_DATABASE_URL',
+        'Runtime database URL only if Fenrir Community Gate needs direct DB access. Neon management uses OAuth connector.',
+      ],
+      ['FENRIR_COMMUNITY_AUTH_SECRET', 'Community auth signing secret'],
+    ],
   },
   {
-    title: "Fenrir runtime",
+    title: 'Fenrir runtime',
     fields: [
-      ["SESSION_SECRET", "Pages session signing secret"],
-      ["FENRIR_CANONICAL_ORIGIN", "Canonical origin, usually https://www.myfenrir.com"],
-      ["PUBLIC_SITE_URL", "Public site URL for Stripe returns"]
-    ]
+      ['SESSION_SECRET', 'Pages session signing secret'],
+      ['FENRIR_CANONICAL_ORIGIN', 'Canonical origin, usually https://www.myfenrir.com'],
+      ['PUBLIC_SITE_URL', 'Public site URL for Stripe returns'],
+    ],
   },
   {
-    title: "Telegram",
+    title: 'Telegram',
     fields: [
-      ["TELEGRAM_BOT_TOKEN", "Fallback bot token"],
-      ["TELEGRAM_PROD_BOT_TOKEN", "Production bot token"],
-      ["TELEGRAM_DEV_BOT_TOKEN", "Development bot token"],
-      ["FENRIR_TELEGRAM_BOT_USERNAME", "Bot username without @"],
-      ["TELEGRAM_WEBHOOK_SECRET", "Webhook verification secret"]
-    ]
+      ['TELEGRAM_BOT_TOKEN', 'Fallback bot token'],
+      ['TELEGRAM_PROD_BOT_TOKEN', 'Production bot token'],
+      ['TELEGRAM_DEV_BOT_TOKEN', 'Development bot token'],
+      ['FENRIR_TELEGRAM_BOT_USERNAME', 'Bot username without @'],
+      ['TELEGRAM_WEBHOOK_SECRET', 'Webhook verification secret'],
+    ],
   },
   {
-    title: "Stripe",
+    title: 'Stripe',
     fields: [
-      ["STRIPE_SECRET_KEY", "Stripe secret key"],
-      ["STRIPE_WEBHOOK_SECRET", "Stripe webhook signing secret"],
-      ["STRIPE_STARTER_PRICE_ID", "Starter price id"],
-      ["STRIPE_PRO_PRICE_ID", "Pro price id"],
-      ["STRIPE_OPERATOR_PRICE_ID", "Operator price id"]
-    ]
+      ['STRIPE_SECRET_KEY', 'Stripe secret key'],
+      ['STRIPE_WEBHOOK_SECRET', 'Stripe webhook signing secret'],
+      ['STRIPE_STARTER_PRICE_ID', 'Starter price id'],
+      ['STRIPE_PRO_PRICE_ID', 'Pro price id'],
+      ['STRIPE_OPERATOR_PRICE_ID', 'Operator price id'],
+    ],
   },
   {
-    title: "Frisky service auth",
+    title: 'Frisky service auth',
     fields: [
-      ["FRISKY_BOT_API_TOKEN", "Unified server token for Frisky MCP calls, specialist feeds, and Frisky-backed bot workflows. Telegram BotFather tokens only handle Telegram transport."]
-    ]
-  }
+      [
+        'FRISKY_BOT_API_TOKEN',
+        'Unified server token for Frisky MCP calls, specialist feeds, and Frisky-backed bot workflows. Telegram BotFather tokens only handle Telegram transport.',
+      ],
+    ],
+  },
 ];
 
 const allKeys = secretGroups.flatMap((group) => group.fields.map(([key]) => key));
-const deprecatedLocalKeys = new Set(["CLOUDFLARE_API_TOKEN", "SUPABASE_ACCESS_TOKEN", "MCP_TOKEN"]);
+const deprecatedLocalKeys = new Set(['CLOUDFLARE_API_TOKEN', 'SUPABASE_ACCESS_TOKEN', 'MCP_TOKEN']);
 
 function parseEnv(text) {
   const values = new Map();
@@ -104,7 +111,7 @@ function quoteEnv(value) {
 
 async function loadEnv() {
   if (!existsSync(envPath)) return new Map();
-  return parseEnv(await readFile(envPath, "utf8"));
+  return parseEnv(await readFile(envPath, 'utf8'));
 }
 
 async function saveEnv(incoming) {
@@ -116,39 +123,39 @@ async function saveEnv(incoming) {
     existing.set(key, quoteEnv(value.trim()));
   }
   const lines = [
-    "# Fenrir local secrets. Generated by npm run safe-box.",
-    "# This file is gitignored. Do not paste these values into chat.",
+    '# Fenrir local secrets. Generated by npm run safe-box.',
+    '# This file is gitignored. Do not paste these values into chat.',
     ...[...existing.entries()].map(([key, value]) => `${key}=${value}`),
-    ""
+    '',
   ];
-  await writeFile(envPath, lines.join("\n"), { mode: 0o600 });
+  await writeFile(envPath, lines.join('\n'), { mode: 0o600 });
 }
 
 async function saveEncrypted(incoming, passphrase) {
   if (!passphrase.trim()) return false;
   const salt = randomBytes(16);
   const iv = randomBytes(12);
-  const key = pbkdf2Sync(passphrase, salt, 310000, 32, "sha256");
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const key = pbkdf2Sync(passphrase, salt, 310000, 32, 'sha256');
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
   const payload = JSON.stringify(
     Object.fromEntries(Object.entries(incoming).filter(([, value]) => value.trim())),
     null,
     2
   );
-  const encrypted = Buffer.concat([cipher.update(payload, "utf8"), cipher.final()]);
+  const encrypted = Buffer.concat([cipher.update(payload, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
   await writeFile(
     encryptedPath,
     JSON.stringify(
       {
         version: 1,
-        kdf: "pbkdf2-sha256",
+        kdf: 'pbkdf2-sha256',
         iterations: 310000,
-        cipher: "aes-256-gcm",
-        salt: salt.toString("base64"),
-        iv: iv.toString("base64"),
-        tag: tag.toString("base64"),
-        data: encrypted.toString("base64")
+        cipher: 'aes-256-gcm',
+        salt: salt.toString('base64'),
+        iv: iv.toString('base64'),
+        tag: tag.toString('base64'),
+        data: encrypted.toString('base64'),
       },
       null,
       2
@@ -158,7 +165,7 @@ async function saveEncrypted(incoming, passphrase) {
   return true;
 }
 
-function html(message = "") {
+function html(message = '') {
   const groups = secretGroups
     .map(
       (group) => `
@@ -174,11 +181,11 @@ function html(message = "") {
                 </label>
               `
             )
-            .join("")}
+            .join('')}
         </section>
       `
     )
-    .join("");
+    .join('');
 
   return `<!doctype html>
 <html lang="en">
@@ -214,7 +221,7 @@ function html(message = "") {
 	        <p>Cloudflare, Supabase, and Neon management are OAuth-based. Do not enter Cloudflare Global API Keys here.</p>
 	      </div>
 	    </header>
-    ${message ? `<div class="notice">${message}</div>` : ""}
+    ${message ? `<div class="notice">${message}</div>` : ''}
     <form method="post" action="/save">
       <section>
         <h2>Encrypted backup</h2>
@@ -237,34 +244,44 @@ function html(message = "") {
 async function readBody(request) {
   const chunks = [];
   for await (const chunk of request) chunks.push(chunk);
-  return Buffer.concat(chunks).toString("utf8");
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 const server = createServer(async (request, response) => {
   try {
-    if (request.method === "GET") {
-      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+    if (request.method === 'GET') {
+      response.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
       response.end(html());
       return;
     }
-    if (request.method === "POST" && request.url === "/save") {
+    if (request.method === 'POST' && request.url === '/save') {
       const params = new URLSearchParams(await readBody(request));
-      const incoming = Object.fromEntries(allKeys.map((key) => [key, params.get(key) || ""]));
+      const incoming = Object.fromEntries(allKeys.map((key) => [key, params.get(key) || '']));
       await saveEnv(incoming);
-      const encrypted = await saveEncrypted(incoming, params.get("SAFE_BOX_PASSPHRASE") || "");
-      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
-      response.end(html(`Saved to .env.local${encrypted ? " and .fenrir-safe-box.enc" : ""}. No secret values were printed.`));
+      const encrypted = await saveEncrypted(incoming, params.get('SAFE_BOX_PASSPHRASE') || '');
+      response.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+      response.end(
+        html(
+          `Saved to .env.local${encrypted ? ' and .fenrir-safe-box.enc' : ''}. No secret values were printed.`
+        )
+      );
       return;
     }
-    response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-    response.end("not found\n");
+    response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.end('not found\n');
   } catch {
-    response.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-    response.end("safe box failed without printing secrets\n");
+    response.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.end('safe box failed without printing secrets\n');
   }
 });
 
 server.listen(port, host, () => {
   console.error(`Fenrir Safe Box: http://${host}:${port}`);
-  console.error("Local only. Keep this terminal open while entering secrets.");
+  console.error('Local only. Keep this terminal open while entering secrets.');
 });

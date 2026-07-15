@@ -1,4 +1,4 @@
-import { noStoreJson } from "../../_lib/responses";
+import { noStoreJson } from '../../_lib/responses';
 
 type WaitlistRequest = {
   name?: unknown;
@@ -12,14 +12,14 @@ type WaitlistRequest = {
 };
 
 function cleanText(value: unknown, max = 400) {
-  if (typeof value !== "string") return "";
+  if (typeof value !== 'string') return '';
   return value.trim().slice(0, max);
 }
 
 export async function onRequestPost(context: any) {
   const db = context.env?.DB;
   if (!db) {
-    return noStoreJson({ ok: false, error: "d1_not_configured" }, { status: 503 });
+    return noStoreJson({ ok: false, error: 'd1_not_configured' }, { status: 503 });
   }
 
   const body = (await context.request.json().catch(() => null)) as WaitlistRequest | null;
@@ -28,24 +28,24 @@ export async function onRequestPost(context: any) {
   const interest = cleanText(body?.interest, 120);
   const telegramHandle = cleanText(body?.telegramHandle, 80);
   const message = cleanText(body?.message, 2000);
-  const source = cleanText(body?.source, 80) || "waitlist-page";
+  const source = cleanText(body?.source, 80) || 'waitlist-page';
   const pagePath = cleanText(body?.pagePath, 120);
   const referrer = cleanText(body?.referrer, 180);
 
   if (!name) {
-    return noStoreJson({ ok: false, error: "invalid_name" }, { status: 400 });
+    return noStoreJson({ ok: false, error: 'invalid_name' }, { status: 400 });
   }
 
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    return noStoreJson({ ok: false, error: "invalid_email" }, { status: 400 });
+    return noStoreJson({ ok: false, error: 'invalid_email' }, { status: 400 });
   }
 
   if (!interest) {
-    return noStoreJson({ ok: false, error: "invalid_interest" }, { status: 400 });
+    return noStoreJson({ ok: false, error: 'invalid_interest' }, { status: 400 });
   }
 
   const now = new Date().toISOString();
-  const id = `frisky_wait_${crypto.randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase()}`;
+  const id = `frisky_wait_${crypto.randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`;
 
   await db
     .prepare(
@@ -68,7 +68,7 @@ export async function onRequestPost(context: any) {
 
   return noStoreJson({
     ok: true,
-    status: "pending",
-    message: "Waitlist request saved."
+    status: 'pending',
+    message: 'Waitlist request saved.',
   });
 }

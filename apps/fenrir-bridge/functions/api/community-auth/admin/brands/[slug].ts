@@ -1,4 +1,4 @@
-import { readSession } from "../../../../_lib/auth";
+import { readSession } from '../../../../_lib/auth';
 import {
   assertBrandPayload,
   communityAuthConfigured,
@@ -6,16 +6,16 @@ import {
   ensureCommunityBrandPayload,
   resolveCommunityAuthError,
   upsertCommunityBrand,
-  verifyCommunityBrandWriteAuthorized
-} from "../../../../_lib/community-auth";
-import { noStoreJson } from "../../../../_lib/responses";
+  verifyCommunityBrandWriteAuthorized,
+} from '../../../../_lib/community-auth';
+import { noStoreJson } from '../../../../_lib/responses';
 
 export async function onRequestGet(context: any) {
   if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured();
 
   try {
     const session = await readSession(context.request, context.env);
-    const slug = String(context.params.slug ?? "");
+    const slug = String(context.params.slug ?? '');
     const authorization = await verifyCommunityBrandWriteAuthorized(session, context.env, slug);
     const brand = await ensureCommunityBrandPayload(context.env, slug);
     return noStoreJson({ ok: true, brand, authorization });
@@ -29,7 +29,7 @@ export async function onRequestPut(context: any) {
 
   try {
     const session = await readSession(context.request, context.env);
-    const slug = String(context.params.slug ?? "");
+    const slug = String(context.params.slug ?? '');
     const authorization = await verifyCommunityBrandWriteAuthorized(session, context.env, slug);
     const body = await context.request.json().catch(() => null);
     const payload = assertBrandPayload(body);

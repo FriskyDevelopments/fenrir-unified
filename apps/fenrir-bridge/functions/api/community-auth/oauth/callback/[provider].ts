@@ -1,10 +1,13 @@
-import { handleCommunityOAuthCallback, type CommunityOAuthEnv } from "../../../../_lib/community-oauth";
+import {
+  handleCommunityOAuthCallback,
+  type CommunityOAuthEnv,
+} from '../../../../_lib/community-oauth';
 
-async function handleCallback(context: EventContext<CommunityOAuthEnv, "provider", unknown>) {
+async function handleCallback(context: EventContext<CommunityOAuthEnv, 'provider', unknown>) {
   return handleCommunityOAuthCallback({
     request: context.request,
     env: context.env,
-    provider: context.params.provider
+    provider: context.params.provider,
   });
 }
 

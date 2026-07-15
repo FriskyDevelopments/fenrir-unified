@@ -1,5 +1,5 @@
-import type { SessionPayload } from "./auth";
-import { effectiveOrgBillingPlan } from "./billing-db";
+import type { SessionPayload } from './auth';
+import { effectiveOrgBillingPlan } from './billing-db';
 
 type DomainRow = {
   id: string;
@@ -80,25 +80,40 @@ type AuditRow = {
 
 const nowIso = () => new Date().toISOString();
 
-export function createProductId(kind: "domain" | "bridge" | "room" | "invite" | "audit", hint = "") {
+export function createProductId(
+  kind: 'domain' | 'bridge' | 'room' | 'invite' | 'audit',
+  hint = ''
+) {
   const prefixes = {
-    domain: "frisky_dom",
-    bridge: "frisky_brg",
-    room: "frisky_room",
-    invite: "frisky_inv",
-    audit: "frisky_aud"
+    domain: 'frisky_dom',
+    bridge: 'frisky_brg',
+    room: 'frisky_room',
+    invite: 'frisky_inv',
+    audit: 'frisky_aud',
   };
-  const cleaned = hint.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 8).padEnd(4, "X");
-  return `${prefixes[kind]}_${cleaned}_${crypto.randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
+  const cleaned = hint
+    .replace(/[^a-z0-9]/gi, '')
+    .toUpperCase()
+    .slice(0, 8)
+    .padEnd(4, 'X');
+  return `${prefixes[kind]}_${cleaned}_${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 }
 
-export function cleanSlug(value: string, fallback = "main") {
-  const slug = value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+export function cleanSlug(value: string, fallback = 'main') {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
   return slug || fallback;
 }
 
 export function cleanDomain(value: string) {
-  return value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '');
 }
 
 export function publicUrl(domain: string, slug: string) {
@@ -107,13 +122,35 @@ export function publicUrl(domain: string, slug: string) {
 
 export async function loadAppState(db: D1Database, session: SessionPayload) {
   const [domains, bridges, invites, rooms, telegramChecks, auditLogs, plan] = await Promise.all([
-    db.prepare(`SELECT * FROM frisky_domains WHERE org_id = ? ORDER BY created_at DESC`).bind(session.frisky_org_id).all<DomainRow>(),
-    db.prepare(`SELECT * FROM frisky_bridges WHERE org_id = ? ORDER BY created_at DESC`).bind(session.frisky_org_id).all<BridgeRow>(),
-    db.prepare(`SELECT i.* FROM frisky_invites i JOIN frisky_bridges b ON b.id = i.bridge_id WHERE b.org_id = ? ORDER BY i.created_at DESC`).bind(session.frisky_org_id).all<InviteRow>(),
-    db.prepare(`SELECT * FROM frisky_live_rooms WHERE org_id = ? ORDER BY created_at DESC`).bind(session.frisky_org_id).all<RoomRow>(),
-    db.prepare(`SELECT * FROM telegram_permission_checks WHERE org_id = ? ORDER BY checked_at DESC`).bind(session.frisky_org_id).all<TelegramCheckRow>(),
-    db.prepare(`SELECT * FROM frisky_audit_logs WHERE org_id = ? ORDER BY created_at DESC LIMIT 100`).bind(session.frisky_org_id).all<AuditRow>(),
-    effectiveOrgBillingPlan({ DB: db }, session.frisky_org_id)
+    db
+      .prepare(`SELECT * FROM frisky_domains WHERE org_id = ? ORDER BY created_at DESC`)
+      .bind(session.frisky_org_id)
+      .all<DomainRow>(),
+    db
+      .prepare(`SELECT * FROM frisky_bridges WHERE org_id = ? ORDER BY created_at DESC`)
+      .bind(session.frisky_org_id)
+      .all<BridgeRow>(),
+    db
+      .prepare(
+        `SELECT i.* FROM frisky_invites i JOIN frisky_bridges b ON b.id = i.bridge_id WHERE b.org_id = ? ORDER BY i.created_at DESC`
+      )
+      .bind(session.frisky_org_id)
+      .all<InviteRow>(),
+    db
+      .prepare(`SELECT * FROM frisky_live_rooms WHERE org_id = ? ORDER BY created_at DESC`)
+      .bind(session.frisky_org_id)
+      .all<RoomRow>(),
+    db
+      .prepare(`SELECT * FROM telegram_permission_checks WHERE org_id = ? ORDER BY checked_at DESC`)
+      .bind(session.frisky_org_id)
+      .all<TelegramCheckRow>(),
+    db
+      .prepare(
+        `SELECT * FROM frisky_audit_logs WHERE org_id = ? ORDER BY created_at DESC LIMIT 100`
+      )
+      .bind(session.frisky_org_id)
+      .all<AuditRow>(),
+    effectiveOrgBillingPlan({ DB: db }, session.frisky_org_id),
   ]);
 
   return {
@@ -122,14 +159,14 @@ export async function loadAppState(db: D1Database, session: SessionPayload) {
       email: session.email,
       name: session.name,
       authProvider: session.provider,
-      createdAt: new Date(session.iat * 1000).toISOString()
+      createdAt: new Date(session.iat * 1000).toISOString(),
     },
     org: {
       id: session.frisky_org_id,
       ownerUserId: session.frisky_user_id,
       name: `${session.name}'s Fenrir`,
       plan,
-      createdAt: new Date(session.iat * 1000).toISOString()
+      createdAt: new Date(session.iat * 1000).toISOString(),
     },
     domains: (domains.results ?? []).map(mapDomain),
     bridges: (bridges.results ?? []).map(mapBridge),
@@ -139,40 +176,62 @@ export async function loadAppState(db: D1Database, session: SessionPayload) {
     telegramChecks: (telegramChecks.results ?? []).map(mapTelegramCheck),
     commissionLinks: [
       {
-        id: "frisky_com_CLOUDFLARE",
+        id: 'frisky_com_CLOUDFLARE',
         orgId: session.frisky_org_id,
-        label: "Cloudflare DNS",
-        provider: "Cloudflare",
-        url: "/go/cloudflare",
-        category: "dns",
-        status: "active",
-        partnerStatus: "recommended",
-        commissionNote: "Recommended for DNS, SSL, and lower support friction.",
+        label: 'Cloudflare DNS',
+        provider: 'Cloudflare',
+        url: '/go/cloudflare',
+        category: 'dns',
+        status: 'active',
+        partnerStatus: 'recommended',
+        commissionNote: 'Recommended for DNS, SSL, and lower support friction.',
         clicks: 0,
-        createdAt: nowIso()
-      }
-    ]
+        createdAt: nowIso(),
+      },
+    ],
   };
 }
 
-export async function addAudit(db: D1Database, session: SessionPayload, action: string, targetType: string, targetId: string, metadata: Record<string, string | number | boolean> = {}) {
+export async function addAudit(
+  db: D1Database,
+  session: SessionPayload,
+  action: string,
+  targetType: string,
+  targetId: string,
+  metadata: Record<string, string | number | boolean> = {}
+) {
   await db
     .prepare(
       `INSERT INTO frisky_audit_logs (
         id, org_id, actor_user_id, action, target_type, target_id, metadata_json, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(createProductId("audit", action), session.frisky_org_id, session.frisky_user_id, action, targetType, targetId, JSON.stringify(metadata), nowIso())
+    .bind(
+      createProductId('audit', action),
+      session.frisky_org_id,
+      session.frisky_user_id,
+      action,
+      targetType,
+      targetId,
+      JSON.stringify(metadata),
+      nowIso()
+    )
     .run();
 }
 
 export async function getDomainForOrg(db: D1Database, orgId: string, domainId: string) {
-  const row = await db.prepare(`SELECT * FROM frisky_domains WHERE id = ? AND org_id = ?`).bind(domainId, orgId).first<DomainRow>();
+  const row = await db
+    .prepare(`SELECT * FROM frisky_domains WHERE id = ? AND org_id = ?`)
+    .bind(domainId, orgId)
+    .first<DomainRow>();
   return row ? mapDomain(row) : null;
 }
 
 export async function getBridgeForOrg(db: D1Database, orgId: string, bridgeId: string) {
-  const row = await db.prepare(`SELECT * FROM frisky_bridges WHERE id = ? AND org_id = ?`).bind(bridgeId, orgId).first<BridgeRow>();
+  const row = await db
+    .prepare(`SELECT * FROM frisky_bridges WHERE id = ? AND org_id = ?`)
+    .bind(bridgeId, orgId)
+    .first<BridgeRow>();
   return row ? mapBridge(row) : null;
 }
 
@@ -198,14 +257,17 @@ export async function getActiveBridgeForOrgByChatId(db: D1Database, orgId: strin
 }
 
 export async function getRoomForOrg(db: D1Database, orgId: string, roomId: string) {
-  const row = await db.prepare(`SELECT * FROM frisky_live_rooms WHERE id = ? AND org_id = ?`).bind(roomId, orgId).first<RoomRow>();
+  const row = await db
+    .prepare(`SELECT * FROM frisky_live_rooms WHERE id = ? AND org_id = ?`)
+    .bind(roomId, orgId)
+    .first<RoomRow>();
   return row ? mapRoom(row) : null;
 }
 
 export async function resolvePublicBridge(db: D1Database, hostname: string, slug: string) {
   const domains = publicHostCandidates(hostname);
   if (!domains.length) return null;
-  const placeholders = domains.map(() => "?").join(", ");
+  const placeholders = domains.map(() => '?').join(', ');
   const bridge = await db
     .prepare(
       `SELECT b.*
@@ -221,7 +283,10 @@ export async function resolvePublicBridge(db: D1Database, hostname: string, slug
     .bind(slug, ...domains)
     .first<BridgeRow>();
   if (!bridge) return null;
-  const invite = await db.prepare(`SELECT * FROM frisky_invites WHERE id = ? AND status = 'active'`).bind(bridge.current_invite_id).first<InviteRow>();
+  const invite = await db
+    .prepare(`SELECT * FROM frisky_invites WHERE id = ? AND status = 'active'`)
+    .bind(bridge.current_invite_id)
+    .first<InviteRow>();
   if (!invite) return null;
   return { bridge: mapBridge(bridge), invite: mapInvite(invite) };
 }
@@ -229,7 +294,7 @@ export async function resolvePublicBridge(db: D1Database, hostname: string, slug
 export async function resolvePublicRoom(db: D1Database, hostname: string, slug: string) {
   const domains = publicHostCandidates(hostname);
   if (!domains.length) return null;
-  const placeholders = domains.map(() => "?").join(", ");
+  const placeholders = domains.map(() => '?').join(', ');
   const room = await db
     .prepare(
       `SELECT r.*
@@ -247,10 +312,10 @@ export async function resolvePublicRoom(db: D1Database, hostname: string, slug: 
 }
 
 function publicHostCandidates(hostname: string) {
-  const host = hostname.trim().toLowerCase().replace(/\.$/, "");
-  if (!host || host === "localhost" || host.endsWith(".localhost")) return host ? [host] : [];
+  const host = hostname.trim().toLowerCase().replace(/\.$/, '');
+  if (!host || host === 'localhost' || host.endsWith('.localhost')) return host ? [host] : [];
   const candidates = new Set([host]);
-  if (host.startsWith("www.")) {
+  if (host.startsWith('www.')) {
     candidates.add(host.slice(4));
   } else {
     candidates.add(`www.${host}`);
@@ -272,9 +337,11 @@ export function mapDomain(row: DomainRow) {
     dnsProvider: row.dns_provider,
     certificateStatus: row.certificate_status,
     cloudflareHostnameId: row.cloudflare_hostname_id ?? undefined,
-    cloudflareNameservers: row.cloudflare_nameservers ? JSON.parse(row.cloudflare_nameservers) as string[] : undefined,
+    cloudflareNameservers: row.cloudflare_nameservers
+      ? (JSON.parse(row.cloudflare_nameservers) as string[])
+      : undefined,
     createdAt: row.created_at,
-    verifiedAt: row.verified_at ?? undefined
+    verifiedAt: row.verified_at ?? undefined,
   };
 }
 
@@ -292,7 +359,7 @@ export function mapBridge(row: BridgeRow) {
     status: row.status,
     createdAt: row.created_at,
     rotatedAt: row.rotated_at ?? undefined,
-    revokedAt: row.revoked_at ?? undefined
+    revokedAt: row.revoked_at ?? undefined,
   };
 }
 
@@ -303,7 +370,7 @@ export function mapInvite(row: InviteRow) {
     inviteLink: row.invite_link,
     status: row.status,
     createdAt: row.created_at,
-    revokedAt: row.revoked_at ?? undefined
+    revokedAt: row.revoked_at ?? undefined,
   };
 }
 
@@ -320,7 +387,7 @@ export function mapRoom(row: RoomRow) {
     coverImageUrl: row.cover_image_url,
     status: row.status,
     createdAt: row.created_at,
-    lastOpenedAt: row.last_opened_at ?? undefined
+    lastOpenedAt: row.last_opened_at ?? undefined,
   };
 }
 
@@ -330,7 +397,7 @@ function mapTelegramCheck(row: TelegramCheckRow) {
     botIsAdmin: row.bot_is_admin === 1,
     canInviteUsers: row.can_invite_users === 1,
     canRevokeLinks: row.can_revoke_links === 1,
-    status: row.status
+    status: row.status,
   };
 }
 
@@ -342,7 +409,7 @@ function mapAudit(row: AuditRow) {
     action: row.action,
     targetType: row.target_type,
     targetId: row.target_id,
-    metadata: JSON.parse(row.metadata_json || "{}"),
-    createdAt: row.created_at
+    metadata: JSON.parse(row.metadata_json || '{}'),
+    createdAt: row.created_at,
   };
 }

@@ -1,6 +1,6 @@
-import type { SessionPayload } from "./auth";
-import type { BillingEnv } from "./billing-env";
-import { syncPendingStarsForFriskyUser } from "./stars-billing";
+import type { SessionPayload } from './auth';
+import type { BillingEnv } from './billing-env';
+import { syncPendingStarsForFriskyUser } from './stars-billing';
 
 export type TelegramIdentityLinkRow = {
   telegram_user_id: string;
@@ -43,11 +43,13 @@ export type TelegramIdentityLinkInput = {
 const nowIso = () => new Date().toISOString();
 
 export function telegramBotUsername(env: BillingEnv) {
-  return (env.FENRIR_TELEGRAM_BOT_USERNAME ?? env.MYFENRIR_TELEGRAM_BOT_USERNAME ?? "").replace(/^@/, "").trim();
+  return (env.FENRIR_TELEGRAM_BOT_USERNAME ?? env.MYFENRIR_TELEGRAM_BOT_USERNAME ?? '')
+    .replace(/^@/, '')
+    .trim();
 }
 
 export async function createTelegramAccountLinkCode(db: D1Database, session: SessionPayload) {
-  const code = crypto.randomUUID().replace(/-/g, "").slice(0, 24);
+  const code = crypto.randomUUID().replace(/-/g, '').slice(0, 24);
   const now = Date.now();
   const createdAt = new Date(now).toISOString();
   const expiresAt = new Date(now + 15 * 60 * 1000).toISOString();
@@ -71,7 +73,12 @@ export async function getTelegramIdentityLink(db: D1Database, friskyUserId: stri
     .first<TelegramIdentityLinkRow>();
 }
 
-export async function consumeTelegramAccountLinkCode(env: BillingEnv, db: D1Database, code: string, claim: TelegramLinkClaim) {
+export async function consumeTelegramAccountLinkCode(
+  env: BillingEnv,
+  db: D1Database,
+  code: string,
+  claim: TelegramLinkClaim
+) {
   const pending = await db
     .prepare(
       `SELECT * FROM telegram_account_link_codes
@@ -81,19 +88,21 @@ export async function consumeTelegramAccountLinkCode(env: BillingEnv, db: D1Data
     .bind(code)
     .first<TelegramAccountLinkCodeRow>();
 
-  if (!pending) return { ok: false as const, reason: "not_found" };
+  if (!pending) return { ok: false as const, reason: 'not_found' };
   if (Date.parse(pending.expires_at) <= Date.now()) {
     await db
       .prepare(`UPDATE telegram_account_link_codes SET status = 'expired' WHERE code = ?`)
       .bind(code)
       .run();
-    return { ok: false as const, reason: "expired" };
+    return { ok: false as const, reason: 'expired' };
   }
 
   const ts = nowIso();
   await db.batch([
     db
-      .prepare(`DELETE FROM telegram_identity_links WHERE frisky_user_id = ? OR telegram_user_id = ?`)
+      .prepare(
+        `DELETE FROM telegram_identity_links WHERE frisky_user_id = ? OR telegram_user_id = ?`
+      )
       .bind(pending.frisky_user_id, claim.telegramUserId),
     upsertTelegramIdentityLinkStatement(db, {
       telegramUserId: claim.telegramUserId,
@@ -103,7 +112,7 @@ export async function consumeTelegramAccountLinkCode(env: BillingEnv, db: D1Data
       telegramUsername: claim.telegramUsername ?? null,
       telegramFirstName: claim.telegramFirstName ?? null,
       linkedAt: ts,
-      updatedAt: ts
+      updatedAt: ts,
     }),
     db
       .prepare(
@@ -123,7 +132,7 @@ export async function consumeTelegramAccountLinkCode(env: BillingEnv, db: D1Data
         claim.telegramFirstName ?? null,
         ts,
         code
-      )
+      ),
   ]);
 
   const starsSync = await syncPendingStarsForFriskyUser(db, env, pending.frisky_user_id);
@@ -133,11 +142,14 @@ export async function consumeTelegramAccountLinkCode(env: BillingEnv, db: D1Data
     friskyUserId: pending.frisky_user_id,
     friskyOrgId: pending.frisky_org_id,
     email: pending.email,
-    starsApplied: starsSync.applied
+    starsApplied: starsSync.applied,
   };
 }
 
-export function upsertTelegramIdentityLinkStatement(db: D1Database, input: TelegramIdentityLinkInput) {
+export function upsertTelegramIdentityLinkStatement(
+  db: D1Database,
+  input: TelegramIdentityLinkInput
+) {
   const linkedAt = input.linkedAt ?? nowIso();
   const updatedAt = input.updatedAt ?? linkedAt;
   return db

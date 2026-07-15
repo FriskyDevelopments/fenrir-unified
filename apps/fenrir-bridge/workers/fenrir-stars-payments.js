@@ -7,8 +7,8 @@ const json = (body, init = {}) =>
 const nowIso = () => new Date().toISOString();
 
 const starsPrice = (env) => {
-  const parsed = Number.parseInt(env.FENRIR_STARS_PRICE || "250", 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 250;
+  const parsed = Number.parseInt(env.FENRIR_STARS_PRICE || "100", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
 };
 
 const botUsername = (env) => (env.FENRIR_TELEGRAM_BOT_USERNAME || "").replace(/^@/, "").trim();
@@ -16,6 +16,14 @@ const botUsername = (env) => (env.FENRIR_TELEGRAM_BOT_USERNAME || "").replace(/^
 const botToken = (env, channel) => {
   if (channel === "dev") return (env.TELEGRAM_DEV_BOT_TOKEN || env.TELEGRAM_BOT_TOKEN || "").trim();
   return (env.TELEGRAM_PROD_BOT_TOKEN || env.TELEGRAM_BOT_TOKEN || "").trim();
+};
+
+const EMOJI = {
+  BLUE: '<tg-emoji emoji-id="5422955523995583563">🔵</tg-emoji>',
+  GREEN: '<tg-emoji emoji-id="5422955523995583564">🟢</tg-emoji>',
+  RED: '<tg-emoji emoji-id="5422955523995583565">🔴</tg-emoji>',
+  DIAMOND: '<tg-emoji emoji-id="5422955523995583566">💎</tg-emoji>',
+  WHITE: '<tg-emoji emoji-id="5422955523995583567">⚪️</tg-emoji>'
 };
 
 const normalizeText = (value) => (value || "").trim();
@@ -170,8 +178,9 @@ const FENRIR_BOT_BRIEF = [
   "Primary promise: stop sharing raw Telegram invite links. Use one stable branded domain link, rotate private Telegram invites anytime, and keep control.",
   "Stable link examples: https://customer.myfenrir.com/main and https://join.customer-domain.com/main.",
   "If a private invite leaks, Fenrir rotates or revokes the Telegram invite while the public URL keeps working.",
-  "Brand: Frisky Developments. Product: Fenrir Bridge. Tone: sharp, calm, operational, premium, direct.",
-  "Visual/message style: sleek modular Telegram 2026 update energy, dark command center, clean sections, compact operational labels.",
+  "Brand: Frisky Developments. Product: Fenrir Bridge. Tone: calm, clear, human, premium, direct.",
+  "Message style: plain human language, warm and concise. NEVER use 'OS', 'module', 'MOD 01/02', 'command center', or system/sci-fi jargon. Short replies: 2–5 lines, plain bullets only when they help.",
+  "Do not spam: reply only when the user addresses the bot. Never send unsolicited, repeated, or duplicate messages. One clear answer per question.",
   "Default to English. If the user writes Spanish, answer in Spanish. If French, answer in French. If German, answer in German.",
   "CONTROL RULES:",
   "You do not directly control Telegram. You do not directly process payment. You do not directly verify payment. You do not own entitlement truth.",
@@ -207,6 +216,11 @@ const FENRIR_BOT_BRIEF = [
 async function telegramApi(env, channel, method, body) {
   const token = botToken(env, channel);
   if (!token) throw new Error("missing_telegram_token");
+  
+  if ((method === "sendMessage" || method === "sendVideo" || method === "sendPhoto") && !body.parse_mode) {
+    body.parse_mode = "HTML";
+  }
+
   const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -377,20 +391,20 @@ async function sendStarsInvoice(env, channel, message) {
   const payload = await createOrder(env, String(message.from?.id || message.chat.id), String(message.chat.id), amount);
   await telegramApi(env, channel, "sendInvoice", {
     chat_id: message.chat.id,
-    title: env.FENRIR_STARS_TITLE || "Fenrir Protocol Access",
+    title: env.FENRIR_STARS_TITLE || "Submit your ad — 7-day run (after owner approval).",
     description:
       env.FENRIR_STARS_DESCRIPTION ||
-      "Unlock Fenrir Protocol access with Telegram Stars while card billing is being reviewed.",
+      "After payment you'll send your ad; it runs for 7 days once the owner approves it.",
     payload,
     provider_token: "",
     currency: "XTR",
-    prices: [{ label: env.FENRIR_STARS_LABEL || "Fenrir Protocol Access", amount }],
+    prices: [{ label: env.FENRIR_STARS_LABEL || "7-day Ad Run", amount }],
     protect_content: true
   });
 }
 
 function paymentIntent(text) {
-  return /\b(buy|pay|payment|subscribe|unlock|upgrade|pro|starter|operator|stars|checkout|pagar|comprar|suscribir|desbloquear|me interesa)\b/i.test(
+  return /\b(ad|submit|publish|promote|buy|pay|payment|subscribe|unlock|upgrade|pro|starter|operator|stars|checkout|pagar|comprar|suscribir|desbloquear|me interesa)\b/i.test(
     text
   );
 }
@@ -423,57 +437,54 @@ function modularMenuText(text, entitlement) {
   const active = entitlement?.status === "active";
   if (spanishIntent(text)) {
     return [
-      "FENRIR BOT OS | Menu",
-      `Estado: ${active ? "activo" : "pendiente"}`,
+      "Fenrir — Menú",
+      `Estado: ${active ? "activo ✓" : "pendiente"}`,
       "",
-      "MOD 01 | Setup",
-      "Dominio, DNS, bot admin y primer bridge.",
-      "",
-      "MOD 02 | Planes",
-      "Free, Starter, Pro, Operator.",
-      "",
-      "MOD 03 | Pago",
-      "Abre la caja oficial de Telegram Stars.",
-      "",
-      "MOD 04 | Estado",
-      "Verifica si tu acceso esta activo.",
+      "• Configurar — dominio, bot y tu primer enlace",
+      "• Planes — Free, Starter, Pro, Operator",
+      "• Pago — con Telegram Stars",
+      "• Estado — revisa si tu acceso está activo",
       "",
       "Comandos: /setup /plans /subscribe /status"
     ].join("\n");
   }
   return [
-    "FENRIR BOT OS | Menu",
-    `Status: ${active ? "active" : "pending"}`,
+    "Fenrir — Menu",
+    `Status: ${active ? "active ✓" : "pending"}`,
     "",
-    "MOD 01 | Setup",
-    "Domain, DNS, bot admin permissions, and first bridge.",
-    "",
-    "MOD 02 | Plans",
-    "Free, Starter, Pro, Operator.",
-    "",
-    "MOD 03 | Payment",
-    "Open the official Telegram Stars payment box.",
-    "",
-    "MOD 04 | Status",
-    "Check whether backend entitlement is active.",
+    "• Set up — domain, bot, and your first link",
+    "• Plans — Free, Starter, Pro, Operator",
+    "• Pay — with Telegram Stars",
+    "• Status — check whether your access is active",
     "",
     "Commands: /setup /plans /subscribe /status"
   ].join("\n");
 }
 
 async function sendBotMenu(env, channel, message, entitlement) {
+  const es = spanishIntent(message.text || "");
+  // Telegram inline buttons use the client's native styling (there is no per-button
+  // color in the Bot API); you can customize labels with emojis via env vars.
+  const eSetup = env.MENU_EMOJI_SETUP ? env.MENU_EMOJI_SETUP + " " : "";
+  const ePlans = env.MENU_EMOJI_PLANS ? env.MENU_EMOJI_PLANS + " " : "";
+  const ePay = env.MENU_EMOJI_PAY ? env.MENU_EMOJI_PAY + " " : "";
+  const eStatus = env.MENU_EMOJI_STATUS ? env.MENU_EMOJI_STATUS + " " : "";
+
+  const labels = es
+    ? { setup: eSetup + "Configurar", plans: ePlans + "Planes", pay: ePay + "Pago (Stars)", status: eStatus + "Estado" }
+    : { setup: eSetup + "Set up", plans: ePlans + "Plans", pay: ePay + "Pay (Stars)", status: eStatus + "Status" };
   await telegramApi(env, channel, "sendMessage", {
     chat_id: message.chat.id,
     text: modularMenuText(message.text || "", entitlement),
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "MOD 01 · Setup", callback_data: "fenrir_setup" },
-          { text: "MOD 02 · Plans", callback_data: "fenrir_plans" }
+          { text: labels.setup, callback_data: "fenrir_setup" },
+          { text: labels.plans, callback_data: "fenrir_plans" }
         ],
         [
-          { text: "MOD 03 · Stars", callback_data: "fenrir_subscribe" },
-          { text: "MOD 04 · Status", callback_data: "fenrir_status" }
+          { text: labels.pay, callback_data: "fenrir_subscribe" },
+          { text: labels.status, callback_data: "fenrir_status" }
         ]
       ]
     }
@@ -485,96 +496,69 @@ function fallbackMind(text, entitlement) {
 
   if (statusIntent(text)) {
     if (spanishIntent(text)) {
-      return entitlement?.status === "active"
-        ? `Fenrir Protocol esta activo.\n\nAcceso: activo\nStars: ${entitlement.stars_amount}\nModo: Telegram Stars`
-        : "Fenrir Protocol todavia no esta activo.\n\nDi “comprar” o usa /subscribe y abro la caja oficial de Telegram Stars.";
+      return entitlement?.status === 'active'
+        ? `${EMOJI.GREEN} <b>𝗙𝗘𝗡𝗥𝗜𝗥 𝗔𝗖𝗧𝗜𝗩𝗢</b>\n━━━━━━━━━━━━━━━━━━\nEl Protocolo Fenrir está operando.\n\n🔹 Acceso: Desbloqueado\n🔹 Stars: ${entitlement.stars_amount}\n\n📖 <a href="https://wiki.myfenrir.com">Explora la documentación</a>`
+        : `${EMOJI.RED} <b>𝗔𝗖𝗖𝗘𝗦𝗢 𝗗𝗘𝗡𝗘𝗚𝗔𝗗𝗢</b>\n━━━━━━━━━━━━━━━━━━\nEl Protocolo Fenrir requiere activación.\n\nUsa /subscribe para abrir la caja oficial de Telegram Stars.\n\n📖 <a href="https://wiki.myfenrir.com">Explora la documentación</a>`;
     }
-    return entitlement?.status === "active"
-      ? `Fenrir Protocol is active.\n\nAccess: unlocked\nStars: ${entitlement.stars_amount}\nMode: Telegram Stars`
-      : "Fenrir Protocol is not active yet.\n\nSay “buy” or use /subscribe and I’ll open the Stars payment box.";
+    return entitlement?.status === 'active'
+      ? `${EMOJI.GREEN} <b>𝗙𝗘𝗡𝗥𝗜𝗥 𝗔𝗖𝗧𝗜𝗩𝗘</b>\n━━━━━━━━━━━━━━━━━━\nFenrir Protocol is operating normally.\n\n🔹 Access: Unlocked\n🔹 Stars: ${entitlement.stars_amount}\n\n📖 <a href="https://wiki.myfenrir.com">Explore docs</a>`
+      : `${EMOJI.RED} <b>𝗔𝗖𝗖𝗘𝗦𝗦 𝗗𝗘𝗡𝗜𝗘𝗗</b>\n━━━━━━━━━━━━━━━━━━\nFenrir Protocol requires activation.\n\nUse /subscribe to open the official Telegram Stars payment box.\n\n📖 <a href="https://wiki.myfenrir.com">Explore docs</a>`;
   }
 
   if (pricingIntent(text)) {
     return [
-      "FENRIR PROTOCOL | Plans",
-      "",
-      "Free — $0: 1 Telegram Lock, 1 Fenrir subdomain, for testing.",
-      "Starter — $3/mo or Stars: 3 Telegram Locks, Fenrir subdomains.",
-      "Pro — $7/mo or Stars: 10 Telegram Locks, custom domain support.",
-      "Operator — $15/mo or Stars: unlimited Locks, multi-admin workflows, audit logs.",
-      "",
-      "One group: Starter. Paid VIP/course/client community: Pro. Many groups or clients: Operator."
-    ].join("\n");
+      `${EMOJI.GREEN} <b>𝗙𝗘𝗡𝗥𝗜𝗥 𝗣𝗟𝗔𝗡𝗦</b>`,
+      '━━━━━━━━━━━━━━━━━━',
+      `${EMOJI.WHITE} Free ($0): 1 Telegram Lock, 1 Subdomain`,
+      `${EMOJI.BLUE} Starter ($3/mo): 3 Locks, Subdomains`,
+      `${EMOJI.RED} Pro ($7/mo): 10 Locks, Custom Domain`,
+      `${EMOJI.DIAMOND} Operator ($15/mo): Unlimited Locks, Audit Logs`,
+      '',
+      '📖 <a href="https://wiki.myfenrir.com">Plan comparisons</a>',
+    ].join('\n');
   }
 
   if (stripeIntent(text)) {
     return [
-      "FENRIR PROTOCOL | Direct Billing",
-      "Gateway: Stripe Secure",
-      "Status: pending backend activation",
-      "",
-      "Stripe Direct Billing is the professional card and invoice route for Pro and Operator users.",
-      "",
-      "What it supports once active:",
-      "• Card, Apple Pay, and Google Pay through Stripe Checkout",
-      "• Stripe Customer Portal",
-      "• Business invoices",
-      "• Pro and Operator subscriptions",
-      "",
-      "For now, I can open the official Telegram Stars payment box. Telegram handles the transaction, and Fenrir activates access after confirmation."
-    ].join("\n");
+      `${EMOJI.BLUE} <b>𝗗𝗜𝗥𝗘𝗖𝗧 𝗕𝗜𝗟𝗟𝗜𝗡𝗚</b>`,
+      '━━━━━━━━━━━━━━━━━━',
+      'Gateway: Stripe Secure',
+      'Status: Pending backend activation',
+      '',
+      'Stripe Direct Billing is the professional card and invoice route for Pro and Operator users.',
+      '',
+      'For now, I can open the official Telegram Stars payment box to instantly activate your tier.',
+      '',
+      '📖 <a href="https://wiki.myfenrir.com">Read more</a>',
+    ].join('\n');
   }
 
   if (setupIntent(text)) {
     if (spanishIntent(text)) {
       return [
-        "Si. Fenrir te da un link estable y dejas de compartir invitaciones crudas de Telegram.",
-        "",
-        "Ruta de setup:",
-        "1. Usa un subdominio Fenrir o tu dominio.",
-        "2. Agrega Fenrir Bot al grupo.",
-        "3. Hazlo admin.",
-        "4. Permite crear y revocar invites.",
-        "5. Crea el slug del bridge.",
-        "6. Comparte el link estable.",
-        "",
-        `DNS custom: CNAME join -> ${BRIDGE_TARGET}. No tienes que transferir tu dominio.`
-      ].join("\n");
+        `${EMOJI.BLUE} <b>𝗦𝗬𝗦𝗧𝗘𝗠 𝗦𝗘𝗧𝗨𝗣</b>`,
+        '━━━━━━━━━━━━━━━━━━',
+        'Para conectar tu dominio y grupos:',
+        '1. Mapea DNS (CNAME join -> bridge.myfenrir.com)',
+        '2. Agrega el bot Fenrir a tu grupo como Admin',
+        '3. Genera un Bridge slug seguro',
+        '',
+        '📖 <a href="https://wiki.myfenrir.com">Guía completa</a>',
+      ].join('\n');
     }
     return [
-      "Fenrir Bridge setup path:",
-      "",
-      "1. Choose a Fenrir subdomain or custom domain.",
-      "2. Add Fenrir Bot to the Telegram group.",
-      "3. Make the bot admin.",
-      "4. Allow it to create and revoke invite links.",
-      "5. Create a bridge slug.",
-      "6. Share the stable public URL.",
-      "",
-      `Custom DNS: CNAME join -> ${BRIDGE_TARGET}. You can keep any registrar.`,
-      "",
-      "Say “buy” when you want me to open the Stars payment box."
-    ].join("\n");
+      `${EMOJI.BLUE} <b>𝗦𝗬𝗦𝗧𝗘𝗠 𝗦𝗘𝗧𝗨𝗣</b>`,
+      '━━━━━━━━━━━━━━━━━━',
+      'To securely link your domain and groups:',
+      '1. Map DNS (CNAME join -> bridge.myfenrir.com)',
+      '2. Add Fenrir bot to your Telegram group as Admin',
+      '3. Generate a secure Bridge slug',
+      '',
+      '📖 <a href="https://wiki.myfenrir.com">Full setup guide</a>',
+    ].join('\n');
   }
 
-  return [
-    "FENRIR BOT OS | Menu",
-    "Status: online",
-    "",
-    "MOD 01 | Setup",
-    "Telegram bridge setup, DNS, bot permissions.",
-    "",
-    "MOD 02 | Plans",
-    "Pricing and access limits.",
-    "",
-    "MOD 03 | Payment",
-    "Official Telegram Stars payment box.",
-    "",
-    "MOD 04 | Status",
-    "Backend entitlement check.",
-    "",
-    "Commands: /setup /plans /subscribe /status"
-  ].join("\n");
+  return modularMenuText(text, entitlement);
 }
 
 async function geminiMind(env, input, entitlement) {
@@ -658,7 +642,7 @@ async function handleTelegramWebhook(request, env, url) {
     if (query.data === "fenrir_subscribe") {
       await telegramApi(env, channel, "sendMessage", {
         chat_id: callbackMessage.chat.id,
-        text: "Fenrir Protocol payment box opening. Telegram Stars handles the transaction; Fenrir verifies access after payment."
+        text: "Ad payment box opening. Telegram Stars handles the transaction; your ad will be reviewed and published upon approval."
       });
       // Payer must be the human who tapped the button; callbackMessage.from is the bot itself.
       await sendStarsInvoice(env, channel, { chat: callbackMessage.chat, from: query.from });
@@ -670,7 +654,7 @@ async function handleTelegramWebhook(request, env, url) {
       fenrir_plans: "/plans",
       fenrir_status: "/status"
     }[query.data] || "/menu";
-    const answer = fallbackMind(moduleText, entitlement);
+    const answer = await geminiMind(env, { text: moduleText, channel }, entitlement);
     await telegramApi(env, channel, "sendMessage", {
       chat_id: callbackMessage.chat.id,
       text: answer
@@ -695,6 +679,15 @@ async function handleTelegramWebhook(request, env, url) {
   const text = normalizeText(message?.text);
   if (!text) return json({ ok: true });
 
+  // No-spam guard: in groups/supergroups the bot stays quiet unless directly
+  // addressed with a slash-command (e.g. /menu, /setup, /subscribe — optionally
+  // /command@BotName). It never replies to ordinary group chatter. Private chats
+  // keep the full conversational flow.
+  const chatType = message.chat?.type || "private";
+  const isPrivate = chatType === "private";
+  const isCommand = /^\/[a-z0-9_]+(@[a-z0-9_]+)?\b/i.test(text);
+  if (!isPrivate && !isCommand) return json({ ok: true });
+
   const entitlement = await getEntitlement(env, message.from?.id || message.chat.id);
 
   if (menuIntent(text)) {
@@ -717,7 +710,7 @@ async function handleTelegramWebhook(request, env, url) {
   if (/^\/subscribe\b/i.test(text) || /^\/unlock\b/i.test(text) || /^\/start\s+fenrir_stars\b/i.test(text) || paymentIntent(text)) {
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
-      text: "Fenrir Protocol payment box opening. Telegram Stars handles the transaction; Fenrir verifies access after payment."
+      text: "Ad payment box opening. Telegram Stars handles the transaction; your ad will be reviewed and published upon approval."
     });
     await sendStarsInvoice(env, channel, message);
     return json({ ok: true });

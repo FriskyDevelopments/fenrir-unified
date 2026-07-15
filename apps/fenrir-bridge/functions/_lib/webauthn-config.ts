@@ -1,4 +1,4 @@
-import { siteOrigin, type BillingEnv } from "./billing-env";
+import { siteOrigin, type BillingEnv } from './billing-env';
 
 function hostnameFromPublicSite(env: BillingEnv): string | null {
   const raw = env.PUBLIC_SITE_URL?.trim();
@@ -15,10 +15,10 @@ export function webauthnRpConfig(request: Request, env: BillingEnv) {
   const origin = siteOrigin(request, env);
   const fromEnv = hostnameFromPublicSite(env);
   let rpID = fromEnv ?? url.hostname;
-  if (url.hostname === "127.0.0.1") rpID = "localhost";
+  if (url.hostname === '127.0.0.1') rpID = 'localhost';
   return {
-    rpName: "Fenrir Bridge",
+    rpName: 'Fenrir Bridge',
     rpID,
-    origin
+    origin,
   };
 }

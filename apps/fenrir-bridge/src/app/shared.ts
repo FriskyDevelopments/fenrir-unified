@@ -1,77 +1,106 @@
-import type { FriskyCommissionLink, FriskyDomain, LiveRoomProvider } from "../services/types";
+import type { FriskyCommissionLink, FriskyDomain, LiveRoomProvider } from '../services/types';
 
 export const confettiPieces = Array.from({ length: 28 }, (_, index) => index);
-export const pageKeys = ["command", "links", "domains", "dns", "locks", "rooms", "telegram", "revocations", "audit", "faq", "billing", "brands"] as const;
-export const legalRoutes = new Set(["/legal", "/terms", "/privacy", "/acceptable-use"]);
-export const friskySignalDevRequestUrl = "https://t.me/friskysignal";
-export const liveRoomProviders: Array<{ id: LiveRoomProvider; name: string; icon: string; brand: string; hint: string; placeholder: string }> = [
+export const pageKeys = [
+  'command',
+  'links',
+  'domains',
+  'dns',
+  'locks',
+  'rooms',
+  'telegram',
+  'revocations',
+  'audit',
+  'faq',
+  'billing',
+  'brands',
+] as const;
+export const legalRoutes = new Set(['/legal', '/terms', '/privacy', '/acceptable-use']);
+export const friskySignalDevRequestUrl = 'https://t.me/friskysignal';
+export const liveRoomProviders: Array<{
+  id: LiveRoomProvider;
+  name: string;
+  icon: string;
+  brand: string;
+  hint: string;
+  placeholder: string;
+}> = [
   {
-    id: "zoom",
-    name: "Zoom",
-    icon: "Z",
-    brand: "Zoom",
-    hint: "Zoom Rooms, webinars, client calls",
-    placeholder: "https://zoom.us/j/..."
+    id: 'zoom',
+    name: 'Zoom',
+    icon: 'Z',
+    brand: 'Zoom',
+    hint: 'Zoom Rooms, webinars, client calls',
+    placeholder: 'https://zoom.us/j/...',
   },
   {
-    id: "google_meet",
-    name: "Google Meet",
-    icon: "M",
-    brand: "Google",
-    hint: "Google Workspace calls and classes",
-    placeholder: "https://meet.google.com/..."
+    id: 'google_meet',
+    name: 'Google Meet',
+    icon: 'M',
+    brand: 'Google',
+    hint: 'Google Workspace calls and classes',
+    placeholder: 'https://meet.google.com/...',
   },
   {
-    id: "whereby",
-    name: "Whereby",
-    icon: "W",
-    brand: "Whereby",
-    hint: "Simple browser rooms for customers",
-    placeholder: "https://whereby.com/..."
+    id: 'whereby',
+    name: 'Whereby',
+    icon: 'W',
+    brand: 'Whereby',
+    hint: 'Simple browser rooms for customers',
+    placeholder: 'https://whereby.com/...',
   },
   {
-    id: "webex",
-    name: "Microsoft Teams",
-    icon: "T",
-    brand: "Teams",
-    hint: "Teams calls, cohorts, and community events",
-    placeholder: "https://teams.microsoft.com/l/meetup-join/..."
+    id: 'webex',
+    name: 'Microsoft Teams',
+    icon: 'T',
+    brand: 'Teams',
+    hint: 'Teams calls, cohorts, and community events',
+    placeholder: 'https://teams.microsoft.com/l/meetup-join/...',
   },
   {
-    id: "other",
-    name: "Other room",
-    icon: "+",
-    brand: "Custom",
-    hint: "Teams, Calendly, custom portals, etc.",
-    placeholder: "https://your-room-link.example/..."
-  }
+    id: 'other',
+    name: 'Other room',
+    icon: '+',
+    brand: 'Custom',
+    hint: 'Teams, Calendly, custom portals, etc.',
+    placeholder: 'https://your-room-link.example/...',
+  },
 ];
 
-export const domainTagPresets = ["launch", "client", "vip", "community", "paid", "internal"] as const;
-export const domainSearchTlds = ["com", "io", "app", "gg", "dev", "ai"] as const;
+export const domainTagPresets = [
+  'launch',
+  'client',
+  'vip',
+  'community',
+  'paid',
+  'internal',
+] as const;
+export const domainSearchTlds = ['com', 'io', 'app', 'gg', 'dev', 'ai'] as const;
 
 export const providerLogoPresets: Record<LiveRoomProvider, string> = {
-  zoom: "https://upload.wikimedia.org/wikipedia/commons/7/7b/Zoom_Communications_Logo.svg",
-  google_meet: "https://upload.wikimedia.org/wikipedia/commons/9/9b/Google_Meet_icon_%282020%29.svg",
-  whereby: "https://assets-global.website-files.com/5c45f12b43c3101f4504272f/5c45f12b43c3106a45042802_whereby-logo.svg",
-  webex: "https://upload.wikimedia.org/wikipedia/commons/f/f9/Webex_by_Cisco_logo.svg",
-  other: "/fenrir-splash-icon.svg"
+  zoom: 'https://upload.wikimedia.org/wikipedia/commons/7/7b/Zoom_Communications_Logo.svg',
+  google_meet:
+    'https://upload.wikimedia.org/wikipedia/commons/9/9b/Google_Meet_icon_%282020%29.svg',
+  whereby:
+    'https://assets-global.website-files.com/5c45f12b43c3101f4504272f/5c45f12b43c3106a45042802_whereby-logo.svg',
+  webex: 'https://upload.wikimedia.org/wikipedia/commons/f/f9/Webex_by_Cisco_logo.svg',
+  other: '/fenrir-splash-icon.svg',
 };
 
 export const twoFactorHelpLinks = {
-  google: "https://myaccount.google.com/signinoptions/two-step-verification",
-  microsoft: "https://account.microsoft.com/security",
-  apple: "https://support.apple.com/102661"
+  google: 'https://myaccount.google.com/signinoptions/two-step-verification',
+  microsoft: 'https://account.microsoft.com/security',
+  apple: 'https://support.apple.com/102661',
 } as const;
 
 export function safeHttpUrl(value: string) {
   const trimmed = value.trim();
-  if (!trimmed) return "";
+  if (!trimmed) return '';
   try {
     const url = new URL(trimmed);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : "";
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : '';
   } catch {
-    return "";
+    return '';
   }
 }
 
@@ -82,14 +111,14 @@ export function openSafeUrl(value: string) {
 export function openAnyUrl(value: string) {
   const target = absoluteUrl(value);
   if (!target) return false;
-  window.open(target, "_blank", "noopener,noreferrer");
+  window.open(target, '_blank', 'noopener,noreferrer');
   return true;
 }
 
 export function absoluteUrl(value: string) {
   const trimmed = value.trim();
-  if (!trimmed) return "";
-  if (trimmed.startsWith("/")) {
+  if (!trimmed) return '';
+  if (trimmed.startsWith('/')) {
     return new URL(trimmed, window.location.origin).toString();
   }
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) {
@@ -100,44 +129,51 @@ export function absoluteUrl(value: string) {
   }
   try {
     const url = new URL(trimmed, window.location.origin);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : "";
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : '';
   } catch {
-    return "";
+    return '';
   }
 }
 
 export function commissionUrlSlug(value: string) {
   const trimmed = value.trim();
-  if (!trimmed) return "";
+  if (!trimmed) return '';
   try {
     const path = new URL(trimmed, window.location.origin).pathname;
-    return path.replace(/^\/+|\/+$/g, "").split("/").pop() ?? "";
+    return (
+      path
+        .replace(/^\/+|\/+$/g, '')
+        .split('/')
+        .pop() ?? ''
+    );
   } catch {
-    return "";
+    return '';
   }
 }
 
 export function findCommissionLink(links: FriskyCommissionLink[] = [], slug: string) {
   const target = slug.trim().toLowerCase();
-  return links.find((link) => {
-    if (link.id.toLowerCase() === target) return true;
-    if (commissionUrlSlug(link.url).toLowerCase() === target) return true;
-    return false;
-  }) ?? null;
+  return (
+    links.find((link) => {
+      if (link.id.toLowerCase() === target) return true;
+      if (commissionUrlSlug(link.url).toLowerCase() === target) return true;
+      return false;
+    }) ?? null
+  );
 }
 
 export function commissionFallbackBySlug(slug: string) {
   const target = slug.trim().toLowerCase();
-  if (!target) return "";
+  if (!target) return '';
   const map: Record<string, string> = {
-    dynadot: "https://www.dynadot.com/",
-    "dynadot-auctions": "https://www.dynadot.com/domains/auctions/",
-    "cj-dynadot": "https://www.dynadot.com/register/domains/search",
-    cloudflare: "https://www.cloudflare.com/",
-    porkbun: "https://porkbun.com/",
-    namecheap: "https://www.namecheap.com/"
+    dynadot: 'https://www.dynadot.com/',
+    'dynadot-auctions': 'https://www.dynadot.com/domains/auctions/',
+    'cj-dynadot': 'https://www.dynadot.com/register/domains/search',
+    cloudflare: 'https://www.cloudflare.com/',
+    porkbun: 'https://porkbun.com/',
+    namecheap: 'https://www.namecheap.com/',
   };
-  return map[target] ?? "";
+  return map[target] ?? '';
 }
 
 export function resolveCommissionDestination(link: FriskyCommissionLink | null, slug: string) {
@@ -153,56 +189,56 @@ export function resolveCommissionDestination(link: FriskyCommissionLink | null, 
 
 export function trustedFenrirImageUrl(value: string) {
   const trimmed = value.trim();
-  if (!trimmed) return "";
-  if (trimmed.startsWith("/")) return trimmed;
-  if (trimmed.startsWith("/api/media/proxy?")) return trimmed;
+  if (!trimmed) return '';
+  if (trimmed.startsWith('/')) return trimmed;
+  if (trimmed.startsWith('/api/media/proxy?')) return trimmed;
   try {
     const url = new URL(trimmed, window.location.origin);
-    if (url.origin === window.location.origin && url.pathname.startsWith("/api/media/proxy")) {
+    if (url.origin === window.location.origin && url.pathname.startsWith('/api/media/proxy')) {
       return `${url.pathname}${url.search}`;
     }
-    if (url.protocol === "https:") return url.toString();
+    if (url.protocol === 'https:') return url.toString();
   } catch {
-    return "";
+    return '';
   }
-  return "";
+  return '';
 }
 
 export function parseDomainTags(value: string) {
   const tags = value
     .split(/[,\s]+/)
-    .map((tag) => tag.trim().replace(/^#/, "").toLowerCase())
+    .map((tag) => tag.trim().replace(/^#/, '').toLowerCase())
     .filter(Boolean)
     .filter((tag, index, list) => list.indexOf(tag) === index)
     .slice(0, 8);
-  return tags.length ? tags : ["launch"];
+  return tags.length ? tags : ['launch'];
 }
 
 export function addDomainTag(value: string, tag: string) {
-  return parseDomainTags(`${value}, ${tag}`).join(", ");
+  return parseDomainTags(`${value}, ${tag}`).join(', ');
 }
 
 export function defaultDomainTags(domain: FriskyDomain) {
   const tags: string[] = [domain.status, domain.dnsProvider];
-  if (domain.certificateStatus === "active") tags.push("ssl");
-  if (domain.domain.includes("myfenrir")) tags.push("primary");
+  if (domain.certificateStatus === 'active') tags.push('ssl');
+  if (domain.domain.includes('myfenrir')) tags.push('primary');
   return tags;
 }
 
 export type DomainSearchResult = {
   domain: string;
-  status: "ready" | "available" | "taken" | "unknown" | "invalid" | "error";
+  status: 'ready' | 'available' | 'taken' | 'unknown' | 'invalid' | 'error';
   summary: string;
   records: string[];
   priceTier?: string;
   registrarConfirm?: boolean;
-  confidence?: "authoritative" | "signal" | "none";
+  confidence?: 'authoritative' | 'signal' | 'none';
 };
 
 type AvailabilityApiResult = {
   domain: string;
-  verdict: "available" | "taken" | "unknown" | "invalid";
-  confidence: "authoritative" | "signal" | "none";
+  verdict: 'available' | 'taken' | 'unknown' | 'invalid';
+  confidence: 'authoritative' | 'signal' | 'none';
   registrarConfirm: boolean;
   summary: string;
   records: string[];
@@ -213,17 +249,17 @@ export function cleanDomainSearchBase(value: string) {
   return value
     .trim()
     .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "")
-    .replace(/\/.*$/, "")
-    .replace(/[^a-z0-9.-]/g, "")
-    .replace(/^\.+|\.+$/g, "");
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '')
+    .replace(/[^a-z0-9.-]/g, '')
+    .replace(/^\.+|\.+$/g, '');
 }
 
 export function domainSearchCandidates(value: string) {
   const base = cleanDomainSearchBase(value);
   if (!base) return [];
-  if (base.includes(".")) return [base];
+  if (base.includes('.')) return [base];
   return domainSearchTlds.map((tld) => `${base}.${tld}`);
 }
 
@@ -231,52 +267,71 @@ export function domainSearchCandidates(value: string) {
 // via RDAP + DoH, so the check is independent of the visitor's local DNS resolver
 // — the cause of the old "Live DNS lookup timed out" failures behind a VPN.
 export async function lookupDomainDns(domain: string): Promise<DomainSearchResult> {
-  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain)) {
-    return { domain, status: "invalid", summary: "Use a valid domain name.", records: [] };
+  if (
+    !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(
+      domain
+    )
+  ) {
+    return { domain, status: 'invalid', summary: 'Use a valid domain name.', records: [] };
   }
   try {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 9000);
     const response = await fetch(`/api/domains/availability?domain=${encodeURIComponent(domain)}`, {
-      headers: { accept: "application/json" },
-      signal: controller.signal
+      headers: { accept: 'application/json' },
+      signal: controller.signal,
     });
     window.clearTimeout(timeout);
-    if (!response.ok) throw new Error("availability_lookup_failed");
-    const payload = (await response.json().catch(() => null)) as { ok?: boolean; results?: AvailabilityApiResult[] } | null;
+    if (!response.ok) throw new Error('availability_lookup_failed');
+    const payload = (await response.json().catch(() => null)) as {
+      ok?: boolean;
+      results?: AvailabilityApiResult[];
+    } | null;
     const first = payload?.results?.[0];
-    if (!payload?.ok || !first) throw new Error("availability_no_result");
+    if (!payload?.ok || !first) throw new Error('availability_no_result');
     return {
       domain: first.domain,
-      status: first.verdict === "invalid" ? "invalid" : first.verdict,
+      status: first.verdict === 'invalid' ? 'invalid' : first.verdict,
       summary: first.summary,
       records: first.records ?? [],
       priceTier: first.priceTier,
       registrarConfirm: first.registrarConfirm,
-      confidence: first.confidence
+      confidence: first.confidence,
     };
   } catch {
-    return { domain, status: "unknown", summary: "Couldn't reach the availability service. Check at a registrar directly.", records: [], registrarConfirm: true };
+    return {
+      domain,
+      status: 'unknown',
+      summary: "Couldn't reach the availability service. Check at a registrar directly.",
+      records: [],
+      registrarConfirm: true,
+    };
   }
 }
 
-export const defaultServiceOrg = (import.meta.env.VITE_DEFAULT_SERVICE_ORG ?? "Frisky Dev Workspace").trim();
-export const defaultServiceSubdomain = (import.meta.env.VITE_DEFAULT_SERVICE_SUBDOMAIN ?? "vip.myfenrir.com").trim();
-export const managedDashboardPath = "/main";
+export const defaultServiceOrg = (
+  import.meta.env.VITE_DEFAULT_SERVICE_ORG ?? 'Frisky Dev Workspace'
+).trim();
+export const defaultServiceSubdomain = (
+  import.meta.env.VITE_DEFAULT_SERVICE_SUBDOMAIN ?? 'vip.myfenrir.com'
+).trim();
+export const managedDashboardPath = '/main';
 export const telegramLoginBotUsername = (
   import.meta.env.VITE_FENRIR_TELEGRAM_BOT_USERNAME ??
   import.meta.env.VITE_MYFENRIR_TELEGRAM_BOT_USERNAME ??
-  ""
-).replace(/^@/, "").trim();
-export const vercelPreviewWithoutApi = import.meta.env.VITE_VERCEL_API_MODE === "disabled";
+  ''
+)
+  .replace(/^@/, '')
+  .trim();
+export const vercelPreviewWithoutApi = import.meta.env.VITE_VERCEL_API_MODE === 'disabled';
 
 export type PageKey = (typeof pageKeys)[number];
 export type PersonalLink = {
   id: string;
   title: string;
   url: string;
-  kind: "payment" | "docs" | "booking" | "support" | "other";
-  status: "active" | "draft";
+  kind: 'payment' | 'docs' | 'booking' | 'support' | 'other';
+  status: 'active' | 'draft';
 };
 export type VaultLink = {
   id: string;
@@ -285,10 +340,10 @@ export type VaultLink = {
   kind: string;
   status: string;
 };
-export type FenrirRole = "owner" | "admin" | "user";
+export type FenrirRole = 'owner' | 'admin' | 'user';
 export type Celebration = {
   id: number;
   title: string;
   detail: string;
-  tone: "dns" | "commerce";
+  tone: 'dns' | 'commerce';
 };

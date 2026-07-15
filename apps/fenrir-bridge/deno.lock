@@ -1,7 +1,6 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@neondatabase/serverless@^1.0.1": "1.1.0",
     "npm:@simplewebauthn/browser@^13.3.0": "13.3.0",
     "npm:@simplewebauthn/server@^13.3.0": "13.3.1",
     "npm:@supabase/supabase-js@^2.105.3": "2.108.1",
@@ -1800,21 +1799,33 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:@neondatabase/serverless@^1.0.1",
+        "npm:@neondatabase/serverless@^1.1.0",
         "npm:@simplewebauthn/browser@^13.3.0",
         "npm:@simplewebauthn/server@^13.3.0",
         "npm:@supabase/supabase-js@^2.105.3",
         "npm:@types/react-dom@^19.2.3",
         "npm:@types/react@^19.2.7",
+        "npm:@typescript-eslint/eslint-plugin@^8.62.1",
+        "npm:@typescript-eslint/parser@^8.62.1",
         "npm:@vitejs/plugin-react@^5.2.0",
+        "npm:@wert-io/widget-initializer@^7.0.5",
         "npm:autoprefixer@^10.5.0",
+        "npm:eslint-plugin-react-hooks@^7.1.1",
+        "npm:eslint-plugin-react-refresh@~0.5.3",
+        "npm:eslint-plugin-react@^7.37.5",
+        "npm:eslint@^8.57.1",
+        "npm:framer-motion@^12.42.2",
+        "npm:lucide-react@^1.23.0",
         "npm:postcss@^8.5.14",
+        "npm:prettier@^3.9.4",
         "npm:react-dom@^19.2.1",
         "npm:react@^19.2.1",
         "npm:stripe@^17.7.0",
+        "npm:styled-components@^6.4.3",
         "npm:tailwindcss@^3.4.17",
         "npm:typescript@^6.0.3",
         "npm:vite@^7.2.7",
+        "npm:vitest@^3.2.6",
         "npm:wrangler@^4.95.0"
       ]
     }

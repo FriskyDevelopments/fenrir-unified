@@ -1,4 +1,4 @@
-import type { AuthEnv } from "./auth";
+import type { AuthEnv } from './auth';
 
 export type BillingEnv = AuthEnv & {
   DB?: D1Database;
@@ -20,6 +20,29 @@ export type BillingEnv = AuthEnv & {
   FENRIR_STARS_LABEL?: string;
   /** Plan granted after Telegram Stars payment: starter | pro | operator (default starter). */
   FENRIR_STARS_PLAN?: string;
+  /* ── Wert.io card→crypto on-ramp (card payments). Gated DARK until the first
+     two are set (partner onboarding done); until then the card option honestly
+     self-reports "coming soon". No smart-contract signing key is needed for a
+     plain commodity purchase. ── */
+  WERT_PARTNER_ID?: string;
+  WERT_WEBHOOK_SECRET?: string;
+  WERT_RECEIVING_WALLET?: string;
+  /** https://widget.wert.io (default) or https://sandbox.wert.io for test cards. */
+  WERT_ORIGIN?: string;
+  /** Commodity/network the receiving wallet takes (defaults USDC / polygon). */
+  WERT_COMMODITY?: string;
+  WERT_NETWORK?: string;
+  /** Optional USD price overrides per plan for the card on-ramp. */
+  WERT_STARTER_USD?: string;
+  WERT_PRO_USD?: string;
+  WERT_OPERATOR_USD?: string;
+  /* ── Cloudflare zone automation for the DNS Wizard "Switch DNS to Cloudflare"
+     flow. Sourced ONLY from Cloudflare Pages secrets / Secret Center (1Password
+     op://FriskyDev-Infra/Cloudflare/ACCOUNT_TOKEN) — never hardcoded. When unset,
+     the wizard self-reports "not configured" and stays in manual-instructions
+     mode. Token needs Zone:Read + Zone:Edit (create) + DNS:Edit. ── */
+  CLOUDFLARE_API_TOKEN?: string;
+  CLOUDFLARE_ACCOUNT_ID?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   FENRIR_GOOGLE_OAUTH_CONFIGURED?: string;
   FENRIR_MICROSOFT_OAUTH_CONFIGURED?: string;
@@ -43,8 +66,8 @@ export function missingEnvResponse(name: string) {
   return Response.json(
     {
       ok: false,
-      error: "billing_misconfigured",
-      detail: `${name} is not set in the server environment.`
+      error: 'billing_misconfigured',
+      detail: `${name} is not set in the server environment.`,
     },
     { status: 503 }
   );
@@ -54,8 +77,9 @@ export function dbNotConfiguredResponse() {
   return Response.json(
     {
       ok: false,
-      error: "database_not_configured",
-      detail: "D1 binding DB is not configured. Set database_id in wrangler.jsonc and apply docs/stripe-d1-schema.sql."
+      error: 'database_not_configured',
+      detail:
+        'D1 binding DB is not configured. Set database_id in wrangler.jsonc and apply docs/stripe-d1-schema.sql.',
     },
     { status: 503 }
   );
@@ -66,17 +90,17 @@ export function siteOrigin(request: Request, env: BillingEnv) {
   const requestOrigin = `${url.protocol}//${url.host}`;
 
   // If the request origin is in the allowed redirect URIs, prefer it.
-  const allowed = (env.ALLOWED_REDIRECT_URIS || env.PUBLIC_SITE_URL || "")
-    .split(",")
+  const allowed = (env.ALLOWED_REDIRECT_URIS || env.PUBLIC_SITE_URL || '')
+    .split(',')
     .map((u) => u.trim())
     .filter(Boolean);
 
-  if (allowed.some(base => requestOrigin === base || requestOrigin.startsWith(base + "/"))) {
+  if (allowed.some((base) => requestOrigin === base || requestOrigin.startsWith(base + '/'))) {
     return requestOrigin;
   }
 
   const configured = env.PUBLIC_SITE_URL?.trim();
-  if (configured) return configured.replace(/\/$/, "");
+  if (configured) return configured.replace(/\/$/, '');
   return requestOrigin;
 }
 
@@ -87,7 +111,7 @@ export function authOrigin(request: Request, env: BillingEnv) {
   const configuredAuth = env.PUBLIC_AUTH_URL?.trim();
   if (configuredAuth) {
     // If we are currently ON the configured auth domain, use it.
-    if (requestOrigin === configuredAuth.replace(/\/$/, "")) {
+    if (requestOrigin === configuredAuth.replace(/\/$/, '')) {
       return requestOrigin;
     }
   }
@@ -96,8 +120,8 @@ export function authOrigin(request: Request, env: BillingEnv) {
   // In that case, we should check if it's supposed to use its own origin for auth or the central one.
   // For now, if PUBLIC_AUTH_URL is set, we generally want to use it for the OAuth provider config,
   // UNLESS the request is already on a domain that is allowed.
-  
-  if (configuredAuth) return configuredAuth.replace(/\/$/, "");
+
+  if (configuredAuth) return configuredAuth.replace(/\/$/, '');
   return siteOrigin(request, env);
 }
 
@@ -105,12 +129,12 @@ export function cookieDomain(request: Request, env: BillingEnv) {
   const site = siteOrigin(request, env);
   try {
     const url = new URL(site);
-    const parts = url.hostname.split(".");
+    const parts = url.hostname.split('.');
     // If it's something like myfenrir.com, use the root domain for app cookies.
     if (parts.length >= 2) {
       // Basic logic: last two parts (e.g. myfenrir.com)
       // Note: doesn't handle co.uk but good enough for this MVP
-      return parts.slice(-2).join(".");
+      return parts.slice(-2).join('.');
     }
   } catch {
     // fallback to null

@@ -2,49 +2,69 @@
 // Replaces the old proxy to the (now-dead) Cloud Run cyberpup-* services. The page is
 // the post-FriskyDev-login step that links the signed-in account to CyberPUP Core /
 // Security, then hands off to the bot to finish the claim. No external upstream.
-import { readSession, type AuthEnv } from "./auth";
+import { readSession, type AuthEnv } from './auth';
 
-type BotKey = "core" | "security";
+type BotKey = 'core' | 'security';
 
-const BOTS: Record<BotKey, { label: string; short: string; accent: string; accent2: string; bot: string; tagline: string; blurb: string }> = {
+const BOTS: Record<
+  BotKey,
+  {
+    label: string;
+    short: string;
+    accent: string;
+    accent2: string;
+    bot: string;
+    tagline: string;
+    blurb: string;
+  }
+> = {
   core: {
-    label: "CyberPUP Core",
-    short: "Core",
-    accent: "#22c7a8",
-    accent2: "#9ff4e4",
-    bot: "CyberPUPCorebot",
-    tagline: "Group operator · federation · inspection",
-    blurb: "Core runs your group utilities, federation, and operator tooling. Activation links your FriskyDev account so Core recognizes you as an authorized operator.",
+    label: 'CyberPUP Core',
+    short: 'Core',
+    accent: '#22c7a8',
+    accent2: '#9ff4e4',
+    bot: 'CyberPUPCorebot',
+    tagline: 'Group operator · federation · inspection',
+    blurb:
+      'Core runs your group utilities, federation, and operator tooling. Activation links your FriskyDev account so Core recognizes you as an authorized operator.',
   },
   security: {
-    label: "CyberPUP Security",
-    short: "Security",
-    accent: "#ff334e",
-    accent2: "#ffb4bf",
-    bot: "CyberPUPSecuritybot",
-    tagline: "Defensive moderation · anti-spam · zero-tolerance",
-    blurb: "Security is the pack's hard-moderation sentinel — anti-spam, banned keywords, anti-flood, flagged-account and zero-tolerance enforcement. Activation authorizes you to bind and administer it.",
+    label: 'CyberPUP Security',
+    short: 'Security',
+    accent: '#ff334e',
+    accent2: '#ffb4bf',
+    bot: 'CyberPUPSecuritybot',
+    tagline: 'Defensive moderation · anti-spam · zero-tolerance',
+    blurb:
+      "Security is the pack's hard-moderation sentinel — anti-spam, banned keywords, anti-flood, flagged-account and zero-tolerance enforcement. Activation authorizes you to bind and administer it.",
   },
 };
 
 function esc(s: string): string {
-  return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+  return (s || '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string
+  );
 }
 function shortId(id: string): string {
-  return (id || "").replace(/-/g, "").slice(0, 6).toUpperCase();
+  return (id || '').replace(/-/g, '').slice(0, 6).toUpperCase();
 }
 
 const CSP =
   "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests";
 
-export async function renderActivation(request: Request, env: AuthEnv, bot: BotKey): Promise<Response> {
+export async function renderActivation(
+  request: Request,
+  env: AuthEnv,
+  bot: BotKey
+): Promise<Response> {
   const cfg = BOTS[bot];
   const session = await readSession(request, env).catch(() => null);
   const url = new URL(request.url);
 
-  const accountId = session?.frisky_account_id || "";
-  const fd = accountId ? `FD-${shortId(accountId)}` : "";
-  const startParam = accountId ? `activate_${accountId}` : "activate";
+  const accountId = session?.frisky_account_id || '';
+  const fd = accountId ? `FD-${shortId(accountId)}` : '';
+  const startParam = accountId ? `activate_${accountId}` : 'activate';
   const botLink = `https://t.me/${cfg.bot}?start=${encodeURIComponent(startParam)}`;
   const loginLink = `/login?return=${encodeURIComponent(url.pathname)}`;
 
@@ -53,17 +73,17 @@ export async function renderActivation(request: Request, env: AuthEnv, bot: BotK
     ? `
       <p class="eyebrow">Signed in · Frisky ID</p>
       <div class="who">
-        <div class="avatar">${esc((session!.name || session!.email || "F").slice(0, 1).toUpperCase())}</div>
+        <div class="avatar">${esc((session!.name || session!.email || 'F').slice(0, 1).toUpperCase())}</div>
         <div>
-          <div class="who-name">${esc(session!.name || "FriskyDev member")}</div>
-          <div class="who-mail">${esc(session!.email || "")}</div>
-          ${fd ? `<div class="who-id">${esc(fd)}</div>` : ""}
+          <div class="who-name">${esc(session!.name || 'FriskyDev member')}</div>
+          <div class="who-mail">${esc(session!.email || '')}</div>
+          ${fd ? `<div class="who-id">${esc(fd)}</div>` : ''}
         </div>
       </div>
       <p class="blurb">${esc(cfg.blurb)}</p>
       <a class="cta" href="${esc(botLink)}">Activate in @${esc(cfg.bot)} →</a>
       <p class="hint">Opens Telegram and starts the activation handoff for this account. The bot verifies your FriskyDev identity, then unlocks ${esc(cfg.short)}.</p>
-      ${fd ? `<div class="payload"><span>Activation reference</span><code>${esc(fd)}</code></div>` : ""}
+      ${fd ? `<div class="payload"><span>Activation reference</span><code>${esc(fd)}</code></div>` : ''}
     `
     : `
       <p class="eyebrow">Frisky ID required</p>
@@ -125,6 +145,10 @@ export async function renderActivation(request: Request, env: AuthEnv, bot: BotK
 
   return new Response(html, {
     status: 200,
-    headers: { "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": CSP, "Cache-Control": "no-store" },
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Security-Policy': CSP,
+      'Cache-Control': 'no-store',
+    },
   });
 }

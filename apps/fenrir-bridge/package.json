@@ -27,17 +27,22 @@
     "postinstall": "bash scripts/run-with-node-lts.sh node scripts/clean-icloud-dupes.mjs",
     "predev": "bash scripts/run-with-node-lts.sh node scripts/clean-icloud-dupes.mjs",
     "pretypecheck": "bash scripts/run-with-node-lts.sh node scripts/clean-icloud-dupes.mjs",
-    "dev:mock": "FENRIR_DEV_MOCK_API=1 bash scripts/run-with-node-lts.sh vite --host 0.0.0.0"
+    "dev:mock": "FENRIR_DEV_MOCK_API=1 bash scripts/run-with-node-lts.sh vite --host 0.0.0.0",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.0.1",
+    "@neondatabase/serverless": "^1.1.0",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.0",
     "@supabase/supabase-js": "^2.105.3",
     "@vitejs/plugin-react": "^5.2.0",
+    "@wert-io/widget-initializer": "^7.0.5",
+    "framer-motion": "^12.42.2",
+    "lucide-react": "^1.23.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "stripe": "^17.7.0",
+    "styled-components": "^6.4.3",
     "typescript": "^6.0.3",
     "vite": "^7.2.7",
     "wrangler": "^4.95.0"
@@ -45,8 +50,15 @@
   "devDependencies": {
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.62.1",
+    "@typescript-eslint/parser": "^8.62.1",
     "autoprefixer": "^10.5.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
     "postcss": "^8.5.14",
+    "prettier": "^3.9.4",
     "tailwindcss": "^3.4.17",
     "vitest": "^3.2.6"
   }

@@ -1,5 +1,5 @@
-import type { BillingEnv } from "./billing-env";
-import { effectiveBillingPlanFromRow, type BillingPlanKey, type PaidPlanKey } from "./plan-catalog";
+import type { BillingEnv } from './billing-env';
+import { effectiveBillingPlanFromRow, type BillingPlanKey, type PaidPlanKey } from './plan-catalog';
 
 export type BillingCustomerRow = {
   frisky_org_id: string;
@@ -146,15 +146,21 @@ export async function releaseStripeEvent(db: D1Database, eventId: string) {
 
 export async function resolveBillingForOrg(env: BillingEnv, orgId: string) {
   if (!env.DB) {
-    return { customer: null as BillingCustomerRow | null, subscription: null as BillingSubscriptionRow | null };
+    return {
+      customer: null as BillingCustomerRow | null,
+      subscription: null as BillingSubscriptionRow | null,
+    };
   }
   const customer = await getCustomer(env.DB, orgId);
   const subscription = await getPrimarySubscriptionForOrg(env.DB, orgId);
   return { customer, subscription };
 }
 
-export async function effectiveOrgBillingPlan(env: BillingEnv, orgId: string): Promise<BillingPlanKey> {
-  if (!env.DB) return "free";
+export async function effectiveOrgBillingPlan(
+  env: BillingEnv,
+  orgId: string
+): Promise<BillingPlanKey> {
+  if (!env.DB) return 'free';
   const sub = await getPrimarySubscriptionForOrg(env.DB, orgId);
   return effectiveBillingPlanFromRow(sub);
 }

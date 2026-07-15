@@ -118,9 +118,9 @@ Current file still has old direct org/user/member creation logic. Rework it to:
 Use request metadata helpers already exported:
 
 ```ts
-requestClientIp(context.request)
-requestUserAgent(context.request)
-sha256Hex(session)
+requestClientIp(context.request);
+requestUserAgent(context.request);
+sha256Hex(session);
 ```
 
 2. Add public brand endpoint.
@@ -210,7 +210,7 @@ Support runtime brand imagery:
 Add a new `PageKey` inside the existing dashboard shell, for example:
 
 ```ts
-"brands"
+'brands';
 ```
 
 Route aliases:

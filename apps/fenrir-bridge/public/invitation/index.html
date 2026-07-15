@@ -4,338 +4,407 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MyFenrir Invitation</title>
-    <meta name="description" content="MyFenrir Foundry Pod invitation page with invite code entry for the Neon Nexus community gate." />
+    <meta
+      name="description"
+      content="MyFenrir Foundry Pod invitation page with invite code entry for the Neon Nexus community gate."
+    />
     <link rel="icon" href="../fenrir-splash-icon.svg" />
     <style>
-      :root{
-        color-scheme:dark;
-        --bg:#050607;
-        --panel:rgba(10,14,16,.92);
-        --panel-soft:rgba(16,22,25,.88);
-        --line:rgba(156,235,220,.14);
-        --line-strong:rgba(156,235,220,.22);
-        --text:#f8fffd;
-        --muted:#adc0ba;
-        --teal:#2fd3ba;
-        --teal-deep:#1d907f;
-        --red:#ff6676;
-        --amber:#efb75f;
-        --shadow:0 36px 100px rgba(0,0,0,.48);
+      :root {
+        color-scheme: dark;
+        --bg: #050607;
+        --panel: rgba(10, 14, 16, 0.92);
+        --panel-soft: rgba(16, 22, 25, 0.88);
+        --line: rgba(156, 235, 220, 0.14);
+        --line-strong: rgba(156, 235, 220, 0.22);
+        --text: #f8fffd;
+        --muted: #adc0ba;
+        --teal: #2fd3ba;
+        --teal-deep: #1d907f;
+        --red: #ff6676;
+        --amber: #efb75f;
+        --shadow: 0 36px 100px rgba(0, 0, 0, 0.48);
       }
-      *{box-sizing:border-box}
-      html,body{margin:0;min-height:100%}
-      body{
-        color:var(--text);
-        font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+      body {
+        color: var(--text);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
         background:
-          radial-gradient(circle at 18% 12%, rgba(47,211,186,.13), transparent 18rem),
-          radial-gradient(circle at 84% 20%, rgba(255,102,118,.12), transparent 20rem),
-          radial-gradient(circle at 78% 78%, rgba(239,183,95,.10), transparent 24rem),
-          linear-gradient(180deg,#06080a,var(--bg) 28rem);
+          radial-gradient(circle at 18% 12%, rgba(47, 211, 186, 0.13), transparent 18rem),
+          radial-gradient(circle at 84% 20%, rgba(255, 102, 118, 0.12), transparent 20rem),
+          radial-gradient(circle at 78% 78%, rgba(239, 183, 95, 0.1), transparent 24rem),
+          linear-gradient(180deg, #06080a, var(--bg) 28rem);
       }
-      body::before{
-        content:"";
-        position:fixed;
-        inset:0;
-        pointer-events:none;
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
         background-image:
-          linear-gradient(rgba(156,235,220,.035) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(156,235,220,.035) 1px, transparent 1px);
-        background-size:72px 72px;
-        mask-image:linear-gradient(180deg, rgba(0,0,0,.82), transparent 76%);
+          linear-gradient(rgba(156, 235, 220, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(156, 235, 220, 0.035) 1px, transparent 1px);
+        background-size: 72px 72px;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.82), transparent 76%);
       }
-      .page{
-        width:min(1240px,calc(100% - 32px));
-        margin:0 auto;
-        padding:22px 0 52px;
-        position:relative;
-        z-index:1;
+      .page {
+        width: min(1240px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 22px 0 52px;
+        position: relative;
+        z-index: 1;
       }
-      .topbar{
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        gap:16px;
-        margin-bottom:18px;
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 18px;
       }
-      .brand{
-        display:inline-flex;
-        align-items:center;
-        gap:12px;
-        text-decoration:none;
-        color:inherit;
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+        color: inherit;
       }
-      .brand img{width:40px;height:40px;flex:0 0 auto}
-      .brand strong{
-        display:block;
-        font-size:16px;
-        letter-spacing:2px;
-        text-transform:uppercase;
+      .brand img {
+        width: 40px;
+        height: 40px;
+        flex: 0 0 auto;
       }
-      .brand span{
-        display:block;
-        margin-top:2px;
-        color:var(--muted);
-        font-size:13px;
+      .brand strong {
+        display: block;
+        font-size: 16px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
       }
-      .status-row{
-        display:flex;
-        flex-wrap:wrap;
-        justify-content:flex-end;
-        gap:10px;
+      .brand span {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 13px;
       }
-      .pill{
-        display:inline-flex;
-        align-items:center;
-        min-height:32px;
-        padding:0 12px;
-        border-radius:999px;
-        border:1px solid rgba(255,255,255,.08);
-        background:rgba(255,255,255,.04);
-        color:#dfefea;
-        font-size:12px;
-        letter-spacing:.08em;
-        text-transform:uppercase;
-        white-space:nowrap;
+      .status-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 10px;
       }
-      .pill.green{border-color:rgba(47,211,186,.25); color:#c8f9f1}
-      .pill.red{border-color:rgba(255,102,118,.24); color:#ffd0d6}
-      .hero{
-        border:1px solid rgba(255,255,255,.08);
-        border-radius:30px;
-        overflow:hidden;
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 0 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+        color: #dfefea;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .pill.green {
+        border-color: rgba(47, 211, 186, 0.25);
+        color: #c8f9f1;
+      }
+      .pill.red {
+        border-color: rgba(255, 102, 118, 0.24);
+        color: #ffd0d6;
+      }
+      .hero {
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 30px;
+        overflow: hidden;
         background:
-          radial-gradient(circle at 16% 16%, rgba(47,211,186,.11), transparent 16rem),
-          radial-gradient(circle at 82% 18%, rgba(255,102,118,.11), transparent 18rem),
-          linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)), var(--panel);
-        box-shadow:var(--shadow);
+          radial-gradient(circle at 16% 16%, rgba(47, 211, 186, 0.11), transparent 16rem),
+          radial-gradient(circle at 82% 18%, rgba(255, 102, 118, 0.11), transparent 18rem),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
+          var(--panel);
+        box-shadow: var(--shadow);
       }
-      .hero-grid{
-        display:grid;
-        grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);
-        min-height:760px;
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+        min-height: 760px;
       }
       .left,
-      .right{
-        position:relative;
-        padding:clamp(28px,4vw,56px);
+      .right {
+        position: relative;
+        padding: clamp(28px, 4vw, 56px);
       }
-      .left{
-        border-right:1px solid rgba(255,255,255,.06);
-        display:flex;
-        flex-direction:column;
-        justify-content:center;
-        gap:22px;
+      .left {
+        border-right: 1px solid rgba(255, 255, 255, 0.06);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 22px;
       }
-      .right{
-        display:flex;
-        flex-direction:column;
-        justify-content:space-between;
-        gap:24px;
-        background:linear-gradient(180deg, rgba(10,14,16,.14), rgba(10,14,16,.48));
+      .right {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 24px;
+        background: linear-gradient(180deg, rgba(10, 14, 16, 0.14), rgba(10, 14, 16, 0.48));
       }
-      h1{
-        margin:0;
-        max-width:620px;
-        font-size:clamp(48px,6.4vw,94px);
-        line-height:.9;
-        letter-spacing:0;
-        font-weight:760;
+      h1 {
+        margin: 0;
+        max-width: 620px;
+        font-size: clamp(48px, 6.4vw, 94px);
+        line-height: 0.9;
+        letter-spacing: 0;
+        font-weight: 760;
       }
-      .accent{
-        background:linear-gradient(90deg,#fff9f2,var(--teal) 34%,var(--amber) 68%,var(--red));
-        -webkit-background-clip:text;
-        background-clip:text;
-        color:transparent;
+      .accent {
+        background: linear-gradient(90deg, #fff9f2, var(--teal) 34%, var(--amber) 68%, var(--red));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
       }
-      .lede{
-        max-width:620px;
-        margin:0;
-        color:#d4e2de;
-        font-size:clamp(17px,1.6vw,21px);
-        line-height:1.52;
+      .lede {
+        max-width: 620px;
+        margin: 0;
+        color: #d4e2de;
+        font-size: clamp(17px, 1.6vw, 21px);
+        line-height: 1.52;
       }
-      .facts{
-        display:flex;
-        flex-wrap:wrap;
-        gap:10px;
-        max-width:640px;
+      .facts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        max-width: 640px;
       }
-      .fact{
-        display:inline-flex;
-        align-items:center;
-        min-height:38px;
-        padding:0 14px;
-        border-radius:999px;
-        border:1px solid rgba(255,255,255,.08);
-        background:rgba(255,255,255,.03);
-        color:#dce8e4;
-        font-size:13px;
+      .fact {
+        display: inline-flex;
+        align-items: center;
+        min-height: 38px;
+        padding: 0 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+        color: #dce8e4;
+        font-size: 13px;
       }
-      .invite-card{
-        display:grid;
-        gap:12px;
-        max-width:560px;
-        padding:18px;
-        border:1px solid rgba(255,255,255,.08);
-        border-radius:22px;
-        background:var(--panel-soft);
-        box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+      .invite-card {
+        display: grid;
+        gap: 12px;
+        max-width: 560px;
+        padding: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 22px;
+        background: var(--panel-soft);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
       }
-      .invite-label{
-        margin:0;
-        color:#b9c9c4;
-        font-size:13px;
-        letter-spacing:.15em;
-        text-transform:uppercase;
+      .invite-label {
+        margin: 0;
+        color: #b9c9c4;
+        font-size: 13px;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
       }
-      .invite-field{
-        display:grid;
-        gap:10px;
+      .invite-field {
+        display: grid;
+        gap: 10px;
       }
-      .invite-input{
-        display:flex;
-        align-items:center;
-        gap:16px;
-        min-height:76px;
-        border:1px solid rgba(255,255,255,.12);
-        border-radius:18px;
-        background:rgba(7,10,12,.96);
-        padding:0 20px;
+      .invite-input {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        min-height: 76px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 18px;
+        background: rgba(7, 10, 12, 0.96);
+        padding: 0 20px;
       }
-      .invite-key{
-        width:26px;
-        height:26px;
-        flex:0 0 auto;
-        color:var(--teal);
+      .invite-key {
+        width: 26px;
+        height: 26px;
+        flex: 0 0 auto;
+        color: var(--teal);
       }
-      .invite-input input{
-        width:100%;
-        border:0;
-        outline:0;
-        background:transparent;
-        color:var(--text);
-        font:inherit;
-        font-size:18px;
+      .invite-input input {
+        width: 100%;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+        font-size: 18px;
       }
-      .invite-input input::placeholder{color:#859893}
-      .button{
-        display:inline-flex;
-        align-items:center;
-        justify-content:center;
-        min-height:76px;
-        padding:0 22px;
-        border-radius:18px;
-        border:1px solid rgba(122,255,229,.8);
-        color:#061113;
-        background:linear-gradient(135deg,#d5fff3 0%, var(--teal) 52%, #ff8292 100%);
-        box-shadow:0 18px 36px rgba(47,211,186,.18), inset 0 0 0 1px rgba(255,255,255,.18);
-        text-decoration:none;
-        font-size:22px;
-        font-weight:800;
-        cursor:pointer;
+      .invite-input input::placeholder {
+        color: #859893;
       }
-      .signin{
-        color:#d3dfdc;
-        font-size:16px;
-        line-height:1.5;
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 76px;
+        padding: 0 22px;
+        border-radius: 18px;
+        border: 1px solid rgba(122, 255, 229, 0.8);
+        color: #061113;
+        background: linear-gradient(135deg, #d5fff3 0%, var(--teal) 52%, #ff8292 100%);
+        box-shadow:
+          0 18px 36px rgba(47, 211, 186, 0.18),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+        text-decoration: none;
+        font-size: 22px;
+        font-weight: 800;
+        cursor: pointer;
       }
-      .signin a{
-        color:var(--teal);
-        text-decoration:none;
-        font-weight:700;
+      .signin {
+        color: #d3dfdc;
+        font-size: 16px;
+        line-height: 1.5;
       }
-      .sign-note{
-        color:#9fb0ab;
-        font-size:14px;
-        margin:0;
+      .signin a {
+        color: var(--teal);
+        text-decoration: none;
+        font-weight: 700;
       }
-      .art{
-        align-self:center;
-        width:min(100%,500px);
-        display:block;
-        filter:drop-shadow(0 28px 60px rgba(0,0,0,.42));
+      .sign-note {
+        color: #9fb0ab;
+        font-size: 14px;
+        margin: 0;
       }
-      .panel-card{
-        align-self:flex-end;
-        width:min(100%,460px);
-        padding:22px 22px 18px;
-        border:1px solid rgba(255,255,255,.09);
-        border-radius:22px;
-        background:rgba(10,14,16,.84);
-        box-shadow:0 18px 40px rgba(0,0,0,.22);
+      .art {
+        align-self: center;
+        width: min(100%, 500px);
+        display: block;
+        filter: drop-shadow(0 28px 60px rgba(0, 0, 0, 0.42));
       }
-      .panel-card strong{
-        display:block;
-        color:#eef5f2;
-        font-size:24px;
-        line-height:1.05;
-        margin-bottom:10px;
+      .panel-card {
+        align-self: flex-end;
+        width: min(100%, 460px);
+        padding: 22px 22px 18px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 22px;
+        background: rgba(10, 14, 16, 0.84);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
       }
-      .panel-card span{
-        color:#c7d2cd;
-        font-size:16px;
-        line-height:1.5;
+      .panel-card strong {
+        display: block;
+        color: #eef5f2;
+        font-size: 24px;
+        line-height: 1.05;
+        margin-bottom: 10px;
       }
-      .steps{
-        display:grid;
-        gap:10px;
-        margin-top:18px;
+      .panel-card span {
+        color: #c7d2cd;
+        font-size: 16px;
+        line-height: 1.5;
       }
-      .step{
-        display:grid;
-        grid-template-columns:auto 1fr;
-        gap:12px;
-        align-items:start;
-        padding:14px 16px;
-        border:1px solid rgba(255,255,255,.08);
-        border-radius:18px;
-        background:rgba(255,255,255,.03);
+      .steps {
+        display: grid;
+        gap: 10px;
+        margin-top: 18px;
       }
-      .step b{
-        display:inline-flex;
-        align-items:center;
-        justify-content:center;
-        width:30px;
-        height:30px;
-        border-radius:999px;
-        background:rgba(47,211,186,.14);
-        color:#dffff7;
-        font-size:13px;
+      .step {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 12px;
+        align-items: start;
+        padding: 14px 16px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.03);
       }
-      .step span{
-        color:#d7e4df;
-        font-size:15px;
-        line-height:1.45;
+      .step b {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        background: rgba(47, 211, 186, 0.14);
+        color: #dffff7;
+        font-size: 13px;
       }
-      .footnote{
-        display:flex;
-        justify-content:space-between;
-        gap:16px;
-        color:#92a4a0;
-        font-size:13px;
-        border-top:1px solid rgba(255,255,255,.06);
-        padding-top:18px;
+      .step span {
+        color: #d7e4df;
+        font-size: 15px;
+        line-height: 1.45;
       }
-      @media (max-width: 980px){
-        .topbar{flex-direction:column;align-items:flex-start}
-        .status-row{justify-content:flex-start}
-        .hero-grid{grid-template-columns:1fr}
-        .left{border-right:0;border-bottom:1px solid rgba(255,255,255,.06)}
-        .right{align-items:flex-start}
-        .panel-card{align-self:flex-start}
+      .footnote {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        color: #92a4a0;
+        font-size: 13px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        padding-top: 18px;
       }
-      @media (max-width: 720px){
-        .page{width:min(100% - 20px,1240px);padding:16px 0 32px}
-        .left,.right{padding:22px}
-        .hero-grid{min-height:auto}
-        h1{font-size:clamp(38px,14vw,64px)}
-        .lede{font-size:16px}
-        .invite-input,.button{min-height:64px;border-radius:16px}
-        .button{font-size:18px}
-        .panel-card strong{font-size:21px}
-        .panel-card span{font-size:15px}
-        .footnote{flex-direction:column}
+      @media (max-width: 980px) {
+        .topbar {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .status-row {
+          justify-content: flex-start;
+        }
+        .hero-grid {
+          grid-template-columns: 1fr;
+        }
+        .left {
+          border-right: 0;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .right {
+          align-items: flex-start;
+        }
+        .panel-card {
+          align-self: flex-start;
+        }
+      }
+      @media (max-width: 720px) {
+        .page {
+          width: min(100% - 20px, 1240px);
+          padding: 16px 0 32px;
+        }
+        .left,
+        .right {
+          padding: 22px;
+        }
+        .hero-grid {
+          min-height: auto;
+        }
+        h1 {
+          font-size: clamp(38px, 14vw, 64px);
+        }
+        .lede {
+          font-size: 16px;
+        }
+        .invite-input,
+        .button {
+          min-height: 64px;
+          border-radius: 16px;
+        }
+        .button {
+          font-size: 18px;
+        }
+        .panel-card strong {
+          font-size: 21px;
+        }
+        .panel-card span {
+          font-size: 15px;
+        }
+        .footnote {
+          flex-direction: column;
+        }
       }
     </style>
   </head>
@@ -357,7 +426,10 @@
         <div class="hero-grid">
           <section class="left">
             <h1><span class="accent">Welcome to the Foundry Pod</span></h1>
-            <p class="lede">This is the working room where we shape access, verify identity, and prepare the Neon Nexus community gate before beta opens.</p>
+            <p class="lede">
+              This is the working room where we shape access, verify identity, and prepare the Neon
+              Nexus community gate before beta opens.
+            </p>
 
             <div class="facts" aria-label="Foundry Pod facts">
               <span class="fact">Claim flow</span>
@@ -371,24 +443,40 @@
               <form class="invite-field" id="invite-form">
                 <label class="invite-input" aria-label="Invite code">
                   <svg class="invite-key" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M14.5 5.5a6 6 0 1 0 3.2 11.1l2.3 2.3h2.5v-2.5l-2.1-2.1v-1.7h-1.8l-.9-.9a6 6 0 0 0-3.2-9z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
-                    <circle cx="9.5" cy="10.5" r="2" stroke="currentColor" stroke-width="1.7"/>
+                    <path
+                      d="M14.5 5.5a6 6 0 1 0 3.2 11.1l2.3 2.3h2.5v-2.5l-2.1-2.1v-1.7h-1.8l-.9-.9a6 6 0 0 0-3.2-9z"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linejoin="round"
+                    />
+                    <circle cx="9.5" cy="10.5" r="2" stroke="currentColor" stroke-width="1.7" />
                   </svg>
-                  <input id="invite-code" name="inviteCode" placeholder="Invite code" autocomplete="one-time-code" />
+                  <input
+                    id="invite-code"
+                    name="inviteCode"
+                    placeholder="Invite code"
+                    autocomplete="one-time-code"
+                  />
                 </label>
                 <button class="button" type="submit">Claim access</button>
               </form>
               <p class="sign-note">This handoff leads into Neon Nexus, not the dashboard.</p>
             </section>
 
-            <div class="signin">Already have an account? <a href="https://www.myfenrir.com/community/fenrir">Sign in to Neon Nexus</a></div>
+            <div class="signin">
+              Already have an account?
+              <a href="https://www.myfenrir.com/community/fenrir">Sign in to Neon Nexus</a>
+            </div>
           </section>
 
           <aside class="right">
             <img class="art" src="../fenrir-cyber-guardian-hero.svg" alt="Fenrir guardian" />
             <section class="panel-card">
               <strong>Build the gate before beta</strong>
-              <span>The Foundry Pod is where we prove the access path, verify the route, and keep the Neon Nexus invite lane clean.</span>
+              <span
+                >The Foundry Pod is where we prove the access path, verify the route, and keep the
+                Neon Nexus invite lane clean.</span
+              >
               <div class="steps">
                 <div class="step">
                   <b>1</b>
@@ -413,17 +501,19 @@
       </section>
     </main>
     <script>
-      const liveOrigin = "https://www.myfenrir.com";
+      const liveOrigin = 'https://www.myfenrir.com';
       function route(path) {
-        return window.location.protocol === "file:" ? `${liveOrigin}${path}` : path;
+        return window.location.protocol === 'file:' ? `${liveOrigin}${path}` : path;
       }
 
-      const form = document.getElementById("invite-form");
-      const input = document.getElementById("invite-code");
-      form.addEventListener("submit", (event) => {
+      const form = document.getElementById('invite-form');
+      const input = document.getElementById('invite-code');
+      form.addEventListener('submit', (event) => {
         event.preventDefault();
-        const value = String(input.value || "").trim();
-        window.location.href = route(value ? `/community/fenrir?invite=${encodeURIComponent(value)}` : "/community/fenrir");
+        const value = String(input.value || '').trim();
+        window.location.href = route(
+          value ? `/community/fenrir?invite=${encodeURIComponent(value)}` : '/community/fenrir'
+        );
       });
     </script>
   </body>

@@ -1,7 +1,7 @@
-type OAuthProvider = "google" | "microsoft" | "apple" | "telegram";
+type OAuthProvider = 'google' | 'microsoft' | 'apple' | 'telegram';
 
 /** OAuth, WorkOS AuthKit, or passkey — session cookie may reference any after sign-in. */
-export type SessionProvider = OAuthProvider | "passkey" | "workos";
+export type SessionProvider = OAuthProvider | 'passkey' | 'workos';
 
 export type AuthEnv = {
   SESSION_SECRET?: string;
@@ -43,7 +43,7 @@ export type SessionPayload = {
   exp: number;
 };
 
-const sessionCookie = "fenrir_session";
+const sessionCookie = 'fenrir_session';
 const week = 60 * 60 * 24 * 7;
 
 export function cookieHeader(name: string, value: string, maxAge: number, domain?: string) {
@@ -63,8 +63,14 @@ export function clearCookieHeader(name: string, domain?: string) {
 }
 
 export function readCookie(request: Request, name: string) {
-  const cookie = request.headers.get("Cookie") ?? "";
-  return cookie.split(";").map((item) => item.trim()).find((item) => item.startsWith(`${name}=`))?.slice(name.length + 1) ?? "";
+  const cookie = request.headers.get('Cookie') ?? '';
+  return (
+    cookie
+      .split(';')
+      .map((item) => item.trim())
+      .find((item) => item.startsWith(`${name}=`))
+      ?.slice(name.length + 1) ?? ''
+  );
 }
 
 export function sessionCookieName() {
@@ -72,7 +78,7 @@ export function sessionCookieName() {
 }
 
 export async function signSession(payload: SessionPayload, env: AuthEnv) {
-  const secret = requireSecret(env.SESSION_SECRET, "SESSION_SECRET");
+  const secret = requireSecret(env.SESSION_SECRET, 'SESSION_SECRET');
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(payload)));
   const signature = await hmac(secret, encoded);
   return `${encoded}.${signature}`;
@@ -81,9 +87,9 @@ export async function signSession(payload: SessionPayload, env: AuthEnv) {
 export async function readSession(request: Request, env: AuthEnv) {
   const token = readCookie(request, sessionCookie);
   if (!token) return null;
-  const [encoded, signature] = token.split(".");
+  const [encoded, signature] = token.split('.');
   if (!encoded || !signature) return null;
-  const expected = await hmac(requireSecret(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
+  const expected = await hmac(requireSecret(env.SESSION_SECRET, 'SESSION_SECRET'), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
   // A signature-valid token can still carry a malformed/empty body (e.g. a
   // truncated cookie, or a token minted by an older/other shape). Decoding or
@@ -96,7 +102,7 @@ export async function readSession(request: Request, env: AuthEnv) {
   } catch {
     return null;
   }
-  if (!payload || typeof payload !== "object") return null;
+  if (!payload || typeof payload !== 'object') return null;
   if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
   return payload;
 }
@@ -116,16 +122,16 @@ export function createSessionPayload(input: {
   friskyOrgId?: string;
 }): SessionPayload {
   const now = Math.floor(Date.now() / 1000);
-  const friskyUserId = input.friskyUserId ?? stableFriskyId("usr", input.identityId);
+  const friskyUserId = input.friskyUserId ?? stableFriskyId('usr', input.identityId);
   return {
     email: input.email,
     name: input.name,
     provider: input.provider,
     ...(input.friskyAccountId ? { frisky_account_id: input.friskyAccountId } : {}),
     frisky_user_id: friskyUserId,
-    frisky_org_id: input.friskyOrgId ?? stableFriskyId("org", friskyUserId),
+    frisky_org_id: input.friskyOrgId ?? stableFriskyId('org', friskyUserId),
     iat: now,
-    exp: now + week
+    exp: now + week,
   };
 }
 
@@ -135,30 +141,39 @@ function requireSecret(value: string | undefined, name: string) {
 }
 
 async function hmac(secret: string, data: string) {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
   return base64Url(new Uint8Array(signature));
 }
 
-function stableFriskyId(kind: "usr" | "org", value: string) {
+function stableFriskyId(kind: 'usr' | 'org', value: string) {
   const normalized = value.trim().toLowerCase();
   let hash = 2166136261;
   for (const char of normalized) {
     hash ^= char.charCodeAt(0);
     hash = Math.imul(hash, 16777619);
   }
-  const safe = normalized.replace(/[^a-z0-9]+/g, "").toUpperCase();
-  return `frisky_${kind}_${safe.slice(0, 18).padEnd(6, "X")}_${(hash >>> 0).toString(36).toUpperCase()}`;
+  const safe = normalized.replace(/[^a-z0-9]+/g, '').toUpperCase();
+  return `frisky_${kind}_${safe.slice(0, 18).padEnd(6, 'X')}_${(hash >>> 0).toString(36).toUpperCase()}`;
 }
 
 function base64Url(bytes: Uint8Array) {
-  let binary = "";
+  let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
 function base64UrlToBytes(value: string) {
-  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const padded = value
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+    .padEnd(Math.ceil(value.length / 4) * 4, '=');
   const binary = atob(padded);
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }

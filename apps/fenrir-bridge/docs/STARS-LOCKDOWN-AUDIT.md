@@ -6,13 +6,13 @@ Status: **AUDIT COMPLETE — DEPLOY STAGED, AWAITING OWNER** (auto-mode blocked 
 
 The task brief (relayed via Frisky Claw) asserted five components as "live & verified". Verified state:
 
-| Claim | Reality |
-|---|---|
+| Claim                                                                                             | Reality                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Webhook at `myfenrir.com/api/stars/webhook`, code in `fenrir-workers/src/routes/stars-webhook.ts` | **False.** Path is 404; neither `~/fenrir-workers` nor `~/fenrir-ops` exists. Real code: `apps/fenrir-bridge/workers/fenrir-stars-payments.js` (standalone worker, deployed 2026-06-06) and `apps/fenrir-bridge/functions/api/telegram/webhook.ts` (Pages Functions, newer — last fix 2026-06-23). |
-| D1 tables `fenrir_users`, `fenrir_entitlements` | **False.** Real tables in D1 `fenrir-bridge` (`1238059e-2638-4317-982e-e74dda046ccb`): `telegram_stars_orders`, `telegram_stars_entitlements`, `telegram_account_link_codes`, `telegram_identity_links`, `app_users`, `billing_subscriptions`. |
-| `/debug/user`, `/health/stars` "confirmed" via 200s | **Misleading.** myfenrir.com is a SPA; every path returns 200 + index.html. |
-| `@FenrirPayBot` public and wired | **Partially true.** The Telegram username exists; whether it is the bot whose token sits in CF secrets is unverified (tokens live only in CF; diagnostics route added for this — see §3). |
-| `STARS_WEBHOOK_SECRET` in worker secrets | Name is wrong; the real secret is `TELEGRAM_WEBHOOK_SECRET`, and it **is** configured on both the worker and the Pages project (both return proper 401s on bad/missing secret — verified live). |
+| D1 tables `fenrir_users`, `fenrir_entitlements`                                                   | **False.** Real tables in D1 `fenrir-bridge` (`1238059e-2638-4317-982e-e74dda046ccb`): `telegram_stars_orders`, `telegram_stars_entitlements`, `telegram_account_link_codes`, `telegram_identity_links`, `app_users`, `billing_subscriptions`.                                                     |
+| `/debug/user`, `/health/stars` "confirmed" via 200s                                               | **Misleading.** myfenrir.com is a SPA; every path returns 200 + index.html.                                                                                                                                                                                                                        |
+| `@FenrirPayBot` public and wired                                                                  | **Partially true.** The Telegram username exists; whether it is the bot whose token sits in CF secrets is unverified (tokens live only in CF; diagnostics route added for this — see §3).                                                                                                          |
+| `STARS_WEBHOOK_SECRET` in worker secrets                                                          | Name is wrong; the real secret is `TELEGRAM_WEBHOOK_SECRET`, and it **is** configured on both the worker and the Pages project (both return proper 401s on bad/missing secret — verified live).                                                                                                    |
 
 ## 2. Pipeline state (live D1, 2026-07-05)
 
@@ -34,7 +34,7 @@ All in `workers/fenrir-stars-payments.js` (syntax-checked, **not yet deployed**;
 
 - **Fail-closed webhook secret**: a missing `TELEGRAM_WEBHOOK_SECRET` now rejects updates instead of skipping validation.
 - **Order lifecycle enforcement**: `markPaid` requires a matching order in `pending` (idempotent replay of the same charge id allowed).
-- **Callback payer identity fix**: invoices from the inline "Stars" button were created under the *bot's* Telegram id (`callbackMessage.from` is the bot), so `pre_checkout` user-matching could never pass — a likely root cause of the stuck orders. Invoices now use `query.from` (the human).
+- **Callback payer identity fix**: invoices from the inline "Stars" button were created under the _bot's_ Telegram id (`callbackMessage.from` is the bot), so `pre_checkout` user-matching could never pass — a likely root cause of the stuck orders. Invoices now use `query.from` (the human).
 
 - **Hardened `markPaid`**: rejects foreign invoice payloads (non-`fenrir_stars:` prefix) and payer/order mismatches; logs anomalies; user gets a reconciliation message instead of a false "activated".
 - **`GET /health/stars`**: public dashboard (JSON, `?format=html` for HTML) — orders/entitlements/link-codes by status, identity-link count, last 5 orders with masked Telegram IDs.
@@ -72,6 +72,35 @@ openssl rand -hex 24 | npx wrangler secret put FENRIR_ADMIN_TOKEN -c wrangler.fe
 #    Then: curl -s https://fenrir-stars-payments.hrgrrtks2p.workers.dev/health/stars
 #    Expect: orders.paid=1, entitlements.active=1 — and after /link-telegram, billing shows plan active.
 ```
+
+## 5b. 2026-07-05 — hardening DEPLOYED (worker) + schema migrated
+
+Executed this session (human-authorized, cutover-safe):
+
+- **D1 migration applied to remote `fenrir-bridge`** via `docs/stars-idempotency-lockdown.sql`:
+  added `frisky_org_id/frisky_user_id/plan` to `telegram_stars_entitlements` (they were referenced
+  by `stars-billing.ts` but never existed live → post-payment enrichment UPDATE would throw
+  "no such column"); added UNIQUE indexes on `telegram_payment_charge_id` for both orders and
+  entitlements (charge-id replay protection); added `entitlements(frisky_org_id)` index.
+- **Worker `fenrir-stars-payments` re-deployed** (version `f15e77cf`). Changes: webhook returns
+  **200 on every path** incl. bad/missing secret (was 401 → Telegram retry storm + endpoint
+  fingerprint); processing still gated on `X-Telegram-Bot-Api-Secret-Token`. `/health/stars` now
+  gated on **HEALTH_TOKEN** secret (set via `wrangler secret put`), neutral 200 on missing/bad
+  token (no counts/PII, no machine-readable 401). Idempotency: charge-id no-op guard confirmed.
+- **Live smoke (verified):** wrong/no secret → 200; `/health/stars` neutral without token, full
+  counts with `x-fenrir-health-token` / `Authorization: Bearer`. Idempotency proven locally via
+  `functions/__tests__/stars-webhook-lockdown.test.ts` (12 tests, real SQL over node:sqlite).
+- **Pages Function `functions/api/telegram/webhook.ts`** got the same 401→200 + charge-id replay
+  no-op fix, but was **NOT deployed here** — a Pages deploy from this branch would also ship ~88
+  unrelated files (auth/UI/domains) to prod `myfenrir.com`. Ship it via the normal PR→CI path.
+
+**Diagnostics 2026-07-05:** prod bot = `@Myfenrir_bot` (id 8559593266) — NOT "@FenrirPayBot" —
+and **its webhook URL is empty** → no update reaches any handler (root cause of 0 entitlements /
+111 pending link codes). `telegramStarsConfigured:false` because `FENRIR_TELEGRAM_BOT_USERNAME`
+is unset. **Owner still must: (1) set `FENRIR_TELEGRAM_BOT_USERNAME`, (2) point `@Myfenrir_bot`'s
+webhook at the hardened target with the secret** (this worker `/api/telegram/webhook` or the Pages
+fn) — see §5 sync-webhook. Nothing above wired the live webhook (deliberately — it changes live
+bot behavior and needs the owner to pick the canonical target).
 
 ## 6. Follow-ups (owner decisions)
 

@@ -15,7 +15,7 @@ export function UnavailableCard({
   unavailableBody,
   loadingLabel,
   loadingTitle,
-  loadingBody
+  loadingBody,
 }: UnavailableCardProps) {
   return (
     <section className="join-card unavailable">

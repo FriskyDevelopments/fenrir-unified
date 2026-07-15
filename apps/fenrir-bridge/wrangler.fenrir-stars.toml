@@ -4,6 +4,15 @@ compatibility_date = "2026-05-08"
 
 [vars]
 GEMINI_MODEL = "gemini-3-flash-preview"
+FENRIR_TELEGRAM_BOT_USERNAME = "Myfenrir_bot"
+# Fenrir Hub — invite rotation stays DORMANT until HUB_CHAT_ID is set (add it in
+# the Cloudflare dashboard or here). Owner-tunable; see docs/HUB-SETUP.md.
+HUB_GATE_MODE = "request"
+HUB_INVITE_TTL_HOURS = "24"
+
+# Rotating-invite cadence. Default: every 12 hours (owner can change this cron).
+[triggers]
+crons = ["0 */12 * * *"]
 
 [[d1_databases]]
 binding = "DB"

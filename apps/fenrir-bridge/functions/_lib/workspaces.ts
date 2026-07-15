@@ -1,4 +1,4 @@
-import type { SessionPayload } from "./auth";
+import type { SessionPayload } from './auth';
 
 const nowIso = () => new Date().toISOString();
 

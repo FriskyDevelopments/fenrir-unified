@@ -1,10 +1,18 @@
-import { communitySessionClearCookie } from "../../_lib/community-auth";
-import { noStoreJson } from "../../_lib/responses";
+import {
+  communityCookieDomain,
+  communitySessionClearCookie,
+  type CommunityAuthEnv,
+} from '../../_lib/community-auth';
+import { noStoreJson } from '../../_lib/responses';
 
-export async function onRequestPost() {
-  return noStoreJson({ ok: true }, {
-    headers: {
-      "Set-Cookie": communitySessionClearCookie()
+export const onRequestPost: PagesFunction<CommunityAuthEnv> = async (context) => {
+  const domain = communityCookieDomain(context.request, context.env);
+  return noStoreJson(
+    { ok: true },
+    {
+      headers: {
+        'Set-Cookie': communitySessionClearCookie(domain),
+      },
     }
-  });
-}
+  );
+};

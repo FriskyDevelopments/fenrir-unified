@@ -1,30 +1,30 @@
-export type Plan = "free" | "starter" | "pro" | "operator";
-export type DomainStatus = "pending" | "verified" | "failed";
-export type DnsProvider = "cloudflare" | "external";
-export type CertificateStatus = "not_requested" | "dns_pending" | "issuing" | "active" | "failed";
-export type BridgeStatus = "active" | "revoked" | "paused";
-export type LiveRoomStatus = "active" | "paused";
-export type LiveRoomProvider = "zoom" | "webex" | "whereby" | "google_meet" | "other";
-export type InviteStatus = "active" | "revoked";
+export type Plan = 'free' | 'starter' | 'pro' | 'operator';
+export type DomainStatus = 'pending' | 'verified' | 'failed';
+export type DnsProvider = 'cloudflare' | 'external';
+export type CertificateStatus = 'not_requested' | 'dns_pending' | 'issuing' | 'active' | 'failed';
+export type BridgeStatus = 'active' | 'revoked' | 'paused';
+export type LiveRoomStatus = 'active' | 'paused';
+export type LiveRoomProvider = 'zoom' | 'webex' | 'whereby' | 'google_meet' | 'other';
+export type InviteStatus = 'active' | 'revoked';
 export type AuditAction =
-  | "user_created"
-  | "domain_added"
-  | "domain_verified"
-  | "bridge_created"
-  | "invite_rotated"
-  | "invite_revoked"
-  | "bridge_revoked"
-  | "live_room_created"
-  | "live_room_paused"
-  | "live_room_opened"
-  | "dns_check_failed"
-  | "telegram_permission_failed"
-  | "commission_link_clicked"
-  | "domain_provider_recommended"
-  | "domain_auction_opened"
-  | "jules_ticket_created"
-  | "gemini_dns_explained"
-  | "cursor_handoff_exported";
+  | 'user_created'
+  | 'domain_added'
+  | 'domain_verified'
+  | 'bridge_created'
+  | 'invite_rotated'
+  | 'invite_revoked'
+  | 'bridge_revoked'
+  | 'live_room_created'
+  | 'live_room_paused'
+  | 'live_room_opened'
+  | 'dns_check_failed'
+  | 'telegram_permission_failed'
+  | 'commission_link_clicked'
+  | 'domain_provider_recommended'
+  | 'domain_auction_opened'
+  | 'jules_ticket_created'
+  | 'gemini_dns_explained'
+  | 'cursor_handoff_exported';
 
 export type FriskyUser = {
   id: string;
@@ -117,9 +117,9 @@ export type FriskyCommissionLink = {
   label: string;
   provider: string;
   url: string;
-  category: "dns" | "domain" | "security" | "hosting" | "telegram" | "other";
-  status: "active" | "pending" | "paused";
-  partnerStatus: "approved" | "pending" | "fallback" | "recommended";
+  category: 'dns' | 'domain' | 'security' | 'hosting' | 'telegram' | 'other';
+  status: 'active' | 'pending' | 'paused';
+  partnerStatus: 'approved' | 'pending' | 'fallback' | 'recommended';
   commissionNote: string;
   clicks: number;
   createdAt: string;
@@ -130,7 +130,7 @@ export type TelegramPermissionCheck = {
   botIsAdmin: boolean;
   canInviteUsers: boolean;
   canRevokeLinks: boolean;
-  status: "ready" | "missing_permissions";
+  status: 'ready' | 'missing_permissions';
 };
 
 export type AppState = {

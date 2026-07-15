@@ -1,4 +1,6 @@
-import type { AuthProvider } from "../services/authGateway";
+import type { AuthProvider } from '../services/authGateway';
+
+import { MagneticButton } from './MagneticButton';
 
 type AuthProviderButtonProps = {
   provider: AuthProvider;
@@ -7,22 +9,28 @@ type AuthProviderButtonProps = {
   disabled?: boolean;
 };
 
-export function AuthProviderButton({ provider, label, onClick, disabled = false }: AuthProviderButtonProps) {
+export function AuthProviderButton({
+  provider,
+  label,
+  onClick,
+  disabled = false,
+}: AuthProviderButtonProps) {
   return (
-    <button
-      className={`auth-provider-button ${provider}-auth-button ${provider === "microsoft" ? "secondary" : ""}`.trim()}
+    <MagneticButton
+      className={`auth-provider-button ${provider}-auth-button ${provider === 'microsoft' ? 'secondary' : ''}`.trim()}
       type="button"
       onClick={onClick}
       disabled={disabled}
+      strength={0.3}
     >
       <AuthProviderIcon provider={provider} />
       <span>{label}</span>
-    </button>
+    </MagneticButton>
   );
 }
 
 export function AuthProviderIcon({ provider }: { provider: AuthProvider }) {
-  if (provider === "google") {
+  if (provider === 'google') {
     return (
       <span className="provider-icon google-icon" aria-hidden="true">
         <span />
@@ -30,7 +38,7 @@ export function AuthProviderIcon({ provider }: { provider: AuthProvider }) {
     );
   }
 
-  if (provider === "microsoft") {
+  if (provider === 'microsoft') {
     return (
       <span className="provider-icon microsoft-icon" aria-hidden="true">
         <span />

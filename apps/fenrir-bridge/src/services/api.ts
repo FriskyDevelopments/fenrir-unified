@@ -1,10 +1,31 @@
-import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from "@simplewebauthn/browser";
-import { copy } from "../i18n";
-import { addBridge, addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
+import type {
+  AuthenticationResponseJSON,
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+  RegistrationResponseJSON,
+} from '@simplewebauthn/browser';
+import { copy } from '../i18n';
+import {
+  addBridge,
+  addDomain,
+  addLiveRoom,
+  appendAudit,
+  pauseLiveRoom,
+  store,
+  trackCommissionClick,
+} from './mockStore';
 // Auth broker is WorkOS AuthKit. The hosted flow mints the Fenrir session
 // cookie server-side in /api/auth/callback/workos, so the client no longer
 // performs any token exchange after the redirect (directAuthOrigin is declared below).
-import type { AppState, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck } from "./types";
+import type {
+  AppState,
+  FriskyBridge,
+  FriskyLiveRoom,
+  FriskyTelegramInvite,
+  LiveRoomProvider,
+  Plan,
+  TelegramPermissionCheck,
+} from './types';
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
 export const defaultBillingCheckoutErrorMessage = copy.en.checkoutErrorGeneric;
@@ -13,14 +34,14 @@ const telegramBotUsername = () =>
   (
     import.meta.env.VITE_FENRIR_TELEGRAM_BOT_USERNAME ??
     import.meta.env.VITE_MYFENRIR_TELEGRAM_BOT_USERNAME ??
-    "Myfenrir_bot"
+    'Myfenrir_bot'
   )
-    .replace(/^@/, "")
+    .replace(/^@/, '')
     .trim();
 
-const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? "").trim().replace(/\/$/, "");
+const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? '').trim().replace(/\/$/, '');
 
-export type PaidPlan = Exclude<Plan, "free">;
+export type PaidPlan = Exclude<Plan, 'free'>;
 
 export type BillingLimits = {
   maxTelegramLocks: number | null;
@@ -28,7 +49,7 @@ export type BillingLimits = {
   customDomainSupported: boolean;
   liveRoomsSupported: boolean;
   multiAdminWorkflows: boolean;
-  auditLogScope: "none" | "standard" | "full";
+  auditLogScope: 'none' | 'standard' | 'full';
 };
 
 export type ReadinessPayload = {
@@ -83,7 +104,7 @@ export type TelegramIdentityLinkStartPayload = {
 
 export type TelegramReaddPayload = {
   ok: true;
-  mode: "telegram_readd";
+  mode: 'telegram_readd';
   linked: true;
   telegramUserId: string;
   telegramUsername: string | null;
@@ -99,7 +120,7 @@ export type AuthSession = {
     id: string;
     email: string;
     name: string;
-    authProvider: "google" | "microsoft" | "apple" | "telegram" | "passkey";
+    authProvider: 'google' | 'microsoft' | 'apple' | 'telegram' | 'passkey';
   };
   org?: {
     id: string;
@@ -120,20 +141,28 @@ export type TelegramLoginPayload = {
 async function apiRequest<T>(path: string, init?: RequestInit) {
   try {
     const response = await fetch(path, {
-      credentials: "include",
-      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-      ...init
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+      ...init,
     });
-    const body = await response.json().catch(() => null) as T | null;
+    const body = (await response.json().catch(() => null)) as T | null;
     if (!body) {
       return devApiFallback<T>(path, init, `api_empty_${response.status}`);
     }
     if (!response.ok) {
-      return devApiFallback<T>(path, init, (body as { error?: string } | null)?.error ?? `api_error_${response.status}`);
+      return devApiFallback<T>(
+        path,
+        init,
+        (body as { error?: string } | null)?.error ?? `api_error_${response.status}`
+      );
     }
     return body as T;
   } catch (error) {
-    return devApiFallback<T>(path, init, error instanceof Error ? error.message : "api_unavailable");
+    return devApiFallback<T>(
+      path,
+      init,
+      error instanceof Error ? error.message : 'api_unavailable'
+    );
   }
 }
 
@@ -149,21 +178,26 @@ function devAuthSession(): AuthSession & { ok: true } {
       id: store.user.id,
       email: store.user.email,
       name: store.user.name,
-      authProvider: "google"
+      authProvider: 'google',
     },
     org: {
       id: store.org.id,
-      plan: store.org.plan
-    }
+      plan: store.org.plan,
+    },
   };
 }
 
 function safeCurrentAuthReturnPath() {
   const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-  if (!path.startsWith("/") || path.startsWith("//")) return "/main";
-  const pathname = window.location.pathname || "/";
-  if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) {
-    return "/main";
+  if (!path.startsWith('/') || path.startsWith('//')) return '/main';
+  const pathname = window.location.pathname || '/';
+  if (
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname.startsWith('/auth/') ||
+    pathname.startsWith('/api/auth/')
+  ) {
+    return '/main';
   }
   return path;
 }
@@ -173,122 +207,165 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
     throw new Error(reason);
   }
 
-  const method = (init?.method ?? "GET").toUpperCase();
-  const body = typeof init?.body === "string" ? JSON.parse(init.body || "{}") as Record<string, unknown> : {};
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const body =
+    typeof init?.body === 'string'
+      ? (JSON.parse(init.body || '{}') as Record<string, unknown>)
+      : {};
 
-  if (path === "/api/auth/me") {
+  if (path === '/api/auth/me') {
     return devAuthSession() as T;
   }
-  if (path === "/api/auth/logout") {
+  if (path === '/api/auth/logout') {
     return { ok: true } as T;
   }
-  if (path === "/api/auth/telegram-session" && method === "POST") {
+  if (path === '/api/auth/telegram-session' && method === 'POST') {
     return { ok: true } as T;
   }
-  if (path === "/api/app-state") {
+  if (path === '/api/app-state') {
     return { ok: true, data: cloneStore() } as T;
   }
-  if (path === "/api/domains" && method === "POST") {
-    return { ok: true, data: addDomain(String(body.domain || "")) } as T;
+  if (path === '/api/domains' && method === 'POST') {
+    return { ok: true, data: addDomain(String(body.domain || '')) } as T;
   }
-  if (path === "/api/domains/check" && method === "POST") {
+  if (path === '/api/domains/check' && method === 'POST') {
     const domain = store.domains.find((item) => item.id === body.domainId) ?? store.domains[0];
     if (domain) {
-      domain.status = "verified";
-      domain.certificateStatus = "active";
+      domain.status = 'verified';
+      domain.certificateStatus = 'active';
       domain.verifiedAt = new Date().toISOString();
     }
     return { ok: true, data: domain } as T;
   }
-  if (path === "/api/bridges" && method === "POST") {
+  if (path === '/api/domains/cloudflare-zone' && method === 'POST') {
+    const domain = store.domains.find((item) => item.id === body.domainId) ?? store.domains[0];
+    const nameservers = ['aria.ns.cloudflare.com', 'hank.ns.cloudflare.com'];
+    if (domain) {
+      domain.dnsProvider = 'cloudflare';
+      domain.cloudflareHostnameId = `cf_zone_${Date.now().toString(36)}`;
+      domain.cloudflareNameservers = nameservers;
+      domain.certificateStatus = 'dns_pending';
+    }
+    return {
+      ok: true,
+      data: domain,
+      zone: {
+        id: domain?.cloudflareHostnameId ?? 'cf_zone_mock',
+        apex: domain?.domain ?? 'example.com',
+        status: 'pending',
+        nameservers,
+      },
+    } as T;
+  }
+  if (path === '/api/domains/cloudflare-status' && method === 'POST') {
+    const domain = store.domains.find((item) => item.id === body.domainId) ?? store.domains[0];
+    if (domain) {
+      domain.status = 'verified';
+      domain.certificateStatus = 'active';
+      domain.verifiedAt = domain.verifiedAt ?? new Date().toISOString();
+    }
+    return {
+      ok: true,
+      data: domain,
+      zone: {
+        id: domain?.cloudflareHostnameId ?? 'cf_zone_mock',
+        status: 'active',
+        active: true,
+        nameservers: domain?.cloudflareNameservers ?? [],
+      },
+    } as T;
+  }
+  if (path === '/api/bridges' && method === 'POST') {
     const bridge = addBridge(
-      String(body.domainId || store.domains[0]?.id || ""),
-      String(body.slug || "main"),
-      String(body.telegramChatId || "-10020260513"),
-      String(body.telegramGroupName || ""),
-      String(body.telegramGroupImageUrl || "")
+      String(body.domainId || store.domains[0]?.id || ''),
+      String(body.slug || 'main'),
+      String(body.telegramChatId || '-10020260513'),
+      String(body.telegramGroupName || ''),
+      String(body.telegramGroupImageUrl || '')
     );
     const invite = store.invites.find((item) => item.id === bridge.currentInviteId);
     return { ok: true, data: bridge, invite } as T;
   }
-  if (path === "/api/bridges/rotate" && method === "POST") {
+  if (path === '/api/bridges/rotate' && method === 'POST') {
     const bridge = store.bridges.find((item) => item.id === body.bridgeId);
-    if (!bridge) throw new Error("bridge_not_found");
+    if (!bridge) throw new Error('bridge_not_found');
     const currentInvite = store.invites.find((item) => item.id === bridge.currentInviteId);
     if (currentInvite) {
-      currentInvite.status = "revoked";
+      currentInvite.status = 'revoked';
       currentInvite.revokedAt = new Date().toISOString();
     }
     const invite: FriskyTelegramInvite = {
       id: `frisky_invite_${Date.now()}`,
       bridgeId: bridge.id,
       inviteLink: `https://t.me/+${bridge.slug}Rotated${Math.random().toString(36).slice(2, 5)}`,
-      status: "active",
-      createdAt: new Date().toISOString()
+      status: 'active',
+      createdAt: new Date().toISOString(),
     };
     store.invites.unshift(invite);
     bridge.currentInviteId = invite.id;
-    bridge.status = "active";
+    bridge.status = 'active';
     bridge.rotatedAt = new Date().toISOString();
     return { ok: true, data: bridge, invite } as T;
   }
-  if (path === "/api/bridges/revoke" && method === "POST") {
+  if (path === '/api/bridges/revoke' && method === 'POST') {
     const bridge = store.bridges.find((item) => item.id === body.bridgeId);
-    if (!bridge) throw new Error("bridge_not_found");
-    bridge.status = "revoked";
+    if (!bridge) throw new Error('bridge_not_found');
+    bridge.status = 'revoked';
     bridge.revokedAt = new Date().toISOString();
     const currentInvite = store.invites.find((item) => item.id === bridge.currentInviteId);
     if (currentInvite) {
-      currentInvite.status = "revoked";
+      currentInvite.status = 'revoked';
       currentInvite.revokedAt = bridge.revokedAt;
     }
     return { ok: true, data: bridge } as T;
   }
-  if (path === "/api/rooms" && method === "POST") {
+  if (path === '/api/rooms' && method === 'POST') {
     const room = addLiveRoom(
-      String(body.domainId || store.domains[0]?.id || ""),
-      String(body.slug || "room"),
-      String(body.title || ""),
-      (body.provider || "zoom") as LiveRoomProvider,
-      String(body.targetUrl || "https://meet.google.com/client-room"),
-      String(body.coverImageUrl || "")
+      String(body.domainId || store.domains[0]?.id || ''),
+      String(body.slug || 'room'),
+      String(body.title || ''),
+      (body.provider || 'zoom') as LiveRoomProvider,
+      String(body.targetUrl || 'https://meet.google.com/client-room'),
+      String(body.coverImageUrl || '')
     );
     return { ok: true, data: room } as T;
   }
-  if (path === "/api/rooms/pause" && method === "POST") {
-    const room = pauseLiveRoom(String(body.roomId || ""));
-    if (!room) throw new Error("room_not_found");
+  if (path === '/api/rooms/pause' && method === 'POST') {
+    const room = pauseLiveRoom(String(body.roomId || ''));
+    if (!room) throw new Error('room_not_found');
     return { ok: true, data: room } as T;
   }
-  if (path === "/api/telegram/check" && method === "POST") {
+  if (path === '/api/telegram/check' && method === 'POST') {
     const check: TelegramPermissionCheck = {
-      chatId: String(body.chatId || "-10020260513"),
+      chatId: String(body.chatId || '-10020260513'),
       botIsAdmin: true,
       canInviteUsers: true,
       canRevokeLinks: true,
-      status: "ready"
+      status: 'ready',
     };
     store.telegramChecks.unshift(check);
     return { ok: true, data: check } as T;
   }
-  if (path.startsWith("/api/public/bridge/")) {
-    const slug = decodeURIComponent(path.split("/").pop() || "");
-    const bridge = store.bridges.find((item) => item.slug === slug && item.status === "active");
-    const invite = bridge ? store.invites.find((item) => item.id === bridge.currentInviteId && item.status === "active") : null;
-    if (!bridge || !invite) throw new Error("bridge_not_found");
+  if (path.startsWith('/api/public/bridge/')) {
+    const slug = decodeURIComponent(path.split('/').pop() || '');
+    const bridge = store.bridges.find((item) => item.slug === slug && item.status === 'active');
+    const invite = bridge
+      ? store.invites.find((item) => item.id === bridge.currentInviteId && item.status === 'active')
+      : null;
+    if (!bridge || !invite) throw new Error('bridge_not_found');
     return { ok: true, bridge, invite } as T;
   }
-  if (path.startsWith("/api/public/room/")) {
-    const slug = decodeURIComponent(path.split("/").pop() || "");
-    const room = store.liveRooms.find((item) => item.slug === slug && item.status === "active");
-    if (!room) throw new Error("room_not_found");
+  if (path.startsWith('/api/public/room/')) {
+    const slug = decodeURIComponent(path.split('/').pop() || '');
+    const room = store.liveRooms.find((item) => item.slug === slug && item.status === 'active');
+    if (!room) throw new Error('room_not_found');
     return { ok: true, room } as T;
   }
-  if (path === "/api/billing/status") {
+  if (path === '/api/billing/status') {
     return {
       ok: true,
       plan: store.org.plan,
-      subscriptionStatus: "telegram_stars_pending",
+      subscriptionStatus: 'telegram_stars_pending',
       stripeCustomerId: null,
       stripeSubscriptionId: null,
       currentPeriodEnd: null,
@@ -299,36 +376,46 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
         customDomainSupported: false,
         liveRoomsSupported: true,
         multiAdminWorkflows: false,
-        auditLogScope: "standard"
-      }
+        auditLogScope: 'standard',
+      },
     } as T;
   }
-  if (path === "/api/telegram/link" && method === "POST") {
+  if (path === '/api/telegram/link' && method === 'POST') {
     const code = Math.random().toString(36).slice(2, 14);
     return {
       ok: true,
       linked: false,
       code,
       expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-      url: `https://t.me/${telegramBotUsername()}?start=link_${code}`
+      url: `https://t.me/${telegramBotUsername()}?start=link_${code}`,
     } as T;
   }
-  if (path === "/api/telegram/link") {
-    return { ok: true, linked: false, telegramUserId: null, telegramUsername: null, linkedAt: null } as T;
-  }
-  if (path === "/api/telegram/readd" && method === "POST") {
-    const bridge = store.bridges.find((item) => item.status === "active" && (item.id === body.bridgeId || item.telegramChatId === body.chatId));
-    if (!bridge) throw new Error("telegram_bridge_not_found");
+  if (path === '/api/telegram/link') {
     return {
       ok: true,
-      mode: "telegram_readd",
+      linked: false,
+      telegramUserId: null,
+      telegramUsername: null,
+      linkedAt: null,
+    } as T;
+  }
+  if (path === '/api/telegram/readd' && method === 'POST') {
+    const bridge = store.bridges.find(
+      (item) =>
+        item.status === 'active' &&
+        (item.id === body.bridgeId || item.telegramChatId === body.chatId)
+    );
+    if (!bridge) throw new Error('telegram_bridge_not_found');
+    return {
+      ok: true,
+      mode: 'telegram_readd',
       linked: true,
-      telegramUserId: "123456789",
-      telegramUsername: "fenrir_dev",
+      telegramUserId: '123456789',
+      telegramUsername: 'fenrir_dev',
       bridgeId: bridge.id,
       chatId: bridge.telegramChatId,
-      inviteUrl: "https://t.me/+fenrirRecoveryInvite",
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString()
+      inviteUrl: 'https://t.me/+fenrirRecoveryInvite',
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     } as T;
   }
   throw new Error(reason);
@@ -336,12 +423,12 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
 
 async function webauthnPost<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(path, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: body !== undefined ? JSON.stringify(body) : "{}"
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: body !== undefined ? JSON.stringify(body) : '{}',
   });
-  const data = await response.json().catch(() => null) as T | { error?: string } | null;
+  const data = (await response.json().catch(() => null)) as T | { error?: string } | null;
   if (!response.ok) {
     throw new Error((data as { error?: string } | null)?.error ?? `api_error_${response.status}`);
   }
@@ -349,18 +436,21 @@ async function webauthnPost<T>(path: string, body?: unknown): Promise<T> {
 }
 
 export const webauthnService = {
-  async registerOptions(): Promise<{ ok: true; optionsJSON: PublicKeyCredentialCreationOptionsJSON }> {
-    return webauthnPost("/api/webauthn/register-options");
+  async registerOptions(): Promise<{
+    ok: true;
+    optionsJSON: PublicKeyCredentialCreationOptionsJSON;
+  }> {
+    return webauthnPost('/api/webauthn/register-options');
   },
   async registerVerify(registration: RegistrationResponseJSON): Promise<{ ok: true }> {
-    return webauthnPost("/api/webauthn/register-verify", registration);
+    return webauthnPost('/api/webauthn/register-verify', registration);
   },
   async loginOptions(): Promise<{ ok: true; optionsJSON: PublicKeyCredentialRequestOptionsJSON }> {
-    return webauthnPost("/api/webauthn/login-options");
+    return webauthnPost('/api/webauthn/login-options');
   },
   async loginVerify(assertion: AuthenticationResponseJSON): Promise<{ ok: true }> {
-    return webauthnPost("/api/webauthn/login-verify", assertion);
-  }
+    return webauthnPost('/api/webauthn/login-verify', assertion);
+  },
 };
 
 export const authService = {
@@ -368,89 +458,168 @@ export const authService = {
     // WorkOS AuthKit mints the Fenrir session cookie on the server callback,
     // so the browser only needs to read the resulting session.
     try {
-      const result = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
+      const result = await apiRequest<AuthSession & { ok: boolean }>('/api/auth/me');
       return { ok: true as const, data: result };
     } catch {
       return { ok: true as const, data: { authenticated: false } as AuthSession };
     }
   },
-  async login(provider: "google" | "microsoft" | "apple") {
+  async login(provider: 'google' | 'microsoft' | 'apple') {
     const returnTo = safeCurrentAuthReturnPath();
     // Route social sign-in through WorkOS AuthKit; the provider hint jumps
     // straight to the matching hosted connection.
-    window.location.assign(`${directAuthOrigin}/api/auth/workos/login?provider=${provider}&return_to=${encodeURIComponent(returnTo)}`);
+    window.location.assign(
+      `${directAuthOrigin}/api/auth/workos/login?provider=${provider}&return_to=${encodeURIComponent(returnTo)}`
+    );
   },
   async telegramLogin(payload: TelegramLoginPayload) {
-    return apiRequest<{ ok: true; authenticated: true; user: AuthSession["user"]; org: AuthSession["org"] }>("/api/auth/telegram-session", {
-      method: "POST",
-      body: JSON.stringify(payload)
+    return apiRequest<{
+      ok: true;
+      authenticated: true;
+      user: AuthSession['user'];
+      org: AuthSession['org'];
+    }>('/api/auth/telegram-session', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     });
   },
   async logout() {
-    await apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }).catch(() => null);
-  }
+    await apiRequest<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }).catch(() => null);
+  },
 };
 
 export const liveRoomService = {
-  async create(input: { domainId: string; slug: string; title: string; provider: LiveRoomProvider; targetUrl: string; coverImageUrl: string }) {
-    return apiRequest<{ ok: true; data: FriskyLiveRoom }>("/api/rooms", {
-      method: "POST",
-      body: JSON.stringify(input)
+  async create(input: {
+    domainId: string;
+    slug: string;
+    title: string;
+    provider: LiveRoomProvider;
+    targetUrl: string;
+    coverImageUrl: string;
+  }) {
+    return apiRequest<{ ok: true; data: FriskyLiveRoom }>('/api/rooms', {
+      method: 'POST',
+      body: JSON.stringify(input),
     });
   },
   async pause(roomId: string) {
-    return apiRequest<{ ok: true; data: FriskyLiveRoom }>("/api/rooms/pause", {
-      method: "POST",
-      body: JSON.stringify({ roomId })
+    return apiRequest<{ ok: true; data: FriskyLiveRoom }>('/api/rooms/pause', {
+      method: 'POST',
+      body: JSON.stringify({ roomId }),
     });
   },
   async publicRedirect(slug: string) {
-    return apiRequest<{ ok: true; room: FriskyLiveRoom }>(`/api/public/room/${encodeURIComponent(slug)}`);
-  }
+    return apiRequest<{ ok: true; room: FriskyLiveRoom }>(
+      `/api/public/room/${encodeURIComponent(slug)}`
+    );
+  },
 };
 
 export const appService = {
   async load(): Promise<{ ok: true; data: AppState }> {
-    return apiRequest<{ ok: true; data: AppState }>("/api/app-state");
-  }
+    return apiRequest<{ ok: true; data: AppState }>('/api/app-state');
+  },
 };
 
 export const domainService = {
   async create(domain: string) {
-    return apiRequest<{ ok: true; data: AppState["domains"][number] }>("/api/domains", {
-      method: "POST",
-      body: JSON.stringify({ domain })
+    return apiRequest<{ ok: true; data: AppState['domains'][number] }>('/api/domains', {
+      method: 'POST',
+      body: JSON.stringify({ domain }),
     });
   },
   async checkDns(domainId: string) {
     try {
-      return await apiRequest<{ ok: true; data: AppState["domains"][number] }>("/api/domains/check", {
-        method: "POST",
-        body: JSON.stringify({ domainId })
+      return await apiRequest<{ ok: true; data: AppState['domains'][number] }>(
+        '/api/domains/check',
+        {
+          method: 'POST',
+          body: JSON.stringify({ domainId }),
+        }
+      );
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: {
+          code: 'dns_check_failed',
+          message: error instanceof Error ? error.message : 'DNS check failed.',
+        },
+      };
+    }
+  },
+  // "Switch DNS to Cloudflare": create/identify the real zone and get nameservers.
+  async cloudflareZone(domainId: string) {
+    try {
+      return await apiRequest<{
+        ok: true;
+        data: AppState['domains'][number];
+        zone: { id: string; apex: string; status: string; nameservers: string[] };
+      }>('/api/domains/cloudflare-zone', {
+        method: 'POST',
+        body: JSON.stringify({ domainId }),
       });
     } catch (error) {
-      return { ok: false as const, error: { code: "dns_check_failed", message: error instanceof Error ? error.message : "DNS check failed." } };
+      return {
+        ok: false as const,
+        error: {
+          code: 'cloudflare_zone_failed',
+          message: error instanceof Error ? error.message : 'Cloudflare zone creation failed.',
+        },
+      };
     }
-  }
+  },
+  // Poll propagation + Universal SSL for the domain's Cloudflare zone.
+  async cloudflareStatus(domainId: string) {
+    try {
+      return await apiRequest<{
+        ok: true;
+        data: AppState['domains'][number];
+        zone: { id: string; status: string; active: boolean; nameservers: string[] };
+      }>('/api/domains/cloudflare-status', {
+        method: 'POST',
+        body: JSON.stringify({ domainId }),
+      });
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: {
+          code: 'cloudflare_status_failed',
+          message: error instanceof Error ? error.message : 'Cloudflare status check failed.',
+        },
+      };
+    }
+  },
 };
 
 export const bridgeService = {
-  async create(input: { domainId: string; slug: string; telegramChatId: string; telegramGroupName: string; telegramGroupImageUrl: string }) {
-    return apiRequest<{ ok: true; data: FriskyBridge; invite: FriskyTelegramInvite }>("/api/bridges", {
-      method: "POST",
-      body: JSON.stringify(input)
-    });
+  async create(input: {
+    domainId: string;
+    slug: string;
+    telegramChatId: string;
+    telegramGroupName: string;
+    telegramGroupImageUrl: string;
+  }) {
+    return apiRequest<{ ok: true; data: FriskyBridge; invite: FriskyTelegramInvite }>(
+      '/api/bridges',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }
+    );
   },
   async rotate(bridgeId: string) {
-    return apiRequest<{ ok: true; data: FriskyBridge; invite: FriskyTelegramInvite }>("/api/bridges/rotate", {
-      method: "POST",
-      body: JSON.stringify({ bridgeId })
-    });
+    return apiRequest<{ ok: true; data: FriskyBridge; invite: FriskyTelegramInvite }>(
+      '/api/bridges/rotate',
+      {
+        method: 'POST',
+        body: JSON.stringify({ bridgeId }),
+      }
+    );
   },
   async revoke(bridgeId: string) {
-    return apiRequest<{ ok: true; data: FriskyBridge }>("/api/bridges/revoke", {
-      method: "POST",
-      body: JSON.stringify({ bridgeId })
+    return apiRequest<{ ok: true; data: FriskyBridge }>('/api/bridges/revoke', {
+      method: 'POST',
+      body: JSON.stringify({ bridgeId }),
     });
   },
   async publicRedirect(slug: string) {
@@ -460,85 +629,122 @@ export const bridgeService = {
       invite: FriskyTelegramInvite | null;
       access: { inviteAvailable: boolean; reason: string };
     }>(`/api/public/bridge/${encodeURIComponent(slug)}`);
-  }
+  },
 };
 
 export const telegramService = {
   async checkPermissions(chatId: string): Promise<{ ok: true; data: TelegramPermissionCheck }> {
-    return apiRequest<{ ok: true; data: TelegramPermissionCheck }>("/api/telegram/check", {
-      method: "POST",
-      body: JSON.stringify({ chatId })
+    return apiRequest<{ ok: true; data: TelegramPermissionCheck }>('/api/telegram/check', {
+      method: 'POST',
+      body: JSON.stringify({ chatId }),
     });
   },
   commandExamples: [
-    "/bridge_link main <telegram_group_id>",
-    "/bridge_rotate main",
-    "/bridge_revoke main",
-    "/bridge_links",
-    "/bridge_check <telegram_group_id>"
-  ]
+    '/bridge_link main <telegram_group_id>',
+    '/bridge_rotate main',
+    '/bridge_revoke main',
+    '/bridge_links',
+    '/bridge_check <telegram_group_id>',
+  ],
 };
 
 export const aiOpsService = {
   julesTicket() {
-    appendAudit("jules_ticket_created", "FriskyOrg", store.org.id, { label: "backend hardening task" });
+    appendAudit('jules_ticket_created', 'FriskyOrg', store.org.id, {
+      label: 'backend hardening task',
+    });
   },
   geminiDnsExplanation() {
-    appendAudit("gemini_dns_explained", "FriskyDomain", store.domains[0]?.id ?? "none", { assistant: "Gemini", note: "DNS wizard guidance generated." });
+    appendAudit('gemini_dns_explained', 'FriskyDomain', store.domains[0]?.id ?? 'none', {
+      assistant: 'Gemini',
+      note: 'DNS wizard guidance generated.',
+    });
   },
   cursorHandoff() {
-    appendAudit("cursor_handoff_exported", "FriskyOrg", store.org.id, { target: "Cursor workspace" });
-  }
+    appendAudit('cursor_handoff_exported', 'FriskyOrg', store.org.id, {
+      target: 'Cursor workspace',
+    });
+  },
 };
 
 export const commerceService = {
   click(slug: string) {
     return trackCommissionClick(slug);
-  }
+  },
 };
 
 export const readinessService = {
   async get(): Promise<ReadinessPayload | null> {
     try {
-      const response = await fetch("/api/readiness", { credentials: "same-origin" });
+      const response = await fetch('/api/readiness', { credentials: 'same-origin' });
       const body = (await response.json().catch(() => null)) as ReadinessPayload | null;
       if (!response.ok || !body?.ok) return null;
       return body;
     } catch {
       return null;
     }
-  }
+  },
 };
 
 export const billingService = {
   async getStatus(): Promise<BillingStatusPayload> {
-    return apiRequest<BillingStatusPayload>("/api/billing/status");
+    return apiRequest<BillingStatusPayload>('/api/billing/status');
   },
   async checkout(plan: PaidPlan): Promise<{ ok: true; url: string }> {
-    return apiRequest<{ ok: true; url: string }>("/api/billing/checkout", {
-      method: "POST",
-      body: JSON.stringify({ plan })
+    return apiRequest<{ ok: true; url: string }>('/api/billing/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ plan }),
+    });
+  },
+  /**
+   * Card→crypto on-ramp via Wert. Returns `enabled:false` (not an error) when
+   * partner creds aren't configured yet, so the UI can show "coming soon".
+   * When enabled, `wert` is the @wert-io/widget-initializer options object.
+   */
+  async wertCheckout(plan: PaidPlan): Promise<{
+    ok: true;
+    enabled: boolean;
+    plan?: PaidPlan;
+    amountUsd?: number;
+    sandbox?: boolean;
+    wert?: Record<string, unknown>;
+  }> {
+    return apiRequest('/api/billing/wert-checkout', {
+      method: 'POST',
+      body: JSON.stringify({ plan }),
     });
   },
   async portal(): Promise<{ ok: true; url: string }> {
-    return apiRequest<{ ok: true; url: string }>("/api/billing/portal", { method: "POST" });
+    return apiRequest<{ ok: true; url: string }>('/api/billing/portal', { method: 'POST' });
   },
-  async telegramStars(): Promise<{ ok: true; botUsername: string; url: string; stars: number; mode: "telegram_stars" }> {
-    return apiRequest<{ ok: true; botUsername: string; url: string; stars: number; mode: "telegram_stars" }>("/api/telegram/stars");
-  }
+  async telegramStars(): Promise<{
+    ok: true;
+    botUsername: string;
+    url: string;
+    stars: number;
+    mode: 'telegram_stars';
+  }> {
+    return apiRequest<{
+      ok: true;
+      botUsername: string;
+      url: string;
+      stars: number;
+      mode: 'telegram_stars';
+    }>('/api/telegram/stars');
+  },
 };
 
 export const telegramIdentityService = {
   async status(): Promise<TelegramIdentityLinkPayload> {
-    return apiRequest<TelegramIdentityLinkPayload>("/api/telegram/link");
+    return apiRequest<TelegramIdentityLinkPayload>('/api/telegram/link');
   },
   async start(): Promise<TelegramIdentityLinkStartPayload> {
-    return apiRequest<TelegramIdentityLinkStartPayload>("/api/telegram/link", { method: "POST" });
+    return apiRequest<TelegramIdentityLinkStartPayload>('/api/telegram/link', { method: 'POST' });
   },
   async readd(input: { bridgeId?: string; chatId?: string }): Promise<TelegramReaddPayload> {
-    return apiRequest<TelegramReaddPayload>("/api/telegram/readd", {
-      method: "POST",
-      body: JSON.stringify(input)
+    return apiRequest<TelegramReaddPayload>('/api/telegram/readd', {
+      method: 'POST',
+      body: JSON.stringify(input),
     });
-  }
+  },
 };

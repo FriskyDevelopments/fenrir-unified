@@ -1,4 +1,4 @@
-import type { WebAuthnCredential } from "@simplewebauthn/server";
+import type { WebAuthnCredential } from '@simplewebauthn/server';
 
 function nowIso() {
   return new Date().toISOString();
@@ -16,7 +16,7 @@ export type StoredCredentialRow = {
 };
 
 export function uint8ToBase64(u8: Uint8Array): string {
-  let binary = "";
+  let binary = '';
   for (const b of u8) binary += String.fromCharCode(b);
   return btoa(binary);
 }
@@ -33,7 +33,9 @@ export async function listExcludeCredentials(db: D1Database, friskyUserId: strin
     .all<{ credential_id: string; transports: string | null }>();
   return (results ?? []).map((row) => ({
     id: row.credential_id,
-    transports: row.transports ? (JSON.parse(row.transports) as WebAuthnCredential["transports"]) : undefined
+    transports: row.transports
+      ? (JSON.parse(row.transports) as WebAuthnCredential['transports'])
+      : undefined,
   }));
 }
 
@@ -47,7 +49,7 @@ export async function insertCredential(
     displayName: string;
     publicKey: Uint8Array;
     counter: number;
-    transports?: WebAuthnCredential["transports"];
+    transports?: WebAuthnCredential['transports'];
   }
 ) {
   const t = nowIso();
@@ -73,7 +75,10 @@ export async function insertCredential(
     .run();
 }
 
-export async function getCredentialById(db: D1Database, credentialId: string): Promise<StoredCredentialRow | null> {
+export async function getCredentialById(
+  db: D1Database,
+  credentialId: string
+): Promise<StoredCredentialRow | null> {
   const row = await db
     .prepare(`SELECT * FROM webauthn_credentials WHERE credential_id = ?`)
     .bind(credentialId)
@@ -81,7 +86,11 @@ export async function getCredentialById(db: D1Database, credentialId: string): P
   return row ?? null;
 }
 
-export async function updateCredentialCounter(db: D1Database, credentialId: string, counter: number) {
+export async function updateCredentialCounter(
+  db: D1Database,
+  credentialId: string,
+  counter: number
+) {
   await db
     .prepare(`UPDATE webauthn_credentials SET counter = ?, updated_at = ? WHERE credential_id = ?`)
     .bind(counter, nowIso(), credentialId)
@@ -93,11 +102,16 @@ export function rowToWebAuthnCredential(row: StoredCredentialRow): WebAuthnCrede
     id: row.credential_id,
     publicKey: base64ToUint8(row.public_key_b64),
     counter: row.counter,
-    transports: row.transports ? (JSON.parse(row.transports) as WebAuthnCredential["transports"]) : undefined
+    transports: row.transports
+      ? (JSON.parse(row.transports) as WebAuthnCredential['transports'])
+      : undefined,
   };
 }
 
-export async function countCredentialsForUser(db: D1Database, friskyUserId: string): Promise<number> {
+export async function countCredentialsForUser(
+  db: D1Database,
+  friskyUserId: string
+): Promise<number> {
   const row = await db
     .prepare(`SELECT COUNT(*) as n FROM webauthn_credentials WHERE frisky_user_id = ?`)
     .bind(friskyUserId)

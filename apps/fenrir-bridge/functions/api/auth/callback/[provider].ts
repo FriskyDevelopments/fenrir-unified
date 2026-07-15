@@ -1,4 +1,4 @@
-import { noStoreJson } from "../../../_lib/responses";
+import { noStoreJson } from '../../../_lib/responses';
 import {
   clearTransactionCookie,
   exchangeCodeForSession,
@@ -8,17 +8,17 @@ import {
   safeReturnPath,
   signSessionTransfer,
   validateOAuthTransaction,
-  type OAuthEnv
-} from "../../../_lib/oauth";
-import { authOrigin, siteOrigin } from "../../../_lib/billing-env";
-import { ensureDefaultWorkspace } from "../../../_lib/workspaces";
-import { upsertProfileForSession } from "../../../_lib/supabase-profiles";
-import { resolveFriskyAccountId, type SupabaseAdminEnv } from "../../../_lib/frisky-account";
+  type OAuthEnv,
+} from '../../../_lib/oauth';
+import { authOrigin, siteOrigin } from '../../../_lib/billing-env';
+import { ensureDefaultWorkspace } from '../../../_lib/workspaces';
+import { upsertProfileForSession } from '../../../_lib/supabase-profiles';
+import { resolveFriskyAccountId, type SupabaseAdminEnv } from '../../../_lib/frisky-account';
 
-async function handleCallback(context: EventContext<OAuthEnv, "provider", unknown>) {
+async function handleCallback(context: EventContext<OAuthEnv, 'provider', unknown>) {
   const provider = context.params.provider;
   if (!isOAuthProvider(provider)) {
-    return noStoreJson({ ok: false, error: "unsupported_provider" }, { status: 404 });
+    return noStoreJson({ ok: false, error: 'unsupported_provider' }, { status: 404 });
   }
 
   const siteBase = siteOrigin(context.request, context.env);
@@ -26,8 +26,8 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
     return noStoreJson(
       {
         ok: false,
-        error: "direct_oauth_disabled",
-        detail: "Set the direct OAuth client ID/secret environment variables for this provider."
+        error: 'direct_oauth_disabled',
+        detail: 'Set the direct OAuth client ID/secret environment variables for this provider.',
       },
       { status: 410 }
     );
@@ -39,17 +39,17 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
   let providerErrorDescription: string | null = null;
   const url = new URL(context.request.url);
 
-  if (context.request.method === "POST") {
+  if (context.request.method === 'POST') {
     const formData = await context.request.formData();
-    code = formData.get("code") as string | null;
-    state = formData.get("state") as string | null;
-    providerError = formData.get("error") as string | null;
-    providerErrorDescription = formData.get("error_description") as string | null;
+    code = formData.get('code') as string | null;
+    state = formData.get('state') as string | null;
+    providerError = formData.get('error') as string | null;
+    providerErrorDescription = formData.get('error_description') as string | null;
   } else {
-    code = url.searchParams.get("code");
-    state = url.searchParams.get("state");
-    providerError = url.searchParams.get("error");
-    providerErrorDescription = url.searchParams.get("error_description");
+    code = url.searchParams.get('code');
+    state = url.searchParams.get('state');
+    providerError = url.searchParams.get('error');
+    providerErrorDescription = url.searchParams.get('error_description');
   }
 
   if (providerError) {
@@ -57,7 +57,7 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
   }
 
   if (!code) {
-    return redirectWithAuthError(siteBase, "missing_code", null);
+    return redirectWithAuthError(siteBase, 'missing_code', null);
   }
 
   const authBase = authOrigin(context.request, context.env);
@@ -89,17 +89,17 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
       try {
         await ensureDefaultWorkspace(context.env.DB, sessionPayload);
       } catch (e) {
-        console.error("callback enrichment: ensureDefaultWorkspace failed (non-blocking)", e);
+        console.error('callback enrichment: ensureDefaultWorkspace failed (non-blocking)', e);
       }
     }
     await upsertProfileForSession(context.env, sessionPayload, result.identityId).catch((e) =>
-      console.error("callback enrichment: upsertProfileForSession failed (non-blocking)", e)
+      console.error('callback enrichment: upsertProfileForSession failed (non-blocking)', e)
     );
 
-    const returnToUrl = tx?.returnTo ?? "/main";
+    const returnToUrl = tx?.returnTo ?? '/main';
     let finalLocation: string;
 
-    if (returnToUrl.startsWith("http")) {
+    if (returnToUrl.startsWith('http')) {
       const targetUrl = new URL(returnToUrl);
       const targetOrigin = `${targetUrl.protocol}//${targetUrl.host}`;
       finalLocation = `${targetOrigin}/api/auth/complete?token=${encodeURIComponent(await signSessionTransfer(sessionPayload, returnToUrl, context.env))}`;
@@ -108,15 +108,19 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
     }
 
     const headers = new Headers({
-      Location: finalLocation
+      Location: finalLocation,
     });
-    headers.append("Set-Cookie", clearTransactionCookie());
+    headers.append('Set-Cookie', clearTransactionCookie());
     return new Response(null, {
       status: 302,
-      headers
+      headers,
     });
   } catch (error) {
-    return redirectWithAuthError(siteBase, error instanceof Error ? error.message : "oauth_exchange_failed", null);
+    return redirectWithAuthError(
+      siteBase,
+      error instanceof Error ? error.message : 'oauth_exchange_failed',
+      null
+    );
   }
 }
 
@@ -125,12 +129,12 @@ export const onRequestPost: PagesFunction<OAuthEnv> = handleCallback;
 
 function redirectWithAuthError(siteBase: string, error: string, detail: string | null) {
   const params = new URLSearchParams({ auth_error: error });
-  if (detail) params.set("auth_error_detail", detail);
+  if (detail) params.set('auth_error_detail', detail);
   return new Response(null, {
     status: 302,
     headers: {
       Location: `${siteBase}/login?${params.toString()}`,
-      "Set-Cookie": clearTransactionCookie()
-    }
+      'Set-Cookie': clearTransactionCookie(),
+    },
   });
 }

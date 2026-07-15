@@ -20,13 +20,13 @@ requires a **paid Apple Developer account**.
 
 ## What you'll end up with
 
-| Field | Where it comes from |
-| --- | --- |
-| Services ID (client ID) | Apple Developer -> Identifiers |
-| Team ID | Apple Developer -> Membership |
-| Key ID | Apple Developer -> Keys |
-| Private key (`.p8`) | Apple Developer -> Keys (downloaded once) |
-| Return URL | WorkOS shows it when you enable the Apple connection |
+| Field                   | Where it comes from                                  |
+| ----------------------- | ---------------------------------------------------- |
+| Services ID (client ID) | Apple Developer -> Identifiers                       |
+| Team ID                 | Apple Developer -> Membership                        |
+| Key ID                  | Apple Developer -> Keys                              |
+| Private key (`.p8`)     | Apple Developer -> Keys (downloaded once)            |
+| Return URL              | WorkOS shows it when you enable the Apple connection |
 
 ---
 
@@ -63,6 +63,7 @@ requires a **paid Apple Developer account**.
 
 1. **Redirect URI** (one-time, applies to all providers):
    Authentication -> Redirects -> set the AuthKit redirect to exactly:
+
    ```
    https://auth.myfenrir.com/api/auth/callback/workos
    ```
@@ -91,6 +92,7 @@ WorkOS's side):
 2. You should be redirected to Apple's sign-in, then back to Fenrir signed in.
 
 If it bounces back to `/login?auth_error=...`:
+
 - **redirect/return URL mismatch** is the #1 cause — the Return URL in Apple
   must byte-for-byte match the one WorkOS displayed.
 - Make sure the WorkOS Apple connection is **active**, not just saved as draft.

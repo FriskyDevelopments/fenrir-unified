@@ -1,103 +1,576 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Projects — Hub</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-<style>
-:root{--bg:#0b0c10;--bg-2:#111319;--card:#15171f;--card-2:#1b1e28;--stroke:rgba(255,255,255,.07);--stroke-2:rgba(255,255,255,.12);--text:#f4f5f7;--muted:#9aa0ad;--faint:#646b79;--radius:20px;--radius-sm:13px;--radius-pill:999px;}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{font-family:'Inter',system-ui,sans-serif;background:radial-gradient(1100px 600px at 12% -10%, rgba(127,119,221,.22), transparent 60%),radial-gradient(900px 600px at 100% 0%, rgba(216,90,48,.16), transparent 55%),radial-gradient(800px 700px at 50% 120%, rgba(29,158,117,.14), transparent 60%),var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;min-height:100vh;padding:40px 20px 80px;}
-.wrap{max-width:1080px;margin:0 auto}
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:30px}
-.brand{display:flex;align-items:center;gap:14px}
-.logo{width:46px;height:46px;border-radius:14px;flex-shrink:0;background:linear-gradient(135deg,#7f77dd,#534ab7);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(83,74,183,.45);font-size:22px;}
-.brand h1{font-size:20px;font-weight:700;letter-spacing:-.01em;line-height:1.1}
-.brand p{font-size:13px;color:var(--muted);font-weight:500}
-.newbtn{display:flex;align-items:center;gap:8px;cursor:pointer;background:linear-gradient(135deg,#7f77dd,#534ab7);color:#fff;border:none;font-family:inherit;font-weight:600;font-size:14px;padding:12px 20px;border-radius:var(--radius-pill);box-shadow:0 8px 22px rgba(83,74,183,.4);transition:transform .15s ease,box-shadow .15s ease;}
-.newbtn:hover{transform:translateY(-1px);box-shadow:0 12px 28px rgba(83,74,183,.55)}
-.promo{position:relative;overflow:hidden;border-radius:var(--radius);background:linear-gradient(110deg,#d85a30 0%,#e0683c 45%,#d4537e 100%);padding:22px 26px;display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:30px;box-shadow:0 18px 40px rgba(216,90,48,.28);}
-.promo::after{content:"";position:absolute;inset:0;background:radial-gradient(400px 200px at 90% 120%,rgba(255,255,255,.25),transparent 60%);pointer-events:none}
-.promo .pl{display:flex;align-items:center;gap:18px;position:relative;z-index:1}
-.promo .gift{width:50px;height:50px;border-radius:14px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
-.promo h3{font-size:17px;font-weight:700;color:#fff;margin-bottom:3px}
-.promo span{font-size:13.5px;color:rgba(255,255,255,.9);font-weight:500}
-.promo .cta{position:relative;z-index:1;background:#fff;color:#993c1d;font-weight:700;font-size:14px;border:none;font-family:inherit;padding:12px 22px;border-radius:var(--radius-pill);cursor:pointer;white-space:nowrap;transition:transform .15s ease}
-.promo .cta:hover{transform:scale(1.04)}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:30px}
-.stat{background:var(--card);border:1px solid var(--stroke);border-radius:var(--radius-sm);padding:18px 20px}
-.stat .n{font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1}
-.stat .l{font-size:12.5px;color:var(--muted);font-weight:500;margin-top:7px;text-transform:uppercase;letter-spacing:.04em}
-.stat .n.purple{color:#a79efc}.stat .n.green{color:#7fd6a8}.stat .n.amber{color:#f0b65c}.stat .n.blue{color:#7cb6ef}
-.filters{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:22px}
-.pill{font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;background:var(--card);border:1px solid var(--stroke);padding:8px 16px;border-radius:var(--radius-pill);transition:all .15s ease;user-select:none;}
-.pill:hover{color:var(--text);border-color:var(--stroke-2)}
-.pill.active{background:#fff;color:#0b0c10;border-color:#fff}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
-.card{position:relative;background:var(--card);border:1px solid var(--stroke);border-radius:var(--radius);padding:22px;overflow:hidden;transition:transform .18s ease,border-color .18s ease,background .18s ease;}
-.card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:var(--accent)}
-.card:hover{transform:translateY(-4px);border-color:var(--stroke-2);background:var(--card-2)}
-.card .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
-.card .ic{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;background:var(--accent-soft);flex-shrink:0}
-.card h2{font-size:17.5px;font-weight:700;letter-spacing:-.01em;margin-bottom:3px}
-.card .pid{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--faint);font-weight:500}
-.status{font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:var(--radius-pill);white-space:nowrap;letter-spacing:.02em}
-.card p.desc{font-size:13.5px;color:var(--muted);line-height:1.55;margin:12px 0 16px}
-.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px}
-.chip{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:#c5cad4;background:rgba(255,255,255,.05);border:1px solid var(--stroke);padding:4px 9px;border-radius:8px}
-.meta{display:flex;align-items:center;justify-content:space-between;padding-top:14px;border-top:1px solid var(--stroke)}
-.meta .date{font-size:12px;color:var(--faint);font-weight:500;display:flex;align-items:center;gap:6px}
-.links{display:flex;gap:8px}
-.lnk{width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid var(--stroke);display:flex;align-items:center;justify-content:center;color:var(--muted);text-decoration:none;font-size:14px;transition:all .15s ease}
-.lnk:hover{background:rgba(255,255,255,.12);color:var(--text)}
-.foot{text-align:center;margin-top:48px;color:var(--faint);font-size:12.5px;font-weight:500}
-@media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}.promo{flex-direction:column;align-items:flex-start}.grid{grid-template-columns:1fr}}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <div class="topbar">
-    <div class="brand"><div class="logo">🚀</div><div><h1>Projects</h1><p>Your dev &amp; web build hub</p></div></div>
-    <button class="newbtn">＋ New project</button>
-  </div>
-  <div class="promo">
-    <div class="pl"><div class="gift">🎁</div><div><h3>5 active builds in flight</h3><span>1 launched · 1 in progress · keep the momentum going.</span></div></div>
-    <button class="cta">View roadmap</button>
-  </div>
-  <div class="stats">
-    <div class="stat"><div class="n purple">5</div><div class="l">Total</div></div>
-    <div class="stat"><div class="n amber">1</div><div class="l">In progress</div></div>
-    <div class="stat"><div class="n green">1</div><div class="l">Launched</div></div>
-    <div class="stat"><div class="n blue">2</div><div class="l">High priority</div></div>
-  </div>
-  <div class="filters" id="filters">
-    <div class="pill active" data-f="all">All</div>
-    <div class="pill" data-f="In Progress">In progress</div>
-    <div class="pill" data-f="Planning">Planning</div>
-    <div class="pill" data-f="Idea">Idea</div>
-    <div class="pill" data-f="Launched">Launched</div>
-    <div class="pill" data-f="On Hold">On hold</div>
-  </div>
-  <div class="grid" id="grid"></div>
-  <div class="foot">Synced from your Notion Projects database · PRJ-1 → PRJ-5</div>
-</div>
-<script>
-const STATUS={"In Progress":{bg:"rgba(240,182,92,.15)",fg:"#f0b65c",accent:"#f0b65c",soft:"rgba(240,182,92,.14)"},"Planning":{bg:"rgba(124,182,239,.15)",fg:"#7cb6ef",accent:"#7cb6ef",soft:"rgba(124,182,239,.14)"},"Idea":{bg:"rgba(154,160,173,.15)",fg:"#b4b9c4",accent:"#9aa0ad",soft:"rgba(154,160,173,.12)"},"Launched":{bg:"rgba(127,214,168,.15)",fg:"#7fd6a8",accent:"#7fd6a8",soft:"rgba(127,214,168,.14)"},"On Hold":{bg:"rgba(216,90,48,.15)",fg:"#e8825f",accent:"#d85a30",soft:"rgba(216,90,48,.13)"}};
-const PROJECTS=[
-{id:"PRJ-1",name:"Portfolio Site v2",icon:"🎨",status:"In Progress",type:"Website",priority:"High",stack:["Next.js","TypeScript","Tailwind","Vercel"],desc:"Rebuild with case studies, dark mode, and a blog.",date:"Launch Jul 15",repo:"https://github.com/yourname/portfolio",live:null},
-{id:"PRJ-4",name:"DevDash",icon:"📊",status:"Launched",type:"Web App",priority:"High",stack:["React","Supabase","Tailwind","Vercel"],desc:"Dashboard aggregating GitHub + deploy status.",date:"Shipped Apr 20",repo:"https://github.com/yourname/devdash",live:"https://devdash.app"},
-{id:"PRJ-2",name:"TaskFlow API",icon:"⚙️",status:"Planning",type:"API / Backend",priority:"Medium",stack:["Node","TypeScript","Postgres"],desc:"REST API for a task manager. Auth + webhooks.",date:"Started Jun 10",repo:null,live:null},
-{id:"PRJ-3",name:"SnapNote",icon:"📱",status:"Idea",type:"Mobile",priority:"Low",stack:["React"],desc:"Quick voice-to-note capture app.",date:"Backlog",repo:null,live:null},
-{id:"PRJ-5",name:"cli-deploy",icon:"🛠️",status:"On Hold",type:"CLI / Tool",priority:"Low",stack:["Python"],desc:"One-command deploy helper. Paused for now.",date:"Paused",repo:"https://github.com/yourname/cli-deploy",live:null}];
-function chipsHtml(arr){return arr.map(s=>`<span class="chip">${s}</span>`).join("")}
-function linkHtml(p){let h="";if(p.repo)h+=`<a class="lnk" href="${p.repo}" target="_blank" title="Repo">&lt;/&gt;</a>`;if(p.live)h+=`<a class="lnk" href="${p.live}" target="_blank" title="Live">↗</a>`;return h||`<span class="date" style="color:var(--faint)">—</span>`;}
-function render(filter){const grid=document.getElementById("grid");const list=filter==="all"?PROJECTS:PROJECTS.filter(p=>p.status===filter);grid.innerHTML=list.map(p=>{const s=STATUS[p.status];return `<div class="card" style="--accent:${s.accent};--accent-soft:${s.soft}"><div class="head"><div style="display:flex;gap:13px;align-items:center"><div class="ic">${p.icon}</div><div><h2>${p.name}</h2><div class="pid">${p.id} · ${p.type}</div></div></div><span class="status" style="background:${s.bg};color:${s.fg}">${p.status}</span></div><p class="desc">${p.desc}</p><div class="chips">${chipsHtml(p.stack)}</div><div class="meta"><span class="date">🗓 ${p.date}</span><div class="links">${linkHtml(p)}</div></div></div>`;}).join("");}
-document.getElementById("filters").addEventListener("click",e=>{const pill=e.target.closest(".pill");if(!pill)return;document.querySelectorAll(".pill").forEach(p=>p.classList.remove("active"));pill.classList.add("active");render(pill.dataset.f);});
-render("all");
-</script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Projects — Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --bg-2: #111319;
+        --card: #15171f;
+        --card-2: #1b1e28;
+        --stroke: rgba(255, 255, 255, 0.07);
+        --stroke-2: rgba(255, 255, 255, 0.12);
+        --text: #f4f5f7;
+        --muted: #9aa0ad;
+        --faint: #646b79;
+        --radius: 20px;
+        --radius-sm: 13px;
+        --radius-pill: 999px;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background:
+          radial-gradient(1100px 600px at 12% -10%, rgba(127, 119, 221, 0.22), transparent 60%),
+          radial-gradient(900px 600px at 100% 0%, rgba(216, 90, 48, 0.16), transparent 55%),
+          radial-gradient(800px 700px at 50% 120%, rgba(29, 158, 117, 0.14), transparent 60%),
+          var(--bg);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+        padding: 40px 20px 80px;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+      }
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 30px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .logo {
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+        flex-shrink: 0;
+        background: linear-gradient(135deg, #7f77dd, #534ab7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 24px rgba(83, 74, 183, 0.45);
+        font-size: 22px;
+      }
+      .brand h1 {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        line-height: 1.1;
+      }
+      .brand p {
+        font-size: 13px;
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .newbtn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        background: linear-gradient(135deg, #7f77dd, #534ab7);
+        color: #fff;
+        border: none;
+        font-family: inherit;
+        font-weight: 600;
+        font-size: 14px;
+        padding: 12px 20px;
+        border-radius: var(--radius-pill);
+        box-shadow: 0 8px 22px rgba(83, 74, 183, 0.4);
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+      .newbtn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 28px rgba(83, 74, 183, 0.55);
+      }
+      .promo {
+        position: relative;
+        overflow: hidden;
+        border-radius: var(--radius);
+        background: linear-gradient(110deg, #d85a30 0%, #e0683c 45%, #d4537e 100%);
+        padding: 22px 26px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 30px;
+        box-shadow: 0 18px 40px rgba(216, 90, 48, 0.28);
+      }
+      .promo::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          400px 200px at 90% 120%,
+          rgba(255, 255, 255, 0.25),
+          transparent 60%
+        );
+        pointer-events: none;
+      }
+      .promo .pl {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        position: relative;
+        z-index: 1;
+      }
+      .promo .gift {
+        width: 50px;
+        height: 50px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.18);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        flex-shrink: 0;
+      }
+      .promo h3 {
+        font-size: 17px;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 3px;
+      }
+      .promo span {
+        font-size: 13.5px;
+        color: rgba(255, 255, 255, 0.9);
+        font-weight: 500;
+      }
+      .promo .cta {
+        position: relative;
+        z-index: 1;
+        background: #fff;
+        color: #993c1d;
+        font-weight: 700;
+        font-size: 14px;
+        border: none;
+        font-family: inherit;
+        padding: 12px 22px;
+        border-radius: var(--radius-pill);
+        cursor: pointer;
+        white-space: nowrap;
+        transition: transform 0.15s ease;
+      }
+      .promo .cta:hover {
+        transform: scale(1.04);
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 30px;
+      }
+      .stat {
+        background: var(--card);
+        border: 1px solid var(--stroke);
+        border-radius: var(--radius-sm);
+        padding: 18px 20px;
+      }
+      .stat .n {
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      .stat .l {
+        font-size: 12.5px;
+        color: var(--muted);
+        font-weight: 500;
+        margin-top: 7px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .stat .n.purple {
+        color: #a79efc;
+      }
+      .stat .n.green {
+        color: #7fd6a8;
+      }
+      .stat .n.amber {
+        color: #f0b65c;
+      }
+      .stat .n.blue {
+        color: #7cb6ef;
+      }
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+        margin-bottom: 22px;
+      }
+      .pill {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        background: var(--card);
+        border: 1px solid var(--stroke);
+        padding: 8px 16px;
+        border-radius: var(--radius-pill);
+        transition: all 0.15s ease;
+        user-select: none;
+      }
+      .pill:hover {
+        color: var(--text);
+        border-color: var(--stroke-2);
+      }
+      .pill.active {
+        background: #fff;
+        color: #0b0c10;
+        border-color: #fff;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 18px;
+      }
+      .card {
+        position: relative;
+        background: var(--card);
+        border: 1px solid var(--stroke);
+        border-radius: var(--radius);
+        padding: 22px;
+        overflow: hidden;
+        transition:
+          transform 0.18s ease,
+          border-color 0.18s ease,
+          background 0.18s ease;
+      }
+      .card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--accent);
+      }
+      .card:hover {
+        transform: translateY(-4px);
+        border-color: var(--stroke-2);
+        background: var(--card-2);
+      }
+      .card .head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .card .ic {
+        width: 44px;
+        height: 44px;
+        border-radius: 13px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        background: var(--accent-soft);
+        flex-shrink: 0;
+      }
+      .card h2 {
+        font-size: 17.5px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        margin-bottom: 3px;
+      }
+      .card .pid {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11.5px;
+        color: var(--faint);
+        font-weight: 500;
+      }
+      .status {
+        font-size: 11.5px;
+        font-weight: 700;
+        padding: 5px 11px;
+        border-radius: var(--radius-pill);
+        white-space: nowrap;
+        letter-spacing: 0.02em;
+      }
+      .card p.desc {
+        font-size: 13.5px;
+        color: var(--muted);
+        line-height: 1.55;
+        margin: 12px 0 16px;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-bottom: 16px;
+      }
+      .chip {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        font-weight: 500;
+        color: #c5cad4;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--stroke);
+        padding: 4px 9px;
+        border-radius: 8px;
+      }
+      .meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 14px;
+        border-top: 1px solid var(--stroke);
+      }
+      .meta .date {
+        font-size: 12px;
+        color: var(--faint);
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .links {
+        display: flex;
+        gap: 8px;
+      }
+      .lnk {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--stroke);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 14px;
+        transition: all 0.15s ease;
+      }
+      .lnk:hover {
+        background: rgba(255, 255, 255, 0.12);
+        color: var(--text);
+      }
+      .foot {
+        text-align: center;
+        margin-top: 48px;
+        color: var(--faint);
+        font-size: 12.5px;
+        font-weight: 500;
+      }
+      @media (max-width: 640px) {
+        .stats {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .promo {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <div class="brand">
+          <div class="logo">🚀</div>
+          <div>
+            <h1>Projects</h1>
+            <p>Your dev &amp; web build hub</p>
+          </div>
+        </div>
+        <button class="newbtn">＋ New project</button>
+      </div>
+      <div class="promo">
+        <div class="pl">
+          <div class="gift">🎁</div>
+          <div>
+            <h3>5 active builds in flight</h3>
+            <span>1 launched · 1 in progress · keep the momentum going.</span>
+          </div>
+        </div>
+        <button class="cta">View roadmap</button>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <div class="n purple">5</div>
+          <div class="l">Total</div>
+        </div>
+        <div class="stat">
+          <div class="n amber">1</div>
+          <div class="l">In progress</div>
+        </div>
+        <div class="stat">
+          <div class="n green">1</div>
+          <div class="l">Launched</div>
+        </div>
+        <div class="stat">
+          <div class="n blue">2</div>
+          <div class="l">High priority</div>
+        </div>
+      </div>
+      <div class="filters" id="filters">
+        <div class="pill active" data-f="all">All</div>
+        <div class="pill" data-f="In Progress">In progress</div>
+        <div class="pill" data-f="Planning">Planning</div>
+        <div class="pill" data-f="Idea">Idea</div>
+        <div class="pill" data-f="Launched">Launched</div>
+        <div class="pill" data-f="On Hold">On hold</div>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="foot">Synced from your Notion Projects database · PRJ-1 → PRJ-5</div>
+    </div>
+    <script>
+      const STATUS = {
+        'In Progress': {
+          bg: 'rgba(240,182,92,.15)',
+          fg: '#f0b65c',
+          accent: '#f0b65c',
+          soft: 'rgba(240,182,92,.14)',
+        },
+        Planning: {
+          bg: 'rgba(124,182,239,.15)',
+          fg: '#7cb6ef',
+          accent: '#7cb6ef',
+          soft: 'rgba(124,182,239,.14)',
+        },
+        Idea: {
+          bg: 'rgba(154,160,173,.15)',
+          fg: '#b4b9c4',
+          accent: '#9aa0ad',
+          soft: 'rgba(154,160,173,.12)',
+        },
+        Launched: {
+          bg: 'rgba(127,214,168,.15)',
+          fg: '#7fd6a8',
+          accent: '#7fd6a8',
+          soft: 'rgba(127,214,168,.14)',
+        },
+        'On Hold': {
+          bg: 'rgba(216,90,48,.15)',
+          fg: '#e8825f',
+          accent: '#d85a30',
+          soft: 'rgba(216,90,48,.13)',
+        },
+      };
+      const PROJECTS = [
+        {
+          id: 'PRJ-1',
+          name: 'Portfolio Site v2',
+          icon: '🎨',
+          status: 'In Progress',
+          type: 'Website',
+          priority: 'High',
+          stack: ['Next.js', 'TypeScript', 'Tailwind', 'Vercel'],
+          desc: 'Rebuild with case studies, dark mode, and a blog.',
+          date: 'Launch Jul 15',
+          repo: 'https://github.com/yourname/portfolio',
+          live: null,
+        },
+        {
+          id: 'PRJ-4',
+          name: 'DevDash',
+          icon: '📊',
+          status: 'Launched',
+          type: 'Web App',
+          priority: 'High',
+          stack: ['React', 'Supabase', 'Tailwind', 'Vercel'],
+          desc: 'Dashboard aggregating GitHub + deploy status.',
+          date: 'Shipped Apr 20',
+          repo: 'https://github.com/yourname/devdash',
+          live: 'https://devdash.app',
+        },
+        {
+          id: 'PRJ-2',
+          name: 'TaskFlow API',
+          icon: '⚙️',
+          status: 'Planning',
+          type: 'API / Backend',
+          priority: 'Medium',
+          stack: ['Node', 'TypeScript', 'Postgres'],
+          desc: 'REST API for a task manager. Auth + webhooks.',
+          date: 'Started Jun 10',
+          repo: null,
+          live: null,
+        },
+        {
+          id: 'PRJ-3',
+          name: 'SnapNote',
+          icon: '📱',
+          status: 'Idea',
+          type: 'Mobile',
+          priority: 'Low',
+          stack: ['React'],
+          desc: 'Quick voice-to-note capture app.',
+          date: 'Backlog',
+          repo: null,
+          live: null,
+        },
+        {
+          id: 'PRJ-5',
+          name: 'cli-deploy',
+          icon: '🛠️',
+          status: 'On Hold',
+          type: 'CLI / Tool',
+          priority: 'Low',
+          stack: ['Python'],
+          desc: 'One-command deploy helper. Paused for now.',
+          date: 'Paused',
+          repo: 'https://github.com/yourname/cli-deploy',
+          live: null,
+        },
+      ];
+      function chipsHtml(arr) {
+        return arr.map((s) => `<span class="chip">${s}</span>`).join('');
+      }
+      function linkHtml(p) {
+        let h = '';
+        if (p.repo)
+          h += `<a class="lnk" href="${p.repo}" target="_blank" title="Repo">&lt;/&gt;</a>`;
+        if (p.live) h += `<a class="lnk" href="${p.live}" target="_blank" title="Live">↗</a>`;
+        return h || `<span class="date" style="color:var(--faint)">—</span>`;
+      }
+      function render(filter) {
+        const grid = document.getElementById('grid');
+        const list = filter === 'all' ? PROJECTS : PROJECTS.filter((p) => p.status === filter);
+        grid.innerHTML = list
+          .map((p) => {
+            const s = STATUS[p.status];
+            return `<div class="card" style="--accent:${s.accent};--accent-soft:${s.soft}"><div class="head"><div style="display:flex;gap:13px;align-items:center"><div class="ic">${p.icon}</div><div><h2>${p.name}</h2><div class="pid">${p.id} · ${p.type}</div></div></div><span class="status" style="background:${s.bg};color:${s.fg}">${p.status}</span></div><p class="desc">${p.desc}</p><div class="chips">${chipsHtml(p.stack)}</div><div class="meta"><span class="date">🗓 ${p.date}</span><div class="links">${linkHtml(p)}</div></div></div>`;
+          })
+          .join('');
+      }
+      document.getElementById('filters').addEventListener('click', (e) => {
+        const pill = e.target.closest('.pill');
+        if (!pill) return;
+        document.querySelectorAll('.pill').forEach((p) => p.classList.remove('active'));
+        pill.classList.add('active');
+        render(pill.dataset.f);
+      });
+      render('all');
+    </script>
+  </body>
 </html>

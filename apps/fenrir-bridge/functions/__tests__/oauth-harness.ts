@@ -5,9 +5,9 @@
 // and no Neon — only deterministic in-memory fakes.
 
 function base64Url(bytes: Uint8Array) {
-  let binary = "";
+  let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
 function encodeJson(value: unknown) {
@@ -25,31 +25,31 @@ export type IdTokenFixture = {
  * `verifyIdToken` expects (alg RS256, kid lookup, RSA key, signature + claims).
  */
 export async function mintIdToken(claims: Record<string, unknown>): Promise<IdTokenFixture> {
-  const kid = "test-key-1";
+  const kid = 'test-key-1';
   const keyPair = await crypto.subtle.generateKey(
     {
-      name: "RSASSA-PKCS1-v1_5",
+      name: 'RSASSA-PKCS1-v1_5',
       modulusLength: 2048,
       publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
-      hash: "SHA-256"
+      hash: 'SHA-256',
     },
     true,
-    ["sign", "verify"]
+    ['sign', 'verify']
   );
 
-  const header = { alg: "RS256", kid, typ: "JWT" };
+  const header = { alg: 'RS256', kid, typ: 'JWT' };
   const signingInput = `${encodeJson(header)}.${encodeJson(claims)}`;
   const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
+    'RSASSA-PKCS1-v1_5',
     keyPair.privateKey,
     new TextEncoder().encode(signingInput)
   );
   const idToken = `${signingInput}.${base64Url(new Uint8Array(signature))}`;
 
-  const jwk = (await crypto.subtle.exportKey("jwk", keyPair.publicKey)) as JsonWebKey;
+  const jwk = (await crypto.subtle.exportKey('jwk', keyPair.publicKey)) as JsonWebKey;
   jwk.kid = kid;
-  jwk.alg = "RS256";
-  jwk.use = "sig";
+  jwk.alg = 'RS256';
+  jwk.use = 'sig';
 
   return { idToken, jwks: { keys: [jwk] } };
 }
@@ -57,7 +57,7 @@ export async function mintIdToken(claims: Record<string, unknown>): Promise<IdTo
 export function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" }
+    headers: { 'content-type': 'application/json' },
   });
 }
 
@@ -80,13 +80,16 @@ export type FetchRouter = {
  * throws — a test that hits the real network fails loudly instead of hanging.
  */
 export function buildFetchRouter(
-  routes: Array<{ when: string; respond: (url: string, init?: RequestInit) => Response | Promise<Response> }>
+  routes: Array<{
+    when: string;
+    respond: (url: string, init?: RequestInit) => Response | Promise<Response>;
+  }>
 ): FetchRouter {
-  const calls: FetchRouter["calls"] = [];
+  const calls: FetchRouter['calls'] = [];
   const wrapped: RouteMatcher[] = routes.map((route) => ({
     match: (url) => url.includes(route.when),
     respond: route.respond,
-    calls: []
+    calls: [],
   }));
 
   const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -106,17 +109,17 @@ export function buildFetchRouter(
 
 /** Turn a `Set-Cookie` header value into a request-ready `name=value` pair. */
 export function cookiePair(setCookieHeader: string) {
-  return setCookieHeader.split(";", 1)[0];
+  return setCookieHeader.split(';', 1)[0];
 }
 
 /** Collect every Set-Cookie value from a Response (handles getSetCookie + fallback). */
 export function setCookies(response: Response): string[] {
   const headers = response.headers as Headers & { getSetCookie?: () => string[] };
-  if (typeof headers.getSetCookie === "function") {
+  if (typeof headers.getSetCookie === 'function') {
     const all = headers.getSetCookie();
     if (all.length) return all;
   }
-  const single = response.headers.get("set-cookie");
+  const single = response.headers.get('set-cookie');
   return single ? [single] : [];
 }
 

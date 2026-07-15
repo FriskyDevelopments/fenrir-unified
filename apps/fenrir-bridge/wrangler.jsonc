@@ -11,7 +11,7 @@
     {
       "binding": "DB",
       "database_name": "fenrir-bridge",
-      "database_id": "1238059e-2638-4317-982e-e74dda046ccb"
-    }
-  ]
+      "database_id": "1238059e-2638-4317-982e-e74dda046ccb",
+    },
+  ],
 }

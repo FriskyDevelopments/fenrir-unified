@@ -1,7 +1,7 @@
-import type { CSSProperties, ReactNode } from "react";
-import { languageNames, locales, type Locale } from "../i18n";
-import type { BrandTheme } from "../theme/brandThemes";
-import { themeClassName, themeCssVars } from "../theme/brandThemes";
+import type { CSSProperties, ReactNode } from 'react';
+import { languageNames, locales, type Locale } from '../i18n';
+import type { BrandTheme } from '../theme/brandThemes';
+import { themeClassName, themeCssVars } from '../theme/brandThemes';
 
 type AuthSurfaceProps = {
   theme: BrandTheme;
@@ -13,10 +13,18 @@ type AuthSurfaceProps = {
   children: ReactNode;
 };
 
-export function AuthSurface({ theme, locale, onLocale, railLabel, logoUrl, backgroundUrl, children }: AuthSurfaceProps) {
+export function AuthSurface({
+  theme,
+  locale,
+  onLocale,
+  railLabel,
+  logoUrl,
+  backgroundUrl,
+  children,
+}: AuthSurfaceProps) {
   const style = {
     ...themeCssVars(theme),
-    ...(backgroundUrl ? { "--theme-bg-image": `url("${backgroundUrl}")` } : {})
+    ...(backgroundUrl ? { '--theme-bg-image': `url("${backgroundUrl}")` } : {}),
   } as CSSProperties;
 
   return (
@@ -24,8 +32,10 @@ export function AuthSurface({ theme, locale, onLocale, railLabel, logoUrl, backg
       className={`auth-page community-auth-surface ${themeClassName(theme)}`}
       style={style}
       data-theme={theme.key}
-      data-has-background={backgroundUrl ? "true" : "false"}
+      data-has-background={backgroundUrl ? 'true' : 'false'}
     >
+      <div className="cinematic-noise"></div>
+      
       <div className="auth-atmosphere" aria-hidden="true">
         <span className="auth-fog fog-one" />
         <span className="auth-fog fog-two" />
@@ -35,9 +45,16 @@ export function AuthSurface({ theme, locale, onLocale, railLabel, logoUrl, backg
       </div>
 
       <div className="auth-language-dock">
-        <select className="language-select" value={locale} onChange={(event) => onLocale(event.target.value as Locale)} aria-label="Language">
+        <select
+          className="language-select"
+          value={locale}
+          onChange={(event) => onLocale(event.target.value as Locale)}
+          aria-label="Language"
+        >
           {locales.map((item) => (
-            <option value={item} key={item}>{languageNames[item]}</option>
+            <option value={item} key={item}>
+              {languageNames[item]}
+            </option>
           ))}
         </select>
       </div>
@@ -45,14 +62,14 @@ export function AuthSurface({ theme, locale, onLocale, railLabel, logoUrl, backg
       <section className="auth-shell">
         <div className="auth-hero-copy">
           {theme.heroSrc ? (
-            <div className="auth-hero-visual" aria-hidden={theme.heroAlt ? undefined : true}>
-              <img src={theme.heroSrc} alt={theme.heroAlt ?? ""} />
+            <div className="auth-hero-visual stagger-1" aria-hidden={theme.heroAlt ? undefined : true}>
+              <img src={theme.heroSrc} alt={theme.heroAlt ?? ''} />
             </div>
           ) : null}
-          <img className="auth-wordmark" src={logoUrl || theme.logoSrc} alt={theme.logoAlt} />
-          <h1>{theme.headline}</h1>
-          <p>{theme.subheadline}</p>
-          <div className="protocol-rail" aria-label={railLabel}>
+          <img className="auth-wordmark stagger-1" src={logoUrl || theme.logoSrc} alt={theme.logoAlt} />
+          <h1 className="stagger-2">{theme.headline}</h1>
+          <p className="stagger-3">{theme.subheadline}</p>
+          <div className="protocol-rail stagger-4" aria-label={railLabel}>
             <div>
               {[...theme.lanes, ...theme.lanes].map((lane, index) => (
                 <span key={`${lane}-${index}`}>{lane}</span>
@@ -61,7 +78,9 @@ export function AuthSurface({ theme, locale, onLocale, railLabel, logoUrl, backg
           </div>
         </div>
 
-        {children}
+        <div className="stagger-2">
+          {children}
+        </div>
       </section>
     </main>
   );

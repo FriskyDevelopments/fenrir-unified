@@ -1,7 +1,7 @@
 export type CommunityAuthProposal = {
   ok: true;
-  product: "fenrir-community-gate";
-  database: "neon";
+  product: 'fenrir-community-gate';
+  database: 'neon';
   configured: boolean;
   isolatedFrom: {
     friskyClientPortal: boolean;
@@ -15,7 +15,7 @@ export type CommunityAuthProposal = {
   tables: string[];
 };
 
-export type DefaultAccessState = "provisional" | "open" | "invite_only" | "disabled";
+export type DefaultAccessState = 'provisional' | 'open' | 'invite_only' | 'disabled';
 
 export type CommunityBrandPayload = {
   slug: string;
@@ -53,7 +53,7 @@ export type CommunityBrandUpdatePayload = {
 
 export type CommunityBrandAuthorization = {
   allowed: true;
-  reason: "internal_override" | "allowlisted_owner" | "owner";
+  reason: 'internal_override' | 'allowlisted_owner' | 'owner';
 };
 
 type CommunityBrandResponse = {
@@ -71,7 +71,7 @@ export class CommunityBrandRequestError extends Error {
 
   constructor(status: number, error?: string, detail?: unknown) {
     super(error || `community_brand_request_failed_${status}`);
-    this.name = "CommunityBrandRequestError";
+    this.name = 'CommunityBrandRequestError';
     this.status = status;
     this.error = error;
     this.detail = detail;
@@ -80,11 +80,11 @@ export class CommunityBrandRequestError extends Error {
 
 export async function getCommunityAuthProposal(): Promise<CommunityAuthProposal | null> {
   try {
-    const response = await fetch("/api/community-auth/proposal", {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" }
+    const response = await fetch('/api/community-auth/proposal', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
     });
-    const body = await response.json().catch(() => null) as CommunityAuthProposal | null;
+    const body = (await response.json().catch(() => null)) as CommunityAuthProposal | null;
     if (!response.ok || !body?.ok) return null;
     return body;
   } catch {
@@ -95,10 +95,10 @@ export async function getCommunityAuthProposal(): Promise<CommunityAuthProposal 
 export async function getCommunityBrand(slug: string): Promise<CommunityBrandPayload | null> {
   try {
     const response = await fetch(`/api/community-auth/brand/${encodeURIComponent(slug)}`, {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" }
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
     });
-    const body = await response.json().catch(() => null) as CommunityBrandResponse | null;
+    const body = (await response.json().catch(() => null)) as CommunityBrandResponse | null;
     if (!response.ok || !body?.ok || !body.brand) return null;
     return body.brand;
   } catch {
@@ -112,17 +112,17 @@ export async function getCommunityAuthBrandForAdmin(slug: string): Promise<{
 }> {
   try {
     const response = await fetch(`/api/community-auth/admin/brands/${encodeURIComponent(slug)}`, {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" }
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
     });
-    const body = await response.json().catch(() => null) as CommunityBrandResponse | null;
+    const body = (await response.json().catch(() => null)) as CommunityBrandResponse | null;
     if (!response.ok || !body?.ok || !body.brand || !body.authorization) {
       throw new CommunityBrandRequestError(response.status, body?.error, body?.detail);
     }
     return { brand: body.brand, authorization: body.authorization };
   } catch (error) {
     if (error instanceof CommunityBrandRequestError) throw error;
-    throw new CommunityBrandRequestError(0, "network_failure");
+    throw new CommunityBrandRequestError(0, 'network_failure');
   }
 }
 
@@ -132,15 +132,15 @@ export async function saveCommunityBrand(
 ): Promise<{ brand: CommunityBrandPayload; authorization: CommunityBrandAuthorization } | null> {
   try {
     const response = await fetch(`/api/community-auth/admin/brands/${encodeURIComponent(slug)}`, {
-      method: "PUT",
-      credentials: "include",
+      method: 'PUT',
+      credentials: 'include',
       headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json"
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
-    const body = await response.json().catch(() => null) as CommunityBrandResponse | null;
+    const body = (await response.json().catch(() => null)) as CommunityBrandResponse | null;
     if (!response.ok || !body?.ok || !body.brand || !body.authorization) return null;
     return { brand: body.brand, authorization: body.authorization };
   } catch {

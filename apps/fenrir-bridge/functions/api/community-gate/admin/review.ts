@@ -1,5 +1,13 @@
-import { assertCommunityStaff, authErrorResponse, communityGateConfigured, communityGateNotConfigured, communityGateSql, parseSlug, requireCommunityGateUser } from "../../../_lib/community-gate";
-import { noStoreJson } from "../../../_lib/responses";
+import {
+  assertCommunityStaff,
+  authErrorResponse,
+  communityGateConfigured,
+  communityGateNotConfigured,
+  communityGateSql,
+  parseSlug,
+  requireCommunityGateUser,
+} from '../../../_lib/community-gate';
+import { noStoreJson } from '../../../_lib/responses';
 
 type ReviewBody = {
   sessionId?: unknown;
@@ -11,17 +19,17 @@ type ReviewBody = {
 export async function onRequestPost(context: any) {
   if (!communityGateConfigured(context.env)) return communityGateNotConfigured(context.env);
 
-  const body = await context.request.json().catch(() => null) as ReviewBody | null;
-  const sessionId = typeof body?.sessionId === "string" ? body.sessionId.trim() : "";
-  const status = typeof body?.status === "string" ? body.status.trim().toLowerCase() : "";
-  const reason = typeof body?.reason === "string" ? body.reason.trim().slice(0, 500) : "";
+  const body = (await context.request.json().catch(() => null)) as ReviewBody | null;
+  const sessionId = typeof body?.sessionId === 'string' ? body.sessionId.trim() : '';
+  const status = typeof body?.status === 'string' ? body.status.trim().toLowerCase() : '';
+  const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 500) : '';
   const communitySlug = parseSlug(body?.communitySlug);
 
   if (!/^[0-9a-f-]{36}$/i.test(sessionId)) {
-    return noStoreJson({ ok: false, error: "session_id_invalid" }, { status: 400 });
+    return noStoreJson({ ok: false, error: 'session_id_invalid' }, { status: 400 });
   }
-  if (!["granted", "denied", "flagged"].includes(status)) {
-    return noStoreJson({ ok: false, error: "review_status_invalid" }, { status: 400 });
+  if (!['granted', 'denied', 'flagged'].includes(status)) {
+    return noStoreJson({ ok: false, error: 'review_status_invalid' }, { status: 400 });
   }
 
   try {
@@ -38,7 +46,7 @@ export async function onRequestPost(context: any) {
       returning id, community_id, profile_id, status, decision_reason
     `;
 
-    if (!updated) return noStoreJson({ ok: false, error: "session_not_found" }, { status: 404 });
+    if (!updated) return noStoreJson({ ok: false, error: 'session_not_found' }, { status: 404 });
 
     await sql`
       insert into audit_logs (event, actor_profile_id, community_id, target_id, metadata)

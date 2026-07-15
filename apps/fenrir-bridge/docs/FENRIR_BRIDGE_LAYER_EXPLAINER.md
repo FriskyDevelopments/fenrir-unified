@@ -37,13 +37,13 @@ That is the bridge: not just a redirect, but a trust checkpoint between the outs
 
 Think of Fenrir as five layers stacked together:
 
-| Layer | What it does | Plain-language meaning |
-| --- | --- | --- |
-| Public Gate | Shows the branded community access page | "This is where members knock." |
-| Identity Gate | Verifies the person with Google, Apple, or Microsoft | "Who are you, through a trusted provider?" |
-| Neon Nexus Link | Stores community membership and gate state | "Which community do you belong to, and what is your status?" |
-| Payment and Entitlement Gate | Checks Stars, Stripe, plan, or owner rules | "Are you allowed to unlock this?" |
-| Telegram Lock | Rotates, revokes, and protects the real Telegram invite | "Here is the door, but only when Fenrir says yes." |
+| Layer                        | What it does                                            | Plain-language meaning                                       |
+| ---------------------------- | ------------------------------------------------------- | ------------------------------------------------------------ |
+| Public Gate                  | Shows the branded community access page                 | "This is where members knock."                               |
+| Identity Gate                | Verifies the person with Google, Apple, or Microsoft    | "Who are you, through a trusted provider?"                   |
+| Neon Nexus Link              | Stores community membership and gate state              | "Which community do you belong to, and what is your status?" |
+| Payment and Entitlement Gate | Checks Stars, Stripe, plan, or owner rules              | "Are you allowed to unlock this?"                            |
+| Telegram Lock                | Rotates, revokes, and protects the real Telegram invite | "Here is the door, but only when Fenrir says yes."           |
 
 Fenrir is the control plane across those layers.
 
@@ -238,17 +238,17 @@ flowchart TB
 
 The layer should be designed around a few stable IDs.
 
-| Identifier | Why it matters |
-| --- | --- |
-| `frisky_user_id` | Customer, admin, or operator identity |
-| `community_org_id` | The protected community container |
-| `community_slug` | Human-friendly public route, such as `neon-nexus` |
-| `community_member_id` | The specific person trying to enter a community |
-| `fenrir_session` | Admin/app session |
-| `fenrir_community_session` | Member/community gate session |
-| `telegram_chat_id` | The Telegram group Fenrir protects |
-| `invite_id` or invite hash | The current protected invite reference |
-| `audit_event_id` | The trace of what happened |
+| Identifier                 | Why it matters                                    |
+| -------------------------- | ------------------------------------------------- |
+| `frisky_user_id`           | Customer, admin, or operator identity             |
+| `community_org_id`         | The protected community container                 |
+| `community_slug`           | Human-friendly public route, such as `neon-nexus` |
+| `community_member_id`      | The specific person trying to enter a community   |
+| `fenrir_session`           | Admin/app session                                 |
+| `fenrir_community_session` | Member/community gate session                     |
+| `telegram_chat_id`         | The Telegram group Fenrir protects                |
+| `invite_id` or invite hash | The current protected invite reference            |
+| `audit_event_id`           | The trace of what happened                        |
 
 Those IDs let Fenrir answer the most important production questions:
 

@@ -36,7 +36,7 @@ function adminHeaders(env: SupabaseAdminEnv) {
   return {
     apikey: key,
     Authorization: `Bearer ${key}`,
-    "Content-Type": "application/json"
+    'Content-Type': 'application/json',
   };
 }
 
@@ -44,23 +44,28 @@ function adminHeaders(env: SupabaseAdminEnv) {
  * Look up an existing Supabase auth user by email. Returns null if absent or if
  * the admin API is not configured. Read-only.
  */
-export async function getAccountByEmail(env: SupabaseAdminEnv, email: string): Promise<FriskyAccount | null> {
+export async function getAccountByEmail(
+  env: SupabaseAdminEnv,
+  email: string
+): Promise<FriskyAccount | null> {
   if (!adminConfigured(env)) return null;
-  const base = env.SUPABASE_URL!.replace(/\/$/, "");
+  const base = env.SUPABASE_URL!.replace(/\/$/, '');
   const normalized = email.trim().toLowerCase();
   const response = await fetch(
     `${base}/auth/v1/admin/users?email=${encodeURIComponent(normalized)}`,
     { headers: adminHeaders(env) }
   ).catch(() => null);
   if (!response || !response.ok) return null;
-  const data = (await response.json().catch(() => null)) as { users?: Array<{ id?: string; email?: string }> } | null;
+  const data = (await response.json().catch(() => null)) as {
+    users?: Array<{ id?: string; email?: string }>;
+  } | null;
   // SECURITY: match ONLY on an exact (case-insensitive) email. Some GoTrue
   // versions ignore the `?email=` filter and return the full, paginated user
   // list — in that case a `?? users[0]` fallback would silently collapse a
   // brand-new email onto whatever arbitrary account happens to be first,
   // cross-wiring two humans onto one master identity. Never guess: if no row
   // matches the exact email, treat it as "no account" so the caller creates one.
-  const user = data?.users?.find((u) => (u.email ?? "").trim().toLowerCase() === normalized);
+  const user = data?.users?.find((u) => (u.email ?? '').trim().toLowerCase() === normalized);
   if (!user?.id) return null;
   return { id: user.id, email: (user.email ?? normalized).trim().toLowerCase() };
 }
@@ -73,20 +78,23 @@ export async function getAccountByEmail(env: SupabaseAdminEnv, email: string): P
  * Returns null only when the admin API is unconfigured — callers should then
  * fall back to the legacy synthetic id and continue (never block login on it).
  */
-export async function resolveFriskyAccountId(env: SupabaseAdminEnv, email: string): Promise<string | null> {
+export async function resolveFriskyAccountId(
+  env: SupabaseAdminEnv,
+  email: string
+): Promise<string | null> {
   if (!adminConfigured(env)) return null;
   const normalized = email.trim().toLowerCase();
 
   const existing = await getAccountByEmail(env, normalized);
   if (existing) return existing.id;
 
-  const base = env.SUPABASE_URL!.replace(/\/$/, "");
+  const base = env.SUPABASE_URL!.replace(/\/$/, '');
   const response = await fetch(`${base}/auth/v1/admin/users`, {
-    method: "POST",
+    method: 'POST',
     headers: adminHeaders(env),
     // email_confirm:true — the front-end (WorkOS/OAuth/Telegram HMAC) already
     // proved control of the address, so we don't re-send a confirmation mail.
-    body: JSON.stringify({ email: normalized, email_confirm: true })
+    body: JSON.stringify({ email: normalized, email_confirm: true }),
   }).catch(() => null);
 
   if (response && response.ok) {

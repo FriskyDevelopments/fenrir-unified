@@ -148,6 +148,7 @@ PUBLIC_AUTH_URL=https://auth.myfenrir.com
 Route `auth.myfenrir.com` to the same Cloudflare Pages project as Fenrir Bridge, then register callbacks on that host.
 
 Required Cloudflare auth variables:
+
 ```sh
 SESSION_SECRET=
 VITE_DIRECT_AUTH_ORIGIN=https://auth.myfenrir.com
@@ -262,7 +263,12 @@ CLOUDFLARE_FALLBACK_ORIGIN=
 DigitalOcean badge:
 
 ```html
-<a href="https://www.digitalocean.com/?refcode=e31bed76086e&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge"><img src="https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%201.svg" alt="DigitalOcean Referral Badge" /></a>
+<a
+  href="https://www.digitalocean.com/?refcode=e31bed76086e&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge"
+  ><img
+    src="https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%201.svg"
+    alt="DigitalOcean Referral Badge"
+/></a>
 ```
 
 ## Backend-Ready Services

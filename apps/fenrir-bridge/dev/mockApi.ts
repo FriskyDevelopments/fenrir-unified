@@ -1,4 +1,4 @@
-import type { Plugin } from "vite";
+import type { Plugin } from 'vite';
 
 // DEV-ONLY mock of the Pages Functions API, enabled by FENRIR_DEV_MOCK_API=1
 // (`npm run dev:mock`). Lets the auth-gated dashboard and the Community Gate
@@ -18,7 +18,7 @@ type BrandRow = {
   subheadline: string;
   invite_prefix: string;
   enabled_auth_providers: string[];
-  default_access_state: "provisional" | "open" | "invite_only" | "disabled";
+  default_access_state: 'provisional' | 'open' | 'invite_only' | 'disabled';
   communityOrgId: string | null;
   communityId: string;
   fallbackUsed: boolean;
@@ -29,62 +29,62 @@ const brands = new Map<string, BrandRow>();
 function defaultBrand(slug: string): BrandRow {
   return {
     slug,
-    name: "Neon Nexus",
+    name: 'Neon Nexus',
     logo_url: null,
     mascot_url: null,
     background_url: null,
-    primary_color: "#22c7a8",
-    secondary_color: "#8cb9ff",
-    accent_color: "#9b8cff",
-    headline: "Enter Neon Nexus",
-    subheadline: "Verify your identity and request access to the community.",
+    primary_color: '#22c7a8',
+    secondary_color: '#8cb9ff',
+    accent_color: '#9b8cff',
+    headline: 'Enter Neon Nexus',
+    subheadline: 'Verify your identity and request access to the community.',
     invite_prefix: slug,
-    enabled_auth_providers: ["magic_link"],
-    default_access_state: "provisional",
+    enabled_auth_providers: ['magic_link'],
+    default_access_state: 'provisional',
     communityOrgId: null,
     communityId: `mock-${slug}`,
-    fallbackUsed: false
+    fallbackUsed: false,
   };
 }
 
-function json(res: import("http").ServerResponse, status: number, body: unknown) {
+function json(res: import('http').ServerResponse, status: number, body: unknown) {
   res.statusCode = status;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.end(JSON.stringify(body));
 }
 
-function readBody(req: import("http").IncomingMessage): Promise<string> {
+function readBody(req: import('http').IncomingMessage): Promise<string> {
   return new Promise((resolve) => {
-    let data = "";
-    req.on("data", (chunk) => (data += chunk));
-    req.on("end", () => resolve(data));
+    let data = '';
+    req.on('data', (chunk) => (data += chunk));
+    req.on('end', () => resolve(data));
   });
 }
 
 export function fenrirDevMockApi(): Plugin {
   return {
-    name: "fenrir-dev-mock-api",
+    name: 'fenrir-dev-mock-api',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const url = (req.url ?? "").split("?")[0] ?? "";
-        if (!url.startsWith("/api/")) return next();
+        const url = (req.url ?? '').split('?')[0] ?? '';
+        if (!url.startsWith('/api/')) return next();
 
-        if (url === "/api/community-auth/proposal") {
+        if (url === '/api/community-auth/proposal') {
           return json(res, 200, {
             ok: true,
-            product: "fenrir-community-gate",
-            database: "neon",
+            product: 'fenrir-community-gate',
+            database: 'neon',
             configured: true,
             isolatedFrom: {
               friskyClientPortal: true,
-              friskySessionCookie: "fenrir_session",
-              communitySessionCookie: "fenrir_community_session",
+              friskySessionCookie: 'fenrir_session',
+              communitySessionCookie: 'fenrir_community_session',
               sharedSupabaseAuth: false,
-              sharedFriskyD1Tables: false
+              sharedFriskyD1Tables: false,
             },
             requiredEnv: [],
-            schemaFile: "neon-community-gate.sql",
-            tables: ["community", "community_member", "community_audit"]
+            schemaFile: 'neon-community-gate.sql',
+            tables: ['community', 'community_member', 'community_audit'],
           });
         }
 
@@ -97,60 +97,82 @@ export function fenrirDevMockApi(): Plugin {
         const adminBrand = url.match(/^\/api\/community-auth\/admin\/brands\/([^/]+)$/);
         if (adminBrand) {
           const slug = decodeURIComponent(adminBrand[1]!).toLowerCase();
-          if (req.method === "PUT") {
+          if (req.method === 'PUT') {
             void readBody(req).then((raw) => {
-              const patch = JSON.parse(raw || "{}") as Partial<BrandRow>;
+              const patch = JSON.parse(raw || '{}') as Partial<BrandRow>;
               const current = brands.get(slug) ?? defaultBrand(slug);
-              const merged: BrandRow = { ...current, ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) } as BrandRow;
+              const merged: BrandRow = {
+                ...current,
+                ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)),
+              } as BrandRow;
               brands.set(slug, merged);
-              json(res, 200, { ok: true, brand: merged, authorization: { allowed: true, reason: "internal_override" } });
+              json(res, 200, {
+                ok: true,
+                brand: merged,
+                authorization: { allowed: true, reason: 'internal_override' },
+              });
             });
             return;
           }
           return json(res, 200, {
             ok: true,
             brand: brands.get(slug) ?? defaultBrand(slug),
-            authorization: { allowed: true, reason: "internal_override" }
+            authorization: { allowed: true, reason: 'internal_override' },
           });
         }
 
-        if (url === "/api/community-auth/magic-link/request" && req.method === "POST") {
-          return json(res, 200, { ok: true, message: "Magic link sent (dev mock).", devLink: "/community/neon-nexus?mock-link=1" });
+        if (url === '/api/community-auth/magic-link/request' && req.method === 'POST') {
+          return json(res, 200, {
+            ok: true,
+            message: 'Magic link sent (dev mock).',
+            devLink: '/community/neon-nexus?mock-link=1',
+          });
         }
 
         // Representative availability payload so the live-domain-search UI can be
         // previewed/screenshotted locally. Prod uses the real RDAP+DoH endpoint.
-        if (url === "/api/domains/availability") {
-          const raw = ((req.url ?? "").split("?")[1] ?? "");
+        if (url === '/api/domains/availability') {
+          const raw = (req.url ?? '').split('?')[1] ?? '';
           const params = new URLSearchParams(raw);
-          const domain = (params.get("domain") || params.get("domains") || "").split(",")[0] ?? "";
-          const tld = domain.split(".").pop() ?? "com";
-          const takenSet = new Set(["com", "io", "dev"]);
+          const domain = (params.get('domain') || params.get('domains') || '').split(',')[0] ?? '';
+          const tld = domain.split('.').pop() ?? 'com';
+          const takenSet = new Set(['com', 'io', 'dev']);
           const taken = takenSet.has(tld);
-          const tiers: Record<string, string> = { com: "$", io: "$$$", app: "$", gg: "$$$$", dev: "$", ai: "$$$$", wolf: "$$", pack: "$$" };
+          const tiers: Record<string, string> = {
+            com: '$',
+            io: '$$$',
+            app: '$',
+            gg: '$$$$',
+            dev: '$',
+            ai: '$$$$',
+            wolf: '$$',
+            pack: '$$',
+          };
           return json(res, 200, {
             ok: true,
             results: [
               {
                 domain,
-                verdict: taken ? "taken" : "available",
-                confidence: "authoritative",
-                source: "rdap+dns",
+                verdict: taken ? 'taken' : 'available',
+                confidence: 'authoritative',
+                source: 'rdap+dns',
                 taken,
                 registrarConfirm: false,
-                summary: taken ? "Registered. This domain is taken." : "Not registered — available.",
-                records: taken ? ["ns1.example-dns.com"] : [],
-                priceTier: tiers[tld] ?? "$$"
-              }
-            ]
+                summary: taken
+                  ? 'Registered. This domain is taken.'
+                  : 'Not registered — available.',
+                records: taken ? ['ns1.example-dns.com'] : [],
+                priceTier: tiers[tld] ?? '$$',
+              },
+            ],
           });
         }
 
         // Everything else: 404 JSON so the SPA's built-in devApiFallback demo
         // store (src/services/api.ts) takes over — it already mocks auth,
         // app-state, billing, and the rest of the dashboard in DEV.
-        return json(res, 404, { ok: false, error: "mock_unhandled" });
+        return json(res, 404, { ok: false, error: 'mock_unhandled' });
       });
-    }
+    },
   };
 }

@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from 'vitest/config';
 
 // Hermetic test runner for Pages Functions auth logic.
 //
@@ -8,11 +8,11 @@ import { defineConfig } from "vitest/config";
 // by the build/typecheck pipeline, not by Vitest.
 export default defineConfig({
   test: {
-    environment: "node",
-    include: ["functions/**/__tests__/**/*.test.ts"],
+    environment: 'node',
+    include: ['functions/**/__tests__/**/*.test.ts'],
     // Fail fast if a test accidentally reaches the network: there is no fetch
     // polyfill beyond Node's built-in, and every suite stubs it explicitly.
     clearMocks: true,
-    restoreMocks: true
-  }
+    restoreMocks: true,
+  },
 });

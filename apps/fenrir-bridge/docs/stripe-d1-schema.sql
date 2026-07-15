@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS telegram_stars_orders (
 CREATE INDEX IF NOT EXISTS idx_telegram_stars_orders_user
   ON telegram_stars_orders (telegram_user_id);
 
+-- Idempotency: a Telegram charge id maps to at most one order (NULLs stay distinct while pending).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_telegram_stars_orders_charge
+  ON telegram_stars_orders (telegram_payment_charge_id);
+
 CREATE TABLE IF NOT EXISTS telegram_stars_entitlements (
   telegram_user_id TEXT PRIMARY KEY,
   telegram_chat_id TEXT NOT NULL,
@@ -64,3 +68,7 @@ CREATE TABLE IF NOT EXISTS telegram_stars_entitlements (
 
 CREATE INDEX IF NOT EXISTS idx_telegram_stars_entitlements_org
   ON telegram_stars_entitlements (frisky_org_id);
+
+-- Idempotency: a Telegram charge id maps to exactly one entitlement (replay protection).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_telegram_stars_entitlements_charge
+  ON telegram_stars_entitlements (telegram_payment_charge_id);

@@ -27,13 +27,13 @@ You do not need to wait for an automated system before acting on obvious abuse, 
 
 MyFenrir has several connected surfaces, but they are not the same thing.
 
-| Surface | Purpose | Admin meaning |
-| --- | --- | --- |
-| `myfenrir.com` | Main product/admin surface | Where owner/admin identity, dashboard decisions, domains, locks, and product operations live |
-| Early-adopter Telegram group | Active community/testing group | The live social space you moderate and protect |
-| Telegram Lock / Fenrir Gate | Access bridge into Telegram | Controls invite rotation, revocation, and stable public join links |
-| Neon Nexus | White-label community gate | Separate community auth/brand flow for groups that need a real gated community |
-| Frisky Dev MCP | Operator/specialist layer | Support system for routing tasks, specialists, memory, and builder workflows |
+| Surface                      | Purpose                        | Admin meaning                                                                                |
+| ---------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------- |
+| `myfenrir.com`               | Main product/admin surface     | Where owner/admin identity, dashboard decisions, domains, locks, and product operations live |
+| Early-adopter Telegram group | Active community/testing group | The live social space you moderate and protect                                               |
+| Telegram Lock / Fenrir Gate  | Access bridge into Telegram    | Controls invite rotation, revocation, and stable public join links                           |
+| Neon Nexus                   | White-label community gate     | Separate community auth/brand flow for groups that need a real gated community               |
+| Frisky Dev MCP               | Operator/specialist layer      | Support system for routing tasks, specialists, memory, and builder workflows                 |
 
 Keep this split clear: MyFenrir admin identity is the owner/operator side. Neon Nexus is the member/community verification side. A person can be valid in one context and still need review in the other.
 
@@ -172,16 +172,16 @@ For meaningful decisions, keep a short note: profile, action, reason, date, and 
 
 Use the lightest action that protects the room.
 
-| Action | Use when | Admin note |
-| --- | --- | --- |
-| No action | New profile looks normal | Let them settle in |
-| Watch | Weak signal but no harm yet | Keep an eye on first messages |
-| Ask | Intent is unclear | Ask how they got in or what they need |
-| Warn | Behavior is annoying but recoverable | Keep it short and clear |
-| Delete message | Spam, noise, unsafe link, duplicate clutter | Clean the room without drama |
-| Mute/restrict | Person is disruptive but may be recoverable | Use when cooling off is enough |
-| Remove/kick | Person should leave now but ban is not required | Good for wrong-room or low-trust cases |
-| Ban | Person should not come back through the same path | Use for abuse, scams, harassment, impersonation, repeated boundary crossing, or owner judgment |
+| Action         | Use when                                          | Admin note                                                                                     |
+| -------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| No action      | New profile looks normal                          | Let them settle in                                                                             |
+| Watch          | Weak signal but no harm yet                       | Keep an eye on first messages                                                                  |
+| Ask            | Intent is unclear                                 | Ask how they got in or what they need                                                          |
+| Warn           | Behavior is annoying but recoverable              | Keep it short and clear                                                                        |
+| Delete message | Spam, noise, unsafe link, duplicate clutter       | Clean the room without drama                                                                   |
+| Mute/restrict  | Person is disruptive but may be recoverable       | Use when cooling off is enough                                                                 |
+| Remove/kick    | Person should leave now but ban is not required   | Good for wrong-room or low-trust cases                                                         |
+| Ban            | Person should not come back through the same path | Use for abuse, scams, harassment, impersonation, repeated boundary crossing, or owner judgment |
 
 Your opinion is a valid input. The standard is not "can I prove this in court?" The standard is "does keeping this person create avoidable risk, noise, or harm for the group?"
 

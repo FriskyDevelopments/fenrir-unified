@@ -45,19 +45,19 @@ NO-GO verdict
 
 ## Activities
 
-| Activity | Side effect | Retry policy |
-| --- | --- | --- |
-| `validateDeployRequest` | Reads repo/env metadata | Short retry |
-| `runTypecheck` | Runs `npm run typecheck` | Retry only for transient machine failure |
-| `runBuild` | Runs `npm run build` | Retry only for transient machine failure |
-| `buildCloudRunImage` | Calls Google Cloud Build through `gcloud run deploy --source` | Retry with backoff |
-| `deployCloudRunRevision` | Creates the Cloud Run revision | Retry with backoff |
-| `verifyServiceUrl` | Probes service root and readiness endpoints | Retry with backoff |
-| `verifyAuthRouting` | Ensures auth does not resolve to localhost `/auth/v1/authorize` | Retry with backoff |
-| `evaluateGoNoGo` | Converts evidence into a GO or NO-GO verdict | No retry unless deterministic input is unchanged |
-| `promoteRevision` | Leaves 100 percent traffic on the ready revision | No retry unless idempotent |
-| `rollbackTraffic` | Moves traffic back to the previous known-good revision | Retry with backoff |
-| `notifyOperator` | Sends the deploy result to the operator channel | Retry with cap |
+| Activity                 | Side effect                                                     | Retry policy                                     |
+| ------------------------ | --------------------------------------------------------------- | ------------------------------------------------ |
+| `validateDeployRequest`  | Reads repo/env metadata                                         | Short retry                                      |
+| `runTypecheck`           | Runs `npm run typecheck`                                        | Retry only for transient machine failure         |
+| `runBuild`               | Runs `npm run build`                                            | Retry only for transient machine failure         |
+| `buildCloudRunImage`     | Calls Google Cloud Build through `gcloud run deploy --source`   | Retry with backoff                               |
+| `deployCloudRunRevision` | Creates the Cloud Run revision                                  | Retry with backoff                               |
+| `verifyServiceUrl`       | Probes service root and readiness endpoints                     | Retry with backoff                               |
+| `verifyAuthRouting`      | Ensures auth does not resolve to localhost `/auth/v1/authorize` | Retry with backoff                               |
+| `evaluateGoNoGo`         | Converts evidence into a GO or NO-GO verdict                    | No retry unless deterministic input is unchanged |
+| `promoteRevision`        | Leaves 100 percent traffic on the ready revision                | No retry unless idempotent                       |
+| `rollbackTraffic`        | Moves traffic back to the previous known-good revision          | Retry with backoff                               |
+| `notifyOperator`         | Sends the deploy result to the operator channel                 | Retry with cap                                   |
 
 ## GO Criteria
 

@@ -1,1 +1,1 @@
-export { onRequestGet } from "./microsoft-identity-association.json";
+export { onRequestGet } from './microsoft-identity-association.json';
