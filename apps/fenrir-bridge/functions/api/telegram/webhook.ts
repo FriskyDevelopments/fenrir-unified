@@ -78,8 +78,9 @@ export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
 };
 
 async function handleMessage(env: BillingEnv, message: TelegramMessage, channel: string, origin: string) {
-  const text = (message.text ?? "").trim().toLowerCase();
-  const linkCode = linkCodeFromStart(text);
+  const text = (message.text ?? "").trim();
+  const textLower = text.toLowerCase();
+  const linkCode = linkCodeFromStart(textLower);
   if (linkCode) {
     const result = await consumeTelegramAccountLinkCode(env, env.DB!, linkCode, {
       telegramUserId: String(message.from?.id ?? message.chat.id),
@@ -89,22 +90,69 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
     });
     await telegramApi(env, "sendMessage", {
       chat_id: message.chat.id,
+      parse_mode: "Markdown",
       text: result.ok
-        ? "Telegram identity linked to MyFenrir. Fenrir can now connect this Telegram account to your workspace and admin roster."
-        : "This Fenrir link code is expired or invalid. Open MyFenrir and generate a fresh Telegram link."
+        ? [
+            "🐺 *MyFenrir* · Telegram linked",
+            "",
+            "Your Telegram identity is connected to this workspace.",
+            "Stable lock URLs, invite rotation, and Stars unlock now follow this account.",
+            "",
+            "_One verified link, every product._"
+          ].join("\n")
+        : [
+            "⚠️ That link code expired or is invalid.",
+            "",
+            "Open MyFenrir → *Settings → Link Telegram* and generate a fresh code."
+          ].join("\n"),
+      reply_markup: result.ok
+        ? { inline_keyboard: [[{ text: "Open dashboard", url: origin.replace(/\/$/, "") }]] }
+        : { inline_keyboard: startActionButtons(env, origin) }
     }, channel);
     return;
   }
 
-  if (!text.startsWith("/subscribe") && !text.startsWith("/unlock") && !text.startsWith("/start fenrir_stars")) {
-    if (text.startsWith("/start")) {
+  if (textLower.startsWith("/help") || textLower.startsWith("/commands")) {
+    await telegramApi(env, "sendMessage", {
+      chat_id: message.chat.id,
+      parse_mode: "Markdown",
+      text: [
+        "🐺 *MyFenrir* · Telegram Lock by Frisky",
+        "",
+        "Stable branded lock URLs for your Telegram groups — Fenrir rotates and revokes the invite behind them.",
+        "",
+        "*Commands*",
+        "· `/start` — open dashboard + unlock",
+        "· `/help` — this message",
+        "· `/subscribe` · `/unlock` — pay with Telegram Stars",
+        "",
+        "Link Telegram from the MyFenrir dashboard (Settings → Link Telegram), then manage locks there.",
+        "",
+        "_One verified link, every product._"
+      ].join("\n"),
+      reply_markup: {
+        inline_keyboard: startActionButtons(env, origin)
+      }
+    }, channel);
+    return;
+  }
+
+  if (!textLower.startsWith("/subscribe") && !textLower.startsWith("/unlock") && !textLower.startsWith("/start fenrir_stars")) {
+    if (textLower.startsWith("/start")) {
+      const name = escapeMd(message.from?.first_name?.trim() || "there");
       await telegramApi(env, "sendMessage", {
         chat_id: message.chat.id,
+        parse_mode: "Markdown",
         text: [
-          "MyFenrir bot is online.",
+          `🐺 *MyFenrir* · hey ${name}`,
           "",
-          "Use the one-time link from MyFenrir to connect your Telegram identity.",
-          "For Foundry Pod or Neon Nexus access, open the early-access invitation."
+          "*Telegram Lock* — share one stable URL. Fenrir keeps the real invite fresh, rotated, and revocable.",
+          "",
+          "· Open the dashboard to create locks",
+          "· Link Telegram so Stars and admin roster match this chat",
+          "· Unlock a plan with Stars when you are ready",
+          "",
+          "_One verified link, every product._"
         ].join("\n"),
         reply_markup: {
           inline_keyboard: startActionButtons(env, origin)
@@ -131,6 +179,10 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
   }, channel);
 }
 
+function escapeMd(s: string) {
+  return s.replace(/([_*`\[])/g, "\\$1");
+}
+
 function linkCodeFromStart(text: string) {
   const match = text.match(/^\/start\s+link_([a-z0-9_-]{8,64})$/i);
   return match?.[1] ?? "";
@@ -139,12 +191,12 @@ function linkCodeFromStart(text: string) {
 function startActionButtons(env: BillingEnv, origin: string) {
   const baseUrl = origin.replace(/\/$/, "");
   const buttons = [
-    [{ text: "Open MyFenrir", url: baseUrl }],
-    [{ text: "Open early-access invitation", url: `${baseUrl}/invitation/` }]
+    [{ text: "🐺 Open MyFenrir", url: baseUrl }],
+    [{ text: "🔐 Sign in", url: `${baseUrl}/login` }]
   ];
 
   if (hasStarsBotUsername(env)) {
-    buttons.push([{ text: "Unlock with Telegram Stars", url: starsDeepLink(env) }]);
+    buttons.push([{ text: "⭐ Unlock with Stars", url: starsDeepLink(env) }]);
   }
 
   return buttons;
@@ -203,11 +255,20 @@ async function handleSuccessfulPayment(env: BillingEnv, message: TelegramMessage
   });
 
   const linkHint = entitlement.applied
-    ? `Workspace plan: ${entitlement.plan}`
-    : "Open MyFenrir → Settings → Link Telegram so Stars unlock your workspace.";
+    ? `Workspace plan: *${entitlement.plan}*`
+    : "Next: open MyFenrir → *Settings → Link Telegram* so Stars unlock this workspace.";
 
   await telegramApi(env, "sendMessage", {
     chat_id: message.chat.id,
-    text: `Fenrir Protocol unlocked with Telegram Stars.\n\nStatus: active\nStars: ${payment.total_amount}\n${linkHint}`
+    parse_mode: "Markdown",
+    text: [
+      "⭐ *MyFenrir* · Stars unlocked",
+      "",
+      "Status: *active*",
+      `Stars: ${payment.total_amount}`,
+      linkHint,
+      "",
+      "_Telegram Lock is ready when you are._"
+    ].join("\n")
   }, channel);
 }
