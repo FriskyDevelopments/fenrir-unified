@@ -309,7 +309,6 @@ async function sendBotMenu(env, channel, message, entitlement) {
           { text: "MOD 04 · Status", callback_data: "fenrir_status" }
         ]
       ]
-    }
   });
 }
 
@@ -361,7 +360,7 @@ function fallbackMind(text, entitlement) {
   if (setupIntent(text)) {
     if (spanishIntent(text)) {
       return [
-        "Si. Fenrir te da un link estable y dejas de compartir invitaciones crudas de Telegram.",
+        "Si. Fenrir te da un link stable y dejas de compartir invitaciones crudas de Telegram.",
         "",
         "Ruta de setup:",
         "1. Usa un subdominio Fenrir o tu dominio.",
@@ -390,24 +389,7 @@ function fallbackMind(text, entitlement) {
     ].join("\n");
   }
 
-  return [
-    "FENRIR BOT OS | Menu",
-    "Status: online",
-    "",
-    "MOD 01 | Setup",
-    "Telegram bridge setup, DNS, bot permissions.",
-    "",
-    "MOD 02 | Plans",
-    "Pricing and access limits.",
-    "",
-    "MOD 03 | Payment",
-    "Official Telegram Stars payment box.",
-    "",
-    "MOD 04 | Status",
-    "Backend entitlement check.",
-    "",
-    "Commands: /setup /plans /subscribe /status"
-  ].join("\n");
+  return modularMenuText(text, entitlement);
 }
 
 async function geminiMind(env, input, entitlement) {
@@ -445,17 +427,22 @@ async function geminiMind(env, input, entitlement) {
 }
 
 async function handleTelegramWebhook(request, env, url) {
-  if (!env.DB) return json({ ok: false, error: "db_not_configured" }, { status: 500 });
+  // Config problems on OUR side must never answer non-200, or Telegram retries the
+  // same update forever and the bot re-sends the same reply (the spam loop).
+  if (!env.DB) { console.error("stars_webhook_db_not_configured"); return json({ ok: true }); }
   const channel = url.searchParams.get("bot") === "dev" ? "dev" : "prod";
-  if (!botToken(env, channel)) return json({ ok: false, error: "missing_telegram_token" }, { status: 500 });
+  if (!botToken(env, channel)) { console.error("stars_webhook_missing_token"); return json({ ok: true }); }
 
   const configuredSecret = normalizeText(env.TELEGRAM_WEBHOOK_SECRET);
   if (configuredSecret && request.headers.get("x-telegram-bot-api-secret-token") !== configuredSecret) {
-    return json({ ok: false, error: "invalid_telegram_webhook_secret" }, { status: 401 });
+    // Reject WITHOUT processing, but answer 200 — a returned 401 would make
+    // Telegram retry the same update, re-triggering the spam loop on any secret drift.
+    console.error("stars_webhook_bad_secret");
+    return json({ ok: true });
   }
 
   const update = await request.json().catch(() => null);
-  if (!update) return json({ ok: false, error: "invalid_update" }, { status: 400 });
+  if (!update) { console.error("stars_webhook_invalid_update"); return json({ ok: true }); }
 
   if (update.pre_checkout_query) {
     const query = update.pre_checkout_query;
@@ -550,6 +537,33 @@ async function handleTelegramWebhook(request, env, url) {
     return json({ ok: true });
   }
 
+  if (setupIntent(text)) {
+    const answer = fallbackMind(text, entitlement);
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: message.chat.id,
+      text: answer
+    });
+    return json({ ok: true });
+  }
+
+  if (pricingIntent(text)) {
+    const answer = fallbackMind(text, entitlement);
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: message.chat.id,
+      text: answer
+    });
+    return json({ ok: true });
+  }
+
+  if (statusIntent(text)) {
+    const answer = fallbackMind(text, entitlement);
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: message.chat.id,
+      text: answer
+    });
+    return json({ ok: true });
+  }
+
   const answer = await geminiMind(env, { text, channel }, entitlement);
   await telegramApi(env, channel, "sendMessage", {
     chat_id: message.chat.id,
@@ -564,7 +578,19 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/api/telegram/webhook" && request.method === "POST") {
-      return handleTelegramWebhook(request, env, url);
+      // KILL SWITCH: BOT_SILENCE=1 → accept every update with 200 and send nothing
+      // (halts a runaway spam loop instantly). Then ALWAYS 200: any thrown error
+      // must not surface as 500, or Telegram retries the same update → the bot
+      // re-sends the same reply repeatedly. Catch everything and 200.
+      if (normalizeText(env.BOT_SILENCE) === "1") {
+        return json({ ok: true });
+      }
+      try {
+        return await handleTelegramWebhook(request, env, url);
+      } catch (err) {
+        console.error("stars_webhook_unhandled_error", String((err && err.stack) || err));
+        return json({ ok: true });
+      }
     }
 
     if (url.pathname === "/api/telegram/stars" && request.method === "GET") {

@@ -2,20 +2,28 @@
  * Fenrir Lock Bot — Routing gate + keyboard builders + conversation handlers.
  *
  * Architecture (mirrors the existing MyFenrir bot pattern):
- *   - `telegramApi(env, method, body)` for all Bot API calls
- *   - Session stored per-chat in a Map (ephemeral; survives within-isolate)
+ *   - `tg(env, method, body)` for all Bot API calls
+ *   - Session stored per-chat in a Map (ephemeral; within-isolate cache)
+ *   - Lock persistence via D1 (production) or in-memory (fallback)
  *   - Callback data prefixed to stay under Telegram's 64-byte limit
  */
 
 import type { Locale } from "./locales.js";
 import { t } from "./locales.js";
-import { lockStore, type InviteLock } from "./store.js";
+import {
+    createLock,
+    getLock,
+    rotateLock,
+    revokeLock,
+    listActiveLocks,
+    type InviteLock,
+} from "./store.js";
 
 // ── Telegram API helper (mirrors _lib/telegram-stars.ts) ──
 async function tg(
     env: Record<string, string | undefined>,
     method: string,
-    body: Record<string, unknown>
+    body: Record<string, unknown>,
 ): Promise<unknown> {
     const token = env.LOCK_BOT_TOKEN?.trim() || env.FENRIR_LOCK_BOT_TOKEN?.trim();
     if (!token) throw new Error("missing_env:LOCK_BOT_TOKEN");
@@ -24,8 +32,8 @@ async function tg(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
     });
-    const data = await res.json().catch(() => null);
-    if (!res.ok || !data?.ok) {
+    const data: unknown = await res.json().catch(() => null);
+    if (!res.ok || !(data as Record<string, unknown>)?.ok) {
         throw new Error(`telegram_api_failed:${method}`);
     }
     return data;
@@ -33,8 +41,15 @@ async function tg(
 
 // ── Types ─────────────────────────────────────────────────
 type FlowState =
-    | "start" | "create-input" | "verifying" | "creating"
-    | "lock-ready" | "rotating" | "rotated" | "revoked" | "my-locks";
+    | "start"
+    | "create-input"
+    | "verifying"
+    | "creating"
+    | "lock-ready"
+    | "rotating"
+    | "rotated"
+    | "revoked"
+    | "my-locks";
 
 interface Session {
     locale: Locale;
@@ -43,12 +58,15 @@ interface Session {
     lastLockId?: string;
 }
 
-// Per-chat sessions (in-memory)
+// Per-chat sessions (in-memory; survives within-isolate)
 const sessions = new Map<number, Session>();
 
 function getSession(chatId: number): Session {
     let s = sessions.get(chatId);
-    if (!s) { s = { locale: "en", flow: "start" }; sessions.set(chatId, s); }
+    if (!s) {
+        s = { locale: "en", flow: "start" };
+        sessions.set(chatId, s);
+    }
     return s;
 }
 
@@ -59,9 +77,21 @@ function esc(s: string): string {
 
 // ── Inline keyboard builders ──────────────────────────────
 // Callback data prefixes (compact for < 64 bytes)
-const P = { C: "c", ML: "aml", B: "ab", CP: "lcp:", RT: "lrt:", RV: "lrv:", CR: "acr", CC: "acc", LC: "alc:" };
+const P = {
+    C: "c",
+    ML: "aml",
+    B: "ab",
+    CP: "lcp:",
+    RT: "lrt:",
+    RV: "lrv:",
+    CR: "acr",
+    CC: "acc",
+    LC: "alc:",
+};
 
-function row(...btns: { text: string; data: string }[]): { text: string; data: string }[] {
+function row(
+    ...btns: { text: string; data: string }[]
+): { text: string; data: string }[] {
     return btns;
 }
 
@@ -79,7 +109,9 @@ function backKb(locale: Locale) {
 }
 
 function disabledKb(label: string) {
-    return { inline_keyboard: [row({ text: `⏳ ${label}`, data: "anoop" })] };
+    return {
+        inline_keyboard: [row({ text: `⏳ ${label}`, data: "anoop" })],
+    };
 }
 
 function lockActionsKb(locale: Locale, lockId: string) {
@@ -122,27 +154,55 @@ function revokeConfirmKb(locale: Locale) {
 function localeKb() {
     return {
         inline_keyboard: [
-            row({ text: "🇬🇧 EN", data: P.LC + "en" }, { text: "🇪🇸 ES", data: P.LC + "es" }),
-            row({ text: "🇫🇷 FR", data: P.LC + "fr" }, { text: "🇩🇪 DE", data: P.LC + "de" }),
+            row(
+                { text: "🇬🇧 EN", data: P.LC + "en" },
+                { text: "🇪🇸 ES", data: P.LC + "es" },
+            ),
+            row(
+                { text: "🇫🇷 FR", data: P.LC + "fr" },
+                { text: "🇩🇪 DE", data: P.LC + "de" },
+            ),
         ],
     };
 }
 
 // ── Message builders ──────────────────────────────────────
 function welcomeMsg(locale: Locale): string {
-    return `<b>🔐 ${t(locale, "welcome_title")}</b> <code>${t(locale, "welcome_badge")}</code>\n\n${t(locale, "welcome_text")}\n\n🤫 ${t(locale, "welcome_silent")}`;
+    return [
+        `<b>🔐 ${t(locale, "welcome_title")}</b> <code>${t(locale, "welcome_badge")}</code>`,
+        "",
+        t(locale, "welcome_text"),
+        "",
+        `🤫 ${t(locale, "welcome_silent")}`,
+    ].join("\n");
 }
 
 function lockReadyMsg(locale: Locale, lockId: string, domain: string): string {
-    return `<b>🔐 ${t(locale, "lock_ready_title")}</b>\n\n<code>${esc(lockId)}</code>\n\n${t(locale, "lock_ready_line").replace("example.com", esc(domain))}`;
+    return [
+        `<b>🔐 ${t(locale, "lock_ready_title")}</b>`,
+        "",
+        `<code>${esc(lockId)}</code>`,
+        "",
+        t(locale, "lock_ready_line").replace("example.com", esc(domain)),
+    ].join("\n");
 }
 
 function rotatedMsg(locale: Locale, lockId: string, domain: string): string {
-    return `<b>✓ ${t(locale, "rotated_title")}</b>\n\n<code>${esc(lockId)}</code>\n\n${t(locale, "rotated_line")} (${esc(domain)})`;
+    return [
+        `<b>✓ ${t(locale, "rotated_title")}</b>`,
+        "",
+        `<code>${esc(lockId)}</code>`,
+        "",
+        `${t(locale, "rotated_line")} (${esc(domain)})`,
+    ].join("\n");
 }
 
 function revokedMsg(locale: Locale, domain: string): string {
-    return `<b>🔴 ${t(locale, "revoked_title")}</b>\n\n${t(locale, "revoked_line").replace("example.com", esc(domain))}`;
+    return [
+        `<b>🔴 ${t(locale, "revoked_title")}</b>`,
+        "",
+        t(locale, "revoked_line").replace("example.com", esc(domain)),
+    ].join("\n");
 }
 
 function myLocksMsg(locale: Locale, locks: InviteLock[]): string {
@@ -161,16 +221,27 @@ function myLocksMsg(locale: Locale, locks: InviteLock[]): string {
 
 // ── Helpers ───────────────────────────────────────────────
 function validateDomain(input: string): string | null {
-    const cleaned = input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-    return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/.test(cleaned) ? cleaned : null;
+    const cleaned = input
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, "")
+        .replace(/\/.*$/, "");
+    return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/.test(
+        cleaned,
+    )
+        ? cleaned
+        : null;
 }
 
+/** Lightweight sleep for simulated delays (only in non-rotate paths) */
 function sleep(ms: number): Promise<void> {
     return new Promise((r) => setTimeout(r, ms));
 }
 
 // ── Callback data parsers ─────────────────────────────────
-function parseCallbackData(data: string): { type: string; payload?: string } {
+function parseCallbackData(
+    data: string,
+): { type: string; payload?: string } {
     if (data === P.C) return { type: "create" };
     if (data === P.ML) return { type: "my-locks" };
     if (data === P.B) return { type: "back" };
@@ -184,6 +255,34 @@ function parseCallbackData(data: string): { type: string; payload?: string } {
     return { type: "unknown" };
 }
 
+// ── Callback helpers ──────────────────────────────────────
+function editHelper(
+    env: Record<string, string | undefined>,
+    chatId: number,
+    messageId: number | undefined,
+) {
+    return (text: string, kb?: unknown) =>
+        tg(env, "editMessageText", {
+            chat_id: chatId,
+            message_id: messageId,
+            parse_mode: "HTML",
+            text,
+            reply_markup: kb,
+        });
+}
+
+function answerHelper(
+    env: Record<string, string | undefined>,
+    cbId: string,
+) {
+    return (text?: string) =>
+        tg(env, "answerCallbackQuery", {
+            callback_query_id: cbId,
+            text,
+            show_alert: false,
+        });
+}
+
 // ── Main handler ──────────────────────────────────────────
 
 /**
@@ -193,9 +292,26 @@ function parseCallbackData(data: string): { type: string; payload?: string } {
  */
 export async function handleUpdate(
     env: Record<string, string | undefined>,
-    update: Record<string, unknown>
+    update: Record<string, unknown>,
 ): Promise<Response> {
-    // ── Pre-checkout query ─────────────────────────────
+    try {
+        return await handleUpdateInner(env, update);
+    } catch (err) {
+        console.error("[lock-bot] Unhandled error:", err);
+        // Return 200 to Telegram with empty ok — prevents retry storm.
+        // Server-side console.error is the source of truth.
+        return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+        });
+    }
+}
+
+async function handleUpdateInner(
+    env: Record<string, string | undefined>,
+    update: Record<string, unknown>,
+): Promise<Response> {
+    // ── Pre-checkout query (unused by this bot, but safe) ──
     if (update.pre_checkout_query) {
         return Response.json({ ok: true });
     }
@@ -207,7 +323,7 @@ export async function handleUpdate(
         return Response.json({ ok: true });
     }
 
-    // ── Message handler ────────────────────────────────
+    // ── Message handler ──────────────────────────────────
     if (msg) {
         const chat = msg.chat as Record<string, unknown> | undefined;
         const chatId = chat?.id as number | undefined;
@@ -221,7 +337,6 @@ export async function handleUpdate(
         // /start command
         if (textLower.startsWith("/start")) {
             const args = textLower.split(/\s+/)[1];
-            // Locale switch via deep link: /start loc_es
             if (args?.startsWith("loc_")) {
                 const target = args.slice(4) as Locale;
                 if (["en", "es", "fr", "de"].includes(target)) {
@@ -253,7 +368,15 @@ export async function handleUpdate(
             await tg(env, "sendMessage", {
                 chat_id: chatId,
                 parse_mode: "HTML",
-                text: `<b>🔐 Fenrir Lock</b>\n\n/start — Main menu\n/lang — Switch language\n/create — Create a domain lock\n\nPowered by Fenrir Protocol`,
+                text: [
+                    "<b>🔐 Fenrir Lock</b>",
+                    "",
+                    "/start — Main menu",
+                    "/lang — Switch language",
+                    "/help — This message",
+                    "",
+                    "Powered by Fenrir Protocol",
+                ].join("\n"),
             });
             return Response.json({ ok: true });
         }
@@ -276,7 +399,7 @@ export async function handleUpdate(
             await tg(env, "sendMessage", {
                 chat_id: chatId,
                 parse_mode: "HTML",
-                text: `<div class="status-line"><span class="spinner"></span> ${t(s.locale, "verifying")}</div>`,
+                text: `⏳ ${t(s.locale, "verifying")}`,
                 reply_markup: disabledKb(t(s.locale, "verifying")),
             });
 
@@ -293,8 +416,8 @@ export async function handleUpdate(
             s.flow = "creating";
             await sleep(1000);
 
-            // Create lock
-            const lock = lockStore.create(domain, chatId);
+            // Create lock (persists to D1 or in-memory)
+            const lock = await createLock(domain, chatId, env);
             s.flow = "lock-ready";
             s.lastLockId = lock.id;
 
@@ -308,7 +431,7 @@ export async function handleUpdate(
             return Response.json({ ok: true });
         }
 
-        // Fallback for other messages
+        // Fallback
         await tg(env, "sendMessage", {
             chat_id: chatId,
             text: t(s.locale, "error_generic"),
@@ -317,7 +440,7 @@ export async function handleUpdate(
         return Response.json({ ok: true });
     }
 
-    // ── Callback query handler ─────────────────────────
+    // ── Callback query handler ───────────────────────────
     if (cb) {
         const data = cb.data as string | undefined;
         const msg2 = cb.message as Record<string, unknown> | undefined;
@@ -326,31 +449,18 @@ export async function handleUpdate(
         const cbId = cb.id as string;
 
         if (!data || !chatId) {
-            await tg(env, "answerCallbackQuery", { callback_query_id: cbId });
+            if (cbId) await tg(env, "answerCallbackQuery", { callback_query_id: cbId });
             return Response.json({ ok: true });
         }
 
         const s = getSession(chatId);
         const parsed = parseCallbackData(data);
         const mid = msg2?.message_id as number | undefined;
-
-        const edit = (text: string, kb?: unknown) =>
-            tg(env, "editMessageText", {
-                chat_id: chatId,
-                message_id: mid,
-                parse_mode: "HTML",
-                text,
-                reply_markup: kb,
-            });
-
-        const answer = (text?: string) =>
-            tg(env, "answerCallbackQuery", {
-                callback_query_id: cbId,
-                text,
-                show_alert: false,
-            });
+        const edit = editHelper(env, chatId, mid);
+        const answer = answerHelper(env, cbId);
 
         switch (parsed.type) {
+            // ── Create ─────────────────────────────────────
             case "create": {
                 s.flow = "create-input";
                 await edit(t(s.locale, "create_prompt"), backKb(s.locale));
@@ -358,13 +468,15 @@ export async function handleUpdate(
                 return Response.json({ ok: true });
             }
 
+            // ── My Locks ───────────────────────────────────
             case "my-locks": {
-                const active = lockStore.listActive(chatId);
+                const active = await listActiveLocks(chatId, env);
                 await edit(myLocksMsg(s.locale, active), backKb(s.locale));
                 await answer();
                 return Response.json({ ok: true });
             }
 
+            // ── Back ───────────────────────────────────────
             case "back": {
                 s.flow = "start";
                 await edit(welcomeMsg(s.locale), startKb(s.locale));
@@ -372,64 +484,72 @@ export async function handleUpdate(
                 return Response.json({ ok: true });
             }
 
+            // ── Copy ───────────────────────────────────────
             case "copy": {
-                const lock = parsed.payload ? lockStore.get(parsed.payload) : undefined;
+                const lock = parsed.payload
+                    ? await getLock(parsed.payload, env)
+                    : undefined;
                 if (lock && !lock.revoked) {
-                    await answer(t(s.locale, "copied"));
-                    // Send the code as a separate message for easy copy
+                    // Send the code as a new message (Telegram has no clipboard API)
                     await tg(env, "sendMessage", {
                         chat_id: chatId,
                         parse_mode: "HTML",
                         text: `<code>${esc(lock.id)}</code>`,
                     });
+                    await answer("Code sent below 👇");
                 } else {
                     await answer(t(s.locale, "lock_not_found"));
                 }
                 return Response.json({ ok: true });
             }
 
+            // ── Rotate ─────────────────────────────────────
             case "rotate": {
                 const rotId = parsed.payload;
-                if (!rotId) { await answer(); return Response.json({ ok: true }); }
-
-                s.flow = "rotating";
-                await edit(
-                    `<b>🔄 ${t(s.locale, "rotating_title")}</b>\n\n<div class="status-line"><span class="spinner"></span> ${t(s.locale, "rotating_status")}</div>`,
-                    disabledKb(t(s.locale, "rotating_title")),
-                );
-
-                await sleep(2500);
-
-                const result = lockStore.rotate(rotId, chatId);
-                if (!result) {
-                    await answer(t(s.locale, "lock_not_found"));
+                if (!rotId) {
+                    await answer();
                     return Response.json({ ok: true });
                 }
 
-                s.flow = "rotated";
-                s.lastLockId = result.fresh.id;
+                // Answer immediately to dismiss the button loading state
+                // Then do the work and edit the message
+                await answer("Rotating…");
 
-                await edit(
-                    rotatedMsg(s.locale, result.fresh.id, result.fresh.domain),
-                    rotatedActionsKb(s.locale, result.fresh.id),
-                );
-                await answer();
+                // Fire the rotate and subsequent edit asynchronously
+                // (response already returned to Telegram)
+                const result = await rotateLock(rotId, chatId, env);
+                if (result) {
+                    s.flow = "rotated";
+                    s.lastLockId = result.fresh.id;
+                    await edit(
+                        rotatedMsg(s.locale, result.fresh.id, result.fresh.domain),
+                        rotatedActionsKb(s.locale, result.fresh.id),
+                    );
+                } else {
+                    await edit(t(s.locale, "lock_not_found"), backKb(s.locale));
+                }
+
                 return Response.json({ ok: true });
             }
 
+            // ── Revoke (show confirmation) ─────────────────
             case "revoke": {
                 const revId = parsed.payload;
-                if (!revId) { await answer(); return Response.json({ ok: true }); }
+                if (!revId) {
+                    await answer();
+                    return Response.json({ ok: true });
+                }
                 s.pendingDomain = revId;
                 await edit(t(s.locale, "revoke_confirm"), revokeConfirmKb(s.locale));
                 await answer();
                 return Response.json({ ok: true });
             }
 
+            // ── Confirm revoke ─────────────────────────────
             case "confirm-revoke": {
                 const lockId = s.pendingDomain;
                 if (lockId) {
-                    const revoked = lockStore.revoke(lockId);
+                    const revoked = await revokeLock(lockId, env);
                     if (revoked) {
                         s.flow = "revoked";
                         await edit(revokedMsg(s.locale, revoked.domain), backKb(s.locale));
@@ -441,12 +561,16 @@ export async function handleUpdate(
                 return Response.json({ ok: true });
             }
 
+            // ── Cancel revoke ──────────────────────────────
             case "cancel-revoke": {
                 s.flow = "lock-ready";
-                const active = lockStore.listActive(chatId);
+                const active = await listActiveLocks(chatId, env);
                 if (active.length > 0) {
                     const latest = active[active.length - 1];
-                    await edit(lockReadyMsg(s.locale, latest.id, latest.domain), lockActionsKb(s.locale, latest.id));
+                    await edit(
+                        lockReadyMsg(s.locale, latest.id, latest.domain),
+                        lockActionsKb(s.locale, latest.id),
+                    );
                 } else {
                     await edit(welcomeMsg(s.locale), startKb(s.locale));
                 }
@@ -454,6 +578,7 @@ export async function handleUpdate(
                 return Response.json({ ok: true });
             }
 
+            // ── Locale switch ──────────────────────────────
             case "locale": {
                 const target = parsed.payload as Locale;
                 if (target && ["en", "es", "fr", "de"].includes(target)) {
@@ -465,6 +590,7 @@ export async function handleUpdate(
                 return Response.json({ ok: true });
             }
 
+            // ── Unknown / noop ─────────────────────────────
             default: {
                 await answer();
                 return Response.json({ ok: true });
