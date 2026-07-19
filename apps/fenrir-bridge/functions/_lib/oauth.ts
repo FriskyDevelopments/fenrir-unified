@@ -12,6 +12,8 @@ export type OAuthEnv = BillingEnv & {
   APPLE_PRIVATE_KEY?: string;
   WORKOS_CLIENT_ID?: string;
   WORKOS_API_KEY?: string;
+  /** Opt-in for legacy per-provider OAuth (default off — WorkOS only). */
+  DIRECT_OAUTH_ENABLED?: string;
 };
 
 export type OAuthProvider = "google" | "microsoft" | "apple" | "workos";
@@ -59,7 +61,19 @@ export function isCommunityOAuthProvider(value: unknown): value is OAuthProvider
   return isOAuthProvider(value);
 }
 
+/**
+ * Legacy per-provider OAuth is retired in production (WorkOS AuthKit only).
+ * Set DIRECT_OAUTH_ENABLED=true to exercise the old routes in tests/local.
+ */
+export function isDirectOAuthEnabled(env: OAuthEnv): boolean {
+  const flag = env.DIRECT_OAUTH_ENABLED?.trim().toLowerCase();
+  return flag === "1" || flag === "true" || flag === "yes";
+}
+
 export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): boolean {
+  if (provider !== "workos" && !isDirectOAuthEnabled(env)) {
+    return false;
+  }
   if (provider === "google") {
     return Boolean(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim());
   }

@@ -243,9 +243,22 @@ export function communityNameFromSlug(slug: string) {
 
 export function siteOrigin(request: Request, env: CommunityAuthEnv) {
   const configured = env.PUBLIC_SITE_URL?.trim();
-  if (configured) return configured.replace(/\/$/, "");
-  const url = new URL(request.url);
-  return `${url.protocol}//${url.host}`;
+  const raw = configured
+    ? configured.replace(/\/$/, "")
+    : (() => {
+        const url = new URL(request.url);
+        return `${url.protocol}//${url.host}`;
+      })();
+  try {
+    const url = new URL(raw);
+    if (url.hostname === "myfenrir.com") {
+      url.hostname = "www.myfenrir.com";
+      return url.origin;
+    }
+    return url.origin;
+  } catch {
+    return raw;
+  }
 }
 
 export function defaultBrandForSlug(slug: string) {

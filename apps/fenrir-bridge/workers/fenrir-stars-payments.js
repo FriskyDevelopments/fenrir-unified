@@ -301,14 +301,15 @@ async function sendBotMenu(env, channel, message, entitlement) {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "MOD 01 · Setup", callback_data: "fenrir_setup" },
-          { text: "MOD 02 · Plans", callback_data: "fenrir_plans" }
+          { text: "🔵 MOD 01 · Setup", callback_data: "fenrir_setup" },
+          { text: "🔵 MOD 02 · Plans", callback_data: "fenrir_plans" }
         ],
         [
-          { text: "MOD 03 · Stars", callback_data: "fenrir_subscribe" },
-          { text: "MOD 04 · Status", callback_data: "fenrir_status" }
+          { text: "🔵 MOD 03 · Stars", callback_data: "fenrir_subscribe" },
+          { text: "🔵 MOD 04 · Status", callback_data: "fenrir_status" }
         ]
       ]
+    }
   });
 }
 

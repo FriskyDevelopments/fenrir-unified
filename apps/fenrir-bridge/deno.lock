@@ -1815,6 +1815,7 @@
         "npm:tailwindcss@^3.4.17",
         "npm:typescript@^6.0.3",
         "npm:vite@^7.2.7",
+        "npm:vitest@^3.2.6",
         "npm:wrangler@^4.95.0"
       ]
     }

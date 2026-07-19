@@ -1,5 +1,5 @@
 import { noStoreJson } from "../../../_lib/responses";
-import { authOrigin, cookieDomain } from "../../../_lib/billing-env";
+import { cookieDomain, siteOrigin } from "../../../_lib/billing-env";
 import {
   buildAuthorizationUrl,
   createStatePayload,
@@ -28,7 +28,9 @@ export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
     const providerHint = isWorkOSProviderHint(providerParam) ? providerParam : undefined;
     const returnTo = safeReturnPath(requestUrl.searchParams.get("return_to"));
 
-    const origin = authOrigin(context.request, context.env);
+    // Callback must hit the canonical site (www), not auth.* or apex — apex 301s
+    // via oauth-guard and strands WorkOS state. Login may still be initiated on any host.
+    const origin = siteOrigin(context.request, context.env);
     const redirectUri = `${origin}/api/auth/callback/workos`;
 
     const statePayload = createStatePayload(returnTo);

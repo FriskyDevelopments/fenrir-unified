@@ -61,43 +61,60 @@ export function dbNotConfiguredResponse() {
   );
 }
 
+/**
+ * Apex myfenrir.com is edge-redirected to www; OAuth redirect_uri + cookies must
+ * treat www as the only canonical site origin so WorkOS callbacks never land on
+ * apex (which 301s and can strand state).
+ */
+export function canonicalizeSiteOrigin(origin: string): string {
+  const trimmed = origin.trim().replace(/\/$/, "");
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname === "myfenrir.com") {
+      url.hostname = "www.myfenrir.com";
+      return url.origin;
+    }
+    return url.origin;
+  } catch {
+    return trimmed;
+  }
+}
+
 export function siteOrigin(request: Request, env: BillingEnv) {
   const url = new URL(request.url);
-  const requestOrigin = `${url.protocol}//${url.host}`;
+  const requestOrigin = canonicalizeSiteOrigin(`${url.protocol}//${url.host}`);
 
   // If the request origin is in the allowed redirect URIs, prefer it.
   const allowed = (env.ALLOWED_REDIRECT_URIS || env.PUBLIC_SITE_URL || "")
     .split(",")
-    .map((u) => u.trim())
+    .map((u) => canonicalizeSiteOrigin(u))
     .filter(Boolean);
 
-  if (allowed.some(base => requestOrigin === base || requestOrigin.startsWith(base + "/"))) {
+  if (allowed.some((base) => requestOrigin === base || requestOrigin.startsWith(base + "/"))) {
     return requestOrigin;
   }
 
   const configured = env.PUBLIC_SITE_URL?.trim();
-  if (configured) return configured.replace(/\/$/, "");
+  if (configured) return canonicalizeSiteOrigin(configured);
   return requestOrigin;
 }
 
 export function authOrigin(request: Request, env: BillingEnv) {
   const url = new URL(request.url);
-  const requestOrigin = `${url.protocol}//${url.host}`;
+  const requestOrigin = canonicalizeSiteOrigin(`${url.protocol}//${url.host}`);
 
   const configuredAuth = env.PUBLIC_AUTH_URL?.trim();
   if (configuredAuth) {
+    const authBase = canonicalizeSiteOrigin(configuredAuth);
     // If we are currently ON the configured auth domain, use it.
-    if (requestOrigin === configuredAuth.replace(/\/$/, "")) {
+    if (requestOrigin === authBase) {
       return requestOrigin;
     }
+    // Auth subdomain hosts login, but WorkOS/provider redirect_uri must stay on
+    // the canonical site (www) — apex is not a safe callback host.
+    return siteOrigin(request, env);
   }
 
-  // If the current request origin is one of the allowed domains, it might be a white-label site.
-  // In that case, we should check if it's supposed to use its own origin for auth or the central one.
-  // For now, if PUBLIC_AUTH_URL is set, we generally want to use it for the OAuth provider config,
-  // UNLESS the request is already on a domain that is allowed.
-  
-  if (configuredAuth) return configuredAuth.replace(/\/$/, "");
   return siteOrigin(request, env);
 }
 

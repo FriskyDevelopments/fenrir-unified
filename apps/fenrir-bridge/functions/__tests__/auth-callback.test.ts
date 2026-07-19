@@ -94,6 +94,7 @@ describe("WorkOS AuthKit callback (needs WorkOS network, now mocked)", () => {
 describe("Direct Google OAuth callback (needs Google network + Supabase, now mocked)", () => {
   const env: OAuthEnv = {
     SESSION_SECRET: "test-session-secret-direct",
+    DIRECT_OAUTH_ENABLED: "true",
     GOOGLE_CLIENT_ID: "google-client-id.apps.googleusercontent.com",
     GOOGLE_CLIENT_SECRET: "google-secret",
     PUBLIC_SITE_URL: "https://app.example.test",
