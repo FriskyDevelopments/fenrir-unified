@@ -298,8 +298,12 @@ export async function handleUpdate(
         return await handleUpdateInner(env, update);
     } catch (err) {
         console.error("[lock-bot] Unhandled error:", err);
-        // Return 200 to Telegram (don't retry), but log for debugging
-        return Response.json({ ok: true, error: String(err) });
+        // Return 200 to Telegram with empty ok — prevents retry storm.
+        // Server-side console.error is the source of truth.
+        return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+        });
     }
 }
 
