@@ -151,24 +151,24 @@ export async function rotateLock(
 
     if (hasDB(env)) {
         const db = env.DB as any;
-        await db
-            .prepare("UPDATE invite_locks SET revoked = 1 WHERE id = ?")
-            .bind(lockId)
-            .run();
 
         for (let attempt = 0; attempt < 5; attempt++) {
             const freshId = generateId();
-            const hit = await db
-                .prepare("SELECT id FROM invite_locks WHERE id = ?")
-                .bind(freshId)
-                .first();
-            if (!hit) {
-                await db
-                    .prepare(
-                        "INSERT INTO invite_locks (id, domain, chat_id, created_at, revoked, rotated_from) VALUES (?, ?, ?, ?, 0, ?)",
-                    )
-                    .bind(freshId, existing.domain, chatId, now, lockId)
-                    .run();
+
+            // Atomic batch: UPDATE (revoke old) + INSERT (create fresh)
+            // If either fails, both roll back — no half-state.
+            try {
+                await db.batch([
+                    db
+                        .prepare("UPDATE invite_locks SET revoked = 1 WHERE id = ?")
+                        .bind(lockId),
+                    db
+                        .prepare(
+                            "INSERT INTO invite_locks (id, domain, chat_id, created_at, revoked, rotated_from) VALUES (?, ?, ?, ?, 0, ?)",
+                        )
+                        .bind(freshId, existing.domain, chatId, now, lockId),
+                ]);
+
                 const fresh: InviteLock = {
                     id: freshId,
                     domain: existing.domain,
@@ -178,6 +178,14 @@ export async function rotateLock(
                     rotatedFrom: lockId,
                 };
                 return { old: { ...existing, revoked: true }, fresh };
+            } catch (batchErr) {
+                // SQLITE_CONSTRAINT_UNIQUE on freshId collision — retry
+                // Other errors bubble up to the outer try/catch in handleUpdate
+                const msg = String(batchErr);
+                if (!msg.includes("UNIQUE") && !msg.includes("SQLITE_CONSTRAINT")) {
+                    throw batchErr;
+                }
+                // Collision — loop to regenerate freshId
             }
         }
         throw new Error("failed to generate unique lock id after 5 attempts");
