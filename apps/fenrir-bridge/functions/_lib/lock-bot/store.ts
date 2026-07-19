@@ -12,7 +12,8 @@ export interface InviteLock {
     id: string;
     domain: string;
     chatId: number;
-    createdAt: string; // ISO-8601
+    /** ISO-8601 (e.g. "2026-06-19T12:34:56.789Z"). Must be zero-padded + T separator so ORDER BY sorts lexicographically. Never switch to epoch millis here. */
+    createdAt: string;
     revoked: boolean;
     rotatedFrom?: string;
 }
