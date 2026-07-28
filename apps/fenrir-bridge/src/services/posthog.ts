@@ -55,7 +55,15 @@ export function installPosthog(): void {
         // enmascarado por defecto: una repetición no puede filtrar nada.
         maskAllInputs: true,
         maskTextSelector: "[data-ph-mask]",
+        // MyFenrir embebe iframes de terceros (WorkOS AuthKit, widgets de pago).
+        // Grabarlos capturaría formularios de credenciales de otro origen, así
+        // que se apaga explícitamente en vez de confiar en el default.
+        recordCrossOriginIframes: false,
       },
+      // OJO: la opción es `capture_exceptions` (snake_case). `captureExceptions`
+      // en camelCase NO existe en posthog-js y se ignora en silencio — el error
+      // tracking parecería activo y no capturaría nada. Verificado contra
+      // posthog-js 1.407.3 (dist/module.d.ts).
       capture_exceptions: true,
       autocapture: true,
     });
