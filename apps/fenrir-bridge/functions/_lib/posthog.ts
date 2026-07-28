@@ -150,6 +150,137 @@ export async function captureException(
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LLM observability ($ai_generation)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// PostHog deriva coste, latencia y tasa de error de los LLM a partir de un único
+// evento `$ai_generation` con propiedades `$ai_*`. No hay que calcular nada: si
+// el evento lleva modelo y tokens, PostHog pone el precio. Por eso conviene
+// emitirlo desde el envoltorio y no a mano en cada llamada.
+//
+// Nota: hoy fenrir-bridge NO hace ninguna llamada a un LLM (verificado por
+// búsqueda: cero referencias a dashscope/openai/anthropic/completions). Este
+// envoltorio queda listo para el momento en que el bot incorpore un modelo, y
+// es el mismo contrato que usan los bots de ClipsFlow y Marina en HostCasa.
+
+export type AiGenerationInput = {
+  /** Agrupa todas las llamadas de una misma conversación en una traza. */
+  traceId: string;
+  model: string;
+  provider: string;
+  /** Mensajes de entrada, ya recortados/redactados por el llamador. */
+  input?: unknown;
+  spanName?: string;
+  platform?: string;
+  id?: unknown;
+  properties?: Record<string, unknown>;
+};
+
+/**
+ * Envuelve una llamada a un LLM y emite `$ai_generation` pase lo que pase.
+ *
+ * Mide latencia, propaga el resultado sin tocarlo y en caso de excepción emite
+ * el evento con `$ai_is_error` antes de re-lanzar. El error se re-lanza a
+ * propósito: la observabilidad no cambia el comportamiento del bot, sólo lo
+ * observa.
+ */
+export async function withAiGeneration<T>(
+  env: PosthogEnv,
+  input: AiGenerationInput,
+  call: () => Promise<T>,
+  extract?: (result: T) => {
+    output?: unknown;
+    inputTokens?: number;
+    outputTokens?: number;
+    httpStatus?: number;
+  }
+): Promise<T> {
+  const startedAt = Date.now();
+  try {
+    const result = await call();
+    const meta = extract ? extract(result) : {};
+    await captureAiGeneration(env, input, {
+      latencySeconds: (Date.now() - startedAt) / 1000,
+      output: meta.output,
+      inputTokens: meta.inputTokens,
+      outputTokens: meta.outputTokens,
+      httpStatus: meta.httpStatus ?? 200,
+      isError: false,
+    });
+    return result;
+  } catch (error) {
+    await captureAiGeneration(env, input, {
+      latencySeconds: (Date.now() - startedAt) / 1000,
+      isError: true,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error; // la observabilidad observa, no altera
+  }
+}
+
+async function captureAiGeneration(
+  env: PosthogEnv,
+  input: AiGenerationInput,
+  outcome: {
+    latencySeconds: number;
+    output?: unknown;
+    inputTokens?: number;
+    outputTokens?: number;
+    httpStatus?: number;
+    isError: boolean;
+    error?: string;
+  }
+): Promise<void> {
+  const did = distinctId(input.platform ?? "telegram", input.id);
+  await send(env, {
+    event: "$ai_generation",
+    distinct: did ?? ANONYMOUS_ID,
+    properties: {
+      ...(input.properties ?? {}),
+      $ai_trace_id: input.traceId,
+      $ai_span_name: input.spanName,
+      $ai_model: input.model,
+      $ai_provider: input.provider,
+      $ai_input: input.input,
+      $ai_output_choices: outcome.output,
+      $ai_input_tokens: outcome.inputTokens,
+      $ai_output_tokens: outcome.outputTokens,
+      $ai_latency: outcome.latencySeconds,
+      $ai_http_status: outcome.httpStatus,
+      $ai_is_error: outcome.isError,
+      $ai_error: outcome.error,
+    },
+  });
+}
+
+/**
+ * Envuelve el handler de una Pages Function para que ninguna excepción se
+ * escape sin registrarse.
+ *
+ * En el runtime de Workers NO existen `process.on("uncaughtException")` ni
+ * `unhandledRejection` — son APIs de Node. El equivalente correcto aquí es
+ * envolver el handler, que además da algo que Node no da: la petición que lo
+ * provocó. La excepción se re-lanza para que Cloudflare la registre también.
+ */
+export function withErrorTracking<
+  C extends { request: Request; env: PosthogEnv }
+>(component: string, handler: (context: C) => Promise<Response>) {
+  return async (context: C): Promise<Response> => {
+    try {
+      return await handler(context);
+    } catch (error) {
+      const url = new URL(context.request.url);
+      await captureException(context.env, error, {
+        component,
+        stage: "request",
+        context: { path: url.pathname, method: context.request.method },
+      });
+      throw error;
+    }
+  };
+}
+
 /**
  * Lee un feature flag en el borde. Devuelve `fallback` ante cualquier fallo:
  * una caída de PostHog no puede abrir ni cerrar una puerta del producto —
