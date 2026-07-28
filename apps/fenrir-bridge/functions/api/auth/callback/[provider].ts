@@ -1,112 +1,31 @@
 import { noStoreJson } from "../../../_lib/responses";
-import {
-  clearTransactionCookie,
-  exchangeCodeForSession,
-  isDirectOAuthAvailable,
-  isOAuthProvider,
-  readOAuthTransaction,
-  safeReturnPath,
-  signSessionTransfer,
-  validateOAuthTransaction,
-  type OAuthEnv
-} from "../../../_lib/oauth";
-import { authOrigin, siteOrigin } from "../../../_lib/billing-env";
-import { ensureDefaultWorkspace } from "../../../_lib/workspaces";
-import { upsertProfileForSession } from "../../../_lib/supabase-profiles";
+import { clearTransactionCookie } from "../../../_lib/oauth";
 
-async function handleCallback(context: EventContext<OAuthEnv, "provider", unknown>) {
-  const provider = context.params.provider;
-  if (!isOAuthProvider(provider)) {
-    return noStoreJson({ ok: false, error: "unsupported_provider" }, { status: 404 });
-  }
-
-  const siteBase = siteOrigin(context.request, context.env);
-  if (!isDirectOAuthAvailable(provider, context.env)) {
-    return noStoreJson(
-      {
-        ok: false,
-        error: "direct_oauth_disabled",
-        detail: "Set the direct OAuth client ID/secret environment variables for this provider."
-      },
-      { status: 410 }
-    );
-  }
-
-  let code: string | null = null;
-  let state: string | null = null;
-  let providerError: string | null = null;
-  let providerErrorDescription: string | null = null;
-  const url = new URL(context.request.url);
-
-  if (context.request.method === "POST") {
-    const formData = await context.request.formData();
-    code = formData.get("code") as string | null;
-    state = formData.get("state") as string | null;
-    providerError = formData.get("error") as string | null;
-    providerErrorDescription = formData.get("error_description") as string | null;
-  } else {
-    code = url.searchParams.get("code");
-    state = url.searchParams.get("state");
-    providerError = url.searchParams.get("error");
-    providerErrorDescription = url.searchParams.get("error_description");
-  }
-
-  if (providerError) {
-    return redirectWithAuthError(siteBase, providerError, providerErrorDescription);
-  }
-
-  if (!code) {
-    return redirectWithAuthError(siteBase, "missing_code", null);
-  }
-
-  const authBase = authOrigin(context.request, context.env);
-  const callbackUri = `${authBase}/api/auth/callback/${provider}`;
-
-  try {
-    const tx = await readOAuthTransaction(context.request, context.env);
-    validateOAuthTransaction(tx, provider, state);
-    const result = await exchangeCodeForSession(provider, context.env, code, callbackUri, tx!);
-    const sessionPayload = result.session;
-    if (context.env.DB) {
-      await ensureDefaultWorkspace(context.env.DB, sessionPayload);
+// Retired: the direct Google/Microsoft/Apple callback for the MyFenrir login.
+//
+// It used to verify a provider id_token, mint a Fenrir session and upsert the
+// identity into the Supabase project shared with clipsflow.tech. MyFenrir
+// identity is WorkOS-only now, so this handler must never mint a session
+// again — the only live callback is /api/auth/callback/workos.
+//
+// The route stays reachable (instead of 404-ing through the API catch-all) so
+// that a stale provider console still holding this redirect URI gets an
+// unambiguous, greppable answer instead of a generic not-found, and so the
+// stale transaction cookie from any in-flight legacy attempt is cleared.
+async function retiredCallback() {
+  return noStoreJson(
+    {
+      ok: false,
+      error: "direct_oauth_retired",
+      detail:
+        "MyFenrir sign-in is WorkOS-only. Direct Google/Microsoft/Apple OAuth was removed; use /api/auth/workos/login."
+    },
+    {
+      status: 410,
+      headers: { "Set-Cookie": clearTransactionCookie() }
     }
-    await upsertProfileForSession(context.env, sessionPayload, result.identityId);
-
-    const returnToUrl = tx?.returnTo ?? "/main";
-    let finalLocation: string;
-
-    if (returnToUrl.startsWith("http")) {
-      const targetUrl = new URL(returnToUrl);
-      const targetOrigin = `${targetUrl.protocol}//${targetUrl.host}`;
-      finalLocation = `${targetOrigin}/api/auth/complete?token=${encodeURIComponent(await signSessionTransfer(sessionPayload, returnToUrl, context.env))}`;
-    } else {
-      finalLocation = `${siteBase}/api/auth/complete?token=${encodeURIComponent(await signSessionTransfer(sessionPayload, returnToUrl, context.env))}`;
-    }
-
-    const headers = new Headers({
-      Location: finalLocation
-    });
-    headers.append("Set-Cookie", clearTransactionCookie());
-    return new Response(null, {
-      status: 302,
-      headers
-    });
-  } catch (error) {
-    return redirectWithAuthError(siteBase, error instanceof Error ? error.message : "oauth_exchange_failed", null);
-  }
+  );
 }
 
-export const onRequestGet: PagesFunction<OAuthEnv> = handleCallback;
-export const onRequestPost: PagesFunction<OAuthEnv> = handleCallback;
-
-function redirectWithAuthError(siteBase: string, error: string, detail: string | null) {
-  const params = new URLSearchParams({ auth_error: error });
-  if (detail) params.set("auth_error_detail", detail);
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: `${siteBase}/login?${params.toString()}`,
-      "Set-Cookie": clearTransactionCookie()
-    }
-  });
-}
+export const onRequestGet: PagesFunction = retiredCallback;
+export const onRequestPost: PagesFunction = retiredCallback;
