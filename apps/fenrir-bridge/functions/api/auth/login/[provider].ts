@@ -1,40 +1,65 @@
 import { noStoreJson } from "../../../_lib/responses";
-import { safeReturnPath, type WorkOSEnv } from "../../../_lib/workos";
-import { authOrigin } from "../../../_lib/billing-env";
+import {
+  createOAuthTransaction,
+  getAuthorizationUrl,
+  isDirectOAuthAvailable,
+  isOAuthProvider,
+  safeAllowedReturnTo,
+  transactionSetCookie,
+  validateRedirectUri,
+  type OAuthEnv
+} from "../../../_lib/oauth";
+import { authOrigin, siteOrigin } from "../../../_lib/billing-env";
 
-// MyFenrir identity is WorkOS-only.
-//
-// This route used to open a *direct* OAuth transaction against Google,
-// Microsoft and Apple with per-provider client IDs, running in parallel with
-// the WorkOS path on the same host. Two live stacks behind one login screen is
-// what kept re-breaking sign-in: a fix applied to one stack left the other one
-// still answering, and the direct callbacks also wrote identities into the
-// Supabase project shared with clipsflow.tech. Supabase belongs to FriskyDev;
-// Community/MyFenrir is WorkOS for identity and Neon for data.
-//
-// The path is kept rather than deleted so already-issued links and any cached
-// bundle keep working, but it can no longer reach an identity provider on its
-// own — it only forwards into WorkOS.
-const workosProviderHints = new Set(["google", "microsoft", "apple"]);
-
-export const onRequestGet: PagesFunction<WorkOSEnv> = async (context) => {
-  const provider = String(context.params.provider ?? "");
-  if (provider !== "workos" && !workosProviderHints.has(provider)) {
+export const onRequestGet: PagesFunction<OAuthEnv> = async (context) => {
+  const provider = context.params.provider;
+  if (!isOAuthProvider(provider)) {
     return noStoreJson({ ok: false, error: "unsupported_provider" }, { status: 404 });
   }
 
-  const requestUrl = new URL(context.request.url);
-  const target = new URL(`${authOrigin(context.request, context.env)}/api/auth/workos/login`);
-  if (workosProviderHints.has(provider)) {
-    target.searchParams.set("provider", provider);
+  if (!isDirectOAuthAvailable(provider, context.env)) {
+    return noStoreJson(
+      {
+        ok: false,
+        error: "direct_oauth_disabled",
+        detail: "Set the direct OAuth client ID/secret environment variables for this provider."
+      },
+      { status: 410 }
+    );
   }
-  target.searchParams.set("return_to", safeReturnPath(requestUrl.searchParams.get("return_to")));
 
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: target.toString(),
-      "Cache-Control": "no-store"
-    }
-  });
+  try {
+    const origin = authOrigin(context.request, context.env);
+    const callbackUri = `${origin}/api/auth/callback/${provider}`;
+    const requestUrl = new URL(context.request.url);
+
+    // Validate the redirect URI if one was provided in the query params (e.g. for white-labeling)
+    // The 'redirect_uri' is where the user goes AFTER the entire flow is complete.
+    // The 'callbackUri' is where the OAuth provider sends the user back to us.
+    const finalRedirectUri = validateRedirectUri(requestUrl.searchParams.get("redirect_uri"), context.env);
+    const returnTo = safeAllowedReturnTo(requestUrl.searchParams.get("return_to") || finalRedirectUri, context.env);
+
+    const tx = await createOAuthTransaction(provider, context.env, returnTo);
+    const url = await getAuthorizationUrl(provider, context.env, callbackUri, tx);
+
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: url,
+        "Set-Cookie": await transactionSetCookie(tx, context.env)
+      }
+    });
+  } catch (error) {
+    // A misconfigured environment (e.g. missing SESSION_SECRET / PUBLIC_SITE_URL)
+    // must not surface as an opaque 500 on the login button. Redirect back to the
+    // login screen with a diagnosable error code, matching the callback handler.
+    console.error("OAuth login initiation failed", error);
+    const message = error instanceof Error ? error.message : "oauth_login_init_failed";
+    const siteBase = siteOrigin(context.request, context.env);
+    const params = new URLSearchParams({ auth_error: "oauth_login_init_failed", auth_error_detail: message });
+    return new Response(null, {
+      status: 302,
+      headers: { Location: `${siteBase}/login?${params.toString()}` }
+    });
+  }
 };
