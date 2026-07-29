@@ -537,10 +537,7 @@ export async function ensureCommunityMembershipForEmail(sql: Awaited<ReturnType<
     insert into fenrir_community_memberships (user_id, org_id, role, status)
     values (${user.id}, ${orgId}, 'member', 'pending')
     on conflict (user_id, org_id) do update
-      set
-        status = excluded.status,
-        role = excluded.role,
-        updated_at = now()
+      set updated_at = now()
     returning id, role, status
   `;
   if (!membership) throw new Error("community_membership_not_created");

@@ -3199,7 +3199,8 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
       trustB: "Invite-aware",
       trustC: "Every approval is audited",
       guarded: "Guarded by Fenrir",
-      googleButton: "Continue with Google"
+      googleButton: "Continue with Google",
+      microsoftButton: "Continue with Microsoft"
     },
     es: {
       kicker: "Comunidad privada",
@@ -3216,7 +3217,8 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
       trustB: "Reconoce invitaciones",
       trustC: "Cada aprobación queda auditada",
       guarded: "Custodiado por Fenrir",
-      googleButton: "Continuar con Google"
+      googleButton: "Continuar con Google",
+      microsoftButton: "Continuar con Microsoft"
     },
     fr: {
       kicker: "Communauté privée",
@@ -3233,7 +3235,8 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
       trustB: "Invitations reconnues",
       trustC: "Chaque approbation est auditée",
       guarded: "Gardé par Fenrir",
-      googleButton: "Continuer avec Google"
+      googleButton: "Continuer avec Google",
+      microsoftButton: "Continuer avec Microsoft"
     },
     de: {
       kicker: "Private Community",
@@ -3250,7 +3253,8 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
       trustB: "Einladungen zählen",
       trustC: "Jede Freigabe wird auditiert",
       guarded: "Bewacht von Fenrir",
-      googleButton: "Mit Google fortfahren"
+      googleButton: "Mit Google fortfahren",
+      microsoftButton: "Mit Microsoft fortfahren"
     }
   }[locale];
 
@@ -3348,6 +3352,14 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
               href={`/api/community-auth/oauth/google?slug=${encodeURIComponent(slug)}`}
             >
               {gateText.googleButton}
+            </a>
+          ) : null}
+          {brand?.enabled_auth_providers?.includes("microsoft") ? (
+            <a
+              className="apple-auth-button community-submit-button community-google-button community-microsoft-button"
+              href={`/api/community-auth/oauth/microsoft?slug=${encodeURIComponent(slug)}`}
+            >
+              {gateText.microsoftButton}
             </a>
           ) : null}
           <form className="community-auth-form" onSubmit={requestLink}>
