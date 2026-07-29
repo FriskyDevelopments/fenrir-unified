@@ -376,9 +376,16 @@ export const authService = {
   },
   async login(provider: "google" | "microsoft" | "apple") {
     const returnTo = safeCurrentAuthReturnPath();
-    // Route social sign-in through WorkOS AuthKit; the provider hint jumps
-    // straight to the matching hosted connection.
-    window.location.assign(`${directAuthOrigin}/api/auth/workos/login?provider=${provider}&return_to=${encodeURIComponent(returnTo)}`);
+    // Google goes through WorkOS (its hosted connection works). Microsoft and
+    // Apple use the direct OAuth stack: the WorkOS MicrosoftOAuth connection's
+    // Azure app is missing WorkOS's redirect URI (redirect_uri not valid) and
+    // no WorkOS AppleOAuth connection exists (404), while the direct clients
+    // are registered against this origin's /api/auth/callback/:provider.
+    if (provider === "google") {
+      window.location.assign(`${directAuthOrigin}/api/auth/workos/login?provider=${provider}&return_to=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+    window.location.assign(`${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
   },
   async telegramLogin(payload: TelegramLoginPayload) {
     return apiRequest<{ ok: true; authenticated: true; user: AuthSession["user"]; org: AuthSession["org"] }>("/api/auth/telegram-session", {
