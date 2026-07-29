@@ -49,6 +49,16 @@ export function communityOAuthErrorLocation(origin: string, slug: string, error:
   return `${origin.replace(/\/$/, "")}/community/${slug}?${params.toString()}`;
 }
 
+// OAuth must round-trip on the host the browser is actually on: the PKCE
+// transaction cookie is host-only, and the provider-registered redirect URI is
+// the www host. PUBLIC_SITE_URL points at the apex, so siteOrigin() would send
+// the callback (and Google's redirect_uri check) to a host that neither holds
+// the cookie nor is registered — redirect_uri_mismatch.
+function communityOAuthOrigin(request: Request) {
+  const url = new URL(request.url);
+  return `${url.protocol}//${url.host}`;
+}
+
 export async function handleCommunityOAuthStart(context: {
   request: Request;
   env: CommunityOAuthEnv;
@@ -66,7 +76,7 @@ export async function handleCommunityOAuthStart(context: {
     return jsonError("invalid_community_slug", 400);
   }
 
-  const origin = siteOrigin(context.request, context.env);
+  const origin = communityOAuthOrigin(context.request);
 
   if (!isDirectOAuthAvailable(provider, context.env)) {
     return redirect(communityOAuthErrorLocation(origin, slug, "provider_not_configured"));
@@ -110,7 +120,7 @@ export async function handleCommunityOAuthCallback(context: {
   }
 
   const provider = context.provider as OAuthProvider;
-  const origin = siteOrigin(context.request, context.env);
+  const origin = communityOAuthOrigin(context.request);
   const url = new URL(context.request.url);
 
   let code: string | null = null;
@@ -215,7 +225,9 @@ export async function finalizeCommunityOAuthSignIn(options: {
     expiresAt: new Date(payload.exp * 1000)
   });
 
-  const origin = siteOrigin(options.request, options.env);
+  // Same-origin final hop: the session cookie set on this response is host-only,
+  // so land the user on the host that owns it (www), not the apex canonical.
+  const origin = communityOAuthOrigin(options.request);
   const location = safeCommunityReturnPath(options.returnTo).startsWith("/community/")
     ? `${origin.replace(/\/$/, "")}${safeCommunityReturnPath(options.returnTo)}`
     : `${origin.replace(/\/$/, "")}/community/${options.slug}`;
