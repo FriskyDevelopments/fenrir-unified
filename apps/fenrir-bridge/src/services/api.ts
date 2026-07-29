@@ -1,6 +1,7 @@
 import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from "@simplewebauthn/browser";
 import { copy } from "../i18n";
 import { addBridge, addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
+import { completeSupabaseSession, hasSupabaseCallbackInLocation, isSupabaseAuthConfigured, signInWithSupabase, signOutSupabase } from "./supabaseAuth";
 // Auth broker is WorkOS AuthKit. The hosted flow mints the Fenrir session
 // cookie server-side in /api/auth/callback/workos, so the client no longer
 // performs any token exchange after the redirect (directAuthOrigin is declared below).
@@ -365,22 +366,39 @@ export const webauthnService = {
 
 export const authService = {
   async me() {
-    // WorkOS AuthKit mints the Fenrir session cookie on the server callback,
-    // so the browser only needs to read the resulting session.
+    // Supabase Auth is the login broker: after the provider redirects back to
+    // /auth/callback, exchange the Supabase session for the Fenrir cookie.
+    if (hasSupabaseCallbackInLocation()) {
+      const completed = await completeSupabaseSession();
+      if (completed) {
+        return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
+      }
+    }
+
     try {
       const result = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
+      if (!result.authenticated) {
+        const completed = await completeSupabaseSession();
+        if (completed) {
+          return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
+        }
+      }
       return { ok: true as const, data: result };
     } catch {
       return { ok: true as const, data: { authenticated: false } as AuthSession };
     }
   },
   async login(provider: "google" | "microsoft" | "apple") {
+    // Supabase Auth is the restored login broker (the original working flow):
+    // signInWithOAuth against project yqevglppbhuoxxfsfnih, which holds the
+    // provider apps that accept its callback (including Apple). Only if the
+    // bundle was built without Supabase config do we fall back to the interim
+    // per-provider routing (Google via WorkOS, others via the direct stack).
+    if (isSupabaseAuthConfigured()) {
+      await signInWithSupabase(provider);
+      return;
+    }
     const returnTo = safeCurrentAuthReturnPath();
-    // Google goes through WorkOS (its hosted connection works). Microsoft and
-    // Apple use the direct OAuth stack: the WorkOS MicrosoftOAuth connection's
-    // Azure app is missing WorkOS's redirect URI (redirect_uri not valid) and
-    // no WorkOS AppleOAuth connection exists (404), while the direct clients
-    // are registered against this origin's /api/auth/callback/:provider.
     if (provider === "google") {
       window.location.assign(`${directAuthOrigin}/api/auth/workos/login?provider=${provider}&return_to=${encodeURIComponent(returnTo)}`);
       return;
@@ -394,6 +412,7 @@ export const authService = {
     });
   },
   async logout() {
+    await signOutSupabase();
     await apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }).catch(() => null);
   }
 };
