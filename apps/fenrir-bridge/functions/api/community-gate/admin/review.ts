@@ -26,17 +26,33 @@ export async function onRequestPost(context: any) {
 
   try {
     const user = await requireCommunityGateUser(context.request, context.env);
-    const { profile } = await assertCommunityStaff(context.env, user, communitySlug);
+    const { profile, community } = await assertCommunityStaff(context.env, user, communitySlug);
     const sql = await communityGateSql(context.env);
-    const [updated] = await sql`
-      update verification_sessions
-      set
-        status = ${status},
-        decision_reason = ${reason || null},
-        updated_at = now()
-      where id = ${sessionId}::uuid
-      returning id, community_id, profile_id, status, decision_reason
-    `;
+
+    // AUTHZ: staff are authorized for `communitySlug` only, so the write must be
+    // scoped to that community too. Updating by session id alone let a staff member
+    // of one community review (grant/deny/flag) a verification session belonging to
+    // another community by passing its id (IDOR). platform_admin keeps global reach.
+    const [updated] = community
+      ? await sql`
+          update verification_sessions
+          set
+            status = ${status},
+            decision_reason = ${reason || null},
+            updated_at = now()
+          where id = ${sessionId}::uuid
+            and community_id = ${community.community_id}
+          returning id, community_id, profile_id, status, decision_reason
+        `
+      : await sql`
+          update verification_sessions
+          set
+            status = ${status},
+            decision_reason = ${reason || null},
+            updated_at = now()
+          where id = ${sessionId}::uuid
+          returning id, community_id, profile_id, status, decision_reason
+        `;
 
     if (!updated) return noStoreJson({ ok: false, error: "session_not_found" }, { status: 404 });
 
