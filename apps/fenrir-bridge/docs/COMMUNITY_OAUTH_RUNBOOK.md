@@ -1,5 +1,16 @@
 # Community Bridge OAuth — provider registration runbook
 
+## Status
+
+| | |
+|---|---|
+| Code | Merged on `feat/community-oauth-bridge`, deployed to preview: `https://community-oauth-bridge.fenrir-bridge.pages.dev` |
+| Production | **Not cut over.** The magic link on `www.myfenrir.com` is untouched. |
+| Verified | 19 hermetic tests (`npm test`); routes reachable on the preview deployment |
+| Not verified | The provider code exchange — needs the console credentials below |
+| Blockers | 1. `PUBLIC_SITE_URL` unset in production (see below) · 2. no provider credentials · 3. the Pages **preview** environment has no `NEON_DATABASE_URL`, so the whole Community Gate (magic link included) 503s there — pre-existing, unrelated to this change |
+
+
 The Community Bridge is the **Neon** login for `/community/<slug>` pages. It mints the
 `fenrir_community_session` cookie and is completely separate from the operator/admin gate
 on `auth.myfenrir.com` (which mints `fenrir_session` and is allow-listed to staff).
@@ -46,9 +57,36 @@ that matter:
 > admin gate, which uses `https://auth.myfenrir.com/api/auth/callback/<provider>`. Each
 > provider must end up with **both** URLs registered.
 
-`PUBLIC_SITE_URL` must be set in the Cloudflare Pages production environment. If it is
-missing, the bridge falls back to the request origin and an apex-vs-`www` mismatch makes
-every provider reject the `redirect_uri`.
+### ⚠️ `PUBLIC_SITE_URL` is NOT set in production — set it before going live
+
+`siteOrigin()` returns `PUBLIC_SITE_URL` when set and otherwise falls back to the incoming
+`Host`. Probing production shows the fallback is in effect — the same endpoint reports a
+different origin depending on which hostname you hit:
+
+```
+$ curl -si https://www.myfenrir.com/api/auth/complete?token=invalid  | grep -i location
+location: https://www.myfenrir.com/login?auth_error=oauth_transfer_invalid
+$ curl -si https://auth.myfenrir.com/api/auth/complete?token=invalid | grep -i location
+location: https://myfenrir.com/login?auth_error=oauth_transfer_invalid      # ← apex, no www
+```
+
+Today the gate still works out to `www` in practice, because the apex 301s to `www`
+before the Function runs. But the `redirect_uri` sent to the provider is derived from
+whatever `Host` reaches the Function, and providers match it **character for character**.
+Any request arriving with a different host — the apex without the 301, `auth.myfenrir.com`,
+a `*.pages.dev` URL — mints a `redirect_uri` the console does not know, and the token
+exchange fails with `*_token_exchange_failed`.
+
+Pin it before enabling any provider:
+
+```bash
+# Pages → fenrir-bridge → Settings → Variables and Secrets → Production
+PUBLIC_SITE_URL = https://www.myfenrir.com
+```
+
+This variable is read by every endpoint that builds an absolute URL (magic-link emails,
+Stripe checkout/portal returns, the operator gate), so set it to the canonical `www` origin
+that those flows already produce — it pins current behaviour rather than changing it.
 
 ---
 
