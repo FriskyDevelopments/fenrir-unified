@@ -2,7 +2,7 @@ import { communityAuthConfigured, communityAuthNotConfigured, getCommunityMember
 import { noStoreJson } from "../../_lib/responses";
 
 export async function onRequestGet(context: any) {
-  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured();
+  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured(context.env);
 
   const session = await readCommunitySession(context.request, context.env);
   if (!session) return noStoreJson({ ok: true, authenticated: false, product: "fenrir-community-gate" });

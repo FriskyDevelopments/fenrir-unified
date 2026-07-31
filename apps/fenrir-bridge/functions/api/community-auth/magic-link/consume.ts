@@ -20,7 +20,7 @@ type MagicLinkConsume = {
 };
 
 export async function onRequestPost(context: any) {
-  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured();
+  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured(context.env);
 
   const body = await context.request.json().catch(() => null) as MagicLinkConsume | null;
   const token = typeof body?.token === "string" ? body.token.trim() : "";
@@ -28,7 +28,7 @@ export async function onRequestPost(context: any) {
 }
 
 export async function onRequestGet(context: any) {
-  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured();
+  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured(context.env);
 
   const url = new URL(context.request.url);
   const token = url.searchParams.get("token")?.trim() ?? "";

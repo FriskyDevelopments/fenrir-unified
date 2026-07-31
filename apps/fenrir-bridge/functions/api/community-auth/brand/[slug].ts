@@ -18,6 +18,6 @@ export async function onRequestGet(context: any) {
       brand: { ...brand, available_auth_providers: availableCommunityAuthProviders(context.env) }
     });
   } catch (error) {
-    return resolveCommunityAuthError(error);
+    return resolveCommunityAuthError(error, context.env);
   }
 }

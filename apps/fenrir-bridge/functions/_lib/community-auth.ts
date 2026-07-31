@@ -636,7 +636,7 @@ export async function verifyCommunityBrandWriteAuthorized(
   return { allowed: true, reason: "owner" };
 }
 
-export function resolveCommunityAuthError(error: unknown) {
+export function resolveCommunityAuthError(error: unknown, env: CommunityAuthEnv = {}) {
   const message = error instanceof Error ? error.message : "community_auth_error";
   if (message === "invalid_community_slug") {
     return noStoreJson({ ok: false, error: "invalid_community_slug" }, { status: 400 });
@@ -654,7 +654,7 @@ export function resolveCommunityAuthError(error: unknown) {
     return noStoreJson({ ok: false, error: "forbidden" }, { status: 403 });
   }
   if (message.startsWith("missing_env:")) {
-    return communityAuthNotConfigured();
+    return communityAuthNotConfigured(env);
   }
   return noStoreJson({ ok: false, error: message }, { status: 400 });
 }
