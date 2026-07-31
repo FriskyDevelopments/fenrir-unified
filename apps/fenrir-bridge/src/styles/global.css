@@ -974,6 +974,57 @@ code {
   background: rgba(255,51,78,.10);
 }
 
+.community-oauth-providers {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* Neutral glass, not the red .button-link CTA: the provider row sits alongside the
+   magic-link submit rather than competing with it. */
+.community-oauth-button {
+  min-height: 48px;
+  border: 1px solid rgba(255,255,255,.16);
+  color: #eaf4f1;
+  background: rgba(255,255,255,.06);
+  box-shadow: none;
+  letter-spacing: .01em;
+  transition: border-color .16s ease, background .16s ease;
+}
+
+.community-oauth-button:hover {
+  border-color: rgba(255,255,255,.32);
+  background: rgba(255,255,255,.10);
+}
+
+.community-oauth-button[data-provider="google"]:hover { border-color: rgba(66,133,244,.62); }
+.community-oauth-button[data-provider="microsoft"]:hover { border-color: rgba(0,164,239,.62); }
+.community-oauth-button[data-provider="apple"]:hover { border-color: rgba(255,255,255,.62); }
+
+.community-oauth-divider {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  color: #8fa6a1;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.community-oauth-divider::before,
+.community-oauth-divider::after {
+  content: "";
+  height: 1px;
+  background: rgba(255,255,255,.12);
+}
+
 .community-dev-link {
   margin-top: 12px;
 }
@@ -3931,14 +3982,55 @@ p {
   line-height: 1.35;
 }
 
-.live-domain-result.no_dns_signal {
+.live-domain-search-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.live-domain-handoff {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid rgba(34,199,168,.22);
+  border-radius: 8px;
+  background: rgba(34,199,168,.06);
+}
+
+.live-domain-handoff .muted {
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.live-domain-result.available_clean,
+.live-domain-result.likely_available {
   border-color: rgba(34,199,168,.28);
   background: linear-gradient(135deg, rgba(34,199,168,.09), rgba(255,255,255,.03));
 }
 
-.live-domain-result.dns_found {
+.live-domain-result.available_dirty,
+.live-domain-result.registered_dropping,
+.live-domain-result.registered_parked,
+.live-domain-result.unknown {
   border-color: rgba(241,183,92,.28);
   background: linear-gradient(135deg, rgba(241,183,92,.08), rgba(255,255,255,.03));
+}
+
+.live-domain-result.registered_live,
+.live-domain-result.likely_registered,
+.live-domain-result.invalid {
+  border-color: rgba(240,116,116,.24);
+  background: linear-gradient(135deg, rgba(240,116,116,.07), rgba(255,255,255,.03));
+}
+
+.live-domain-flags {
+  color: #f1b75c !important;
+  font-family: var(--mono);
+  font-size: 11px !important;
 }
 
 .live-domain-result .row-actions {
