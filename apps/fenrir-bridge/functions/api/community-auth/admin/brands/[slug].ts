@@ -12,7 +12,7 @@ import { availableCommunityAuthProviders } from "../../../../_lib/community-oaut
 import { noStoreJson } from "../../../../_lib/responses";
 
 export async function onRequestGet(context: any) {
-  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured();
+  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured(context.env);
 
   try {
     const session = await readSession(context.request, context.env);
@@ -25,12 +25,12 @@ export async function onRequestGet(context: any) {
       authorization
     });
   } catch (error) {
-    return resolveCommunityAuthError(error);
+    return resolveCommunityAuthError(error, context.env);
   }
 }
 
 export async function onRequestPut(context: any) {
-  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured();
+  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured(context.env);
 
   try {
     const session = await readSession(context.request, context.env);
@@ -45,6 +45,6 @@ export async function onRequestPut(context: any) {
       authorization
     });
   } catch (error) {
-    return resolveCommunityAuthError(error);
+    return resolveCommunityAuthError(error, context.env);
   }
 }
