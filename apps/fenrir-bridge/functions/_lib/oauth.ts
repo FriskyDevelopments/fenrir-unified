@@ -21,11 +21,22 @@ export type OAuthTransaction = {
   nonce: string;
   returnTo: string;
   exp: number;
+  /** Community Gate slug, set only for the community OAuth bridge flow. */
+  community?: string;
 };
 
 export type DirectOAuthSession = {
   session: SessionPayload;
   identityId: string;
+};
+
+/** Raw verified identity from an OAuth provider, before any operator/community session is minted. */
+export type OAuthIdentity = {
+  provider: OAuthProvider;
+  email: string;
+  name: string;
+  identityId: string;
+  emailVerified: boolean;
 };
 
 export type OAuthSessionTransfer = {
@@ -39,6 +50,15 @@ const transactionMaxAge = 10 * 60;
 
 export function isOAuthProvider(value: unknown): value is OAuthProvider {
   return value === "google" || value === "microsoft" || value === "apple" || value === "workos";
+}
+
+/**
+ * Providers offered by the Community Gate. Deliberately narrower than isOAuthProvider():
+ * `workos` is the operator/admin broker and is NOT a value the Neon
+ * fenrir_community_oauth_identities.provider check constraint accepts.
+ */
+export function isCommunityOAuthProvider(value: unknown): value is OAuthProvider {
+  return value === "google" || value === "microsoft" || value === "apple";
 }
 
 export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): boolean {
@@ -65,6 +85,26 @@ export async function createOAuthTransaction(provider: OAuthProvider, env: OAuth
     nonce: randomUrlToken(32),
     returnTo: safeReturnPath(returnTo),
     exp: Math.floor(Date.now() / 1000) + transactionMaxAge
+  };
+}
+
+/**
+ * Community Gate variant: carries the community slug through the round trip and
+ * constrains returnTo to a relative /community/... path (never cross-origin).
+ */
+export async function createCommunityOAuthTransaction(
+  provider: OAuthProvider,
+  _env: OAuthEnv,
+  options: { community: string; returnTo: string }
+): Promise<OAuthTransaction> {
+  return {
+    provider,
+    state: randomUrlToken(32),
+    verifier: randomUrlToken(64),
+    nonce: randomUrlToken(32),
+    returnTo: safeCommunityReturnPath(options.returnTo),
+    exp: Math.floor(Date.now() / 1000) + transactionMaxAge,
+    community: options.community
   };
 }
 
@@ -140,7 +180,7 @@ export async function getAuthorizationUrl(provider: OAuthProvider, env: OAuthEnv
 export async function transactionSetCookie(tx: OAuthTransaction, env: OAuthEnv, domain?: string) {
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(tx)));
   const signature = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
-  let header = `${transactionCookie}=${encoded}.${signature}; Path=/api/auth; HttpOnly; Secure; SameSite=Lax; Max-Age=${transactionMaxAge}`;
+  let header = `${transactionCookie}=${encoded}.${signature}; Path=/api/auth; HttpOnly; Secure; SameSite=${transactionSameSite(tx.provider)}; Max-Age=${transactionMaxAge}`;
   if (domain) header += `; Domain=${domain}`;
   return header;
 }
@@ -161,7 +201,13 @@ export async function readSessionTransfer(token: string, env: OAuthEnv): Promise
   if (!encoded || !signature) return null;
   const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
-  const transfer = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthSessionTransfer;
+  let transfer: OAuthSessionTransfer;
+  try {
+    transfer = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthSessionTransfer;
+  } catch {
+    return null;
+  }
+  if (!transfer || typeof transfer !== "object") return null;
   if (!transfer.exp || transfer.exp < Math.floor(Date.now() / 1000)) return null;
   if (!transfer.session?.email || !transfer.session?.frisky_user_id || !transfer.session?.frisky_org_id) return null;
   return {
@@ -177,6 +223,58 @@ export function clearTransactionCookie(domain?: string) {
   return header;
 }
 
+const communityTransactionCookie = "fenrir_community_oauth_tx";
+const communityTransactionPath = "/api/community-auth";
+
+export async function communityTransactionSetCookie(tx: OAuthTransaction, env: OAuthEnv, domain?: string) {
+  const encoded = base64Url(new TextEncoder().encode(JSON.stringify(tx)));
+  const signature = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
+  let header = `${communityTransactionCookie}=${encoded}.${signature}; Path=${communityTransactionPath}; HttpOnly; Secure; SameSite=${transactionSameSite(tx.provider)}; Max-Age=${transactionMaxAge}`;
+  if (domain) header += `; Domain=${domain}`;
+  return header;
+}
+
+/**
+ * Apple returns via response_mode=form_post, i.e. a cross-site POST. A SameSite=Lax
+ * cookie is withheld on cross-site POSTs, so the transaction would never reach the
+ * callback and every Apple sign-in would fail with oauth_state_missing. SameSite=None
+ * is required there; the cookie stays HttpOnly + Secure + HMAC-signed + state-checked.
+ */
+function transactionSameSite(provider: OAuthProvider) {
+  return provider === "apple" ? "None" : "Lax";
+}
+
+export async function readCommunityOAuthTransaction(request: Request, env: OAuthEnv): Promise<OAuthTransaction | null> {
+  const token = readCookie(request, communityTransactionCookie);
+  if (!token) return null;
+  const [encoded, signature] = token.split(".");
+  if (!encoded || !signature) return null;
+  const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
+  if (!timingSafeEqual(signature, expected)) return null;
+  const tx = decodeTransaction(encoded);
+  if (!tx) return null;
+  if (!isCommunityOAuthProvider(tx.provider)) return null;
+  return tx;
+}
+
+export function clearCommunityTransactionCookie(domain?: string) {
+  let header = `${communityTransactionCookie}=; Path=${communityTransactionPath}; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+  if (domain) header += `; Domain=${domain}`;
+  return header;
+}
+
+/**
+ * Community OAuth returnTo allow-list: relative paths under /community only.
+ * Never emits an absolute URL — an attacker-supplied ?return_to=https://evil.tld
+ * would otherwise turn the callback into an open redirect.
+ */
+export function safeCommunityReturnPath(value: string | null | undefined) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
+  const pathname = value.split(/[?#]/, 1)[0] || "/";
+  if (!pathname.startsWith("/community/")) return "/";
+  return value;
+}
+
 export async function readOAuthTransaction(request: Request, env: OAuthEnv): Promise<OAuthTransaction | null> {
   const token = readCookie(request, transactionCookie);
   if (!token) return null;
@@ -184,8 +282,21 @@ export async function readOAuthTransaction(request: Request, env: OAuthEnv): Pro
   if (!encoded || !signature) return null;
   const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
-  const tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
+  const tx = decodeTransaction(encoded);
+  if (!tx) return null;
   if (!isOAuthProvider(tx.provider)) return null;
+  return tx;
+}
+
+/** Decode + shape-check a signed transaction blob. Returns null on garbage or expiry. */
+function decodeTransaction(encoded: string): OAuthTransaction | null {
+  let tx: OAuthTransaction;
+  try {
+    tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
+  } catch {
+    return null;
+  }
+  if (!tx || typeof tx !== "object") return null;
   if (!tx.exp || tx.exp < Math.floor(Date.now() / 1000)) return null;
   return tx;
 }
@@ -196,6 +307,26 @@ export function validateOAuthTransaction(tx: OAuthTransaction | null, provider: 
   if (!state || !timingSafeEqual(tx.state, state)) throw new Error("oauth_state_invalid");
 }
 
+/**
+ * Verify the provider round trip and return the raw identity, WITHOUT minting an
+ * operator session or applying the operator admin allow-list. The Community Gate
+ * bridge builds its own Neon session from this; exchangeCodeForSession() is the
+ * operator path and keeps the allow-list check.
+ */
+export async function exchangeCodeForIdentity(
+  provider: OAuthProvider,
+  env: OAuthEnv,
+  code: string,
+  redirectUri: string,
+  tx: OAuthTransaction
+): Promise<OAuthIdentity> {
+  if (provider === "google") return exchangeGoogleCode(env, code, redirectUri, tx);
+  if (provider === "microsoft") return exchangeMicrosoftCode(env, code, redirectUri, tx);
+  if (provider === "apple") return exchangeAppleCode(env, code, redirectUri, tx);
+  if (provider === "workos") return exchangeWorkOSCode(env, code, redirectUri, tx);
+  throw new Error(`exchange_not_implemented_for:${provider}`);
+}
+
 export async function exchangeCodeForSession(
   provider: OAuthProvider,
   env: OAuthEnv,
@@ -203,20 +334,17 @@ export async function exchangeCodeForSession(
   redirectUri: string,
   tx: OAuthTransaction
 ): Promise<DirectOAuthSession> {
-  let result: DirectOAuthSession;
-  if (provider === "google") {
-    result = await exchangeGoogleCode(env, code, redirectUri, tx);
-  } else if (provider === "microsoft") {
-    result = await exchangeMicrosoftCode(env, code, redirectUri, tx);
-  } else if (provider === "apple") {
-    result = await exchangeAppleCode(env, code, redirectUri, tx);
-  } else if (provider === "workos") {
-    result = await exchangeWorkOSCode(env, code, redirectUri, tx);
-  } else {
-    throw new Error(`exchange_not_implemented_for:${provider}`);
-  }
-  assertAdminAllowed(result.session.email, env.SUPABASE_ADMIN_EMAILS);
-  return result;
+  const identity = await exchangeCodeForIdentity(provider, env, code, redirectUri, tx);
+  assertAdminAllowed(identity.email, env.SUPABASE_ADMIN_EMAILS);
+  return {
+    identityId: identity.identityId,
+    session: createSessionPayload({
+      email: identity.email,
+      name: identity.name,
+      provider: identity.provider,
+      identityId: identity.identityId
+    })
+  };
 }
 
 export function safeReturnPath(value: string | null | undefined) {
@@ -226,7 +354,7 @@ export function safeReturnPath(value: string | null | undefined) {
   return value;
 }
 
-async function exchangeGoogleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<DirectOAuthSession> {
+async function exchangeGoogleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
   const clientId = requireEnv(env.GOOGLE_CLIENT_ID, "GOOGLE_CLIENT_ID");
   const clientSecret = requireEnv(env.GOOGLE_CLIENT_SECRET, "GOOGLE_CLIENT_SECRET");
 
@@ -249,17 +377,16 @@ async function exchangeGoogleCode(env: OAuthEnv, code: string, redirectUri: stri
   const sub = stringClaim(claims.sub, "google_missing_sub");
   const identityId = `google:${sub}`;
   return {
+    provider: "google",
+    email,
+    name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
     identityId,
-    session: createSessionPayload({
-      email,
-      name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
-      provider: "google",
-      identityId
-    })
+    // Google only omits email_verified for unverified accounts — default closed.
+    emailVerified: parseBoolClaim(claims.email_verified, false)
   };
 }
 
-async function exchangeMicrosoftCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<DirectOAuthSession> {
+async function exchangeMicrosoftCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
   const clientId = requireEnv(env.MICROSOFT_CLIENT_ID, "MICROSOFT_CLIENT_ID");
   const clientSecret = requireEnv(env.MICROSOFT_CLIENT_SECRET, "MICROSOFT_CLIENT_SECRET");
 
@@ -278,21 +405,22 @@ async function exchangeMicrosoftCode(env: OAuthEnv, code: string, redirectUri: s
     nonce: tx.nonce,
     jwksUrl: "https://login.microsoftonline.com/common/discovery/v2.0/keys"
   });
-  const email = typeof claims.email === "string" ? claims.email : stringClaim(claims.preferred_username, "microsoft_missing_email");
+  const email = typeof claims.email === "string" && claims.email.trim().length > 0
+    ? claims.email
+    : stringClaim(claims.preferred_username, "microsoft_missing_email");
   const sub = stringClaim(claims.sub, "microsoft_missing_sub");
   const identityId = `microsoft:${sub}`;
   return {
+    provider: "microsoft",
+    email,
+    name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
     identityId,
-    session: createSessionPayload({
-      email,
-      name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
-      provider: "microsoft",
-      identityId
-    })
+    // Entra ID only emits email_verified/xms_edov for federated-domain edge cases.
+    emailVerified: parseBoolClaim(claims.email_verified ?? claims.xms_edov, true)
   };
 }
 
-async function exchangeAppleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<DirectOAuthSession> {
+async function exchangeAppleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
   const clientId = requireEnv(env.APPLE_CLIENT_ID, "APPLE_CLIENT_ID");
   const clientSecret = await createAppleClientSecret(env);
 
@@ -315,21 +443,20 @@ async function exchangeAppleCode(env: OAuthEnv, code: string, redirectUri: strin
   const sub = stringClaim(claims.sub, "apple_missing_sub");
   const identityId = `apple:${sub}`;
   return {
+    provider: "apple",
+    email,
+    name: email.split("@")[0],
     identityId,
-    session: createSessionPayload({
-      email,
-      name: email.split("@")[0],
-      provider: "apple",
-      identityId
-    })
+    // Apple omits email_verified for the private-relay alias, which is verified by construction.
+    emailVerified: parseBoolClaim(claims.email_verified, true)
   };
 }
 
-async function exchangeWorkOSCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<DirectOAuthSession> {
+async function exchangeWorkOSCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
   const clientId = requireEnv(env.WORKOS_CLIENT_ID, "WORKOS_CLIENT_ID");
   const apiKey = requireEnv(env.WORKOS_API_KEY, "WORKOS_API_KEY");
 
-  const res = await fetch("https://api.workos.com/user_management/authenticate", {
+  const res = await httpFetch("https://api.workos.com/user_management/authenticate", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -349,7 +476,7 @@ async function exchangeWorkOSCode(env: OAuthEnv, code: string, redirectUri: stri
   }
 
   const data = await res.json() as {
-    user?: { id?: string; email?: string; first_name?: string; last_name?: string };
+    user?: { id?: string; email?: string; first_name?: string; last_name?: string; email_verified?: boolean };
   };
 
   const userId = data.user?.id;
@@ -357,16 +484,29 @@ async function exchangeWorkOSCode(env: OAuthEnv, code: string, redirectUri: stri
   if (!userId || !email) throw new Error("workos_missing_user");
 
   const name = [data.user?.first_name, data.user?.last_name].filter(Boolean).join(" ") || email.split("@")[0];
-  const identityId = `workos:${userId}`;
 
   return {
-    identityId,
-    session: createSessionPayload({ email, name, provider: "workos", identityId })
+    provider: "workos",
+    email,
+    name,
+    identityId: `workos:${userId}`,
+    emailVerified: data.user?.email_verified ?? true
   };
 }
 
+let fetchOverride: typeof fetch | null = null;
+
+/** Test hook: route OAuth token/JWKS calls through a stub instead of the network. */
+export function __setFetchForTests(fetchFn: typeof fetch | null) {
+  fetchOverride = fetchFn;
+}
+
+function httpFetch(input: RequestInfo | URL, init?: RequestInit) {
+  return (fetchOverride ?? fetch)(input, init);
+}
+
 async function exchangeToken(url: string, params: Record<string, string>, provider: OAuthProvider) {
-  const tokenRes = await fetch(url, {
+  const tokenRes = await httpFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(params)
@@ -392,7 +532,7 @@ async function verifyIdToken(token: string, options: {
   const kid = stringClaim(header.kid, "id_token_missing_kid");
   if (alg !== "RS256") throw new Error(`unsupported_id_token_alg:${alg}`);
 
-  const jwks = await fetch(options.jwksUrl).then((response) => {
+  const jwks = await httpFetch(options.jwksUrl).then((response) => {
     if (!response.ok) throw new Error("jwks_fetch_failed");
     return response.json();
   }) as { keys?: JsonWebKey[] };
@@ -494,6 +634,17 @@ function timingSafeEqual(a: string, b: string) {
 function stringClaim(value: unknown, error: string) {
   if (typeof value !== "string" || !value.trim()) throw new Error(error);
   return value;
+}
+
+/** id_token booleans arrive as either true/false or the strings "true"/"false". */
+function parseBoolClaim(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+  return fallback;
 }
 
 function assertAdminAllowed(email: string, allowlist?: string) {
