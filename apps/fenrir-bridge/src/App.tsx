@@ -14,6 +14,13 @@ import {
   type CommunityBrandUpdatePayload,
   type DefaultAccessState
 } from "./services/communityAuth";
+import {
+  cleanDomainSearchBase,
+  domainSearchCandidates,
+  frontDoorCandidates,
+  type DomainSearchResult,
+  type DomainVerdict
+} from "../shared/domain-search";
 import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan } from "./services/types";
 import { AuthProviderButton } from "./components/AuthProviderButton";
 import { AuthSurface } from "./components/AuthSurface";
@@ -806,7 +813,6 @@ const liveRoomProviders: Array<{ id: LiveRoomProvider; name: string; icon: strin
 ];
 
 const domainTagPresets = ["launch", "client", "vip", "community", "paid", "internal"] as const;
-const domainSearchTlds = ["com", "io", "app", "dev", "ai"] as const;
 
 const providerLogoPresets: Record<LiveRoomProvider, string> = {
   zoom: "https://upload.wikimedia.org/wikipedia/commons/7/7b/Zoom_Communications_Logo.svg",
@@ -947,63 +953,53 @@ function defaultDomainTags(domain: FriskyDomain) {
   return tags;
 }
 
-type DomainSearchResult = {
-  domain: string;
-  status: "ready" | "dns_found" | "no_dns_signal" | "invalid" | "error";
-  summary: string;
-  records: string[];
+const domainVerdictLabels: Record<DomainVerdict, string> = {
+  available_clean: "Free & clean",
+  available_dirty: "Free, has residue",
+  registered_dropping: "Dropping soon",
+  registered_parked: "Registered (parked)",
+  registered_live: "Taken",
+  likely_available: "Likely free",
+  likely_registered: "Likely taken",
+  unknown: "Inconclusive",
+  invalid: "Invalid"
 };
 
-function cleanDomainSearchBase(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "")
-    .replace(/\/.*$/, "")
-    .replace(/[^a-z0-9.-]/g, "")
-    .replace(/^\.+|\.+$/g, "");
-}
+const domainVerdictTones: Record<DomainVerdict, string> = {
+  available_clean: "good",
+  available_dirty: "amber",
+  registered_dropping: "amber",
+  registered_parked: "amber",
+  registered_live: "danger",
+  likely_available: "good",
+  likely_registered: "danger",
+  unknown: "amber",
+  invalid: "danger"
+};
 
-function domainSearchCandidates(value: string) {
-  const base = cleanDomainSearchBase(value);
-  if (!base) return [];
-  if (base.includes(".")) return [base];
-  return domainSearchTlds.map((tld) => `${base}.${tld}`);
-}
+const domainFlagLabels: Record<string, string> = {
+  "mail-history": "had email (MX)",
+  "verification-txt-leftovers": "old verification TXT",
+  "resolves-to-host": "resolves to a host",
+  "rdap-dns-conflict": "registry and DNS disagree",
+  "registration-dropping": "in redemption/pending delete",
+  "no-rdap-service": "no RDAP for this TLD",
+  "rdap-unreachable": "registry did not answer",
+  "dns-unreachable": "resolvers did not answer"
+};
 
-async function lookupDomainDns(domain: string): Promise<DomainSearchResult> {
-  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain)) {
-    return { domain, status: "invalid", summary: "Use a valid domain name.", records: [] };
+/** One-line evidence trail so a verdict is never just a coloured badge. */
+function domainEvidence(result: DomainSearchResult) {
+  const parts: string[] = [];
+  if (result.dns.nxdomain) parts.push("NXDOMAIN on both resolvers");
+  if (result.dns.ns.length) parts.push(`NS ${result.dns.ns.slice(0, 2).join(", ")}`);
+  if (result.dns.a.length || result.dns.aaaa.length) {
+    parts.push(`A/AAAA ${result.dns.a.concat(result.dns.aaaa).slice(0, 2).join(", ")}`);
   }
-  try {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 2800);
-    const response = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=NS`, {
-      headers: { accept: "application/dns-json" },
-      signal: controller.signal
-    });
-    window.clearTimeout(timeout);
-    if (!response.ok) throw new Error("dns_lookup_failed");
-    const payload = (await response.json().catch(() => null)) as { Status?: number; Answer?: Array<{ data?: string }> } | null;
-    const records = (payload?.Answer ?? []).map((answer) => String(answer.data ?? "").replace(/\.$/, "")).filter(Boolean).slice(0, 3);
-    if (records.length) {
-      return {
-        domain,
-        status: "dns_found",
-        summary: "DNS exists. Treat as owned or already configured.",
-        records
-      };
-    }
-    return {
-      domain,
-      status: "no_dns_signal",
-      summary: "No NS signal found. Check registrar availability next.",
-      records: []
-    };
-  } catch {
-    return { domain, status: "error", summary: "Live DNS lookup timed out. Check registrar availability directly.", records: [] };
-  }
+  if (result.dns.mx.length) parts.push(`${result.dns.mx.length} MX`);
+  if (result.registration.registrar) parts.push(`registrar ${result.registration.registrar}`);
+  if (result.registration.expiresAt) parts.push(`expires ${result.registration.expiresAt.slice(0, 10)}`);
+  return parts.join(" · ");
 }
 
 type Celebration = {
@@ -1100,9 +1096,12 @@ export function App() {
   const [domainInput, setDomainInput] = useState("");
   const [domainTagsInput, setDomainTagsInput] = useState("launch, paid");
   const [domainTagsById, setDomainTagsById] = useState<Record<string, string[]>>({});
-  const [domainSearchInput, setDomainSearchInput] = useState("myfenrir");
+  const [domainSearchInput, setDomainSearchInput] = useState("fenrir");
   const [domainSearchResults, setDomainSearchResults] = useState<DomainSearchResult[]>([]);
   const [domainSearchBusy, setDomainSearchBusy] = useState(false);
+  const [domainSearchMode, setDomainSearchMode] = useState<"front-door" | "exact">("front-door");
+  const [domainSearchMeta, setDomainSearchMeta] = useState<{ checkedAt: string; viaFallback: boolean } | null>(null);
+  const [wizardQueue, setWizardQueue] = useState<string[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [slugInput, setSlugInput] = useState("");
   const [groupNameInput, setGroupNameInput] = useState("");
@@ -1352,18 +1351,49 @@ export function App() {
     }
   }
 
-  async function runDomainSearch(seed = domainSearchInput) {
-    const candidates = domainSearchCandidates(seed);
-    if (!candidates.length) {
+  async function runDomainSearch(seed = domainSearchInput, mode = domainSearchMode) {
+    if (!cleanDomainSearchBase(seed)) {
       setNotice("Enter a domain or brand name before searching.");
       return;
     }
     setDomainSearchBusy(true);
     setDomainSearchResults([]);
-    const results = await Promise.all(candidates.slice(0, 5).map(lookupDomainDns));
-    setDomainSearchResults(results);
+    setDomainSearchMeta(null);
+    const response = await domainService.search({ seed, mode, limit: mode === "front-door" ? 18 : 12 });
     setDomainSearchBusy(false);
-    setNotice(`Live domain search checked ${results.length} option${results.length === 1 ? "" : "s"}.`);
+
+    if (!response.ok) {
+      setNotice(response.error?.message ?? "Live domain search failed.");
+      return;
+    }
+
+    setDomainSearchResults(response.results);
+    setDomainSearchMeta({ checkedAt: response.checkedAt, viaFallback: Boolean(response.viaBrowserFallback) });
+    const clean = response.promising.length;
+    setNotice(
+      `Checked ${response.checked} name${response.checked === 1 ? "" : "s"} against public DNS and RDAP — ` +
+        `${clean} clean front door${clean === 1 ? "" : "s"} found.`
+    );
+  }
+
+  /** Step 2 of the flow: hand a name to the domain wizard so it can be registered and wired. */
+  function sendToWizard(domain: string) {
+    setDomainInput(domain);
+    setDomainTagsInput(addDomainTag(domainTagsInput, "launch"));
+    setWizardQueue((current) => (current.includes(domain) ? current : [...current, domain]));
+    setNotice(`${domain} moved into the Fenrir domain wizard.`);
+  }
+
+  function sendPromisingToWizard() {
+    const clean = domainSearchResults.filter((result) => result.promising).map((result) => result.domain);
+    if (!clean.length) {
+      setNotice("No clean candidates in the current results.");
+      return;
+    }
+    setWizardQueue((current) => Array.from(new Set([...current, ...clean])));
+    setDomainInput(clean[0]);
+    setDomainTagsInput(addDomainTag(domainTagsInput, "launch"));
+    setNotice(`${clean.length} clean name${clean.length === 1 ? "" : "s"} queued in the domain wizard. ${clean[0]} is loaded first.`);
   }
 
   async function checkDns(domain: FriskyDomain) {
@@ -1862,13 +1892,15 @@ export function App() {
               value={domainSearchInput}
               results={domainSearchResults}
               busy={domainSearchBusy}
+              mode={domainSearchMode}
+              meta={domainSearchMeta}
+              queue={wizardQueue}
               onValue={setDomainSearchInput}
+              onMode={setDomainSearchMode}
               onSearch={() => void runDomainSearch()}
-              onPick={(domain) => {
-                setDomainInput(domain);
-                setDomainTagsInput(addDomainTag(domainTagsInput, "launch"));
-                setNotice(`${domain} moved into the Fenrir domain wizard.`);
-              }}
+              onPick={sendToWizard}
+              onSendPromising={sendPromisingToWizard}
+              onClearQueue={() => setWizardQueue([])}
               onOpenRegistrar={(domain) => {
                 const query = encodeURIComponent(domain);
                 openSafeUrl(`https://www.dynadot.com/domain/search?domain=${query}`);
@@ -2594,7 +2626,33 @@ const accessStateHelp: Record<DefaultAccessState, string> = {
 
 function communityAuthProviderLabel(provider: string) {
   if (provider === "magic_link") return "Magic link";
+  if (provider === "microsoft") return "Microsoft";
   return provider[0]?.toUpperCase() + provider.slice(1);
+}
+
+/** Providers the Community Gate OAuth bridge can complete end-to-end. */
+const communityOAuthProviders = ["google", "microsoft", "apple"] as const;
+
+function communityOAuthStartUrl(provider: string, slug: string) {
+  const params = new URLSearchParams({ slug, return_to: `/community/${slug}` });
+  return `/api/community-auth/oauth/${provider}?${params.toString()}`;
+}
+
+/** Human-readable copy for the ?auth_error= the bridge callback redirects back with. */
+function communityOAuthErrorMessage(search: string) {
+  const raw = new URLSearchParams(search).get("auth_error");
+  if (!raw) return null;
+  const code = raw.split(":", 1)[0];
+  if (code === "provider_not_configured") return "That provider is not connected yet. Use the magic link, or ask the community owner to finish the provider setup.";
+  if (code === "provider_not_enabled") return "That provider is switched off for this community. Use another sign-in option.";
+  if (code === "email_unverified") return "The provider did not confirm that email address. Verify it with the provider, then try again.";
+  if (code === "access_denied") return "You cancelled at the provider consent screen. Try again to continue.";
+  if (code === "community_org_required") return "This community is not fully provisioned yet. Ask the owner to finish setup.";
+  if (code === "oauth_state_missing" || code === "oauth_state_invalid" || code === "oauth_provider_mismatch") {
+    return "That sign-in attempt expired. Start again from this page.";
+  }
+  if (code === "missing_code") return "The provider returned without an authorization code. Try again.";
+  return `Sign-in did not complete (${raw}). Try again or use the magic link.`;
 }
 
 const legacyNeonPromoAsset = "/mj-neon-hero.gif";
@@ -2979,13 +3037,14 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
                   {["magic_link", "google", "apple", "microsoft"].map((provider) => {
                     const providers = Array.isArray(draft.enabled_auth_providers) ? draft.enabled_auth_providers : (previewBrand.enabled_auth_providers || []);
                     const checked = providers.includes(provider);
-                    const live = provider === "magic_link";
+                    // The bridge is wired for all four; a provider is only "live" once its
+                    // credentials exist in the environment.
+                    const live = (loadedBrand?.available_auth_providers ?? ["magic_link"]).includes(provider);
                     return (
                       <label className={live ? "live" : "planned"} key={provider}>
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={!live}
                           onChange={(e) => {
                             const next = e.target.checked
                               ? [...providers, provider]
@@ -2997,12 +3056,12 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
                           }}
                         />
                         <span>{communityAuthProviderLabel(provider)}</span>
-                        <small>{live ? "Live now" : "Requires OAuth bridge"}</small>
+                        <small>{live ? "Live now" : "Awaiting provider credentials"}</small>
                       </label>
                     );
                   })}
                 </div>
-                <small>Magic link is the live Community Gate method today. OAuth providers stay visible as planned options until their Neon session bridge is wired.</small>
+                <small>The Neon OAuth bridge is wired for Google, Microsoft and Apple. A provider only appears on the public gate once you enable it here AND its credentials are set in the environment.</small>
               </div>
             </div>
           )}
@@ -3076,6 +3135,14 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
   const [devLink, setDevLink] = useState<string | null>(null);
   const trimmedEmail = email.trim();
   const communityName = brand?.name || theme.productName;
+  const enabledProviders = brand?.enabled_auth_providers ?? ["magic_link"];
+  // A provider needs BOTH the owner's switch and real credentials, otherwise the button
+  // would just bounce back with ?auth_error=provider_not_configured.
+  const availableProviders = brand?.available_auth_providers;
+  const enabledOAuthProviders = communityOAuthProviders.filter(
+    (provider) => enabledProviders.includes(provider) && (!availableProviders || availableProviders.includes(provider))
+  );
+  const oauthError = useMemo(() => communityOAuthErrorMessage(window.location.search), []);
   const gateText = {
     en: {
       kicker: "Private community access",
@@ -3222,6 +3289,27 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
               <small>{gateText.stepSessionBody}</small>
             </section>
           </div>
+          {oauthError ? <small className="community-auth-message error" role="alert">{oauthError}</small> : null}
+          {enabledOAuthProviders.length > 0 ? (
+            <div className="community-oauth-providers" aria-label="Social sign-in">
+              {enabledOAuthProviders.map((provider) => (
+                <a
+                  key={provider}
+                  className="button-link community-oauth-button"
+                  data-provider={provider}
+                  href={communityOAuthStartUrl(provider, slug)}
+                  rel="nofollow"
+                >
+                  Continue with {communityAuthProviderLabel(provider)}
+                </a>
+              ))}
+            </div>
+          ) : null}
+          {enabledOAuthProviders.length > 0 ? (
+            <div className="community-oauth-divider" aria-hidden="true"><span>or</span></div>
+          ) : null}
+          {/* The magic link is unconditional: it needs no provider credentials and is the
+              only method that cannot be locked out by a console misconfiguration. */}
           <form className="community-auth-form" onSubmit={requestLink}>
             <label>
               <span>{c.serviceEmail}</span>
@@ -4432,19 +4520,34 @@ function LiveDomainSearchPanel({
   value,
   results,
   busy,
+  mode,
+  meta,
+  queue,
   onValue,
+  onMode,
   onSearch,
   onPick,
+  onSendPromising,
+  onClearQueue,
   onOpenRegistrar
 }: {
   value: string;
   results: DomainSearchResult[];
   busy: boolean;
+  mode: "front-door" | "exact";
+  meta: { checkedAt: string; viaFallback: boolean } | null;
+  queue: string[];
   onValue: (value: string) => void;
+  onMode: (mode: "front-door" | "exact") => void;
   onSearch: () => void;
   onPick: (domain: string) => void;
+  onSendPromising: () => void;
+  onClearQueue: () => void;
   onOpenRegistrar: (domain: string) => void;
 }) {
+  const preview = mode === "front-door" ? frontDoorCandidates(value, { limit: 6 }) : domainSearchCandidates(value).slice(0, 6);
+  const promisingCount = results.filter((result) => result.promising).length;
+
   return (
     <div className="live-domain-search" aria-label="Live domain search">
       <div className="live-domain-search-head">
@@ -4464,36 +4567,94 @@ function LiveDomainSearchPanel({
             placeholder="brand, community, or full domain"
           />
           <button type="button" disabled={busy} onClick={onSearch}>
-            {busy ? "Searching..." : "Search live"}
+            {busy ? "Checking DNS + RDAP..." : "Search live"}
           </button>
         </div>
       </div>
+
+      <div className="live-domain-search-modes" role="group" aria-label="Search mode">
+        <button
+          type="button"
+          className={`compact-button ${mode === "front-door" ? "secondary" : "ghost"}`}
+          onClick={() => onMode("front-door")}
+        >
+          Front-door variants
+        </button>
+        <button
+          type="button"
+          className={`compact-button ${mode === "exact" ? "secondary" : "ghost"}`}
+          onClick={() => onMode("exact")}
+        >
+          Exact name
+        </button>
+        {meta && (
+          <small className="muted">
+            Checked {new Date(meta.checkedAt).toLocaleTimeString()}
+            {meta.viaFallback ? " · resolved from this browser" : ""}
+          </small>
+        )}
+      </div>
+
+      {results.length > 0 && (
+        <div className="live-domain-handoff" aria-label="Wizard handoff">
+          <span className="status good">{promisingCount} clean</span>
+          <button type="button" className="compact-button" disabled={!promisingCount} onClick={onSendPromising}>
+            Send clean names to the wizard
+          </button>
+          {queue.length > 0 && (
+            <>
+              <span className="muted">Queued: {queue.join(", ")}</span>
+              <button type="button" className="ghost compact-button" onClick={onClearQueue}>
+                Clear
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="live-domain-results" aria-label="Domain search results">
-        {(results.length ? results : domainSearchCandidates(value).slice(0, 5).map((domain) => ({
-          domain,
-          status: "ready" as const,
-          summary: "Ready to check live DNS.",
-          records: []
-        }))).map((result) => (
-          <article className={`live-domain-result ${result.status}`} key={result.domain}>
-            <div>
-              <b>{result.domain}</b>
-              <span className={`status ${result.status === "dns_found" ? "amber" : result.status === "no_dns_signal" ? "good" : result.status === "ready" ? "blue" : "danger"}`}>
-                {result.status === "dns_found" ? "DNS found" : result.status === "no_dns_signal" ? "No DNS signal" : result.status === "ready" ? "Ready" : result.status}
-              </span>
-            </div>
-            <p>{result.summary}</p>
-            {result.records.length ? <small>NS: {result.records.join(" / ")}</small> : <small>Registrar check still required before purchase.</small>}
-            <div className="row-actions">
-              <button type="button" className="secondary compact-button" onClick={() => onPick(result.domain)}>
-                Use in wizard
-              </button>
-              <button type="button" className="ghost compact-button" onClick={() => onOpenRegistrar(result.domain)}>
-                Check registrar
-              </button>
-            </div>
-          </article>
-        ))}
+        {results.length
+          ? results.map((result) => {
+              const evidence = domainEvidence(result);
+              return (
+                <article className={`live-domain-result ${result.verdict}`} key={result.domain}>
+                  <div>
+                    <b>{result.domain}</b>
+                    <span className={`status ${domainVerdictTones[result.verdict]}`}>{domainVerdictLabels[result.verdict]}</span>
+                  </div>
+                  <p>{result.summary}</p>
+                  <small>{evidence || "No public DNS records."}</small>
+                  {result.flags.length > 0 && (
+                    <small className="live-domain-flags">
+                      {result.flags.map((flag) => domainFlagLabels[flag] ?? flag).join(" · ")}
+                    </small>
+                  )}
+                  <div className="row-actions">
+                    <button
+                      type="button"
+                      className="secondary compact-button"
+                      disabled={!result.promising}
+                      title={result.promising ? "Load into the domain wizard" : "Only clean, buyable names go to the wizard"}
+                      onClick={() => onPick(result.domain)}
+                    >
+                      Use in wizard
+                    </button>
+                    <button type="button" className="ghost compact-button" onClick={() => onOpenRegistrar(result.domain)}>
+                      Check registrar
+                    </button>
+                  </div>
+                </article>
+              );
+            })
+          : preview.map((domain) => (
+              <article className="live-domain-result pending" key={domain}>
+                <div>
+                  <b>{domain}</b>
+                  <span className="status blue">Not checked</span>
+                </div>
+                <p>Run the live search to query public DNS and the registry.</p>
+              </article>
+            ))}
       </div>
     </div>
   );
