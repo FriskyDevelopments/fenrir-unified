@@ -31,7 +31,7 @@ async function readJson(response) {
 async function verifyUnauthenticated(base) {
   const response = await fetch(`${base}/api/readiness`, {
     headers: { Accept: "application/json" },
-    redirect: "manual",
+    redirect: "follow",
     signal: AbortSignal.timeout(20_000)
   });
   const body = await readJson(response);
@@ -70,6 +70,7 @@ async function verifyAuthenticated(base) {
       Accept: "application/json",
       Cookie: sessionCookie
     },
+    redirect: "follow",
     signal: AbortSignal.timeout(20_000)
   });
   const body = await readJson(response);
