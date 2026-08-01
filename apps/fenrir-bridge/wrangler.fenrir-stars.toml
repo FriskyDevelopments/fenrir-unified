@@ -4,6 +4,11 @@ compatibility_date = "2026-05-08"
 
 [vars]
 GEMINI_MODEL = "gemini-3-flash-preview"
+# Codified here (not dashboard-only) so a `wrangler deploy` can never drop them again.
+# Prior "changes kept reverting" was a split-brain between dashboard/script-API vars and
+# local toml deploys clobbering each other.
+FENRIR_TELEGRAM_BOT_USERNAME = "Myfenrir_bot"
+FENRIR_STARS_PRICE = "250"
 
 [[d1_databases]]
 binding = "DB"

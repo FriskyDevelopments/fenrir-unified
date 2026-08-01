@@ -294,6 +294,148 @@ function modularMenuText(text, entitlement) {
   ].join("\n");
 }
 
+// --- Deterministic module screens (single source of truth) --------------------
+// Each MOD button AND its slash command render the SAME screen from these builders.
+// They never route through the LLM, so a module always opens its real content
+// instead of the model reprinting the menu.
+
+function setupScreen(text) {
+  if (spanishIntent(text)) {
+    return [
+      "MOD 01 · SETUP — Fenrir Bridge",
+      "Deja de compartir invitaciones crudas de Telegram: un link estable, invites rotables.",
+      "",
+      "PASOS:",
+      "1. Elige un subdominio Fenrir o tu propio dominio.",
+      "2. Agrega Fenrir Bot al grupo de Telegram.",
+      "3. Hazlo administrador.",
+      "4. Permítele crear y revocar enlaces de invitación.",
+      "5. Crea el slug del bridge.",
+      "6. Comparte el link público estable.",
+      "",
+      "DNS (dominio propio) — bridge target:",
+      `• CNAME · Nombre: join · Valor: ${BRIDGE_TARGET} · TTL: Auto (enruta tu subdominio a Fenrir)`,
+      "• TXT · Nombre: _fenrir · Valor: fenrir-verify=<token> · TTL: Auto (prueba de propiedad)",
+      "",
+      `Bridge target address: ${BRIDGE_TARGET}. Conservas tu registrador; no transfieres el dominio.`,
+      "",
+      "Siguiente: /plans · /subscribe · /status"
+    ].join("\n");
+  }
+  return [
+    "MOD 01 · SETUP — Fenrir Bridge",
+    "Stop sharing raw Telegram invite links — one stable link, rotatable invites.",
+    "",
+    "STEPS:",
+    "1. Choose a Fenrir subdomain or your own custom domain.",
+    "2. Add Fenrir Bot to your Telegram group.",
+    "3. Make the bot an admin.",
+    "4. Allow it to create and revoke invite links.",
+    "5. Create a bridge slug.",
+    "6. Share the stable public URL.",
+    "",
+    "DNS (custom domain) — bridge target:",
+    `• CNAME · Name: join · Value: ${BRIDGE_TARGET} · TTL: Auto (routes your subdomain to Fenrir)`,
+    "• TXT · Name: _fenrir · Value: fenrir-verify=<token> · TTL: Auto (proves domain ownership)",
+    "",
+    `Bridge target address: ${BRIDGE_TARGET}. Keep any registrar; no domain transfer needed.`,
+    "",
+    "Next: /plans · /subscribe · /status"
+  ].join("\n");
+}
+
+function plansScreen(text) {
+  if (spanishIntent(text)) {
+    return [
+      "MOD 02 · PLANES — Fenrir Protocol",
+      "",
+      "Free — $0: 1 Telegram Lock, 1 subdominio Fenrir. Para probar.",
+      "Starter — $3/mes o Stars: 3 Telegram Locks, subdominios Fenrir.",
+      "Pro — $7/mes o Stars: 10 Telegram Locks, soporte de dominio propio.",
+      "Operator — $15/mes o Stars: Locks ilimitados, multi-admin, audit logs.",
+      "",
+      "Un grupo → Starter. VIP/curso/comunidad de clientes → Pro. Muchos grupos o clientes → Operator.",
+      "",
+      "Paga con /subscribe (Telegram Stars)."
+    ].join("\n");
+  }
+  return [
+    "MOD 02 · PLANS — Fenrir Protocol",
+    "",
+    "Free — $0: 1 Telegram Lock, 1 Fenrir subdomain. For testing.",
+    "Starter — $3/mo or Stars: 3 Telegram Locks, Fenrir subdomains.",
+    "Pro — $7/mo or Stars: 10 Telegram Locks, custom domain support.",
+    "Operator — $15/mo or Stars: unlimited Locks, multi-admin workflows, audit logs.",
+    "",
+    "One group → Starter. Paid VIP/course/client community → Pro. Many groups or clients → Operator.",
+    "",
+    "Pay with /subscribe (Telegram Stars)."
+  ].join("\n");
+}
+
+function paymentScreen(text) {
+  if (spanishIntent(text)) {
+    return [
+      "MOD 03 · PAGO — Telegram Stars",
+      "Abriendo la caja oficial de pago de Telegram.",
+      "",
+      "Telegram Stars procesa la transacción; Fenrir verifica y activa tu acceso cuando Telegram confirma el pago.",
+      "No pido datos de tarjeta y no confirmo el pago manualmente."
+    ].join("\n");
+  }
+  return [
+    "MOD 03 · PAYMENT — Telegram Stars",
+    "Opening the official Telegram payment box.",
+    "",
+    "Telegram Stars handles the transaction; Fenrir verifies and activates your access once Telegram confirms payment.",
+    "I never ask for card details and never confirm payment by hand."
+  ].join("\n");
+}
+
+function statusScreen(entitlement, text) {
+  const active = entitlement?.status === "active";
+  if (spanishIntent(text)) {
+    return active
+      ? [
+          "MOD 04 · ESTADO — Fenrir Protocol",
+          "Acceso: ACTIVO",
+          `Stars: ${entitlement.stars_amount || 0}`,
+          "Modo: Telegram Stars"
+        ].join("\n")
+      : [
+          "MOD 04 · ESTADO — Fenrir Protocol",
+          "Acceso: PENDIENTE (todavía no activo)",
+          "",
+          "Usa /subscribe y abro la caja oficial de Telegram Stars para activarte."
+        ].join("\n");
+  }
+  return active
+    ? [
+        "MOD 04 · STATUS — Fenrir Protocol",
+        "Access: ACTIVE",
+        `Stars: ${entitlement.stars_amount || 0}`,
+        "Mode: Telegram Stars"
+      ].join("\n")
+    : [
+        "MOD 04 · STATUS — Fenrir Protocol",
+        "Access: PENDING (not active yet)",
+        "",
+        "Run /subscribe and I’ll open the official Telegram Stars box to activate you."
+      ].join("\n");
+}
+
+async function sendText(env, channel, chatId, text) {
+  await telegramApi(env, channel, "sendMessage", { chat_id: chatId, text });
+}
+
+// Parse a leading slash command: "/setup@Myfenrir_bot arg" -> { cmd:"setup", arg:"arg" }.
+// Returns null when the text is not a slash command.
+function parseCommand(text) {
+  const m = /^\/([a-z0-9_]+)(?:@[\w]+)?(?:\s+([\s\S]*))?$/i.exec((text || "").trim());
+  if (!m) return null;
+  return { cmd: m[1].toLowerCase(), arg: (m[2] || "").trim() };
+}
+
 async function sendBotMenu(env, channel, message, entitlement) {
   await telegramApi(env, channel, "sendMessage", {
     chat_id: message.chat.id,
@@ -301,12 +443,12 @@ async function sendBotMenu(env, channel, message, entitlement) {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "⚙️ MOD 01 · Setup", callback_data: "fenrir_setup" },
-          { text: "📋 MOD 02 · Plans", callback_data: "fenrir_plans" }
+          { text: "🌐 MOD 01 · Setup", callback_data: "fenrir_setup" },
+          { text: "🎟️ MOD 02 · Plans", callback_data: "fenrir_plans" }
         ],
         [
-          { text: "⭐ MOD 03 · Stars", callback_data: "fenrir_subscribe" },
-          { text: "📊 MOD 04 · Status", callback_data: "fenrir_status" }
+          { text: "⭐️ MOD 03 · Stars", callback_data: "fenrir_subscribe" },
+          { text: "✅ MOD 04 · Status", callback_data: "fenrir_status" }
         ]
       ]
     }
@@ -316,29 +458,9 @@ async function sendBotMenu(env, channel, message, entitlement) {
 function fallbackMind(text, entitlement) {
   if (menuIntent(text)) return modularMenuText(text, entitlement);
 
-  if (statusIntent(text)) {
-    if (spanishIntent(text)) {
-      return entitlement?.status === "active"
-        ? `Fenrir Protocol esta activo.\n\nAcceso: activo\nStars: ${entitlement.stars_amount}\nModo: Telegram Stars`
-        : "Fenrir Protocol todavia no esta activo.\n\nDi “comprar” o usa /subscribe y abro la caja oficial de Telegram Stars.";
-    }
-    return entitlement?.status === "active"
-      ? `Fenrir Protocol is active.\n\nAccess: unlocked\nStars: ${entitlement.stars_amount}\nMode: Telegram Stars`
-      : "Fenrir Protocol is not active yet.\n\nSay “buy” or use /subscribe and I’ll open the Stars payment box.";
-  }
+  if (statusIntent(text)) return statusScreen(entitlement, text);
 
-  if (pricingIntent(text)) {
-    return [
-      "FENRIR PROTOCOL | Plans",
-      "",
-      "Free — $0: 1 Telegram Lock, 1 Fenrir subdomain, for testing.",
-      "Starter — $3/mo or Stars: 3 Telegram Locks, Fenrir subdomains.",
-      "Pro — $7/mo or Stars: 10 Telegram Locks, custom domain support.",
-      "Operator — $15/mo or Stars: unlimited Locks, multi-admin workflows, audit logs.",
-      "",
-      "One group: Starter. Paid VIP/course/client community: Pro. Many groups or clients: Operator."
-    ].join("\n");
-  }
+  if (pricingIntent(text)) return plansScreen(text);
 
   if (stripeIntent(text)) {
     return [
@@ -358,37 +480,7 @@ function fallbackMind(text, entitlement) {
     ].join("\n");
   }
 
-  if (setupIntent(text)) {
-    if (spanishIntent(text)) {
-      return [
-        "Si. Fenrir te da un link estable y dejas de compartir invitaciones crudas de Telegram.",
-        "",
-        "Ruta de setup:",
-        "1. Usa un subdominio Fenrir o tu dominio.",
-        "2. Agrega Fenrir Bot al grupo.",
-        "3. Hazlo admin.",
-        "4. Permite crear y revocar invites.",
-        "5. Crea el slug del bridge.",
-        "6. Comparte el link estable.",
-        "",
-        `DNS custom: CNAME join -> ${BRIDGE_TARGET}. No tienes que transferir tu dominio.`
-      ].join("\n");
-    }
-    return [
-      "Fenrir Bridge setup path:",
-      "",
-      "1. Choose a Fenrir subdomain or custom domain.",
-      "2. Add Fenrir Bot to the Telegram group.",
-      "3. Make the bot admin.",
-      "4. Allow it to create and revoke invite links.",
-      "5. Create a bridge slug.",
-      "6. Share the stable public URL.",
-      "",
-      `Custom DNS: CNAME join -> ${BRIDGE_TARGET}. You can keep any registrar.`,
-      "",
-      "Say “buy” when you want me to open the Stars payment box."
-    ].join("\n");
-  }
+  if (setupIntent(text)) return setupScreen(text);
 
   return [
     "FENRIR BOT OS | Menu",
@@ -444,15 +536,49 @@ async function geminiMind(env, input, entitlement) {
   return answer || fallbackMind(input.text, entitlement);
 }
 
+// Constant-time string comparison so we never leak the webhook secret via timing.
+// Length is allowed to short-circuit (standard and acceptable for a fixed-length token).
+function timingSafeEqualStr(a, b) {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  if (aBytes.length !== bBytes.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
+  return diff === 0;
+}
+
 async function handleTelegramWebhook(request, env, url) {
   if (!env.DB) return json({ ok: false, error: "db_not_configured" }, { status: 500 });
   const channel = url.searchParams.get("bot") === "dev" ? "dev" : "prod";
   if (!botToken(env, channel)) return json({ ok: false, error: "missing_telegram_token" }, { status: 500 });
 
+  // --- FAIL-CLOSED webhook authentication (audit finding H2) --------------------
+  // Telegram signs every legitimate webhook POST with the secret registered via
+  // setWebhook({ secret_token }), sent back in the x-telegram-bot-api-secret-token
+  // header. We require that secret to be BOTH configured on this worker AND to match
+  // the request. If it is missing OR wrong, the update is UNTRUSTED and we process
+  // nothing below (no markPaid, no entitlement write, no bot reply). We return HTTP
+  // 200 so Telegram does not enter its retry loop for forged/misconfigured traffic,
+  // but we grant nothing and we log the rejection.
+  //
+  // Previous (VULNERABLE) behaviour was fail-OPEN: `if (configuredSecret && ...)` —
+  // when TELEGRAM_WEBHOOK_SECRET was unset the check was skipped entirely, so a
+  // forged `successful_payment` POST could self-grant a paid entitlement.
   const configuredSecret = normalizeText(env.TELEGRAM_WEBHOOK_SECRET);
-  if (configuredSecret && request.headers.get("x-telegram-bot-api-secret-token") !== configuredSecret) {
-    return json({ ok: false, error: "invalid_telegram_webhook_secret" }, { status: 401 });
+  const presentedSecret = request.headers.get("x-telegram-bot-api-secret-token") || "";
+  if (!configuredSecret || !timingSafeEqualStr(presentedSecret, configuredSecret)) {
+    console.warn(JSON.stringify({
+      event: "telegram_webhook_rejected",
+      reason: configuredSecret ? "secret_mismatch" : "secret_not_configured",
+      channel,
+      hasHeader: Boolean(request.headers.get("x-telegram-bot-api-secret-token")),
+      ts: nowIso()
+    }));
+    // 200 => Telegram will not retry; ignored:true => we did not act on the update.
+    return json({ ok: true, ignored: true }, { status: 200 });
   }
+  // -----------------------------------------------------------------------------
 
   const update = await request.json().catch(() => null);
   if (!update) return json({ ok: false, error: "invalid_update" }, { status: 400 });
@@ -485,25 +611,26 @@ async function handleTelegramWebhook(request, env, url) {
       text: "Fenrir module selected."
     });
 
+    // MOD buttons render the SAME deterministic screens as their slash commands.
+    const cbText = callbackMessage.text || "";
     if (query.data === "fenrir_subscribe") {
-      await telegramApi(env, channel, "sendMessage", {
-        chat_id: callbackMessage.chat.id,
-        text: "Fenrir Protocol payment box opening. Telegram Stars handles the transaction; Fenrir verifies access after payment."
-      });
+      await sendText(env, channel, callbackMessage.chat.id, paymentScreen(cbText));
       await sendStarsInvoice(env, channel, callbackMessage);
       return json({ ok: true });
     }
-
-    const moduleText = {
-      fenrir_setup: "/setup",
-      fenrir_plans: "/plans",
-      fenrir_status: "/status"
-    }[query.data] || "/menu";
-    const answer = fallbackMind(moduleText, entitlement);
-    await telegramApi(env, channel, "sendMessage", {
-      chat_id: callbackMessage.chat.id,
-      text: answer
-    });
+    if (query.data === "fenrir_setup") {
+      await sendText(env, channel, callbackMessage.chat.id, setupScreen(cbText));
+      return json({ ok: true });
+    }
+    if (query.data === "fenrir_plans") {
+      await sendText(env, channel, callbackMessage.chat.id, plansScreen(cbText));
+      return json({ ok: true });
+    }
+    if (query.data === "fenrir_status") {
+      await sendText(env, channel, callbackMessage.chat.id, statusScreen(entitlement, cbText));
+      return json({ ok: true });
+    }
+    await sendBotMenu(env, channel, callbackMessage, entitlement);
     return json({ ok: true });
   }
 
@@ -511,6 +638,33 @@ async function handleTelegramWebhook(request, env, url) {
   if (message?.successful_payment) {
     const payment = message.successful_payment;
     const order = await getOrder(env, payment.invoice_payload);
+    // Defense-in-depth (audit finding H2, second layer): the request is already
+    // secret-authenticated above, so only Telegram can reach this line. We ADDITIONALLY
+    // grant only when the payment maps to a real, still-pending order for THIS user,
+    // currency (XTR) and exact amount — mirroring the bridge Pages Function handler
+    // (functions/api/telegram/webhook.ts). A payment signal that does not match an
+    // order changes NOTHING.
+    const telegramUserId = String(message.from?.id || order?.telegram_user_id || message.chat.id);
+    const valid =
+      payment.invoice_payload?.startsWith("fenrir_stars:") &&
+      order &&
+      order.status === "pending" &&
+      String(order.telegram_user_id) === telegramUserId &&
+      payment.currency === "XTR" &&
+      payment.total_amount === Number(order.amount);
+    if (!valid) {
+      console.warn(JSON.stringify({
+        event: "stars_payment_unmatched",
+        payload: payment.invoice_payload,
+        channel,
+        ts: nowIso()
+      }));
+      await telegramApi(env, channel, "sendMessage", {
+        chat_id: message.chat.id,
+        text: "Fenrir received a payment signal that did not match an active order. Access was not changed. Run /subscribe again if you need a fresh invoice."
+      });
+      return json({ ok: true });
+    }
     await markPaid(env, payment, message, order);
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
@@ -522,40 +676,111 @@ async function handleTelegramWebhook(request, env, url) {
   const text = normalizeText(message?.text);
   if (!text) return json({ ok: true });
 
-  const entitlement = await getEntitlement(env, message.from?.id || message.chat.id);
+  const isGroup = message.chat?.type === "group" || message.chat?.type === "supergroup";
+  const username = botUsername(env);
+  const mentionsBot = username && text.toLowerCase().includes(`@${username.toLowerCase()}`);
+  const isCommand = text.startsWith("/");
 
+  if (isGroup && !mentionsBot && !isCommand) {
+    return json({ ok: true });
+  }
+
+  const entitlement = await getEntitlement(env, message.from?.id || message.chat.id);
+  const chatId = message.chat.id;
+
+  const openInvoice = async () => {
+    await sendText(env, channel, chatId, paymentScreen(text));
+    await sendStarsInvoice(env, channel, message);
+    return json({ ok: true });
+  };
+
+  // 1) SLASH COMMANDS — fully deterministic. A command ALWAYS opens its own screen,
+  //    never the LLM and never the fallback menu. This is what makes the MOD commands
+  //    behave like real commands instead of collapsing to the menu.
+  const parsed = parseCommand(text);
+  if (parsed) {
+    const { cmd, arg } = parsed;
+
+    if (cmd === "start") {
+      // /start with a payload routes by payload; bare /start shows the menu.
+      if (/^fenrir_stars\b/i.test(arg)) return openInvoice();
+      const startLink = arg.match(/^link_([a-z0-9_-]{8,64})$/i);
+      if (startLink) {
+        const result = await consumeTelegramLinkCode(env, startLink[1], message);
+        await sendText(
+          env,
+          channel,
+          chatId,
+          result.ok
+            ? "Telegram identity linked to your Frisky ID. Fenrir can now connect this Telegram account to your workspace."
+            : "This Fenrir link code is expired or invalid. Open MyFenrir and generate a fresh Telegram link."
+        );
+        return json({ ok: true });
+      }
+      await sendBotMenu(env, channel, message, entitlement);
+      return json({ ok: true });
+    }
+
+    if (cmd === "menu" || cmd === "help") {
+      await sendBotMenu(env, channel, message, entitlement);
+      return json({ ok: true });
+    }
+    if (cmd === "setup") {
+      await sendText(env, channel, chatId, setupScreen(text));
+      return json({ ok: true });
+    }
+    if (cmd === "plans" || cmd === "pricing") {
+      await sendText(env, channel, chatId, plansScreen(text));
+      return json({ ok: true });
+    }
+    if (cmd === "status") {
+      await sendText(env, channel, chatId, statusScreen(entitlement, text));
+      return json({ ok: true });
+    }
+    if (cmd === "subscribe" || cmd === "unlock" || cmd === "pay" || cmd === "buy") {
+      return openInvoice();
+    }
+    // Unknown slash command falls through to the intent router below.
+  }
+
+  // Late link-code path for any non-/start carrier of a raw link code.
+  const linkCode = linkCodeFromStart(text);
+  if (linkCode) {
+    const result = await consumeTelegramLinkCode(env, linkCode, message);
+    await sendText(
+      env,
+      channel,
+      chatId,
+      result.ok
+        ? "Telegram identity linked to your Frisky ID. Fenrir can now connect this Telegram account to your workspace."
+        : "This Fenrir link code is expired or invalid. Open MyFenrir and generate a fresh Telegram link."
+    );
+    return json({ ok: true });
+  }
+
+  // 2) NATURAL-LANGUAGE INTENTS — also deterministic screens, so a plain question like
+  //    "how do I set up the bridge target?" opens MOD 01 instead of the menu or the LLM.
   if (menuIntent(text)) {
     await sendBotMenu(env, channel, message, entitlement);
     return json({ ok: true });
   }
-
-  const linkCode = linkCodeFromStart(text);
-  if (linkCode) {
-    const result = await consumeTelegramLinkCode(env, linkCode, message);
-    await telegramApi(env, channel, "sendMessage", {
-      chat_id: message.chat.id,
-      text: result.ok
-        ? "Telegram identity linked to your Frisky ID. Fenrir can now connect this Telegram account to your workspace."
-        : "This Fenrir link code is expired or invalid. Open MyFenrir and generate a fresh Telegram link."
-    });
+  if (paymentIntent(text)) return openInvoice();
+  if (setupIntent(text)) {
+    await sendText(env, channel, chatId, setupScreen(text));
+    return json({ ok: true });
+  }
+  if (pricingIntent(text)) {
+    await sendText(env, channel, chatId, plansScreen(text));
+    return json({ ok: true });
+  }
+  if (statusIntent(text)) {
+    await sendText(env, channel, chatId, statusScreen(entitlement, text));
     return json({ ok: true });
   }
 
-  if (/^\/subscribe\b/i.test(text) || /^\/unlock\b/i.test(text) || /^\/start\s+fenrir_stars\b/i.test(text) || paymentIntent(text)) {
-    await telegramApi(env, channel, "sendMessage", {
-      chat_id: message.chat.id,
-      text: "Fenrir Protocol payment box opening. Telegram Stars handles the transaction; Fenrir verifies access after payment."
-    });
-    await sendStarsInvoice(env, channel, message);
-    return json({ ok: true });
-  }
-
+  // 3) FREE-FORM — only genuinely open-ended chat reaches the LLM (or the menu fallback).
   const answer = await geminiMind(env, { text, channel }, entitlement);
-  await telegramApi(env, channel, "sendMessage", {
-    chat_id: message.chat.id,
-    text: answer
-  });
-
+  await sendText(env, channel, chatId, answer);
   return json({ ok: true });
 }
 
