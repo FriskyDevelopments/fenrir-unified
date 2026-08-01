@@ -2,9 +2,13 @@ import { createClient, type Provider, type SupabaseClient } from "@supabase/supa
 
 type AuthProvider = "google" | "microsoft" | "apple";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const authRedirectOrigin = (import.meta.env.VITE_AUTH_REDIRECT_ORIGIN ?? "").trim();
+// Production defaults are baked in so a build made WITHOUT .env still produces
+// the working Supabase login instead of silently falling back to another broker
+// (that silent fallback is exactly how the WorkOS regression shipped). Both
+// values are public by design — they are embedded in every client bundle.
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://yqevglppbhuoxxfsfnih.supabase.co";
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_t8xng5GIhOmAtT4Nsf7Zgg_TO36FTTE";
+const authRedirectOrigin = (import.meta.env.VITE_AUTH_REDIRECT_ORIGIN ?? "https://www.myfenrir.com").trim();
 const authRedirectPath = (import.meta.env.VITE_AUTH_REDIRECT_PATH ?? "/auth/callback").trim();
 const fenrirManagedUrl = (import.meta.env.VITE_FENRIR_MANAGED_URL ?? "/main").trim();
 const postAuthDestinationKey = "fenrir_post_auth_destination";
