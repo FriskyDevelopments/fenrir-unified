@@ -66,10 +66,9 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
     const tx = await readOAuthTransaction(context.request, context.env);
     validateOAuthTransaction(tx, provider, state);
     const result = await exchangeCodeForSession(provider, context.env, code, redirectUri, tx!);
-    const sessionPayload = result.session;
-    if (context.env.DB) {
-      await ensureDefaultWorkspace(context.env.DB, sessionPayload);
-    }
+    const sessionPayload = context.env.DB
+      ? await ensureDefaultWorkspace(context.env.DB, result.session)
+      : result.session;
     await upsertProfileForSession(context.env, sessionPayload, result.identityId);
 
     const headers = new Headers({
