@@ -15,9 +15,9 @@ export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
   }
 
   try {
-    const session = await createSessionFromTelegramLogin(context.env.DB, context.env, body);
+    let session = await createSessionFromTelegramLogin(context.env.DB, context.env, body);
     if (context.env.DB) {
-      await ensureDefaultWorkspace(context.env.DB, session);
+      session = await ensureDefaultWorkspace(context.env.DB, session);
     }
     await upsertProfileForSession(context.env, session, `telegram:${String(body.id)}`);
     const token = await signSession(session, context.env);

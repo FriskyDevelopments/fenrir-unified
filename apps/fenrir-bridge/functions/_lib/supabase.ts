@@ -56,11 +56,9 @@ export async function createSessionFromSupabaseToken(accessToken: string, env: S
     provider: sessionProvider(user.app_metadata?.provider),
     identityId: `supabase:${user.id}`
   });
-  if (env.DB) {
-    await ensureDefaultWorkspace(env.DB, session);
-  }
-  await upsertProfileForSession(env, session, user.id);
-  return session;
+  const canonical = env.DB ? await ensureDefaultWorkspace(env.DB, session) : session;
+  await upsertProfileForSession(env, canonical, user.id);
+  return canonical;
 }
 
 function parseAdminEmails(value?: string) {
