@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-export type BrandKey = "fenrir" | "friskyGhost" | "neonNexus" | "stixMagic";
+export type BrandKey = "fenrir" | "neonNexus" | "stixMagic";
 
 export type BrandTheme = {
   key: BrandKey;
@@ -21,7 +21,6 @@ export type BrandTheme = {
   glow: string;
   background:
     | "protocol"
-    | "ghost"
     | "nexus"
     | "experimental";
 };
@@ -38,28 +37,12 @@ export const brandThemes: Record<BrandKey, BrandTheme> = {
     lanes: ["IDENTITY", "WORKSPACES", "MEDIA", "AI AGENTS", "PROTOCOL SERVICES"],
     nodeStatus: ["AUTH ONLINE", "SESSION BRIDGE ACTIVE", "PASSKEY READY", "PROTOCOL STABLE"],
     authKicker: "OAuth + passkeys",
-    primary: "#ff334e",
-    secondary: "#22c7a8",
-    accent: "#f1b75c",
-    glow: "rgba(255, 51, 78, .28)",
+    // FriskyDev system: gold accent over paper/ink — not the LORE neon set.
+    primary: "#c2a469",
+    secondary: "#7fae9d",
+    accent: "#8a6e3c",
+    glow: "rgba(194, 164, 105, .22)",
     background: "protocol"
-  },
-  friskyGhost: {
-    key: "friskyGhost",
-    productName: "Frisky Ghost",
-    systemRole: "operational layer",
-    logoSrc: "/fenrir-cut-wordmark.svg",
-    logoAlt: "Frisky Ghost",
-    headline: "Ghost login for the bot operating layer.",
-    subheadline: "One auth engine, separate product landing, and operational routes for bot-of-bots workflows.",
-    lanes: ["BOT OS", "OPERATIONS", "SIGNALS", "WORKERS", "ROUTES"],
-    nodeStatus: ["GHOST ONLINE", "BOT OS READY", "ROUTES ISOLATED", "SIGNAL CLEAN"],
-    authKicker: "Ghost skin",
-    primary: "#f3f6f9",
-    secondary: "#8cb9ff",
-    accent: "#9b8cff",
-    glow: "rgba(140, 185, 255, .22)",
-    background: "ghost"
   },
   neonNexus: {
     key: "neonNexus",

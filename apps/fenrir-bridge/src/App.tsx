@@ -146,15 +146,6 @@ const uiCopy: Record<Locale, {
   walkthroughStepsClient: [string, string, string, string];
   walkthroughStepsAdmin: [string, string, string, string];
   walkthroughStepsLaunch: [string, string, string, string];
-  ghostRouteTitle: string;
-  ghostRouteBody: string;
-  botOsRouteTitle: string;
-  botOsRouteSubtitle: string;
-  botOsRouteBody: string;
-  botOsRouteModulesTitle: string;
-  botOsRouteFooterGhost: string;
-  botOsRouteFooterCommunity: string;
-  botOsRouteFooterHome: string;
   communityEmailPlaceholder: string;
   neonMagicBusy: string;
   neonMagicButton: string;
@@ -286,15 +277,6 @@ const uiCopy: Record<Locale, {
     walkthroughStepsClient: ["Public link", "Branded gate", "Access check", "Private destination"],
     walkthroughStepsAdmin: ["Stable URL", "Rotate target", "Revoke leak", "Audit action"],
     walkthroughStepsLaunch: ["Customer clicks", "Fenrir explains", "Access unlocks", "Entry opens"],
-    ghostRouteTitle: "Ghost login belongs to the Bot OS surface.",
-    ghostRouteBody: "This route is intentionally separate from Fenrir Bridge. Use it for Frisky Ghost, ghost-styled onboarding, and Bot OS identity moments without touching client accounts.",
-    botOsRouteTitle: "Bot-of-bots command layer.",
-    botOsRouteSubtitle: "Modular command layer for Fenrir and Bot OS operators.",
-    botOsRouteBody: "Modular boxes are back. Ghost handles the playful login skin, Fenrir handles bridge operations, and Community Gate stays isolated on Neon.",
-    botOsRouteModulesTitle: "Bot OS modules",
-    botOsRouteFooterGhost: "Ghost login",
-    botOsRouteFooterCommunity: "Community Gate",
-    botOsRouteFooterHome: "Fenrir Bridge",
     communityEmailPlaceholder: "you@community.com",
     neonMagicBusy: "Creating Neon link...",
     neonMagicButton: "Send Neon magic link",
@@ -457,15 +439,6 @@ const uiCopy: Record<Locale, {
     walkthroughStepsClient: ["Enlace público", "Puerta con marca", "Chequeo de acceso", "Destino privado"],
     walkthroughStepsAdmin: ["URL estable", "Rotar destino", "Revocar fuga", "Acción de auditoría"],
     walkthroughStepsLaunch: ["Cliente hace clic", "Fenrir explica", "Acceso desbloqueado", "Entrada abierta"],
-    ghostRouteTitle: "El inicio de sesión de Ghost pertenece a Bot OS.",
-    ghostRouteBody: "Esta ruta está separada de Fenrir Bridge. Úsala para Frisky Ghost, onboarding con estilo Ghost y momentos de identidad de Bot OS sin tocar cuentas de cliente.",
-    botOsRouteTitle: "Capa de comandos de bots.",
-    botOsRouteSubtitle: "Capa de comandos modular para admins Fenrir y Bot OS.",
-    botOsRouteBody: "Las cajas modulares están de vuelta. Ghost maneja la piel de login lúdica, Fenrir maneja operaciones de puente, y Community Gate permanece aislado en Neon.",
-    botOsRouteModulesTitle: "Módulos de Bot OS",
-    botOsRouteFooterGhost: "Login de Ghost",
-    botOsRouteFooterCommunity: "Community Gate",
-    botOsRouteFooterHome: "Fenrir Bridge",
     communityEmailPlaceholder: "tu@comunidad.com",
     neonMagicBusy: "Creando enlace Neon...",
     neonMagicButton: "Enviar enlace mágico Neon",
@@ -602,15 +575,6 @@ const uiCopy: Record<Locale, {
     walkthroughStepsClient: ["Lien public", "Porte brandée", "Contrôle d'accès", "Destination privée"],
     walkthroughStepsAdmin: ["URL stable", "Tourner la cible", "Révoquer la fuite", "Action d'audit"],
     walkthroughStepsLaunch: ["Client clique", "Fenrir explique", "Déblocage d'accès", "Entrée ouverte"],
-    ghostRouteTitle: "La connexion Ghost appartient à la surface Bot OS.",
-    ghostRouteBody: "Cette route est séparée volontairement de Fenrir Bridge. Utilisez-la pour Frisky Ghost, l'onboarding Ghost et les moments d'identité Bot OS sans toucher les comptes clients Fenrir Bridge.",
-    botOsRouteTitle: "Couche de commandes de bots.",
-    botOsRouteSubtitle: "Couche de commande modulaire pour Fenrir et les ops Bot OS.",
-    botOsRouteBody: "Les blocs modulaires sont de retour. Ghost gère la skin de connexion, Fenrir gère les opérations de pont, et Community Gate reste isolé sur Neon.",
-    botOsRouteModulesTitle: "Modules Bot OS",
-    botOsRouteFooterGhost: "Connexion Ghost",
-    botOsRouteFooterCommunity: "Community Gate",
-    botOsRouteFooterHome: "Fenrir Bridge",
     communityEmailPlaceholder: "vous@communaute.com",
     neonMagicBusy: "Création du lien Neon...",
     neonMagicButton: "Envoyer le lien magique Neon",
@@ -747,15 +711,6 @@ const uiCopy: Record<Locale, {
     walkthroughStepsClient: ["Öffentlicher Link", "Gebānderte Tür", "Zugriffsprüfung", "Privates Ziel"],
     walkthroughStepsAdmin: ["Stabile URL", "Ziel rotieren", "Leckung widerrufen", "Audit-Aktion"],
     walkthroughStepsLaunch: ["Kunde klickt", "Fenrir erklärt", "Zugriff entsperrt", "Einstieg öffnet"],
-    ghostRouteTitle: "Ghost-Login gehört zur Bot OS Oberfläche.",
-    ghostRouteBody: "Diese Route ist absichtlich von Fenrir Bridge getrennt. Nutze sie für Frisky Ghost, Ghost-Onboarding und Bot-OS-Identitätsmomente ohne Berührung der Fenrir-Bridge-Kundenkonten.",
-    botOsRouteTitle: "Befehls-Schicht der Bots.",
-    botOsRouteSubtitle: "Modulare Befehls-Schicht für Fenrir- und Bot-OS-Operatoren.",
-    botOsRouteBody: "Modulare Boxen sind zurück. Ghost übernimmt die spielerische Login-Hülle, Fenrir die Bridge-Operationen, Community Gate bleibt isoliert auf Neon.",
-    botOsRouteModulesTitle: "Bot OS Module",
-    botOsRouteFooterGhost: "Ghost Login",
-    botOsRouteFooterCommunity: "Community Gate",
-    botOsRouteFooterHome: "Fenrir Bridge",
     communityEmailPlaceholder: "du@gemeinschaft.com",
     neonMagicBusy: "Neon-Link wird erstellt...",
     neonMagicButton: "Neon-Magic-Link senden",
@@ -1087,8 +1042,6 @@ export function App() {
   const roomMatch = path.match(/^\/room\/([^/]+)/);
   const vaultMatch = path.match(/^\/vault\/?$/);
   const communityGateMatch = path.match(/^\/(?:community|gate)(?:\/group)?\/([^/]+)/);
-  const ghostRoute = host === "friskyghost.com" || path === "/ghost" || path.startsWith("/ghost/");
-  const botOsRoute = path === "/bot-os" || path.startsWith("/bot-os/") || path === "/bots" || path.startsWith("/bots/");
   const legalMatch = legalRoutes.has(path);
   const [state, setState] = useState<AppState | null>(null);
   const [auth, setAuth] = useState<AuthSession | null>(null);
@@ -1283,14 +1236,6 @@ export function App() {
 
   if (vaultMatch) {
     return <PublicVaultPage links={decodeVaultLinks()} c={c} ui={ui} />;
-  }
-
-  if (ghostRoute) {
-    return <FriskyGhostRoute c={c} ui={ui} />;
-  }
-
-  if (botOsRoute) {
-    return <FriskyBotOsRoute c={c} ui={ui} />;
   }
 
   if (communityGateMatch) {
@@ -2457,117 +2402,6 @@ function ProtocolActivated() {
   );
 }
 
-function FriskyGhostRoute({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] }) {
-  const theme = brandThemes.friskyGhost;
-  return (
-    <main className={`product-route ghost-route ${themeClassName(theme)}`} style={themeCssVars(theme)} data-theme={theme.key}>
-      <GlowCard className="product-route-card">
-        <span className="status good">Frisky Ghost</span>
-        <h1>{ui.ghostRouteTitle}</h1>
-        <p>{ui.ghostRouteBody}</p>
-        <div className="product-route-actions">
-          <a className="button-link" href="/bot-os">{ui.botOsRouteFooterGhost}</a>
-          <a className="button-link ghost" href="/">{ui.botOsRouteFooterHome}</a>
-        </div>
-      </GlowCard>
-    </main>
-  );
-}
-
-function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] }) {
-  const theme = brandThemes.friskyGhost;
-  const botModules = [
-    {
-      code: "MOD 01",
-      title: "Identity Router",
-      status: "Ghost login",
-      body: "Routes Frisky Ghost, Fenrir, and future product skins without mixing auth scopes.",
-      actions: ["Brand skin", "Product landing", "Safe redirect"]
-    },
-    {
-      code: "MOD 02",
-      title: "Fenrir Bot",
-      status: "Telegram ops",
-      body: "Guides admins through stable links, invite rotation, Stars checkout, and DNS setup.",
-      actions: ["/setup", "/plans", "/status"]
-    },
-    {
-      code: "MOD 03",
-      title: "Payment Box",
-      status: "Stars first",
-      body: "Opens the official Telegram Stars payment box and waits for backend entitlement truth.",
-      actions: ["/subscribe", "Pro", "Operator"]
-    },
-    {
-      code: "MOD 04",
-      title: "DNS Wizard",
-      status: "Fenrir Bridge DNS",
-      body: "Keeps registrar choice open while routing CNAME records through Fenrir Bridge infrastructure.",
-      actions: ["TXT _fenrir", "CNAME join", "SSL"]
-    },
-    {
-      code: "MOD 05",
-      title: "Community Gate",
-      status: "Neon scope",
-      body: "Separate realauth for community gates. Different database, tables, and session cookie.",
-      actions: ["/community/fenrir", "Invite codes", "Neon"]
-    },
-    {
-      code: "MOD 06",
-      title: "Operator Console",
-      status: "Bot of bots",
-      body: "A modular command layer for setup, support, routing, billing state, and handoffs.",
-      actions: ["Cursor", "Gemini", "Frisky Signal"]
-    }
-  ];
-
-  return (
-    <main className={`product-route bot-route ${themeClassName(theme)}`} style={themeCssVars(theme)} data-theme={theme.key}>
-      <section className="bot-os-shell">
-        <div className="bot-os-header">
-          <div>
-            <span className="status amber">Frisky Bot OS</span>
-            <h1>{ui.botOsRouteTitle}</h1>
-            <p>{ui.botOsRouteBody}</p>
-            <h3>{ui.botOsRouteModulesTitle}</h3>
-          </div>
-          <div className="bot-os-terminal" aria-label="Bot OS menu">
-            <b>MENU</b>
-            <code>/menu</code>
-            <code>/setup</code>
-            <code>/plans</code>
-            <code>/status</code>
-          </div>
-        </div>
-
-        <div className="bot-module-grid">
-          {botModules.map((module) => (
-            <GlowCard as="article" className="bot-module-card" key={module.code}>
-              <div className="bot-module-topline">
-                <span>{module.code}</span>
-                <b>{module.status}</b>
-              </div>
-              <h2>{module.title}</h2>
-              <p>{module.body}</p>
-              <div className="bot-module-actions">
-                {module.actions.map((action) => (
-                  <span key={action}>{action}</span>
-                ))}
-              </div>
-            </GlowCard>
-          ))}
-        </div>
-
-        <div className="product-route-actions">
-          <a className="button-link" href="/ghost">{ui.botOsRouteFooterGhost}</a>
-          <a className="button-link" href="/community/fenrir">{ui.botOsRouteFooterCommunity}</a>
-          <a className="button-link ghost" href="/">{ui.botOsRouteFooterHome}</a>
-        </div>
-      </section>
-    </main>
-  );
-}
-
 function mergeNeonBrandTheme(base: typeof brandThemes.neonNexus, brand: CommunityBrandPayload | null) {
   if (!brand) return base;
   return {
@@ -3389,6 +3223,10 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
             <AuthProviderButton provider="google" label={c.continueGoogle} onClick={() => void signInWithProvider("google")} />
             <AuthProviderButton provider="microsoft" label={c.continueMicrosoft} onClick={() => void signInWithProvider("microsoft")} />
           </div>
+          <a className="auth-alpha-link" href="/waitlist">
+            <span className="auth-alpha-link-label">No account yet?</span>
+            <span className="auth-alpha-link-action">Request alpha access →</span>
+          </a>
           <div className="telegram-login-callout">
             <p className="label">Telegram identity proof</p>
             <p className="muted">If you come through Telegram, use the login widget below. Fenrir will verify the signed Telegram identity and keep you in the same session.</p>
