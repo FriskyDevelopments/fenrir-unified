@@ -6,7 +6,11 @@ routes = [
   { pattern = "myfenrir.com/gate/*", zone_name = "myfenrir.com" },
   { pattern = "www.myfenrir.com/gate/*", zone_name = "myfenrir.com" },
   { pattern = "myfenrir.com/api/telegram/webhook", zone_name = "myfenrir.com" },
-  { pattern = "www.myfenrir.com/api/telegram/webhook", zone_name = "myfenrir.com" }
+  { pattern = "www.myfenrir.com/api/telegram/webhook", zone_name = "myfenrir.com" },
+  { pattern = "myfenrir.com/api/telegram/gate-approve", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/api/telegram/gate-approve", zone_name = "myfenrir.com" },
+  { pattern = "myfenrir.com/api/telegram/gate-status", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/api/telegram/gate-status", zone_name = "myfenrir.com" }
 ]
 
 [vars]

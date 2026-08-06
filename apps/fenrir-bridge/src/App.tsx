@@ -2529,6 +2529,36 @@ const brandStylePresets = [
   { name: "Arcade Pulse", primary: "#a855f7", secondary: "#06b6d4", accent: "#f472b6", note: "More playful, obvious community flavor." }
 ] as const;
 
+// One-tap "looks" — each sets logo + mascot + background + colors together from
+// assets ALREADY bundled in /public, so a new gate looks great with zero hosting
+// and zero URLs. Power users can still paste their own art under "Advanced".
+const brandVisualPresets = [
+  {
+    name: "LORE Neon",
+    note: "Neon ghost · magenta → cyan",
+    logo_url: "/fenrir-splash-icon.svg",
+    mascot_url: "/lore-ghost-neon-signal.svg",
+    background_url: null as string | null,
+    primary_color: "#FF2E6E", secondary_color: "#9D00FF", accent_color: "#00E5FF"
+  },
+  {
+    name: "Fenrir Dark",
+    note: "Cyber guardian · steel + signal",
+    logo_url: "/fenrir-cut-wordmark.svg",
+    mascot_url: "/fenrir-cyber-guardian-hero.svg",
+    background_url: null as string | null,
+    primary_color: "#22c7a8", secondary_color: "#8cb9ff", accent_color: "#f1b75c"
+  },
+  {
+    name: "Minimal",
+    note: "Clean mark · no clutter",
+    logo_url: "/fenrir-splash-icon.svg",
+    mascot_url: null as string | null,
+    background_url: null as string | null,
+    primary_color: "#141414", secondary_color: "#666666", accent_color: "#c9d1d9"
+  }
+] as const;
+
 const communityGateWalkthrough = [
   {
     label: "What it is",
@@ -2560,6 +2590,28 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
   const [authorizationReason, setAuthorizationReason] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const seededDefaultRef = useRef(false);
+
+  // Ship a good default: the first time the builder reaches the look step with
+  // nothing chosen (and nothing loaded from an existing gate), apply the default
+  // preset so the gate looks great with zero input. One-shot; never overrides a
+  // loaded brand or a choice the admin already made.
+  useEffect(() => {
+    if (step !== "Images" || seededDefaultRef.current) return;
+    seededDefaultRef.current = true;
+    const has = (k: keyof CommunityBrandPayload) => Boolean((draft as Record<string, unknown>)[k] ?? (loadedBrand as Record<string, unknown> | null)?.[k]);
+    if (!has("logo_url") && !has("mascot_url") && !has("background_url")) {
+      const p = brandVisualPresets[0];
+      setDraft((c) => ({
+        ...c,
+        logo_url: p.logo_url, mascot_url: p.mascot_url, background_url: p.background_url,
+        primary_color: c.primary_color ?? p.primary_color,
+        secondary_color: c.secondary_color ?? p.secondary_color,
+        accent_color: c.accent_color ?? p.accent_color
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   const previewBrand = useMemo<CommunityBrandPayload>(() => ({
     slug,
@@ -2755,40 +2807,77 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
 
           {step === "Images" && (
             <div className="brand-wizard-image-builder">
-              <div className="brand-asset-help-card">
-                <span className="brand-asset-help-icon">＋</span>
-                <div>
-                  <b>Add your own art</b>
-                  <small>Upload the file to /public, Cloudflare R2, Supabase Storage, or any public HTTPS CDN. Then paste that final URL below. Local files cannot be served to visitors until they are hosted.</small>
-                </div>
+              <div className="brand-visual-preset-head">
+                <b>Pick a look</b>
+                <small>One tap sets the logo, mascot, and atmosphere — it works instantly. You can swap in your own brand files anytime.</small>
               </div>
-              <div className="brand-asset-grid">
-                {brandImageFields.map((field) => {
-                  const value = String(draft[field.key] ?? "");
+              <div className="brand-visual-preset-grid">
+                {brandVisualPresets.map((preset) => {
+                  const active = (draft.logo_url ?? null) === preset.logo_url
+                    && (draft.mascot_url ?? null) === preset.mascot_url
+                    && (draft.background_url ?? null) === preset.background_url;
                   return (
-                    <label className={value ? "brand-asset-card filled" : "brand-asset-card"} key={field.key}>
-                      <span className="brand-asset-icon">{field.icon}</span>
-                      <span className="brand-asset-copy">
-                        <b>{field.title}</b>
-                        <small>{field.help}</small>
+                    <button
+                      type="button"
+                      key={preset.name}
+                      className={active ? "brand-visual-preset active" : "brand-visual-preset"}
+                      aria-pressed={active}
+                      onClick={() => setDraft((c) => ({
+                        ...c,
+                        logo_url: preset.logo_url, mascot_url: preset.mascot_url, background_url: preset.background_url,
+                        primary_color: preset.primary_color, secondary_color: preset.secondary_color, accent_color: preset.accent_color
+                      }))}
+                    >
+                      <span className="brand-visual-thumb" style={{ background: `linear-gradient(135deg, ${preset.primary_color}, ${preset.secondary_color})` }}>
+                        <img src={preset.mascot_url ?? preset.logo_url} alt="" loading="lazy" className={preset.mascot_url ? "" : "logo-only"} />
                       </span>
-                      <input
-                        value={value}
-                        onChange={(event) => setDraft((current) => ({ ...current, [field.key]: event.target.value || null }))}
-                        placeholder={field.placeholder}
-                      />
-                    </label>
+                      <b>{preset.name}</b>
+                      <small>{preset.note}</small>
+                    </button>
                   );
                 })}
               </div>
-              <div className="brand-wizard-suggestions brand-asset-actions">
-                <span>Quick art actions</span>
-                <div>
-                  <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: "/fenrir-cut-wordmark.svg", mascot_url: null, background_url: null }))}>Use clean Fenrir mark</button>
-                  <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: "/fenrir-splash-icon.svg", mascot_url: null, background_url: "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop" }))}>Abstract background</button>
-                  <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: null, mascot_url: null, background_url: null }))}>Clear all images</button>
+              <p className="brand-visual-footnote">Bundled art — no hosting needed. Final brand files can replace these later, and never block launch.</p>
+
+              <details className="brand-advanced">
+                <summary>Advanced — use your own art</summary>
+                <div className="brand-advanced-body">
+                  <div className="brand-asset-help-card">
+                    <span className="brand-asset-help-icon">＋</span>
+                    <div>
+                      <b>Add your own art</b>
+                      <small>Upload the file to /public, Cloudflare R2, Supabase Storage, or any public HTTPS CDN. Then paste that final URL below. Local files cannot be served to visitors until they are hosted.</small>
+                    </div>
+                  </div>
+                  <div className="brand-asset-grid">
+                    {brandImageFields.map((field) => {
+                      const value = String(draft[field.key] ?? "");
+                      return (
+                        <label className={value ? "brand-asset-card filled" : "brand-asset-card"} key={field.key}>
+                          <span className="brand-asset-icon">{field.icon}</span>
+                          <span className="brand-asset-copy">
+                            <b>{field.title}</b>
+                            <small>{field.help}</small>
+                          </span>
+                          <input
+                            value={value}
+                            onChange={(event) => setDraft((current) => ({ ...current, [field.key]: event.target.value || null }))}
+                            placeholder={field.placeholder}
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="brand-wizard-suggestions brand-asset-actions">
+                    <span>Quick art actions</span>
+                    <div>
+                      <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: "/fenrir-cut-wordmark.svg", mascot_url: null, background_url: null }))}>Use clean Fenrir mark</button>
+                      <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: "/fenrir-splash-icon.svg", mascot_url: null, background_url: "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop" }))}>Abstract background</button>
+                      <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: null, mascot_url: null, background_url: null }))}>Clear all images</button>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </details>
             </div>
           )}
 
