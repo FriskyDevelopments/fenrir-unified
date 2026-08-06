@@ -1,9 +1,13 @@
+/* Community Bridge protocol typography: the same three families the
+   Community Gate ships (Unbounded display / Outfit body / JetBrains Mono). */
+@import url("https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap");
+
 :root {
   /* FriskyDev design system (friskydev.com), dark scheme: paper/ink editorial
      palette with the gold accent. Variable NAMES are kept for compatibility —
      the legacy neon values were the LORE contamination and are gone. */
   color-scheme: dark;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background: #12171c;
   color: #e9ebe7;
   --app: #12171c;          /* friskydev --paper (dark) */
@@ -33,9 +37,27 @@
   --theme-secondary: var(--teal);
   --theme-accent: var(--amber);
   --theme-glow: rgba(194, 164, 105, .20);
-  --display: ui-serif, Georgia, "Times New Roman", Times, serif;
-  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --display: "Unbounded", "Outfit", ui-serif, Georgia, serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --shadow: 0 1px 1px rgba(0, 0, 0, 0.28), 0 18px 52px rgba(0, 0, 0, 0.30);
+
+  /* ── Community Bridge gate tokens ─────────────────────────────────────
+     HSL triplets (consumed as hsl(var(--gate-*) / a)), namespaced --gate-*
+     because the legacy --theme-* family holds hex values and is consumed
+     bare throughout this file. Defaults = the Fenrir gold-over-ink brand;
+     brandThemes.themeCssVars() overrides them per theme at runtime. */
+  --gate-bg: 210 22% 9%;             /* #12171c ink */
+  --gate-surface: 210 21% 11%;       /* #171d23 sunk paper */
+  --gate-border: 40 42% 59%;         /* gold edge */
+  --gate-border-alpha: 0.18;
+  --gate-accent: 40 42% 59%;         /* #c2a469 gold */
+  --gate-accent-soft: 158 22% 59%;   /* #7fae9d teal */
+  --gate-glow: 40 42% 59%;
+  --gate-text: 90 9% 91%;            /* #e9ebe7 */
+  --gate-text-muted: 208 12% 70%;    /* #a9b3bc */
+  --gate-gradient-start: 40 42% 59%;
+  --gate-gradient-middle: 158 22% 59%;
+  --gate-gradient-end: 39 39% 39%;   /* #8a6e3c bronze */
 }
 
 * {
@@ -6758,4 +6780,431 @@ p {
   color: var(--amber);
   font-size: 13px;
   font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Community Bridge protocol layer — ported from community-gate/frontend
+   (index.css + GateShell/CommunityGate layout), re-expressed as plain CSS
+   over the --gate-* HSL tokens. New markup only; legacy classes untouched.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.font-display {
+  font-family: var(--display);
+  letter-spacing: -0.02em;
+}
+
+.font-mono-protocol {
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+}
+
+/* Subtle dark glass card (NOT full frosted) */
+.gate-card {
+  background: hsl(var(--gate-surface) / 0.6);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid hsl(var(--gate-border) / var(--gate-border-alpha));
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px hsl(var(--gate-accent) / 0.04),
+    0 30px 80px -20px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 0 hsl(0 0% 100% / 0.04);
+}
+
+.neon-edge {
+  box-shadow:
+    0 0 0 1px hsl(var(--gate-accent) / 0.6),
+    0 0 18px 0 hsl(var(--gate-glow) / 0.45),
+    0 0 60px -10px hsl(var(--gate-glow) / 0.4);
+}
+
+.neon-text {
+  color: hsl(var(--gate-accent));
+  text-shadow: 0 0 14px hsl(var(--gate-glow) / 0.45);
+}
+
+.gate-input {
+  background: hsl(var(--gate-surface) / 0.7);
+  border: 1px solid hsl(var(--gate-border) / var(--gate-border-alpha));
+  color: hsl(var(--gate-text));
+  transition: border-color 200ms, box-shadow 200ms, background 200ms;
+}
+
+.gate-input:focus,
+.gate-input:focus-visible {
+  outline: none;
+  border-color: hsl(var(--gate-accent) / 0.8);
+  box-shadow: 0 0 0 3px hsl(var(--gate-glow) / 0.18);
+}
+
+.gate-input::placeholder {
+  color: hsl(var(--gate-text-muted));
+}
+
+.gate-btn-primary {
+  background: hsl(var(--gate-accent));
+  color: hsl(var(--gate-bg));
+  border: 1px solid hsl(var(--gate-accent));
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-weight: 600;
+  transition: transform 150ms, box-shadow 250ms, background 200ms;
+}
+
+.gate-btn-primary:hover {
+  box-shadow: 0 0 24px hsl(var(--gate-glow) / 0.6),
+              0 0 60px hsl(var(--gate-glow) / 0.3);
+  transform: translateY(-1px);
+}
+
+.gate-btn-primary:active {
+  transform: translateY(0);
+}
+
+.gate-btn-ghost {
+  background: hsl(var(--gate-surface) / 0.6);
+  color: hsl(var(--gate-text));
+  border: 1px solid hsl(var(--gate-border) / var(--gate-border-alpha));
+  transition: background 200ms, border-color 200ms;
+}
+
+.gate-btn-ghost:hover {
+  background: hsl(var(--gate-surface));
+  border-color: hsl(var(--gate-border) / 0.4);
+}
+
+.status-pill {
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid hsl(var(--gate-border) / 0.35);
+  background: hsl(var(--gate-surface) / 0.6);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-pill i {
+  height: 6px;
+  width: 6px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+/* Vertical scanline shimmer for visual side */
+.scanline::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0,
+    transparent 3px,
+    hsl(0 0% 100% / 0.018) 3px,
+    hsl(0 0% 100% / 0.018) 4px
+  );
+  pointer-events: none;
+}
+
+/* Floating wolf eye glow */
+.glow-eye {
+  filter: drop-shadow(0 0 8px hsl(var(--gate-glow) / 0.7))
+          drop-shadow(0 0 16px hsl(var(--gate-glow) / 0.4));
+}
+
+@keyframes gate-drift {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-40px, 20px, 0); }
+}
+
+@keyframes gate-pulse-glow {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1; }
+}
+
+@keyframes gate-slide-in-right {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes gate-slide-in-left {
+  from { transform: translateX(-20px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+.anim-in-r { animation: gate-slide-in-right 500ms cubic-bezier(.2, .7, .2, 1) both; }
+.anim-in-l { animation: gate-slide-in-left 500ms cubic-bezier(.2, .7, .2, 1) both; }
+.anim-pulse-glow { animation: gate-pulse-glow 3s ease-in-out infinite; }
+
+/* ── Gate shell layout (CommunityGate.jsx two-pane structure) ─────────── */
+
+.gate-root {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  background: hsl(var(--gate-bg));
+  color: hsl(var(--gate-text));
+}
+
+.gate-root[data-has-background="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--theme-bg-image);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.gate-fill {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  pointer-events: none;
+}
+
+.gate-bg-layers {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.gate-topbar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 32px;
+}
+
+.gate-brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.gate-brand-lockup .gate-brand-name {
+  font-family: var(--display);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  line-height: 1.25;
+}
+
+.gate-brand-lockup .gate-brand-sub {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  opacity: 0.6;
+  line-height: 1.4;
+}
+
+.gate-topbar .language-select {
+  background: hsl(var(--gate-surface) / 0.6);
+  border: 1px solid hsl(var(--gate-border) / var(--gate-border-alpha));
+  color: hsl(var(--gate-text));
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gate-panes {
+  position: relative;
+  z-index: 10;
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0;
+  padding-bottom: 96px;
+  align-items: center;
+}
+
+.gate-visual-pane {
+  display: none;
+  grid-column: span 7 / span 7;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 48px 0;
+}
+
+.gate-visual-inner {
+  position: relative;
+  width: 100%;
+  max-width: 42rem;
+}
+
+.gate-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.gate-headline {
+  margin: 20px 0 0;
+  font-family: var(--display);
+  font-size: clamp(2.1rem, 4.2vw, 3.6rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.04;
+}
+
+.gate-headline span {
+  display: block;
+}
+
+.gate-gradient-text {
+  background: linear-gradient(
+    96deg,
+    hsl(var(--gate-gradient-start)),
+    hsl(var(--gate-gradient-middle)),
+    hsl(var(--gate-gradient-end))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 18px hsl(var(--gate-glow) / 0.35));
+}
+
+.gate-subhead {
+  margin-top: 24px;
+  max-width: 28rem;
+  font-size: 16px;
+  line-height: 1.65;
+  color: hsl(var(--gate-text-muted));
+}
+
+.gate-wordmark {
+  width: min(230px, 52vw);
+  filter: drop-shadow(0 0 14px hsl(var(--gate-glow) / 0.35));
+}
+
+.gate-badges {
+  margin-top: 40px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.gate-mascot {
+  position: absolute;
+  right: -16px;
+  top: -64px;
+  width: 300px;
+  height: 360px;
+  opacity: 0.95;
+  pointer-events: none;
+}
+
+.gate-mascot svg {
+  height: 100%;
+  width: 100%;
+}
+
+.gate-corner {
+  position: absolute;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  opacity: 0.5;
+  line-height: 1.9;
+}
+
+.gate-corner.bottom-left { bottom: 48px; left: 48px; }
+.gate-corner.top-right { top: 32px; right: 48px; text-align: right; }
+
+.gate-auth-pane {
+  grid-column: span 12 / span 12;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px 20px 0;
+}
+
+.gate-auth-inner {
+  width: 100%;
+  max-width: 30rem;
+}
+
+.gate-mobile-intro {
+  margin-bottom: 28px;
+}
+
+.gate-mobile-intro .gate-headline {
+  font-size: clamp(1.7rem, 7vw, 2.2rem);
+  margin-top: 12px;
+}
+
+.gate-mobile-intro .gate-subhead {
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.gate-footer {
+  position: relative;
+  z-index: 20;
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 32px;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.gate-footer .gate-footer-status {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .gate-footer .gate-footer-status {
+    display: inline;
+  }
+}
+
+@media (min-width: 1024px) {
+  /* The auth card can be much taller than the viewport; keep the visual
+     pane pinned while the card side scrolls. */
+  .gate-visual-pane {
+    display: flex;
+    align-self: start;
+    position: sticky;
+    top: 0;
+    min-height: calc(100vh - 120px);
+  }
+
+  .gate-auth-pane {
+    grid-column: span 5 / span 5;
+    align-items: center;
+    padding: 0 48px;
+  }
+
+  .gate-mobile-intro {
+    display: none;
+  }
 }

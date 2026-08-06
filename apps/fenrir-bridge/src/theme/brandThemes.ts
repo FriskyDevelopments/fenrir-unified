@@ -81,12 +81,46 @@ export const brandThemes: Record<BrandKey, BrandTheme> = {
   }
 };
 
+/** "#c2a469" → "40 42% 59%" (HSL triplet for hsl(var(--x) / a) consumption). */
+export function hexToHslTriplet(hex: string): string {
+  const value = hex.replace("#", "");
+  const full = value.length === 3 ? value.split("").map((c) => c + c).join("") : value;
+  const r = parseInt(full.slice(0, 2), 16) / 255;
+  const g = parseInt(full.slice(2, 4), 16) / 255;
+  const b = parseInt(full.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+  if (delta > 0) {
+    s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+    if (max === r) h = ((g - b) / delta + (g < b ? 6 : 0)) * 60;
+    else if (max === g) h = ((b - r) / delta + 2) * 60;
+    else h = ((r - g) / delta + 4) * 60;
+  }
+  return `${Math.round(h)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
 export function themeCssVars(theme: BrandTheme): CSSProperties {
+  const primary = hexToHslTriplet(theme.primary);
+  const secondary = hexToHslTriplet(theme.secondary);
+  const accent = hexToHslTriplet(theme.accent);
   return {
     "--theme-primary": theme.primary,
     "--theme-secondary": theme.secondary,
     "--theme-accent": theme.accent,
-    "--theme-glow": theme.glow
+    "--theme-glow": theme.glow,
+    // Community Bridge gate tokens (HSL triplets) — drive the protocol
+    // surface (shader, particles, gate-card, gradient headline).
+    "--gate-accent": primary,
+    "--gate-accent-soft": secondary,
+    "--gate-border": primary,
+    "--gate-glow": primary,
+    "--gate-gradient-start": primary,
+    "--gate-gradient-middle": secondary,
+    "--gate-gradient-end": accent
   } as CSSProperties;
 }
 
