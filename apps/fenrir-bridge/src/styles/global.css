@@ -6946,7 +6946,9 @@ p {
   position: relative;
   min-height: 100vh;
   width: 100%;
-  overflow-x: hidden;
+  /* clip (not hidden): hidden would make this the sticky scrollport and
+     kill the pinned visual pane. */
+  overflow-x: clip;
   display: flex;
   flex-direction: column;
   background: hsl(var(--gate-bg));
@@ -7130,7 +7132,7 @@ p {
   line-height: 1.9;
 }
 
-.gate-corner.bottom-left { bottom: 48px; left: 48px; }
+.gate-corner.bottom-left { bottom: 24px; left: 48px; }
 .gate-corner.top-right { top: 32px; right: 48px; text-align: right; }
 
 .gate-auth-pane {
@@ -7196,6 +7198,7 @@ p {
     position: sticky;
     top: 0;
     min-height: calc(100vh - 120px);
+    padding-bottom: 110px;
   }
 
   .gate-auth-pane {
