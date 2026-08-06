@@ -6,15 +6,23 @@ type TelegramLoginWidgetProps = {
   onSuccess?: () => void;
 };
 
+function normalizeBotUsername(value: string): string {
+  return value.trim().replace(/^@/, "");
+}
+
 export function TelegramLoginWidget({ botUsername, onSuccess }: TelegramLoginWidgetProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const normalized = useMemo(() => normalizeBotUsername(botUsername || ""), [botUsername]);
 
-  const loginCallbackName = useMemo(() => `fenrirTelegramAuth_${Math.random().toString(36).slice(2, 11)}`, []);
+  const loginCallbackName = useMemo(
+    () => `fenrirTelegramAuth_${Math.random().toString(36).slice(2, 11)}`,
+    [],
+  );
 
   useEffect(() => {
     const host = hostRef.current;
-    if (!host || !botUsername) return;
+    if (!host || !normalized) return;
 
     const globalWindow = window as unknown as Window & Record<string, (payload: TelegramLoginPayload) => void>;
     globalWindow[loginCallbackName] = async (payload: TelegramLoginPayload) => {
@@ -31,7 +39,7 @@ export function TelegramLoginWidget({ botUsername, onSuccess }: TelegramLoginWid
     const script = document.createElement("script");
     script.async = true;
     script.src = "https://telegram.org/js/telegram-widget.js?22";
-    script.setAttribute("data-telegram-login", botUsername.replace(/^@/, ""));
+    script.setAttribute("data-telegram-login", normalized);
     script.setAttribute("data-size", "large");
     script.setAttribute("data-userpic", "false");
     script.setAttribute("data-request-access", "write");
@@ -43,12 +51,23 @@ export function TelegramLoginWidget({ botUsername, onSuccess }: TelegramLoginWid
       delete globalWindow[loginCallbackName];
       host.replaceChildren();
     };
-  }, [botUsername, loginCallbackName, onSuccess]);
+  }, [normalized, loginCallbackName, onSuccess]);
 
-  if (!botUsername) {
+  if (!normalized) {
     return (
-      <div className="telegram-login-widget telegram-login-widget-missing">
-        <p>Telegram login is not configured yet.</p>
+      <div className="telegram-login-widget telegram-login-widget-missing" role="status">
+        <p className="label">Telegram login not configured</p>
+        <p className="muted">
+          Set <code>FENRIR_TELEGRAM_BOT_USERNAME</code> (Pages) and{" "}
+          <code>TELEGRAM_BOT_TOKEN</code> + <code>TELEGRAM_WEBHOOK_SECRET</code> (Workers)
+          so the Login Widget and Stars checkout share one Fenrir bot.
+        </p>
+        <ul className="telegram-setup-checklist">
+          <li>Create / reclaim the Fenrir bot with BotFather</li>
+          <li>Enable the Telegram Login Widget domain for myfenrir.com</li>
+          <li>Point the webhook at <code>/api/telegram/webhook</code></li>
+          <li>Re-run <code>npm run verify:readiness</code> until Stars + webhook are green</li>
+        </ul>
       </div>
     );
   }
@@ -56,7 +75,9 @@ export function TelegramLoginWidget({ botUsername, onSuccess }: TelegramLoginWid
   return (
     <div className="telegram-login-widget">
       <div className="telegram-login-widget-host" ref={hostRef} />
-      <small className="muted">Telegram proves the admin account and opens the same Fenrir session.</small>
+      <small className="muted">
+        Telegram proves the admin account via @{normalized} and opens the same Fenrir session.
+      </small>
       {status ? <small className="telegram-login-error">{status}</small> : null}
     </div>
   );

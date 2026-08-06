@@ -55,6 +55,7 @@ export type ReadinessPayload = {
     googleConfigured: boolean;
     microsoftConfigured: boolean;
     appleConfigured: boolean;
+    friskyAuthEnabled?: boolean;
   };
   billing: {
     stripeSecretConfigured: boolean;

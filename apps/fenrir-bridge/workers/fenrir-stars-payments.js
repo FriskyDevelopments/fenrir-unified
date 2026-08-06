@@ -21,6 +21,241 @@ const botToken = (env, channel) => {
 const normalizeText = (value) => (value || "").trim();
 const BRIDGE_TARGET = "bridge.myfenrir.com";
 
+// ═══ FENRIR GATE — Telegram Mini App + Cloudflare Turnstile ═══════════════════
+// Join-request-based verification. Group must have "Approve new members" ON.
+// Flow: user requests to join → bot DMs them a web_app button → Mini App renders
+// Turnstile → passes → worker calls approveChatJoinRequest → user is in.
+
+function gateEnabled(env) {
+  return Boolean(normalizeText(env.TURNSTILE_SITE_KEY) && normalizeText(env.TURNSTILE_SECRET_KEY));
+}
+
+function gateMiniAppUrl(env) {
+  return normalizeText(env.FENRIR_GATE_MINI_APP_URL) || "https://www.myfenrir.com/gate/app";
+}
+
+/** HMAC token so gate URLs cannot be spoofed. */
+async function gateToken(env, chatId, userId) {
+  const secret = normalizeText(env.TELEGRAM_WEBHOOK_SECRET) || "fenrir-gate-default";
+  const data = `gate:${chatId}:${userId}`;
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+}
+
+async function verifyGateToken(env, chatId, userId, token) {
+  const expected = await gateToken(env, chatId, userId);
+  if (!token || !expected || token.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < token.length; i++) diff |= token.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
+}
+
+/** Load per-group branding from D1 (falls back to defaults). */
+async function getGateGroup(env, chatId) {
+  if (!env.DB) return null;
+  return env.DB.prepare(
+    `SELECT * FROM gate_groups WHERE chat_id = ? LIMIT 1`
+  ).bind(String(chatId)).first().catch(() => null);
+}
+
+/** Handle chat_join_request — DM the user with a web_app Verify button. */
+async function handleChatJoinRequest(env, channel, joinRequest) {
+  if (!gateEnabled(env)) return false;
+
+  const chatId = joinRequest.chat.id;
+  const userId = joinRequest.from.id;
+  const firstName = joinRequest.from.first_name || "";
+  const chatTitle = joinRequest.chat.title || "this community";
+
+  const token = await gateToken(env, chatId, userId);
+  const miniAppBase = gateMiniAppUrl(env);
+  const webAppUrl = `${miniAppBase}?chat=${chatId}&user=${userId}&token=${token}`;
+
+  // Load per-group config for custom welcome text
+  const groupConfig = await getGateGroup(env, chatId);
+  const welcomeText = groupConfig?.welcome_text ||
+    `You've requested to join ${chatTitle}.\n\nThis community is protected by Fenrir. Tap the button below to verify you're human, and you'll be approved instantly.`;
+
+  try {
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: userId, // DM the user
+      text: `👋 Hey${firstName ? ` ${firstName}` : ""}!\n\n${welcomeText}`,
+      reply_markup: {
+        inline_keyboard: [[
+          { text: "✅ Verify Now", web_app: { url: webAppUrl } }
+        ]]
+      }
+    });
+  } catch (err) {
+    // User may have never started the bot — can't DM them.
+    // Nothing we can do; admin will see pending request in the group.
+    console.warn(JSON.stringify({
+      event: "gate_dm_failed",
+      chatId, userId,
+      error: err?.message,
+      ts: nowIso()
+    }));
+  }
+  return true;
+}
+
+/** Validate Turnstile siteverify response. */
+async function verifyTurnstile(env, turnstileToken, ip) {
+  const secret = normalizeText(env.TURNSTILE_SECRET_KEY);
+  if (!secret) return { success: false, error: "turnstile_not_configured" };
+
+  const formData = new URLSearchParams();
+  formData.append("secret", secret);
+  formData.append("response", turnstileToken);
+  if (ip) formData.append("remoteip", ip);
+
+  const resp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: formData.toString()
+  });
+  const data = await resp.json().catch(() => null);
+  if (!data) return { success: false, error: "turnstile_network_error" };
+  return { success: Boolean(data.success), error: data["error-codes"]?.join(", ") || null };
+}
+
+/** Approve the user's join request after Turnstile passes. */
+async function approveGateUser(env, channel, chatId, userId) {
+  await telegramApi(env, channel, "approveChatJoinRequest", {
+    chat_id: chatId,
+    user_id: userId
+  });
+}
+
+/** Handle POST /api/telegram/gate-approve. */
+async function handleGateApprove(request, env) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ ok: false, error: "invalid_body" }, { status: 400 });
+
+  const { chat, user, token, turnstile } = body;
+  if (!chat || !user || !token || !turnstile) {
+    return json({ ok: false, error: "missing_fields" }, { status: 400 });
+  }
+
+  // Verify our HMAC gate token
+  const tokenValid = await verifyGateToken(env, chat, user, token);
+  if (!tokenValid) {
+    return json({ ok: false, error: "invalid_gate_token" }, { status: 403 });
+  }
+
+  // Verify Turnstile
+  const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "";
+  const turnstileResult = await verifyTurnstile(env, turnstile, ip);
+  if (!turnstileResult.success) {
+    return json({ ok: false, error: `turnstile_failed: ${turnstileResult.error || "unknown"}` }, { status: 403 });
+  }
+
+  // Approve the join request
+  const channel = "prod"; // gate always uses prod bot
+  try {
+    await approveGateUser(env, channel, chat, user);
+  } catch (err) {
+    return json({ ok: false, error: `approve_failed: ${err?.message || "unknown"}` }, { status: 500 });
+  }
+
+  // Log approval
+  if (env.DB) {
+    await env.DB.prepare(
+      `INSERT INTO gate_approvals (chat_id, user_id, approved_at) VALUES (?, ?, ?)`
+    ).bind(String(chat), String(user), nowIso()).run().catch(() => {});
+  }
+
+  return json({ ok: true, approved: true });
+}
+
+/** Serve the Fenrir Gate Mini App HTML at /gate/app. */
+function serveGateMiniApp(env, url) {
+  const siteKey = normalizeText(env.TURNSTILE_SITE_KEY);
+  const chatId = url.searchParams.get("chat") || "";
+  const userId = url.searchParams.get("user") || "";
+  const token = url.searchParams.get("token") || "";
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>Fenrir Gate</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0a;--card:#141414;--border:#222;--accent:#F59E0B;--success:#10B981;--error:#EF4444;--text:#fff;--muted:#888}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:40px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.5)}
+.logo{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#EC4899);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:24px}
+h1{font-size:1.3rem;font-weight:700;margin-bottom:6px}
+.brand{color:var(--accent)}
+p{color:var(--muted);font-size:0.85rem;margin-bottom:24px;line-height:1.5}
+.cf-turnstile{display:flex;justify-content:center;margin-bottom:16px}
+.status{margin-top:16px;font-size:0.85rem;padding:12px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border)}
+.status.success{color:var(--success);border-color:rgba(16,185,129,0.3)}
+.status.error{color:var(--error);border-color:rgba(239,68,68,0.3)}
+.status.pending{color:var(--muted)}
+.shield{font-size:2rem;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="card">
+<div class="shield">🛡️</div>
+<div class="logo">🐺</div>
+<h1><span class="brand">Fenrir</span> Gate</h1>
+<p>Complete the verification below to join the community.</p>
+<div class="cf-turnstile" data-sitekey="${siteKey}" data-callback="onVerify" data-theme="dark" data-size="normal"></div>
+<div class="status pending" id="status">Waiting for verification...</div>
+</div>
+<script>
+const TG = window.Telegram?.WebApp;
+if(TG) TG.ready();
+
+async function onVerify(turnstileToken){
+  const s=document.getElementById('status');
+  s.textContent='Verifying with Fenrir...';
+  s.className='status pending';
+  try{
+    const r=await fetch('/api/telegram/gate-approve',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({chat:'${chatId}',user:'${userId}',token:'${token}',turnstile:turnstileToken})
+    });
+    const d=await r.json();
+    if(d.ok&&d.approved){
+      s.textContent='✅ Verified! You\\'ve been approved. Welcome to the community.';
+      s.className='status success';
+      if(TG) setTimeout(()=>TG.close(),2000);
+    }else{
+      s.textContent='Verification failed: '+(d.error||'unknown')+'. Try again.';
+      s.className='status error';
+      if(window.turnstile) turnstile.reset();
+    }
+  }catch(e){
+    s.textContent='Network error. Please try again.';
+    s.className='status error';
+  }
+}
+</script>
+</body>
+</html>`;
+
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html;charset=utf-8",
+      "cache-control": "no-store",
+    }
+  });
+}
+
+// ═══ END FENRIR GATE ══════════════════════════════════════════════════════════
+
 const FENRIR_BOT_BRIEF = [
   "You are Fenrir Bot by Frisky.",
   "You are NOT Pupbot. You are NOT Gemini Pupbot. You are NOT a generic assistant.",
@@ -583,6 +818,13 @@ async function handleTelegramWebhook(request, env, url) {
   const update = await request.json().catch(() => null);
   if (!update) return json({ ok: false, error: "invalid_update" }, { status: 400 });
 
+  // --- Fenrir Gate: chat_join_request (before any other handler) ----------------
+  if (update.chat_join_request) {
+    const handled = await handleChatJoinRequest(env, channel, update.chat_join_request);
+    return json({ ok: true, gate: handled });
+  }
+  // -----------------------------------------------------------------------------
+
   if (update.pre_checkout_query) {
     const query = update.pre_checkout_query;
     const order = await getOrder(env, query.invoice_payload);
@@ -818,9 +1060,51 @@ export default {
           geminiConfigured: Boolean(normalizeText(env.GEMINI_API_KEY || env.GOOGLE_AI_STUDIO_API_KEY)),
           model: normalizeText(env.GEMINI_MODEL) || "gemini-3-flash-preview",
           fallbackEnabled: true
+        },
+        gate: {
+          enabled: gateEnabled(env),
+          turnstileConfigured: Boolean(normalizeText(env.TURNSTILE_SITE_KEY)),
+          miniAppUrl: gateMiniAppUrl(env)
         }
       });
     }
+
+    // --- Fenrir Gate routes ---------------------------------------------------
+
+    // Serve the Mini App HTML
+    if (url.pathname === "/gate/app" && request.method === "GET") {
+      if (!gateEnabled(env)) {
+        return json({ ok: false, error: "gate_not_configured" }, { status: 503 });
+      }
+      return serveGateMiniApp(env, url);
+    }
+
+    // Gate approve callback (Mini App POSTs here after Turnstile pass)
+    if (url.pathname === "/api/telegram/gate-approve" && request.method === "POST") {
+      if (!gateEnabled(env)) {
+        return json({ ok: false, error: "gate_not_configured" }, { status: 503 });
+      }
+      return handleGateApprove(request, env);
+    }
+
+    // Gate status — check if a group has gate enabled
+    if (url.pathname === "/api/telegram/gate-status" && request.method === "GET") {
+      const chatId = url.searchParams.get("chat");
+      if (!chatId) return json({ ok: false, error: "missing_chat" }, { status: 400 });
+      const groupConfig = await getGateGroup(env, chatId);
+      return json({
+        ok: true,
+        gate_enabled: gateEnabled(env),
+        group: groupConfig ? {
+          chat_id: groupConfig.chat_id,
+          group_name: groupConfig.group_name,
+          accent_color: groupConfig.accent_color,
+          has_logo: Boolean(groupConfig.logo_url),
+        } : null
+      });
+    }
+
+    // -----------------------------------------------------------------
 
     return json({ ok: true, service: "fenrir-stars-payments" });
   }

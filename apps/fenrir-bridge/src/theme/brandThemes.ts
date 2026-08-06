@@ -37,7 +37,8 @@ export const brandThemes: Record<BrandKey, BrandTheme> = {
     lanes: ["IDENTITY", "WORKSPACES", "MEDIA", "AI AGENTS", "PROTOCOL SERVICES"],
     nodeStatus: ["AUTH ONLINE", "SESSION BRIDGE ACTIVE", "PASSKEY READY", "PROTOCOL STABLE"],
     authKicker: "OAuth + passkeys",
-    // FriskyDev system: gold accent over paper/ink — not the LORE neon set.
+    // PROTOCOL kit (@frisky/kit-fenrir): gold over ink — not the LORE neon set.
+    // Source of truth also lives in frisky-ui-kits/packages/tokens/src/brands/fenrir.css
     primary: "#c2a469",
     secondary: "#7fae9d",
     accent: "#8a6e3c",

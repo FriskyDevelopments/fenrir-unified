@@ -1550,6 +1550,31 @@ code {
 .telegram-login-widget-missing {
   color: var(--muted);
   font-size: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.telegram-login-widget-missing .label {
+  color: var(--text, #f4f0e6);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.telegram-login-widget-missing code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--theme-accent, #c2a469);
+}
+
+.telegram-setup-checklist {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .auth-actions button.secondary {
@@ -6495,6 +6520,64 @@ p {
 .brand-wizard-image-builder {
   display: grid;
   gap: 12px;
+}
+
+/* Gate builder "looks" — preset-first, near-zero-config (Francisco feedback) */
+.brand-visual-preset-head { display: grid; gap: 4px; }
+.brand-visual-preset-head b { font-size: 15px; }
+.brand-visual-preset-head small { color: rgba(233,238,236,.62); line-height: 1.45; }
+.brand-visual-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.brand-visual-preset {
+  display: grid; gap: 8px; text-align: left;
+  border: 1px solid rgba(140,185,255,.22); border-radius: 14px;
+  background: rgba(12,18,16,.4); padding: 10px; cursor: pointer; color: inherit;
+  transition: border-color .15s ease, transform .12s ease, box-shadow .15s ease;
+}
+.brand-visual-preset:hover, .brand-visual-preset:focus-visible {
+  border-color: rgba(140,185,255,.6); transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0,0,0,.4); outline: none;
+}
+.brand-visual-preset.active {
+  border-color: var(--teal, #22c7a8);
+  box-shadow: 0 0 0 1px var(--teal, #22c7a8), 0 12px 30px rgba(34,199,168,.18);
+}
+.brand-visual-thumb {
+  position: relative; display: grid; place-items: center;
+  aspect-ratio: 16 / 10; border-radius: 10px; overflow: hidden;
+}
+.brand-visual-thumb::after {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(120% 100% at 50% 120%, rgba(0,0,0,.45), transparent 60%);
+}
+.brand-visual-thumb img {
+  position: relative; z-index: 1; max-width: 62%; max-height: 72%;
+  object-fit: contain; filter: drop-shadow(0 6px 16px rgba(0,0,0,.5));
+}
+.brand-visual-thumb img.logo-only { max-width: 52%; max-height: 46%; }
+.brand-visual-preset b { font-size: 13.5px; }
+.brand-visual-preset small { color: rgba(233,238,236,.6); font-size: 11.5px; line-height: 1.4; }
+.brand-visual-footnote { margin: 2px 2px 0; color: rgba(233,238,236,.5); font-size: 11.5px; line-height: 1.5; }
+
+.brand-advanced {
+  border: 1px solid rgba(140,185,255,.16); border-radius: 12px;
+  background: rgba(10,14,13,.35); margin-top: 4px;
+}
+.brand-advanced > summary {
+  cursor: pointer; list-style: none; padding: 12px 14px; font-weight: 700; font-size: 13px;
+  color: rgba(233,238,236,.82); display: flex; align-items: center; gap: 8px;
+}
+.brand-advanced > summary::-webkit-details-marker { display: none; }
+.brand-advanced > summary::before { content: "\25B8"; color: rgba(140,185,255,.7); transition: transform .15s ease; }
+.brand-advanced[open] > summary::before { transform: rotate(90deg); }
+.brand-advanced > summary:hover { color: #fff; }
+.brand-advanced-body { display: grid; gap: 12px; padding: 0 14px 14px; }
+
+@media (max-width: 460px) {
+  .brand-visual-preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .brand-asset-help-card {

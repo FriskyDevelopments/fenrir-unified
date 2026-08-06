@@ -14,6 +14,7 @@ export type ReadinessSnapshot = {
     googleConfigured: boolean;
     microsoftConfigured: boolean;
     appleConfigured: boolean;
+    friskyAuthEnabled: boolean;
   };
   billing: {
     stripeSecretConfigured: boolean;
@@ -40,7 +41,8 @@ export function computeReadiness(env: OAuthEnv): ReadinessSnapshot {
   const auth = {
     googleConfigured: directGoogle || (supabaseConfigured && enabled(env.FENRIR_GOOGLE_OAUTH_CONFIGURED)),
     microsoftConfigured: directMicrosoft || (supabaseConfigured && enabled(env.FENRIR_MICROSOFT_OAUTH_CONFIGURED)),
-    appleConfigured: directApple || (supabaseConfigured && enabled(env.FENRIR_APPLE_OAUTH_CONFIGURED))
+    appleConfigured: directApple || (supabaseConfigured && enabled(env.FENRIR_APPLE_OAUTH_CONFIGURED)),
+    friskyAuthEnabled: enabled(env.FRISKY_AUTH_ENABLED)
   };
 
   const telegramBotConfigured = nonEmpty(env.TELEGRAM_BOT_TOKEN) || nonEmpty(env.TELEGRAM_PROD_BOT_TOKEN);
