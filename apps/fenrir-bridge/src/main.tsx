@@ -10,6 +10,10 @@ installHoneybadgerBrowserReporter();
 // VITE_POSTHOG_PROJECT_TOKEN, así que arrancar sin configurar no cambia nada.
 installPosthog();
 
+// Expose a non-sensitive release marker and force a fresh content hash when a
+// broken edge response has been cached under a previous asset URL.
+document.documentElement.dataset.fenrirRelease = "supabase-auth-2026-08-07b";
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

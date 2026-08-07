@@ -25,8 +25,6 @@ export type BillingEnv = AuthEnv & {
   FENRIR_MICROSOFT_OAUTH_CONFIGURED?: string;
   FENRIR_APPLE_OAUTH_CONFIGURED?: string;
   NEON_DATABASE_URL?: string;
-  WORKOS_CLIENT_ID?: string;
-  WORKOS_API_KEY?: string;
   MEDIA_PROXY_ALLOWED_HOSTS?: string;
   /** Base URL for Stripe success/cancel/portal returns (no trailing slash). Falls back to request origin. */
   PUBLIC_SITE_URL?: string;

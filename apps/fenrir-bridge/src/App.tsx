@@ -3273,94 +3273,107 @@ function communityBrandAdminErrorMessage(error: unknown) {
 }
 
 function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
-  const theme = brandThemes.fenrir;
-  const [passkeyNote, setPasskeyNote] = useState<string | null>(() => authErrorMessage());
-
-  async function signInWithPasskey() {
-    setPasskeyNote(null);
-    try {
-      const { optionsJSON } = await webauthnService.loginOptions();
-      const assertion = await startAuthentication({ optionsJSON });
-      await webauthnService.loginVerify(assertion);
-      window.location.assign(managedDashboardPath);
-    } catch {
-      setPasskeyNote(c.passkeyError);
-    }
-  }
+  const [authNote, setAuthNote] = useState<string | null>(() => authErrorMessage());
+  const [pendingProvider, setPendingProvider] = useState<AuthProvider | null>(null);
 
   async function signInWithProvider(provider: AuthProvider) {
-    setPasskeyNote(null);
+    setAuthNote(null);
+    setPendingProvider(provider);
     try {
       await friskyClientAuthEngine.signInWithProvider(provider);
     } catch {
-      setPasskeyNote(c.authProviderError);
+      setPendingProvider(null);
+      setAuthNote(c.authProviderError);
     }
   }
 
   return (
-    <AuthSurface theme={{ ...theme, subheadline: c.authSub }} locale={locale} onLocale={onLocale} railLabel="Fenrir ecosystem">
-        <GlowCard className="auth-card" aria-label="Fenrir sign-in">
-          <div className="auth-card-header">
-            <span className="status good">{c.realAuth}</span>
-            <span className="auth-card-kicker">{theme.authKicker}</span>
-          </div>
-          <h2 className="auth-enter-title" data-text={c.authTitle}>
-            <span>{c.authTitle}</span>
-          </h2>
-          <div className="auth-actions">
-            <AuthProviderButton provider="apple" label={c.continueApple} onClick={() => void signInWithProvider("apple")} />
-            <AuthProviderButton provider="google" label={c.continueGoogle} onClick={() => void signInWithProvider("google")} />
-            <AuthProviderButton provider="microsoft" label={c.continueMicrosoft} onClick={() => void signInWithProvider("microsoft")} />
-          </div>
-          <a className="auth-alpha-link" href="/waitlist">
-            <span className="auth-alpha-link-label">No account yet?</span>
-            <span className="auth-alpha-link-action">Request alpha access →</span>
-          </a>
-          <div className="telegram-login-callout">
-            <p className="label">Telegram identity proof</p>
-            <p className="muted">If you come through Telegram, use the login widget below. Fenrir will verify the signed Telegram identity and keep you in the same session.</p>
-            <TelegramLoginWidget botUsername={telegramLoginBotUsername} />
-          </div>
-          <div className="auth-passkey-row">
-            <button type="button" className="secondary" onClick={() => void signInWithPasskey()}>
-              {c.passkeySignIn}
-            </button>
-            {passkeyNote ? <small className="muted">{passkeyNote}</small> : null}
-          </div>
-          <div className="auth-2fa-recommend">
-            <p className="label">{c.twoFactorRecommendTitle}</p>
-            <p className="muted">{c.twoFactorRecommendBody}</p>
-            <nav className="two-factor-links" aria-label="2FA provider help">
-              <a href={twoFactorHelpLinks.google} target="_blank" rel="noreferrer noopener">
-                {c.twoFactorGoogleLinkLabel}
-              </a>
-              <a href={twoFactorHelpLinks.microsoft} target="_blank" rel="noreferrer noopener">
-                {c.twoFactorMicrosoftLinkLabel}
-              </a>
-              <a href={twoFactorHelpLinks.apple} target="_blank" rel="noreferrer noopener">
-                {c.twoFactorAppleLinkLabel}
-              </a>
-            </nav>
-          </div>
-          <div className="auth-node-status" aria-label="Fenrir node status">
-            <b>FENRIR NODE STATUS</b>
-            {theme.nodeStatus.map((item) => (
-              <span key={item}>{item}</span>
-            ))}
-          </div>
-          <div className="auth-foot">
-            <div>
-              <small>{c.authEnvHint}</small>
-              <nav className="legal-links" aria-label="Legal links">
-                <a href="/legal">{c.legal}</a>
-                <a href="/terms">{c.terms}</a>
-                <a href="/privacy">{c.privacy}</a>
-              </nav>
+    <main className="lovable-auth-page" data-login-source="lovable-bd06c2e4">
+      <div className="lovable-auth-atmosphere" aria-hidden="true" />
+      <div className="lovable-auth-column">
+        <LovableAuthTerminal />
+
+        <section className="lovable-auth-card-wrap" aria-label="Fenrir sign-in">
+          <div className="lovable-auth-card-glow" aria-hidden="true" />
+          <div className="lovable-auth-card-border" aria-hidden="true" />
+          <div className="lovable-auth-card">
+            <div className="lovable-auth-card-line" aria-hidden="true" />
+            <div className="lovable-auth-brand">
+              <div className="lovable-auth-mark-shell">
+                <img src="/fenrir-splash-icon.svg" alt="MyFenrir logo" />
+              </div>
+              <img className="lovable-auth-wordmark" src="/fenrir-cut-wordmark.svg" alt="MyFenrir wordmark logo" />
+              <h1>Welcome back</h1>
+              <p>Sign in to continue to MyFenrir</p>
             </div>
+
+            <div className="lovable-auth-actions">
+              {(["apple", "google", "microsoft"] as AuthProvider[]).map((provider) => (
+                <AuthProviderButton
+                  key={provider}
+                  provider={provider}
+                  label={`Continue with ${provider === "apple" ? "Apple" : provider === "google" ? "Google" : "Microsoft"}`}
+                  disabled={pendingProvider !== null}
+                  onClick={() => void signInWithProvider(provider)}
+                />
+              ))}
+            </div>
+
+            {authNote ? <div className="lovable-auth-error" role="alert">{authNote}</div> : null}
+
+            <div className="lovable-auth-divider" aria-hidden="true">
+              <span />
+              <b>Encrypted sign-in</b>
+              <span />
+            </div>
+            <p className="lovable-auth-new-user">New here? Your account is created automatically on first sign-in.</p>
           </div>
-          <BrandSignature c={c} compact />
-        </GlowCard>
-    </AuthSurface>
+        </section>
+
+        <p className="lovable-auth-legal">
+          By continuing you agree to our <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.
+        </p>
+        <div className="lovable-auth-secured">
+          <p>Secured · End-to-end encrypted</p>
+          <a href="https://myfenrir.com" aria-label="Powered by MyFenrir">
+            <img src="/fenrir-splash-icon.svg" alt="" />
+            <span>Powered by MyFenrir</span>
+          </a>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function LovableAuthTerminal() {
+  const lines = ["fenrir --login", "establishing secure channel...", "› providers: apple · google · microsoft", "awaiting identity_"];
+  const [visibleLines, setVisibleLines] = useState(1);
+
+  useEffect(() => {
+    if (visibleLines >= lines.length) return undefined;
+    const timer = window.setTimeout(() => setVisibleLines((current) => current + 1), 420);
+    return () => window.clearTimeout(timer);
+  }, [visibleLines, lines.length]);
+
+  return (
+    <div className="lovable-auth-terminal-wrap" aria-hidden="true">
+      <div className="lovable-auth-terminal-glow" />
+      <div className="lovable-auth-terminal">
+        <div className="lovable-auth-terminal-bar">
+          <i /><i /><i />
+          <span>auth_session.sh</span>
+        </div>
+        <div className="lovable-auth-terminal-body">
+          {lines.slice(0, visibleLines).map((line, index) => (
+            <div key={line} className={`terminal-line terminal-line-${index}`}>
+              {index === 0 ? <strong>➜</strong> : null}
+              <span>{line}</span>
+              {index === visibleLines - 1 && visibleLines < lines.length ? <em /> : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 

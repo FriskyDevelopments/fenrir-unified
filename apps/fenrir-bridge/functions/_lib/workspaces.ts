@@ -6,7 +6,7 @@ const nowIso = () => new Date().toISOString();
  * Provision the user + default workspace, and return the CANONICAL session.
  *
  * The email is the join key for the human. frisky_user_id is derived from the
- * auth-broker identity (supabase:…, workos:…, telegram:…), so the same person
+ * auth-broker identity (supabase:…, telegram:…), so the same person
  * arriving through a different broker gets a different candidate id — and the
  * naive insert then dies on the app_users.email UNIQUE constraint (that is the
  * "D1_ERROR: UNIQUE constraint failed: app_users.email" login failure). When a

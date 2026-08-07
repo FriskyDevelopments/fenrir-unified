@@ -55,7 +55,7 @@ export function installPosthog(): void {
         // enmascarado por defecto: una repetición no puede filtrar nada.
         maskAllInputs: true,
         maskTextSelector: "[data-ph-mask]",
-        // MyFenrir embebe iframes de terceros (WorkOS AuthKit, widgets de pago).
+        // MyFenrir embebe iframes de terceros, como widgets de pago.
         // Grabarlos capturaría formularios de credenciales de otro origen, así
         // que se apaga explícitamente en vez de confiar en el default.
         recordCrossOriginIframes: false,

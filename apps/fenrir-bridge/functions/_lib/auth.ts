@@ -1,4 +1,4 @@
-type OAuthProvider = "google" | "microsoft" | "apple" | "telegram" | "workos";
+type OAuthProvider = "google" | "microsoft" | "apple" | "telegram";
 
 /** OAuth or passkey — session cookie may reference either after sign-in. */
 export type SessionProvider = OAuthProvider | "passkey";

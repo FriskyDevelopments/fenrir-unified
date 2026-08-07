@@ -118,7 +118,7 @@ export type AuthSession = {
     id: string;
     email: string;
     name: string;
-    authProvider: "google" | "microsoft" | "apple" | "workos" | "telegram" | "passkey";
+    authProvider: "google" | "microsoft" | "apple" | "telegram" | "passkey";
   };
   org?: {
     id: string;
