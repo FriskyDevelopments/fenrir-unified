@@ -1,0 +1,3 @@
+[submodule "apps/fenrir-bridge/astelar"]
+	path = apps/fenrir-bridge/astelar
+	url = https://github.com/FriskyDevelopments/astelar.git

@@ -139,12 +139,12 @@ function linkCodeFromStart(text: string) {
 function startActionButtons(env: BillingEnv, origin: string) {
   const baseUrl = origin.replace(/\/$/, "");
   const buttons = [
-    [{ text: "Open MyFenrir", url: baseUrl }],
-    [{ text: "Open early-access invitation", url: `${baseUrl}/invitation/` }]
+    [{ text: "🌐 Open MyFenrir", url: baseUrl }],
+    [{ text: "🎟️ Open early-access invitation", url: `${baseUrl}/invitation/` }]
   ];
 
   if (hasStarsBotUsername(env)) {
-    buttons.push([{ text: "Unlock with Telegram Stars", url: starsDeepLink(env) }]);
+    buttons.push([{ text: "⭐️ Unlock with Telegram Stars", url: starsDeepLink(env) }]);
   }
 
   return buttons;

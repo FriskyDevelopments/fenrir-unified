@@ -18,3 +18,6 @@ coverage/
 .vite/
 *.tsbuildinfo
 artifacts/
+
+# Local secrets — never commit
+.dev.vars

@@ -1,4 +1,4 @@
-type OAuthProvider = "google" | "microsoft" | "apple" | "telegram" | "workos";
+type OAuthProvider = "google" | "microsoft" | "apple" | "telegram";
 
 /** OAuth or passkey — session cookie may reference either after sign-in. */
 export type SessionProvider = OAuthProvider | "passkey";
@@ -103,7 +103,7 @@ async function hmac(secret: string, data: string) {
   return base64Url(new Uint8Array(signature));
 }
 
-function stableFriskyId(kind: "usr" | "org", value: string) {
+export function stableFriskyId(kind: "usr" | "org", value: string) {
   const normalized = value.trim().toLowerCase();
   let hash = 2166136261;
   for (const char of normalized) {

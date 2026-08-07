@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-export type BrandKey = "fenrir" | "friskyGhost" | "neonNexus" | "stixMagic";
+export type BrandKey = "fenrir" | "neonNexus" | "stixMagic";
 
 export type BrandTheme = {
   key: BrandKey;
@@ -21,7 +21,6 @@ export type BrandTheme = {
   glow: string;
   background:
     | "protocol"
-    | "ghost"
     | "nexus"
     | "experimental";
 };
@@ -38,28 +37,13 @@ export const brandThemes: Record<BrandKey, BrandTheme> = {
     lanes: ["IDENTITY", "WORKSPACES", "MEDIA", "AI AGENTS", "PROTOCOL SERVICES"],
     nodeStatus: ["AUTH ONLINE", "SESSION BRIDGE ACTIVE", "PASSKEY READY", "PROTOCOL STABLE"],
     authKicker: "OAuth + passkeys",
-    primary: "#ff334e",
-    secondary: "#22c7a8",
-    accent: "#f1b75c",
-    glow: "rgba(255, 51, 78, .28)",
+    // PROTOCOL kit (@frisky/kit-fenrir): gold over ink — not the LORE neon set.
+    // Source of truth also lives in frisky-ui-kits/packages/tokens/src/brands/fenrir.css
+    primary: "#c2a469",
+    secondary: "#7fae9d",
+    accent: "#8a6e3c",
+    glow: "rgba(194, 164, 105, .22)",
     background: "protocol"
-  },
-  friskyGhost: {
-    key: "friskyGhost",
-    productName: "Frisky Ghost",
-    systemRole: "operational layer",
-    logoSrc: "/fenrir-cut-wordmark.svg",
-    logoAlt: "Frisky Ghost",
-    headline: "Ghost login for the bot operating layer.",
-    subheadline: "One auth engine, separate product landing, and operational routes for bot-of-bots workflows.",
-    lanes: ["BOT OS", "OPERATIONS", "SIGNALS", "WORKERS", "ROUTES"],
-    nodeStatus: ["GHOST ONLINE", "BOT OS READY", "ROUTES ISOLATED", "SIGNAL CLEAN"],
-    authKicker: "Ghost skin",
-    primary: "#f3f6f9",
-    secondary: "#8cb9ff",
-    accent: "#9b8cff",
-    glow: "rgba(140, 185, 255, .22)",
-    background: "ghost"
   },
   neonNexus: {
     key: "neonNexus",
@@ -97,12 +81,46 @@ export const brandThemes: Record<BrandKey, BrandTheme> = {
   }
 };
 
+/** "#c2a469" → "40 42% 59%" (HSL triplet for hsl(var(--x) / a) consumption). */
+export function hexToHslTriplet(hex: string): string {
+  const value = hex.replace("#", "");
+  const full = value.length === 3 ? value.split("").map((c) => c + c).join("") : value;
+  const r = parseInt(full.slice(0, 2), 16) / 255;
+  const g = parseInt(full.slice(2, 4), 16) / 255;
+  const b = parseInt(full.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+  if (delta > 0) {
+    s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+    if (max === r) h = ((g - b) / delta + (g < b ? 6 : 0)) * 60;
+    else if (max === g) h = ((b - r) / delta + 2) * 60;
+    else h = ((r - g) / delta + 4) * 60;
+  }
+  return `${Math.round(h)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
 export function themeCssVars(theme: BrandTheme): CSSProperties {
+  const primary = hexToHslTriplet(theme.primary);
+  const secondary = hexToHslTriplet(theme.secondary);
+  const accent = hexToHslTriplet(theme.accent);
   return {
     "--theme-primary": theme.primary,
     "--theme-secondary": theme.secondary,
     "--theme-accent": theme.accent,
-    "--theme-glow": theme.glow
+    "--theme-glow": theme.glow,
+    // Community Bridge gate tokens (HSL triplets) — drive the protocol
+    // surface (shader, particles, gate-card, gradient headline).
+    "--gate-accent": primary,
+    "--gate-accent-soft": secondary,
+    "--gate-border": primary,
+    "--gate-glow": primary,
+    "--gate-gradient-start": primary,
+    "--gate-gradient-middle": secondary,
+    "--gate-gradient-end": accent
   } as CSSProperties;
 }
 

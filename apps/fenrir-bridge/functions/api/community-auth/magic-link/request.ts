@@ -18,7 +18,7 @@ type MagicLinkRequest = {
 };
 
 export async function onRequestPost(context: any) {
-  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured();
+  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured(context.env);
 
   const body = await context.request.json().catch(() => null) as MagicLinkRequest | null;
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";

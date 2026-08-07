@@ -4,6 +4,7 @@ import {
   ensureCommunityBrandPayload,
   resolveCommunityAuthError
 } from "../../../_lib/community-auth";
+import { availableCommunityAuthProviders } from "../../../_lib/community-oauth";
 import { noStoreJson } from "../../../_lib/responses";
 
 export async function onRequestGet(context: any) {
@@ -12,8 +13,11 @@ export async function onRequestGet(context: any) {
   try {
     const slug = String(context.params.slug ?? "");
     const brand = await ensureCommunityBrandPayload(context.env, slug);
-    return noStoreJson({ ok: true, brand });
+    return noStoreJson({
+      ok: true,
+      brand: { ...brand, available_auth_providers: availableCommunityAuthProviders(context.env) }
+    });
   } catch (error) {
-    return resolveCommunityAuthError(error);
+    return resolveCommunityAuthError(error, context.env);
   }
 }
