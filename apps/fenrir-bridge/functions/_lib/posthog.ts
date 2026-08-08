@@ -13,8 +13,8 @@
  * pago falle.
  *
  * Identidad: el `distinct_id` es `"telegram:<id>"` o el user id de Supabase —
- * la misma forma que usan ClipsFlow y HostCasa, para que la misma persona sea
- * la misma persona en todo el ecosistema Frisky dentro de un único proyecto de
+ * la misma forma que usa ClipsFlow, para que la misma persona sea la misma
+ * persona en todo el ecosistema Frisky dentro de un único proyecto de
  * PostHog.
  */
 
@@ -162,7 +162,7 @@ export async function captureException(
 // Nota: hoy fenrir-bridge NO hace ninguna llamada a un LLM (verificado por
 // búsqueda: cero referencias a dashscope/openai/anthropic/completions). Este
 // envoltorio queda listo para el momento en que el bot incorpore un modelo, y
-// es el mismo contrato que usan los bots de ClipsFlow y Marina en HostCasa.
+// es el mismo contrato que usan los bots de ClipsFlow.
 
 export type AiGenerationInput = {
   /** Agrupa todas las llamadas de una misma conversación en una traza. */

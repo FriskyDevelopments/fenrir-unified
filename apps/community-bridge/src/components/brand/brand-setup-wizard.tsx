@@ -211,7 +211,7 @@ export function BrandSetupWizard({
                 setSlugTouched(true);
                 set("brand_id", slugify(e.target.value));
               }}
-              placeholder="casa-verde"
+              placeholder="lore-archive"
             />
           </Field>
           <Field label="Tagline">
@@ -239,7 +239,7 @@ export function BrandSetupWizard({
                     .filter(Boolean),
                 )
               }
-              placeholder="casaverde.hostcasa.com"
+              placeholder="portal.lore.myfenrir.com"
             />
           </Field>
         </div>
