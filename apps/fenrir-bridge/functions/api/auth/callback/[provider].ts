@@ -3,10 +3,10 @@ import { clearTransactionCookie } from "../../../_lib/oauth";
 
 // Retired: the direct Google/Microsoft/Apple callback for the MyFenrir login.
 //
-// It used to verify a provider id_token, mint a Fenrir session and upsert the
-// identity into the Supabase project shared with clipsflow.tech. MyFenrir
-// identity is WorkOS-only now, so this handler must never mint a session
-// again — the only live callback is /api/auth/callback/workos.
+// MyFenrir sign-in is Supabase-only: the provider redirects back to the
+// Supabase project's /auth/v1/callback, and the client exchanges the resulting
+// session for the Fenrir cookie via /api/auth/supabase-session. This handler
+// must never mint a session again.
 //
 // The route stays reachable (instead of 404-ing through the API catch-all) so
 // that a stale provider console still holding this redirect URI gets an
@@ -18,7 +18,7 @@ async function retiredCallback() {
       ok: false,
       error: "direct_oauth_retired",
       detail:
-        "MyFenrir sign-in is WorkOS-only. Direct Google/Microsoft/Apple OAuth was removed; use /api/auth/workos/login."
+        "MyFenrir sign-in is Supabase-only. Direct per-provider OAuth was removed; sign in from /login."
     },
     {
       status: 410,

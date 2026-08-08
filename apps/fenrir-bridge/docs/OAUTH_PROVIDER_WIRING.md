@@ -1,29 +1,26 @@
-# Direct OAuth Provider Wiring
+# OAuth Provider Wiring
 
-Fenrir signs users in directly with four providers:
+MyFenrir sign-in is **Supabase-only**: the client calls
+`supabase.auth.signInWithOAuth` against the canonical project
+(`yqevglppbhuoxxfsfnih`), which fronts Google (`google`), Microsoft (`azure`)
+and Apple (`apple`). No external auth broker is allowed (banned, same status
+as Vercel). The legacy per-provider endpoints below exist only as retired
+stubs (`/api/auth/login/:provider` → 302 `/login`, callbacks → 410).
 
-- Google: `/api/auth/login/google`
-- Microsoft: `/api/auth/login/microsoft`
-- Apple: `/api/auth/login/apple`
-- WorkOS AuthKit: `/api/auth/login/workos`
-
-WorkOS is the preferred provider for MCP clients — it handles SSO, social login,
-and issues JWTs that the MCP worker validates automatically via WorkOS JWKS.
-
-## WorkOS MCP Login Flow (seamless)
+## MCP Login Flow (Supabase authorization server)
 
 MCP clients (Claude Desktop, Cursor, etc.) discover auth automatically:
 
 1. Client hits `POST /mcp` without a token → `401` with
    `WWW-Authenticate: Bearer resource_metadata="https://www.myfenrir.com/.well-known/oauth-protected-resource"`
-2. Client fetches `/.well-known/oauth-protected-resource` → lists WorkOS as auth server
-3. Client fetches `/.well-known/oauth-authorization-server` → WorkOS PKCE endpoints
-4. Client performs PKCE flow → WorkOS issues an access token (JWT)
-5. Client sends `Authorization: Bearer <workos_jwt>` → MCP worker validates via JWKS
+2. Client fetches `/.well-known/oauth-protected-resource` → lists the Supabase
+   auth server (`https://yqevglppbhuoxxfsfnih.supabase.co/auth/v1`)
+3. Client fetches `/.well-known/oauth-authorization-server` → Supabase OAuth
+   PKCE endpoints (`/oauth/authorize`, `/oauth/token`)
+4. Client performs PKCE flow → Supabase issues an access token (JWT)
+5. Client sends `Authorization: Bearer <jwt>` → MCP worker validates it against
+   the project's JWKS (`/auth/v1/.well-known/jwks.json`)
 6. Seamless from the user's perspective — one browser prompt, then the MCP just works
-
-The callback validates the OAuth transaction cookie, PKCE verifier, state,
-nonce, and OIDC ID token before minting `fenrir_session`.
 
 ## Production URLs
 
@@ -36,30 +33,26 @@ Use these values for the production app:
 - Microsoft callback: `https://auth.myfenrir.com/api/auth/callback/microsoft`
 - Apple callback: `https://auth.myfenrir.com/api/auth/callback/apple`
 
-## WorkOS
+## Supabase (the login broker)
 
-In the [WorkOS Dashboard](https://dashboard.workos.com):
+In the Supabase dashboard for `yqevglppbhuoxxfsfnih`:
 
-1. Create an app → copy **Client ID** and **API Key**
-2. Under **Redirects**, add:
-   - `https://auth.myfenrir.com/api/auth/callback/workos`
-3. Enable social providers (Google, Microsoft, Apple) inside WorkOS so you can
-   consolidate all SSO through one WorkOS app instead of three direct integrations
-4. Set Worker vars/secrets:
+1. Authentication → Providers: enable Google, Azure (Microsoft) and Apple with
+   their provider-console credentials.
+2. Authentication → URL Configuration: allow-list the app origins
+   (`https://www.myfenrir.com`, `https://communities.myfenrir.com`).
+3. Cloudflare Pages production environment:
 
 ```bash
-# var (public, safe to commit after filling in)
-WORKOS_CLIENT_ID = "client_..."
-
-# secret (never commit)
-wrangler secret put WORKOS_API_KEY --config wrangler.fenrir-mcp-beta.toml
+SUPABASE_URL=https://yqevglppbhuoxxfsfnih.supabase.co
+SUPABASE_ANON_KEY=<publishable key>
+SUPABASE_SERVICE_ROLE_KEY=<secret>
 ```
 
-Also add to Cloudflare Pages production environment:
-```bash
-WORKOS_CLIENT_ID=client_...
-WORKOS_API_KEY=<secret>
-```
+The sections below document the DIRECT per-provider consoles. They only matter
+if the retired direct stack is ever deliberately revived; the live login uses
+the Supabase callback (`https://yqevglppbhuoxxfsfnih.supabase.co/auth/v1/callback`)
+in each provider console instead.
 
 ## Google
 
@@ -104,11 +97,8 @@ Set these Cloudflare Pages production variables:
 
 ```bash
 SESSION_SECRET=
-VITE_DIRECT_AUTH_ORIGIN=https://auth.myfenrir.com
 PUBLIC_SITE_URL=https://www.myfenrir.com
 PUBLIC_AUTH_URL=https://auth.myfenrir.com
-WORKOS_CLIENT_ID=
-WORKOS_API_KEY=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 MICROSOFT_CLIENT_ID=

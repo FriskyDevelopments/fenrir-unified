@@ -3414,15 +3414,6 @@ function authErrorMessage() {
   if (errorCode === "supabase_session_failed") {
     return `Could not open a Fenrir admin session.${detail ? ` (${detail})` : ""}`;
   }
-  if (errorCode === "workos_not_configured" || errorCode === "workos_login_init_failed") {
-    return "Sign-in is not fully configured yet. Please try again shortly or contact support.";
-  }
-  if (errorCode === "workos_state_invalid") {
-    return "Your sign-in attempt expired or could not be verified. Please start sign-in again.";
-  }
-  if (errorCode === "workos_exchange_failed" || errorCode === "workos_token_exchange_failed") {
-    return `Could not finish sign-in with the provider.${detail ? ` (${detail})` : " Please try again."}`;
-  }
   if (errorCode === "missing_code") {
     return "The provider did not return a sign-in code. Please try again.";
   }

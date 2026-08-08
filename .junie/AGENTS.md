@@ -26,13 +26,11 @@ Run `npm run build` before deploy-oriented changes.
 ## Auth Redirect Notes
 - The SPA callback route is `/auth/callback`.
 - The direct provider callback routes are `/api/auth/callback/google`, `/api/auth/callback/microsoft`, and `/api/auth/callback/apple`.
-- WorkOS and any OAuth dashboard must register redirect URIs exactly. If WorkOS reports:
-
-```text
-redirect-uri-invalid: https://myfenrir.com/auth/callback
-```
-
-then add this exact URI in the WorkOS application Redirect URIs, or change the app/dashboard setting that starts auth to use one of the already registered callback URIs.
+- Login is Supabase-only (signInWithOAuth on the canonical project
+  yqevglppbhuoxxfsfnih); no external auth broker may be wired (banned, same
+  status as Vercel). Every provider console must register the Supabase
+  callback (`https://yqevglppbhuoxxfsfnih.supabase.co/auth/v1/callback`)
+  exactly, and the app origins must be on the Supabase redirect allow-list.
 
 Current callback candidates used by this app:
 

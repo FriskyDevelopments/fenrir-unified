@@ -423,7 +423,7 @@ function oauthProtectedResourceMetadata(request, env, url) {
   const base = `${url.protocol}//${url.host}`;
   const body = {
     resource: `${base}/mcp`,
-    authorization_servers: ["https://api.workos.com"],
+    authorization_servers: [`${supabaseAuthIssuer(env)}`],
     bearer_methods_supported: ["header"],
     scopes_supported: ["openid", "profile", "email"]
   };
@@ -436,12 +436,12 @@ function oauthProtectedResourceMetadata(request, env, url) {
 }
 
 function oauthAuthorizationServerMetadata(request, env, url) {
-  const clientId = env.WORKOS_CLIENT_ID || "";
+  const issuer = supabaseAuthIssuer(env);
   const body = {
-    issuer: "https://api.workos.com",
-    authorization_endpoint: "https://api.workos.com/user_management/authorize",
-    token_endpoint: "https://api.workos.com/user_management/authenticate",
-    jwks_uri: clientId ? `https://api.workos.com/user_management/jwks/${clientId}` : "https://api.workos.com/user_management/jwks",
+    issuer,
+    authorization_endpoint: `${issuer}/oauth/authorize`,
+    token_endpoint: `${issuer}/oauth/token`,
+    jwks_uri: `${issuer}/.well-known/jwks.json`,
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code"],
     code_challenge_methods_supported: ["S256"],
@@ -527,24 +527,22 @@ async function mcpAuthFailure(request, env, url) {
     if (received && timingSafeEqual(received, staticToken)) return null;
   }
 
-  // 2. WorkOS JWT — validate against WorkOS JWKS
-  if (received && env.WORKOS_CLIENT_ID) {
-    const claims = await validateWorkOSJwt(received, env);
+  // 2. Supabase Auth JWT — validate against the canonical project's JWKS
+  if (received) {
+    const claims = await validateSupabaseJwt(received, env);
     if (claims) return null;
   }
 
-  // Neither valid — WorkOS is configured → direct client to do OAuth
-  const resourceMetaUrl = workosConfigured(env)
-    ? `${url.protocol}//${url.host}/.well-known/oauth-protected-resource`
-    : null;
+  // Not valid — direct the client to the Supabase authorization server.
+  const resourceMetaUrl = `${url.protocol}//${url.host}/.well-known/oauth-protected-resource`;
 
   // If nothing is configured at all, return 503
-  if (!staticToken && !workosConfigured(env)) {
+  if (!staticToken && !supabaseAuthIssuer(env)) {
     return json(
       {
         ok: false,
         error: "mcp_auth_not_configured",
-        detail: "Set FRISKY_BOT_API_TOKEN (static) or WORKOS_CLIENT_ID + WORKOS_API_KEY (WorkOS) before exposing Fenrir MCP beta."
+        detail: "Set FRISKY_BOT_API_TOKEN (static) or SUPABASE_URL before exposing Fenrir MCP beta."
       },
       { status: 503 },
       request,
@@ -564,13 +562,15 @@ async function mcpAuthFailure(request, env, url) {
   return new Response(JSON.stringify(body, null, 2), { ...init, headers });
 }
 
-function workosConfigured(env) {
-  return Boolean(env.WORKOS_CLIENT_ID?.trim() && env.WORKOS_API_KEY?.trim());
+// Supabase Auth on the canonical MyFenrir project is the ONLY authorization
+// server. No external auth broker may be wired here (banned, like Vercel).
+function supabaseAuthIssuer(env) {
+  const base = String(env.SUPABASE_URL || "https://yqevglppbhuoxxfsfnih.supabase.co").replace(/\/$/, "");
+  return `${base}/auth/v1`;
 }
 
-async function validateWorkOSJwt(token, env) {
-  const clientId = env.WORKOS_CLIENT_ID;
-  if (!clientId) return null;
+async function validateSupabaseJwt(token, env) {
+  const issuer = supabaseAuthIssuer(env);
 
   const parts = token.split(".");
   if (parts.length !== 3) return null;
@@ -584,23 +584,25 @@ async function validateWorkOSJwt(token, env) {
   }
 
   if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
-  if (payload.iss !== "https://api.workos.com") return null;
+  if (payload.iss !== issuer) return null;
 
   try {
-    const jwksUrl = `https://api.workos.com/user_management/jwks/${clientId}`;
+    const jwksUrl = `${issuer}/.well-known/jwks.json`;
     const jwks = await fetch(jwksUrl, { cf: { cacheTtl: 3600 } }).then((r) => r.json());
-    const jwk = jwks.keys?.find((k) => k.kid === header.kid && k.kty === "RSA");
+    const jwk = jwks.keys?.find((k) => k.kid === header.kid);
     if (!jwk) return null;
 
-    const key = await crypto.subtle.importKey(
-      "jwk", jwk,
-      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-      false, ["verify"]
-    );
+    const algorithm = jwk.kty === "EC"
+      ? { name: "ECDSA", namedCurve: "P-256" }
+      : { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
+    const verifyAlgorithm = jwk.kty === "EC"
+      ? { name: "ECDSA", hash: "SHA-256" }
+      : "RSASSA-PKCS1-v1_5";
+    const key = await crypto.subtle.importKey("jwk", jwk, algorithm, false, ["verify"]);
     const signedData = `${parts[0]}.${parts[1]}`;
     const signature = base64UrlToBytes(parts[2]);
     const valid = await crypto.subtle.verify(
-      "RSASSA-PKCS1-v1_5", key,
+      verifyAlgorithm, key,
       signature, new TextEncoder().encode(signedData)
     );
     return valid ? payload : null;

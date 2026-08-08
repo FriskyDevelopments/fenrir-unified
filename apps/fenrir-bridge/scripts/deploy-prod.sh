@@ -17,7 +17,7 @@ WRANGLER="deno run -A npm:wrangler@4.90.0"
 PROJECT="fenrir-bridge"
 
 if [[ ! -f .env.local ]]; then
-  echo "ERROR: .env.local not found. Run 'npm run safe-box' and fill in the WorkOS + Fenrir runtime groups first." >&2
+  echo "ERROR: .env.local not found. Run 'npm run safe-box' and fill in the Supabase + Fenrir runtime groups first." >&2
   exit 1
 fi
 
@@ -25,7 +25,7 @@ fi
 set -a; # shellcheck disable=SC1091
 source .env.local; set +a
 
-required=(SESSION_SECRET WORKOS_CLIENT_ID WORKOS_API_KEY)
+required=(SESSION_SECRET SUPABASE_URL SUPABASE_ANON_KEY)
 missing=()
 for k in "${required[@]}"; do
   if [[ -z "${!k:-}" ]]; then missing+=("$k"); fi
@@ -47,9 +47,9 @@ npm run deploy
 
 echo "==> Verifying production…"
 hz=$(curl -s -o /dev/null -w "%{http_code}" https://www.myfenrir.com/healthz || echo "ERR")
-wo=$(curl -s -o /dev/null -w "%{http_code}" "https://auth.myfenrir.com/api/auth/workos/login?provider=google" || echo "ERR")
+lg=$(curl -s -o /dev/null -w "%{http_code}" "https://auth.myfenrir.com/api/auth/login/google" || echo "ERR")
 echo "    healthz: $hz   (expect 200)"
-echo "    workos login: $wo   (expect 302)"
+echo "    login redirect: $lg   (expect 302 -> /login)"
 
 if [[ "$hz" == "200" && "$wo" == "302" ]]; then
   echo "==> DONE. Login broker is live."

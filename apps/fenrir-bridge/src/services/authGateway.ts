@@ -1,4 +1,4 @@
-import { authService } from "./api";
+import { signInWithSupabase } from "./supabaseAuth";
 
 export type AuthProvider = "apple" | "google" | "microsoft";
 export type AuthMode = "frisky-client" | "fenrir-community";
@@ -15,7 +15,10 @@ export const friskyClientAuthEngine: AuthEngine = {
   label: "Frisky Dev client auth",
   supportsOAuth: true,
   signInWithProvider(provider) {
-    return authService.login(provider);
+    // HARD RULE: login is Supabase signInWithOAuth on the canonical MyFenrir
+    // project (yqevglppbhuoxxfsfnih). No external auth broker may ever be
+    // routed here — banned, same status as Vercel; it keeps regressing in.
+    return signInWithSupabase(provider);
   }
 };
 

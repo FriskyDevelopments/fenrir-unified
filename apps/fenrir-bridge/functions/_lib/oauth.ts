@@ -10,11 +10,9 @@ export type OAuthEnv = BillingEnv & {
   APPLE_TEAM_ID?: string;
   APPLE_KEY_ID?: string;
   APPLE_PRIVATE_KEY?: string;
-  WORKOS_CLIENT_ID?: string;
-  WORKOS_API_KEY?: string;
 };
 
-export type OAuthProvider = "google" | "microsoft" | "apple" | "workos";
+export type OAuthProvider = "google" | "microsoft" | "apple";
 
 export type OAuthTransaction = {
   provider: OAuthProvider;
@@ -51,7 +49,7 @@ const transactionCookie = "fenrir_oauth_tx";
 const transactionMaxAge = 10 * 60;
 
 export function isOAuthProvider(value: unknown): value is OAuthProvider {
-  return value === "google" || value === "microsoft" || value === "apple" || value === "workos";
+  return value === "google" || value === "microsoft" || value === "apple";
 }
 
 /** Providers offered by the Community Gate. */
@@ -68,9 +66,6 @@ export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): 
   }
   if (provider === "apple") {
     return Boolean(env.APPLE_CLIENT_ID?.trim() && env.APPLE_TEAM_ID?.trim() && env.APPLE_KEY_ID?.trim() && env.APPLE_PRIVATE_KEY?.trim());
-  }
-  if (provider === "workos") {
-    return Boolean(env.WORKOS_CLIENT_ID?.trim() && env.WORKOS_API_KEY?.trim());
   }
   return false;
 }
@@ -152,20 +147,6 @@ export async function getAuthorizationUrl(provider: OAuthProvider, env: OAuthEnv
       code_challenge_method: "S256"
     });
     return `https://appleid.apple.com/auth/authorize?${params.toString()}`;
-  }
-
-  if (provider === "workos") {
-    const clientId = requireEnv(env.WORKOS_CLIENT_ID, "WORKOS_CLIENT_ID");
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      state: tx.state,
-      code_challenge: codeChallenge,
-      code_challenge_method: "S256",
-      provider: "authkit"
-    });
-    return `https://api.workos.com/user_management/authorize?${params.toString()}`;
   }
 
   throw new Error(`unsupported_provider:${provider}`);
@@ -278,7 +259,6 @@ export async function exchangeCodeForIdentity(
   if (provider === "google") return exchangeGoogleCode(env, code, redirectUri, tx);
   if (provider === "microsoft") return exchangeMicrosoftCode(env, code, redirectUri, tx);
   if (provider === "apple") return exchangeAppleCode(env, code, redirectUri, tx);
-  if (provider === "workos") return exchangeWorkOSCode(env, code, redirectUri, tx);
   throw new Error(`exchange_not_implemented_for:${provider}`);
 }
 
@@ -456,42 +436,6 @@ export function __setFetchForTests(fetchFn: typeof fetch | null) {
 
 function httpFetch(input: RequestInfo | URL, init?: RequestInit) {
   return (fetchOverride ?? fetch)(input, init);
-}
-
-async function exchangeWorkOSCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
-  const clientId = requireEnv(env.WORKOS_CLIENT_ID, "WORKOS_CLIENT_ID");
-  const apiKey = requireEnv(env.WORKOS_API_KEY, "WORKOS_API_KEY");
-
-  const res = await fetch("https://api.workos.com/user_management/authenticate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      client_id: clientId,
-      code,
-      code_verifier: tx.verifier,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code"
-    })
-  });
-
-  if (!res.ok) throw new Error(`workos_token_exchange_failed:${await res.text()}`);
-
-  const data = await res.json() as {
-    user?: { id?: string; email?: string; first_name?: string; last_name?: string; email_verified?: boolean };
-  };
-
-  const userId = data.user?.id;
-  const email = data.user?.email;
-  if (!userId || !email) throw new Error("workos_missing_user");
-
-  const name = [data.user?.first_name, data.user?.last_name].filter(Boolean).join(" ") || email.split("@")[0];
-  return {
-    provider: "workos",
-    email,
-    name,
-    identityId: `workos:${userId}`,
-    emailVerified: data.user?.email_verified ?? true
-  };
 }
 
 async function exchangeToken(url: string, params: Record<string, string>, provider: OAuthProvider) {

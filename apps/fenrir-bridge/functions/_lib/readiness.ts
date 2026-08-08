@@ -32,18 +32,18 @@ export type ReadinessSnapshot = {
 };
 
 export function computeReadiness(env: OAuthEnv): ReadinessSnapshot {
-  // WorkOS AuthKit is the primary social/email broker and covers all three
-  // providers once configured; direct OAuth remains as a per-provider fallback.
-  const workosEnv = env as OAuthEnv & { WORKOS_CLIENT_ID?: string; WORKOS_API_KEY?: string };
-  const workosConfigured = nonEmpty(workosEnv.WORKOS_CLIENT_ID) && nonEmpty(workosEnv.WORKOS_API_KEY);
+  // Supabase Auth is the login broker and covers all three providers once its
+  // server env is present; direct OAuth remains as a per-provider fallback.
+  const supabaseEnv = env as OAuthEnv & { SUPABASE_URL?: string; SUPABASE_ANON_KEY?: string };
+  const supabaseConfigured = nonEmpty(supabaseEnv.SUPABASE_URL) && nonEmpty(supabaseEnv.SUPABASE_ANON_KEY);
   const directGoogle = nonEmpty(env.GOOGLE_CLIENT_ID) && nonEmpty(env.GOOGLE_CLIENT_SECRET);
   const directMicrosoft = nonEmpty(env.MICROSOFT_CLIENT_ID) && nonEmpty(env.MICROSOFT_CLIENT_SECRET);
   const directApple = nonEmpty(env.APPLE_CLIENT_ID) && nonEmpty(env.APPLE_TEAM_ID) && nonEmpty(env.APPLE_KEY_ID) && nonEmpty(env.APPLE_PRIVATE_KEY);
 
   const auth = {
-    googleConfigured: workosConfigured || directGoogle,
-    microsoftConfigured: workosConfigured || directMicrosoft,
-    appleConfigured: workosConfigured || directApple
+    googleConfigured: supabaseConfigured || directGoogle,
+    microsoftConfigured: supabaseConfigured || directMicrosoft,
+    appleConfigured: supabaseConfigured || directApple
   };
 
   const telegramBotConfigured = nonEmpty(env.TELEGRAM_BOT_TOKEN) || nonEmpty(env.TELEGRAM_PROD_BOT_TOKEN);
