@@ -82,8 +82,6 @@ fenrir-cinema:install-and-build:
 #   CLOUDFLARE_API_TOKEN   - Cloudflare token scoped to Pages:Edit
 #   CLOUDFLARE_ACCOUNT_ID  - Cloudflare account id
 #   SESSION_SECRET         - Pages session signing secret
-#   WORKOS_CLIENT_ID       - WorkOS AuthKit client id
-#   WORKOS_API_KEY         - WorkOS API key (sk_...)
 #
 # Gated to main and manual: click "Run" on the pipeline to ship. To make merges
 # auto-deploy, change `when: manual` to `when: on_success`.
@@ -105,7 +103,7 @@ fenrir-bridge:deploy:
     # Push production secrets only when provided, so an unset var never clobbers
     # an existing value with an empty string.
     - |
-      for k in SESSION_SECRET WORKOS_CLIENT_ID WORKOS_API_KEY; do
+      for k in SESSION_SECRET; do
         v="$(eval printf '%s' "\${$k:-}")"
         if [ -n "$v" ]; then
           printf '%s' "$v" | $WRANGLER pages secret put "$k" --project-name fenrir-bridge
@@ -118,7 +116,5 @@ fenrir-bridge:deploy:
     # Verify production responds as expected.
     - |
       hz="$(curl -s -o /dev/null -w '%{http_code}' https://www.myfenrir.com/healthz || echo ERR)"
-      wo="$(curl -s -o /dev/null -w '%{http_code}' 'https://auth.myfenrir.com/api/auth/workos/login?provider=google' || echo ERR)"
-      echo "healthz=$hz (expect 200)  workos=$wo (expect 302)"
+      echo "healthz=$hz (expect 200)"
       test "$hz" = "200"
-      test "$wo" = "302"

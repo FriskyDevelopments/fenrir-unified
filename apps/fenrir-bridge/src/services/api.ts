@@ -1,9 +1,9 @@
 import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from "@simplewebauthn/browser";
 import { copy } from "../i18n";
 import { addBridge, addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
-// Auth broker is WorkOS AuthKit. The hosted flow mints the Fenrir session
-// cookie server-side in /api/auth/callback/workos, so the client no longer
-// performs any token exchange after the redirect (directAuthOrigin is declared below).
+// Auth broker is Supabase Auth (signInWithOAuth). The client starts the OAuth
+// redirect directly against the Supabase project; no server-side broker.
+import { signInWithSupabase } from "./supabaseAuth";
 import type { AppState, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck } from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
@@ -17,8 +17,6 @@ const telegramBotUsername = () =>
   )
     .replace(/^@/, "")
     .trim();
-
-const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? "").trim().replace(/\/$/, "");
 
 export type PaidPlan = Exclude<Plan, "free">;
 
@@ -156,16 +154,6 @@ function devAuthSession(): AuthSession & { ok: true } {
       plan: store.org.plan
     }
   };
-}
-
-function safeCurrentAuthReturnPath() {
-  const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-  if (!path.startsWith("/") || path.startsWith("//")) return "/main";
-  const pathname = window.location.pathname || "/";
-  if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) {
-    return "/main";
-  }
-  return path;
 }
 
 function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: string): T {
@@ -365,7 +353,7 @@ export const webauthnService = {
 
 export const authService = {
   async me() {
-    // WorkOS AuthKit mints the Fenrir session cookie on the server callback,
+    // Supabase Auth handles the session on the client after the redirect,
     // so the browser only needs to read the resulting session.
     try {
       const result = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
@@ -375,10 +363,7 @@ export const authService = {
     }
   },
   async login(provider: "google" | "microsoft" | "apple") {
-    const returnTo = safeCurrentAuthReturnPath();
-    // Route social sign-in through WorkOS AuthKit; the provider hint jumps
-    // straight to the matching hosted connection.
-    window.location.assign(`${directAuthOrigin}/api/auth/workos/login?provider=${provider}&return_to=${encodeURIComponent(returnTo)}`);
+    await signInWithSupabase(provider);
   },
   async telegramLogin(payload: TelegramLoginPayload) {
     return apiRequest<{ ok: true; authenticated: true; user: AuthSession["user"]; org: AuthSession["org"] }>("/api/auth/telegram-session", {

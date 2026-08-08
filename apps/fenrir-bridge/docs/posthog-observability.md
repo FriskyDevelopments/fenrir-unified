@@ -82,7 +82,7 @@ LLMs. Emitir `$ai_generation` sintéticos ahora sólo ensuciaría el coste.
 | Instrumentar el bot | `workers/fenrir-stars-payments.js` | ⛔ **bloqueado — ver §3** |
 
 `recordCrossOriginIframes: false` importa aquí más que en otros productos:
-MyFenrir embebe iframes de terceros (WorkOS AuthKit, widgets de pago) y
+MyFenrir embebe iframes de terceros (widgets de pago) y
 grabarlos capturaría formularios de credenciales de otro origen.
 
 ---
