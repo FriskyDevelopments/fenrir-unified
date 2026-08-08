@@ -1,4 +1,5 @@
 import { createClient, type Provider, type SupabaseClient } from "@supabase/supabase-js";
+import { sharedSessionStorage, sharedStorageKey } from "./sharedSession";
 
 type AuthProvider = "google" | "microsoft" | "apple";
 
@@ -175,7 +176,19 @@ function supabaseClient() {
     console.warn("Supabase auth is not configured correctly. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env. Placeholder 'example.supabase.co' is not allowed.");
     throw new Error("supabase_auth_not_configured");
   }
-  client ??= createClient(supabaseUrl, supabaseAnonKey);
+  // La sesión se guarda en una cookie de `.myfenrir.com` para que valga en
+  // todas las superficies (communities.myfenrir.com incluida) — ver
+  // services/sharedSession.ts. La clave es la que Supabase usa por defecto,
+  // así que las sesiones ya abiertas en localStorage se adoptan sin re-login.
+  client ??= createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      storage: sharedSessionStorage,
+      storageKey: sharedStorageKey(supabaseUrl),
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
   return client;
 }
 
