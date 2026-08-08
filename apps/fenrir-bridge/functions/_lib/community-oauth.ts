@@ -44,6 +44,11 @@ const defaultDeps: Required<CommunityOAuthDeps> = {
   communitySql
 };
 
+/** Path the bridge callback registers with every provider console. */
+export function communityOAuthCallbackPath(provider: OAuthProvider) {
+  return `/api/community-auth/oauth/callback/${provider}`;
+}
+
 const COMMUNITY_OAUTH_PROVIDERS: OAuthProvider[] = ["google", "microsoft", "apple"];
 
 /**

@@ -1728,7 +1728,7 @@
       <span class="hi">NOT A LOGIN PAGE</span>
       <span>SERIOUS · PRECISE · PROTECTIVE</span>
       <span class="hi">CLOUDFLARE EDGE</span>
-      <span>TURNSTILE + WORKOS + RULES + HAIKU</span>
+      <span>TURNSTILE + SUPABASE + RULES + HAIKU</span>
       <span class="hi">FRISKY DEVELOPMENTS</span>
       <span>GATE.MYFENRIR.COM</span>
       <span class="hi">FENRIR PROTOCOL</span>
@@ -1736,7 +1736,7 @@
       <span class="hi">NOT A LOGIN PAGE</span>
       <span>SERIOUS · PRECISE · PROTECTIVE</span>
       <span class="hi">CLOUDFLARE EDGE</span>
-      <span>TURNSTILE + WORKOS + RULES + HAIKU</span>
+      <span>TURNSTILE + SUPABASE + RULES + HAIKU</span>
       <span class="hi">FRISKY DEVELOPMENTS</span>
       <span>GATE.MYFENRIR.COM</span>
     </div>
@@ -1810,7 +1810,7 @@
             <div class="tl" style="padding-left:16px"><span class="tl-ok">A</span><span class="tl-d"
                 style="margin-left:8px">turnstile</span><span class="tl-ok" style="margin-left:6px">ok</span></div>
             <div class="tl" style="padding-left:16px"><span class="tl-ok">B</span><span class="tl-d"
-                style="margin-left:8px">workos·authkit</span><span class="tl-ok" style="margin-left:6px">client
+                style="margin-left:8px">supabase·sso</span><span class="tl-ok" style="margin-left:6px">client
                 live</span></div>
             <div class="tl" style="padding-left:16px"><span class="tl-warn">C</span><span class="tl-d"
                 style="margin-left:8px">rules</span><span class="tl-warn" style="margin-left:6px">rules.md needed</span>
@@ -1911,12 +1911,12 @@
           </div>
           <div class="gate-body">
             <div class="gate-sub">Gate B // Real Identity</div>
-            <h3>WorkOS AuthKit</h3>
-            <p>Same AuthKit client as myfenrir.com. Google / Microsoft / Apple. tg_user_id bound to one verified WorkOS
+            <h3>Supabase Auth</h3>
+            <p>Same AuthKit client as myfenrir.com. Google / Microsoft / Apple. tg_user_id bound to one verified Supabase
               identity in the durable audit table. One human, one account.</p>
           </div>
           <div class="gate-meta">
-            <span class="gate-stack">WorkOS · Frisky AUTH</span>
+            <span class="gate-stack">Supabase · Frisky AUTH</span>
             <span class="gate-state gs-ok">✓ Client live</span>
           </div>
         </div>
@@ -2050,13 +2050,13 @@
             <text x="328" y="380" font-family="JetBrains Mono" font-size="8" fill="rgba(183,255,42,.45)"
               text-anchor="middle">anti-replay · single-use</text>
 
-            <!-- WORKOS -->
+            <!-- SUPABASE -->
             <rect x="458" y="284" width="160" height="110" rx="3" fill="#0d0d12" stroke="rgba(71,191,255,.2)"
               stroke-width="1" />
             <text x="538" y="308" font-family="JetBrains Mono" font-size="9" fill="rgba(71,191,255,.45)"
               text-anchor="middle" letter-spacing="1.5">AUTH</text>
             <text x="538" y="326" font-family="Sora" font-size="12" font-weight="700" fill="#cbd5e1"
-              text-anchor="middle">WorkOS AuthKit</text>
+              text-anchor="middle">Supabase Auth</text>
             <text x="538" y="344" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.3)"
               text-anchor="middle">Google · MS · Apple</text>
             <text x="538" y="360" font-family="JetBrains Mono" font-size="8" fill="rgba(255,255,255,.25)"
@@ -2144,7 +2144,7 @@
           <div class="field"><span class="f-name">tg_chat_id</span><span class="f-type">int</span><span
               class="f-note">waiting room group</span></div>
           <div class="field"><span class="f-name">turnstile</span><span class="f-type">bool</span></div>
-          <div class="field"><span class="f-name">workos</span><span class="f-type">obj|null</span><span
+          <div class="field"><span class="f-name">supabase</span><span class="f-type">obj|null</span><span
               class="f-note">{email, user_id}</span></div>
           <div class="field"><span class="f-name">rules</span><span class="f-type">bool</span></div>
           <div class="field"><span class="f-name">vibe</span><span class="f-type">str|null</span><span
@@ -2158,7 +2158,7 @@
           <div class="field"><span class="f-name">id</span><span class="f-type">uuid</span><span class="f-note"><span
                 class="f-pk">PK</span></span></div>
           <div class="field"><span class="f-name">tg_user_id</span><span class="f-type">bigint</span></div>
-          <div class="field"><span class="f-name">workos_user_id</span><span class="f-type">text</span></div>
+          <div class="field"><span class="f-name">supabase_user_id</span><span class="f-type">text</span></div>
           <div class="field"><span class="f-name">email</span><span class="f-type">text</span></div>
           <div class="field"><span class="f-name">rules_version</span><span class="f-type">text</span></div>
           <div class="field"><span class="f-name">rules_accepted_at</span><span class="f-type">timestamptz</span></div>
@@ -2630,8 +2630,8 @@
           <div class="si-check">
             <div class="chk cy">✓</div>
           </div>
-          <div class="si-body"><b>WorkOS state cookie host-pinned to gate.myfenrir.com</b><span>Avoids
-              workos_state_invalid (the same bug that hit fenrir-bridge). All auth stays on one host.</span></div>
+          <div class="si-body"><b>Supabase state cookie host-pinned to gate.myfenrir.com</b><span>Avoids
+              state_invalid (the same bug that hit fenrir-bridge). All auth stays on one host.</span></div>
         </div>
         <div class="si">
           <div class="si-check">
@@ -2653,7 +2653,7 @@
             <div class="chk cn">→</div>
           </div>
           <div class="si-body"><b>Secrets via CF Secrets + 1Password pipeline</b><span>BOT_TOKEN, TURNSTILE_SECRET,
-              WORKOS_API_KEY, SUPABASE_SERVICE_KEY, ANTHROPIC_API_KEY — wrangler secret put. No secrets in repo.</span>
+              SUPABASE_API_KEY, SUPABASE_SERVICE_KEY, ANTHROPIC_API_KEY — wrangler secret put. No secrets in repo.</span>
           </div>
         </div>
       </div>
@@ -2763,8 +2763,8 @@
           </div>
           <div class="phase">
             <div class="ph-n">Phase 05</div>
-            <h4>Gate B · WorkOS Identity</h4>
-            <p>Add redirect URI to Frisky AUTH. Popup AuthKit in Mini App, bind tg_user_id ↔ WorkOS identity in audit.
+            <h4>Gate B · Supabase Identity</h4>
+            <p>Add redirect URI to Frisky AUTH. Popup AuthKit in Mini App, bind tg_user_id ↔ Supabase identity in audit.
             </p><span class="ph-tag pt-n">→ Build next</span>
           </div>
           <div class="phase">
@@ -2827,7 +2827,7 @@
           <div class="dc-st ds-l">● LIVE · friskyclaw</div>
         </div>
         <div class="dc dc-live"><span class="dc-ico">🔐</span>
-          <h4>WorkOS AuthKit</h4>
+          <h4>Supabase Auth</h4>
           <p>Frisky AUTH app live — Google/Microsoft/Apple. client_01KSSSJENYSQC0YXDYM8ZACYS9.</p>
           <div class="dc-st ds-l">● LIVE · myfenrir.com</div>
         </div>
@@ -2847,7 +2847,7 @@
           <div class="dc-st ds-b">→ NEEDS DNS TOKEN</div>
         </div>
         <div class="dc dc-build"><span class="dc-ico">↗</span>
-          <h4>WorkOS Redirect URI</h4>
+          <h4>Supabase Redirect URI</h4>
           <p>Add gate.myfenrir.com/auth/callback to Frisky AUTH application (dashboard-only, no API).</p>
           <div class="dc-st ds-b">→ NEEDS DASHBOARD</div>
         </div>
@@ -2897,7 +2897,7 @@
       </div>
       <div class="foot-bottom">
         <span class="foot-copy">© 2026 FRISKY DEVELOPMENTS · FENRIR PROTOCOL · MYFENRIR</span>
-        <span class="foot-copy">PROTECTED BY WORKOS · AUTHKIT</span>
+        <span class="foot-copy">PROTECTED BY SUPABASE · SSO</span>
       </div>
     </div>
   </footer>
