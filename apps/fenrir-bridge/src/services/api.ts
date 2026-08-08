@@ -515,12 +515,6 @@ export const domainService = {
   }
 };
 
-export const communitySecurityService = {
-  async getReport(communitySlug: string = "fenrir"): Promise<{ ok: true; data: CommunitySecurityReport }> {
-    return apiRequest<{ ok: true; data: CommunitySecurityReport }>(`/api/community-gate/admin/security-report?communitySlug=${encodeURIComponent(communitySlug)}`);
-  }
-};
-
 export const bridgeService = {
   async create(input: { domainId: string; slug: string; telegramChatId: string; telegramGroupName: string; telegramGroupImageUrl: string }) {
     return apiRequest<{ ok: true; data: FriskyBridge; invite: FriskyTelegramInvite }>("/api/bridges", {
