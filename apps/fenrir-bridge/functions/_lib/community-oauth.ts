@@ -44,41 +44,17 @@ const defaultDeps: Required<CommunityOAuthDeps> = {
   communitySql
 };
 
-/** Path the bridge callback registers with every provider console. */
-export function communityOAuthCallbackPath(provider: OAuthProvider) {
-  return `/api/community-auth/oauth/callback/${provider}`;
-}
-
-const COMMUNITY_OAUTH_PROVIDERS: OAuthProvider[] = ["google", "microsoft", "apple"];
-
-/**
- * Which providers actually have credentials bound in this environment. Lets the gate
- * hide buttons that would dead-end on `provider_not_configured`, and lets the brand
- * wizard tell an owner that a provider still needs console setup. Always includes
- * magic_link, which needs no provider credentials.
- */
-export function availableCommunityAuthProviders(env: CommunityOAuthEnv): string[] {
-  return [
-    "magic_link",
-    ...COMMUNITY_OAUTH_PROVIDERS.filter((provider) => isDirectOAuthAvailable(provider, env))
-  ];
-}
-
 export function communityOAuthErrorLocation(origin: string, slug: string, error: string) {
   const params = new URLSearchParams({ auth_error: error });
   return `${origin.replace(/\/$/, "")}/community/${slug}?${params.toString()}`;
 }
 
-/**
- * GET /api/community-auth/oauth/:provider?slug=<community>[&return_to=/community/...]
- * Mints a signed transaction cookie and redirects to the provider consent screen.
- */
 export async function handleCommunityOAuthStart(context: {
   request: Request;
   env: CommunityOAuthEnv;
   provider: string;
 }) {
-  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured(context.env);
+  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured();
   if (!isCommunityOAuthProvider(context.provider)) {
     return jsonError("unsupported_provider", 404);
   }
@@ -109,7 +85,7 @@ export async function handleCommunityOAuthStart(context: {
       community: slug,
       returnTo
     });
-    const callbackUri = `${origin}${communityOAuthCallbackPath(provider)}`;
+    const callbackUri = `${origin}/api/community-auth/oauth/callback/${provider}`;
     const authUrl = await getAuthorizationUrl(provider, context.env, callbackUri, tx);
 
     return redirect(authUrl, {
@@ -122,17 +98,13 @@ export async function handleCommunityOAuthStart(context: {
   }
 }
 
-/**
- * GET/POST /api/community-auth/oauth/callback/:provider
- * Apple posts back as form_post; Google and Microsoft use the query string.
- */
 export async function handleCommunityOAuthCallback(context: {
   request: Request;
   env: CommunityOAuthEnv;
   provider: string;
   deps?: CommunityOAuthDeps;
 }) {
-  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured(context.env);
+  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured();
   if (!isCommunityOAuthProvider(context.provider)) {
     return jsonError("unsupported_provider", 404);
   }
@@ -171,13 +143,13 @@ export async function handleCommunityOAuthCallback(context: {
     return redirectWithCommunityOAuthCleanup(origin, slug, "provider_not_configured");
   }
 
-  const callbackUri = `${origin}${communityOAuthCallbackPath(provider)}`;
+  const callbackUri = `${origin}/api/community-auth/oauth/callback/${provider}`;
 
   try {
     validateOAuthTransaction(tx, provider, state);
     const identity = await exchangeCodeForIdentity(provider, context.env, code, callbackUri, tx!);
     const resolvedSlug = normalizeCommunitySlugOrThrow(tx!.community);
-    const result = await finalizeCommunityOAuthSignIn({
+    const response = await finalizeCommunityOAuthSignIn({
       env: context.env,
       identity,
       slug: resolvedSlug,
@@ -186,21 +158,18 @@ export async function handleCommunityOAuthCallback(context: {
       deps: context.deps
     });
 
-    const headers = new Headers({ Location: result.location });
-    headers.append("Set-Cookie", result.cookie);
+    const headers = new Headers({
+      Location: response.location,
+      "Set-Cookie": response.cookie
+    });
     headers.append("Set-Cookie", clearCommunityTransactionCookie());
     return new Response(null, { status: 302, headers });
   } catch (error) {
-    console.error("Community OAuth callback failed", error);
     const message = error instanceof Error ? error.message : "oauth_callback_failed";
     return redirectWithCommunityOAuthCleanup(origin, slug, message);
   }
 }
 
-/**
- * Email is the join key, exactly like the magic-link path: a returning human lands on
- * the same Neon fenrir_community_users row regardless of which provider they used.
- */
 export async function finalizeCommunityOAuthSignIn(options: {
   env: CommunityOAuthEnv;
   identity: OAuthIdentity;
@@ -246,13 +215,16 @@ export async function finalizeCommunityOAuthSignIn(options: {
     expiresAt: new Date(payload.exp * 1000)
   });
 
-  const origin = siteOrigin(options.request, options.env).replace(/\/$/, "");
-  const returnTo = safeCommunityReturnPath(options.returnTo);
-  const location = returnTo.startsWith("/community/")
-    ? `${origin}${returnTo}`
-    : `${origin}/community/${options.slug}`;
+  const origin = siteOrigin(options.request, options.env);
+  const location = safeCommunityReturnPath(options.returnTo).startsWith("/community/")
+    ? `${origin.replace(/\/$/, "")}${safeCommunityReturnPath(options.returnTo)}`
+    : `${origin.replace(/\/$/, "")}/community/${options.slug}`;
 
-  return { location, cookie, membership };
+  return {
+    location,
+    cookie,
+    membership
+  };
 }
 
 async function upsertCommunityOAuthIdentity(sql: CommunitySql, userId: string, identity: OAuthIdentity) {

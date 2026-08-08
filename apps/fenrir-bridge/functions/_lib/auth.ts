@@ -1,7 +1,7 @@
 type OAuthProvider = "google" | "microsoft" | "apple" | "telegram";
 
-/** OAuth or passkey — session cookie may reference either after sign-in. */
-export type SessionProvider = OAuthProvider | "passkey";
+/** OAuth, WorkOS AuthKit, or passkey — session cookie may reference any after sign-in. */
+export type SessionProvider = OAuthProvider | "passkey" | "workos";
 
 export type AuthEnv = {
   SESSION_SECRET?: string;

@@ -1,5 +1,5 @@
 name = "fenrir-auth-proxy"
-main = "workers/fenrir-auth-proxy.js"
+main = "workers/fenrir-direct-oauth-guard.js"
 compatibility_date = "2026-05-15"
 
 [vars]
@@ -10,4 +10,4 @@ AUTH_PROXY_ALLOWED_ORIGINS = "https://www.myfenrir.com,https://myfenrir.com,http
 # Cloudflare account as a proxied DNS record. Do not CNAME it directly to
 # *.supabase.co with orange-cloud proxy enabled, because that triggers 1014.
 #
-# route = { pattern = "auth.myfenrir.com/*", zone_name = "myfenrir.com" }
+route = { pattern = "auth.myfenrir.com/*", zone_name = "myfenrir.com" }

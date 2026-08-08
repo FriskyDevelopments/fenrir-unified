@@ -1,5 +1,32 @@
 stages:
+  - review
   - verify
+  - deploy
+
+# Required CI/CD variables (Settings → CI/CD → Variables, Masked):
+#   DASHSCOPE_API_KEY  — Alibaba DashScope key
+#   GITLAB_TOKEN       — Project Access Token, scope: api
+
+qwen_review:
+  stage: review
+  image: debian:bookworm-slim
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $DASHSCOPE_API_KEY && $GITLAB_TOKEN'
+    - when: never
+  timeout: 10 minutes
+  allow_failure: true
+  before_script:
+    - apt-get update -q && apt-get install -y -q git jq curl ca-certificates
+  script: |
+    TARGET="${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-main}"
+    git fetch origin "$TARGET" --depth=50 2>/dev/null || true
+    DIFF="$(git diff "origin/${TARGET}"...HEAD 2>/dev/null || git diff HEAD~1 || echo 'no diff')"
+    DIFF="${DIFF:0:14000}"
+    PAYLOAD="$(jq -n --arg diff "$DIFF" '{model:"qwen-coder-plus-latest",messages:[{role:"system",content:"You are a strict senior engineer."},{role:"user",content:("Review this MR diff. Check: security, secrets, breaking changes.\n\n- **Verdict:** APPROVE / REQUEST CHANGES / COMMENT\n- **Risks**\n- **Required fixes**\n- **Nits** (<=3)\n\nDiff:\n```\n"+$diff+"\n```")}],max_tokens:1000,temperature:0.1}')"
+    REVIEW="$(curl -sf https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions -H "Authorization: Bearer ${DASHSCOPE_API_KEY}" -H "Content-Type: application/json" -d "$PAYLOAD" | jq -r '.choices[0].message.content // "Review unavailable."')"
+    curl -sf -X POST -H "PRIVATE-TOKEN: ${GITLAB_TOKEN}" -H "Content-Type: application/json" \
+      -d "$(jq -n --arg r "### 🤖 Qwen Code Review\n\n${REVIEW}\n\n---\n<sub>qwen-coder-plus-latest</sub>" '{body:$r}')" \
+      "https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
 
 verify:layout:
   stage: verify
@@ -19,6 +46,19 @@ fenrir-bridge:install-and-build:
     - npm ci
     - npm run build
 
+# Hermetic auth tests: Supabase, Neon, and every OAuth provider fetch are mocked,
+# so this runs with no network egress and no secrets.
+fenrir-bridge:test:
+  stage: verify
+  image: node:22
+  rules:
+    - exists:
+        - apps/fenrir-bridge/package.json
+  script:
+    - cd apps/fenrir-bridge
+    - npm ci
+    - npm test
+
 fenrir-cinema:install-and-build:
   stage: verify
   image: node:22
@@ -29,3 +69,56 @@ fenrir-cinema:install-and-build:
     - cd apps/fenrir-cinema
     - npm install
     - npm run build
+
+# Production deploy for fenrir-bridge to Cloudflare Pages.
+#
+# Auth in CI is API-token based (CLOUDFLARE_API_TOKEN), NOT the operator's
+# browser OAuth. The repo's `npm run deploy:ci` runs a guard that does
+# `wrangler whoami` with the token stripped, which only works with OAuth and
+# would fail here, so this job calls wrangler directly with the token.
+#
+# Required CI/CD variables (Settings -> CI/CD -> Variables, all "Masked",
+# "Protected" so they only expose on the protected main branch):
+#   CLOUDFLARE_API_TOKEN   - Cloudflare token scoped to Pages:Edit
+#   CLOUDFLARE_ACCOUNT_ID  - Cloudflare account id
+#   SESSION_SECRET         - Pages session signing secret
+#   WORKOS_CLIENT_ID       - WorkOS AuthKit client id
+#   WORKOS_API_KEY         - WorkOS API key (sk_...)
+#
+# Gated to main and manual: click "Run" on the pipeline to ship. To make merges
+# auto-deploy, change `when: manual` to `when: on_success`.
+fenrir-bridge:deploy:
+  stage: deploy
+  image: node:22
+  needs:
+    - fenrir-bridge:install-and-build
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CLOUDFLARE_API_TOKEN'
+      when: manual
+  variables:
+    WRANGLER: "npx wrangler"
+    WRANGLER_SEND_METRICS: "false"
+  script:
+    - cd apps/fenrir-bridge
+    - npm ci
+    - npm run build
+    # Push production secrets only when provided, so an unset var never clobbers
+    # an existing value with an empty string.
+    - |
+      for k in SESSION_SECRET WORKOS_CLIENT_ID WORKOS_API_KEY; do
+        v="$(eval printf '%s' "\${$k:-}")"
+        if [ -n "$v" ]; then
+          printf '%s' "$v" | $WRANGLER pages secret put "$k" --project-name fenrir-bridge
+          echo "set $k"
+        else
+          echo "skip $k (not set in CI variables)"
+        fi
+      done
+    - $WRANGLER pages deploy dist --project-name fenrir-bridge --branch main
+    # Verify production responds as expected.
+    - |
+      hz="$(curl -s -o /dev/null -w '%{http_code}' https://www.myfenrir.com/healthz || echo ERR)"
+      wo="$(curl -s -o /dev/null -w '%{http_code}' 'https://auth.myfenrir.com/api/auth/workos/login?provider=google' || echo ERR)"
+      echo "healthz=$hz (expect 200)  workos=$wo (expect 302)"
+      test "$hz" = "200"
+      test "$wo" = "302"

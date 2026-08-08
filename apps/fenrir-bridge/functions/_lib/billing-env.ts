@@ -30,6 +30,8 @@ export type BillingEnv = AuthEnv & {
   PUBLIC_SITE_URL?: string;
   /** Base URL for Authentication (e.g. auth.myfenrir.com). Falls back to PUBLIC_SITE_URL or request origin. */
   PUBLIC_AUTH_URL?: string;
+  /** Comma-separated list of allowed redirect URIs for authentication. */
+  ALLOWED_REDIRECT_URIS?: string;
 };
 
 export function requireEnv(value: string | undefined, name: string): string {
@@ -60,15 +62,42 @@ export function dbNotConfiguredResponse() {
 }
 
 export function siteOrigin(request: Request, env: BillingEnv) {
+  const url = new URL(request.url);
+  const requestOrigin = `${url.protocol}//${url.host}`;
+
+  // If the request origin is in the allowed redirect URIs, prefer it.
+  const allowed = (env.ALLOWED_REDIRECT_URIS || env.PUBLIC_SITE_URL || "")
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean);
+
+  if (allowed.some(base => requestOrigin === base || requestOrigin.startsWith(base + "/"))) {
+    return requestOrigin;
+  }
+
   const configured = env.PUBLIC_SITE_URL?.trim();
   if (configured) return configured.replace(/\/$/, "");
-  const url = new URL(request.url);
-  return `${url.protocol}//${url.host}`;
+  return requestOrigin;
 }
 
 export function authOrigin(request: Request, env: BillingEnv) {
-  const configured = env.PUBLIC_AUTH_URL?.trim();
-  if (configured) return configured.replace(/\/$/, "");
+  const url = new URL(request.url);
+  const requestOrigin = `${url.protocol}//${url.host}`;
+
+  const configuredAuth = env.PUBLIC_AUTH_URL?.trim();
+  if (configuredAuth) {
+    // If we are currently ON the configured auth domain, use it.
+    if (requestOrigin === configuredAuth.replace(/\/$/, "")) {
+      return requestOrigin;
+    }
+  }
+
+  // If the current request origin is one of the allowed domains, it might be a white-label site.
+  // In that case, we should check if it's supposed to use its own origin for auth or the central one.
+  // For now, if PUBLIC_AUTH_URL is set, we generally want to use it for the OAuth provider config,
+  // UNLESS the request is already on a domain that is allowed.
+  
+  if (configuredAuth) return configuredAuth.replace(/\/$/, "");
   return siteOrigin(request, env);
 }
 

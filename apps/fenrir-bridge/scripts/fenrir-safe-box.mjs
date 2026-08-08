@@ -28,13 +28,17 @@ const secretGroups = [
     ]
   },
   {
-    title: "Supabase auth",
+    title: "WorkOS auth (primary login broker)",
     fields: [
-      ["VITE_SUPABASE_URL", "Browser Supabase project URL"],
-      ["VITE_SUPABASE_ANON_KEY", "Browser Supabase publishable/anon key"],
-      ["SUPABASE_URL", "Server Supabase project URL"],
-      ["SUPABASE_ANON_KEY", "Server anon key"],
-      ["SUPABASE_SERVICE_ROLE_KEY", "Server-only service role key"]
+      ["WORKOS_CLIENT_ID", "WorkOS AuthKit client ID (client_...)"],
+      ["WORKOS_API_KEY", "WorkOS API key (sk_...). Used server-side for the code exchange."]
+    ]
+  },
+  {
+    title: "Supabase (optional profile store only)",
+    fields: [
+      ["SUPABASE_URL", "Server Supabase project URL (optional; profile upserts only)"],
+      ["SUPABASE_SERVICE_ROLE_KEY", "Server-only service role key (optional; profile upserts only)"]
     ]
   },
   {

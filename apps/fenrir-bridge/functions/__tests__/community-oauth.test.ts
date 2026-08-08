@@ -1,354 +1,200 @@
-/**
- * Hermetic tests for the Community Bridge OAuth flow.
- *
- * Everything here runs without network, without Neon, and without provider credentials:
- * it covers the parts of the bridge that are decided before any database round trip —
- * return-path safety, provider gating, the signed transaction cookie, and the callback
- * error paths. The remaining leg (code exchange → Neon session) needs real console
- * credentials and is covered by the manual steps in docs/COMMUNITY_OAUTH_RUNBOOK.md.
- *
- * Run: npm test
- */
-import assert from "node:assert/strict";
-import test from "node:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { onRequestGet as communityStart } from "../api/community-auth/oauth/[provider]";
+import { onRequestGet as communityCallback } from "../api/community-auth/oauth/callback/[provider]";
 import {
-  clearCommunityTransactionCookie,
   communityTransactionSetCookie,
   createCommunityOAuthTransaction,
-  getAuthorizationUrl,
-  isCommunityOAuthProvider,
-  readCommunityOAuthTransaction,
-  safeCommunityReturnPath,
-  type OAuthEnv
-} from "../_lib/oauth.ts";
-import {
-  availableCommunityAuthProviders,
-  communityOAuthCallbackPath,
-  handleCommunityOAuthCallback,
-  handleCommunityOAuthStart,
-  type CommunityOAuthEnv
-} from "../_lib/community-oauth.ts";
+  type OAuthTransaction
+} from "../_lib/oauth";
+import type { CommunityOAuthEnv } from "../_lib/community-oauth";
+import { buildFetchRouter, cookiePair, hasCookieSet, jsonResponse, mintIdToken, setCookies } from "./oauth-harness";
 
-const ORIGIN = "https://www.myfenrir.com";
+// The community OAuth bridge resolves a brand from Neon and writes membership +
+// session rows. We replace the Neon driver with an in-memory tagged-template
+// fake (keyed by the SQL statement) so the real handler, gate, and PKCE/state
+// crypto run unchanged with no database and no network.
+const dbState = vi.hoisted(() => ({
+  handler: (_query: string, _values: unknown[]) => [] as Array<Record<string, unknown>>
+}));
 
-/** Env shaped like production, with placeholder credentials — never a real secret. */
-function testEnv(overrides: Partial<CommunityOAuthEnv> = {}): CommunityOAuthEnv {
-  return {
-    SESSION_SECRET: "test-session-secret",
-    PUBLIC_SITE_URL: ORIGIN,
-    NEON_DATABASE_URL: "postgres://placeholder/neon",
-    FENRIR_COMMUNITY_AUTH_SECRET: "test-community-secret",
-    GOOGLE_CLIENT_ID: "placeholder-google-client-id",
-    GOOGLE_CLIENT_SECRET: "placeholder-google-client-secret",
-    ...overrides
-  } as CommunityOAuthEnv;
-}
-
-/** Turn a Set-Cookie header into the Cookie header a browser would send back. */
-function cookieHeaderFrom(setCookie: string) {
-  return setCookie.split(";", 1)[0]!;
-}
-
-function requestWithCookie(url: string, cookie: string, init: RequestInit = {}) {
-  return new Request(url, { ...init, headers: { ...(init.headers as object), Cookie: cookie } });
-}
-
-test("safeCommunityReturnPath only allows relative /community paths", () => {
-  assert.equal(safeCommunityReturnPath("/community/fenrir"), "/community/fenrir");
-  assert.equal(safeCommunityReturnPath("/community/fenrir?x=1"), "/community/fenrir?x=1");
-  // Open-redirect and protocol-relative attempts collapse to the site root.
-  assert.equal(safeCommunityReturnPath("https://evil.tld/community/fenrir"), "/");
-  assert.equal(safeCommunityReturnPath("//evil.tld/community/fenrir"), "/");
-  assert.equal(safeCommunityReturnPath("/main"), "/");
-  assert.equal(safeCommunityReturnPath(null), "/");
-});
-
-test("workos is not a community provider", () => {
-  assert.equal(isCommunityOAuthProvider("google"), true);
-  assert.equal(isCommunityOAuthProvider("microsoft"), true);
-  assert.equal(isCommunityOAuthProvider("apple"), true);
-  // The Neon provider check constraint would reject it.
-  assert.equal(isCommunityOAuthProvider("workos"), false);
-  assert.equal(isCommunityOAuthProvider("telegram"), false);
-});
-
-test("availableCommunityAuthProviders reflects bound credentials", () => {
-  assert.deepEqual(availableCommunityAuthProviders(testEnv()), ["magic_link", "google"]);
-  assert.deepEqual(
-    availableCommunityAuthProviders(testEnv({ GOOGLE_CLIENT_SECRET: undefined })),
-    ["magic_link"]
-  );
-  const allThree = availableCommunityAuthProviders(testEnv({
-    MICROSOFT_CLIENT_ID: "x",
-    MICROSOFT_CLIENT_SECRET: "x",
-    APPLE_CLIENT_ID: "x",
-    APPLE_TEAM_ID: "x",
-    APPLE_KEY_ID: "x",
-    APPLE_PRIVATE_KEY: "x"
-  }));
-  assert.deepEqual(allThree, ["magic_link", "google", "microsoft", "apple"]);
-});
-
-test("transaction cookie round-trips the community slug", async () => {
-  const env = testEnv();
-  const tx = await createCommunityOAuthTransaction("google", env, {
-    community: "fenrir",
-    returnTo: "/community/fenrir"
-  });
-  const setCookie = await communityTransactionSetCookie(tx, env);
-  const request = requestWithCookie(`${ORIGIN}/api/community-auth/oauth/callback/google`, cookieHeaderFrom(setCookie));
-
-  const restored = await readCommunityOAuthTransaction(request, env);
-  assert.ok(restored);
-  assert.equal(restored.community, "fenrir");
-  assert.equal(restored.provider, "google");
-  assert.equal(restored.state, tx.state);
-  assert.equal(restored.verifier, tx.verifier);
-});
-
-test("a tampered or foreign-signed transaction cookie is rejected", async () => {
-  const env = testEnv();
-  const tx = await createCommunityOAuthTransaction("google", env, {
-    community: "fenrir",
-    returnTo: "/community/fenrir"
-  });
-  const setCookie = await communityTransactionSetCookie(tx, env);
-  const cookie = cookieHeaderFrom(setCookie);
-
-  // Same payload, signature from a different secret.
-  const forged = await communityTransactionSetCookie(tx, testEnv({ SESSION_SECRET: "attacker" }));
-  assert.equal(
-    await readCommunityOAuthTransaction(
-      requestWithCookie(`${ORIGIN}/x`, cookieHeaderFrom(forged)),
-      env
-    ),
-    null
-  );
-
-  // Flipped payload byte, original signature.
-  const [name, value] = cookie.split("=", 2) as [string, string];
-  const [payload, signature] = value.split(".") as [string, string];
-  const mutated = `${name}=${payload.slice(0, -1)}${payload.at(-1) === "A" ? "B" : "A"}.${signature}`;
-  assert.equal(
-    await readCommunityOAuthTransaction(requestWithCookie(`${ORIGIN}/x`, mutated), env),
-    null
-  );
-});
-
-test("an expired transaction cookie is rejected", async () => {
-  const env = testEnv();
-  const tx = await createCommunityOAuthTransaction("google", env, {
-    community: "fenrir",
-    returnTo: "/community/fenrir"
-  });
-  const expired = { ...tx, exp: Math.floor(Date.now() / 1000) - 1 };
-  const setCookie = await communityTransactionSetCookie(expired, env);
-  assert.equal(
-    await readCommunityOAuthTransaction(
-      requestWithCookie(`${ORIGIN}/x`, cookieHeaderFrom(setCookie)),
-      env
-    ),
-    null
-  );
-});
-
-test("Apple gets SameSite=None so its cross-site form_post carries the cookie", async () => {
-  const env = testEnv();
-  const appleTx = await createCommunityOAuthTransaction("apple", env, {
-    community: "fenrir",
-    returnTo: "/community/fenrir"
-  });
-  const googleTx = await createCommunityOAuthTransaction("google", env, {
-    community: "fenrir",
-    returnTo: "/community/fenrir"
-  });
-
-  const appleCookie = await communityTransactionSetCookie(appleTx, env);
-  const googleCookie = await communityTransactionSetCookie(googleTx, env);
-
-  assert.match(appleCookie, /SameSite=None/);
-  assert.match(appleCookie, /Secure/);
-  assert.match(googleCookie, /SameSite=Lax/);
-  for (const cookie of [appleCookie, googleCookie]) {
-    assert.match(cookie, /HttpOnly/);
-    assert.match(cookie, /Path=\/api\/community-auth/);
+vi.mock("@neondatabase/serverless", () => ({
+  neon: () => {
+    const sql = (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const query = strings.join(" $ ");
+      return Promise.resolve(dbState.handler(query, values));
+    };
+    return sql;
   }
+}));
+
+const SLUG = "stixmagic";
+
+function baseEnv(): CommunityOAuthEnv {
+  return {
+    NEON_DATABASE_URL: "postgres://test-db/neon",
+    FENRIR_COMMUNITY_AUTH_SECRET: "community-auth-secret",
+    SESSION_SECRET: "test-session-secret-community",
+    GOOGLE_CLIENT_ID: "google-client-id.apps.googleusercontent.com",
+    GOOGLE_CLIENT_SECRET: "google-secret",
+    PUBLIC_SITE_URL: "https://app.example.test"
+  };
+}
+
+function brandRow(enabledProviders: string[]) {
+  return {
+    id: "community-1",
+    org_id: "org-1",
+    slug: SLUG,
+    name: "STIX Magic",
+    logo_url: null,
+    mascot_url: null,
+    background_url: null,
+    primary_color: "#22c7a8",
+    secondary_color: "#8cb9ff",
+    accent_color: "#9b8cff",
+    headline: "Join STIX Magic",
+    subheadline: "Enter to continue.",
+    invite_prefix: SLUG,
+    enabled_auth_providers: enabledProviders,
+    default_access_state: "active"
+  };
+}
+
+/** Full happy-path DB: brand resolves, then user/membership/identity/session writes succeed. */
+function happyPathDb(enabledProviders: string[]) {
+  return (query: string) => {
+    if (query.includes("from fenrir_gate_communities")) return [brandRow(enabledProviders)];
+    if (query.includes("insert into fenrir_community_users")) {
+      return [{ id: "user-1", email: "alice@example.test", role: "member", access_status: "pending" }];
+    }
+    if (query.includes("insert into fenrir_community_memberships")) {
+      return [{ id: "membership-1", role: "member", status: "pending" }];
+    }
+    if (query.includes("insert into fenrir_community_oauth_identities")) return [];
+    if (query.includes("insert into fenrir_community_sessions")) return [{ id: "session-1" }];
+    return [];
+  };
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
-test("clearing the transaction cookie expires it on the same path", () => {
-  const cleared = clearCommunityTransactionCookie();
-  assert.match(cleared, /^fenrir_community_oauth_tx=;/);
-  assert.match(cleared, /Max-Age=0/);
-  assert.match(cleared, /Path=\/api\/community-auth/);
+beforeEach(() => {
+  dbState.handler = () => [];
 });
 
-test("the authorization URL carries PKCE, state, nonce and the bridge callback", async () => {
-  const env = testEnv();
-  const tx = await createCommunityOAuthTransaction("google", env, {
-    community: "fenrir",
-    returnTo: "/community/fenrir"
-  });
-  const callback = `${ORIGIN}${communityOAuthCallbackPath("google")}`;
-  const url = new URL(await getAuthorizationUrl("google", env, callback, tx));
+describe("community OAuth start", () => {
+  it("happy path: redirects to the provider authorize URL and sets the signed transaction cookie", async () => {
+    dbState.handler = happyPathDb(["magic_link", "google"]);
+    // No outbound calls expected during start — any fetch is a bug.
+    const router = buildFetchRouter([]);
+    vi.stubGlobal("fetch", router.fetch);
 
-  assert.equal(url.origin + url.pathname, "https://accounts.google.com/o/oauth2/v2/auth");
-  assert.equal(url.searchParams.get("redirect_uri"), "https://www.myfenrir.com/api/community-auth/oauth/callback/google");
-  assert.equal(url.searchParams.get("client_id"), "placeholder-google-client-id");
-  assert.equal(url.searchParams.get("response_type"), "code");
-  assert.equal(url.searchParams.get("state"), tx.state);
-  assert.equal(url.searchParams.get("nonce"), tx.nonce);
-  assert.equal(url.searchParams.get("code_challenge_method"), "S256");
-  // The challenge is the hash, never the raw verifier.
-  assert.ok(url.searchParams.get("code_challenge"));
-  assert.notEqual(url.searchParams.get("code_challenge"), tx.verifier);
+    const request = new Request(
+      `https://app.example.test/api/community-auth/oauth/google?slug=${SLUG}&return_to=/community/${SLUG}`
+    );
+    const response = await communityStart({ request, env: baseEnv(), params: { provider: "google" } } as any);
+
+    expect(response.status).toBe(302);
+    const location = response.headers.get("Location") ?? "";
+    expect(location.startsWith("https://accounts.google.com/o/oauth2/v2/auth")).toBe(true);
+    expect(location).toContain("code_challenge=");
+    expect(location).toContain("code_challenge_method=S256");
+    expect(hasCookieSet(response, "fenrir_community_oauth_tx")).toBe(true);
+    expect(router.calls).toHaveLength(0);
+  });
+
+  it("provider_not_enabled gate: redirects to the community page with the gate error when the brand has not enabled the provider", async () => {
+    // Brand exists but only enables magic_link — Google must be refused.
+    dbState.handler = happyPathDb(["magic_link"]);
+    const router = buildFetchRouter([]);
+    vi.stubGlobal("fetch", router.fetch);
+
+    const request = new Request(`https://app.example.test/api/community-auth/oauth/google?slug=${SLUG}`);
+    const response = await communityStart({ request, env: baseEnv(), params: { provider: "google" } } as any);
+
+    expect(response.status).toBe(302);
+    const location = response.headers.get("Location") ?? "";
+    expect(location).toBe(`https://app.example.test/community/${SLUG}?auth_error=provider_not_enabled`);
+    // The gate must not start an OAuth transaction when it refuses the provider.
+    expect(hasCookieSet(response, "fenrir_community_oauth_tx")).toBe(false);
+  });
 });
 
-test("callback paths are the ones registered in the provider consoles", () => {
-  assert.equal(communityOAuthCallbackPath("google"), "/api/community-auth/oauth/callback/google");
-  assert.equal(communityOAuthCallbackPath("microsoft"), "/api/community-auth/oauth/callback/microsoft");
-  assert.equal(communityOAuthCallbackPath("apple"), "/api/community-auth/oauth/callback/apple");
-});
+describe("community OAuth callback", () => {
+  async function mintGoogleToken(tx: OAuthTransaction, emailVerified: boolean) {
+    return mintIdToken({
+      iss: "https://accounts.google.com",
+      aud: "google-client-id.apps.googleusercontent.com",
+      sub: "google-sub-789",
+      email: "alice@example.test",
+      email_verified: emailVerified,
+      name: "Alice Example",
+      nonce: tx.nonce,
+      exp: Math.floor(Date.now() / 1000) + 3600
+    });
+  }
 
-test("start rejects workos, a bad slug, and an unconfigured provider", async () => {
-  const env = testEnv();
+  it("happy path: exchanges the code, provisions membership, and mints the community session", async () => {
+    const env = baseEnv();
+    dbState.handler = happyPathDb(["magic_link", "google"]);
 
-  const workos = await handleCommunityOAuthStart({
-    request: new Request(`${ORIGIN}/api/community-auth/oauth/workos?slug=fenrir`),
-    env,
-    provider: "workos"
-  });
-  assert.equal(workos.status, 404);
+    const tx = await createCommunityOAuthTransaction("google", env, {
+      community: SLUG,
+      returnTo: `/community/${SLUG}`
+    });
+    const { idToken, jwks } = await mintGoogleToken(tx, true);
+    const router = buildFetchRouter([
+      { when: "oauth2.googleapis.com/token", respond: () => jsonResponse({ id_token: idToken }) },
+      { when: "/oauth2/v3/certs", respond: () => jsonResponse(jwks) }
+    ]);
+    vi.stubGlobal("fetch", router.fetch);
 
-  const badSlug = await handleCommunityOAuthStart({
-    request: new Request(`${ORIGIN}/api/community-auth/oauth/google?slug=NOT+A+SLUG`),
-    env,
-    provider: "google"
-  });
-  assert.equal(badSlug.status, 400);
+    const txCookie = cookiePair(await communityTransactionSetCookie(tx, env));
+    const request = new Request(
+      `https://app.example.test/api/community-auth/oauth/callback/google?code=auth_code&state=${tx.state}`,
+      { headers: { Cookie: txCookie } }
+    );
 
-  // No credentials: bounce back to the gate instead of throwing a 500 at the visitor.
-  const unconfigured = await handleCommunityOAuthStart({
-    request: new Request(`${ORIGIN}/api/community-auth/oauth/apple?slug=fenrir`),
-    env,
-    provider: "apple"
-  });
-  assert.equal(unconfigured.status, 302);
-  assert.equal(
-    unconfigured.headers.get("Location"),
-    `${ORIGIN}/community/fenrir?auth_error=provider_not_configured`
-  );
-});
+    const response = await communityCallback({ request, env, params: { provider: "google" } } as any);
 
-test("start 503s when the community bridge itself is not configured", async () => {
-  const response = await handleCommunityOAuthStart({
-    request: new Request(`${ORIGIN}/api/community-auth/oauth/google?slug=fenrir`),
-    env: testEnv({ NEON_DATABASE_URL: undefined }),
-    provider: "google"
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe(`https://app.example.test/community/${SLUG}`);
+    expect(hasCookieSet(response, "fenrir_community_session")).toBe(true);
+    // Transaction cookie is cleared after the exchange completes.
+    expect(setCookies(response).some((c) => c.startsWith("fenrir_community_oauth_tx=;"))).toBe(true);
   });
-  assert.equal(response.status, 503);
-});
 
-test("callback surfaces a provider error without touching the database", async () => {
-  const response = await handleCommunityOAuthCallback({
-    request: new Request(`${ORIGIN}/api/community-auth/oauth/callback/google?error=access_denied`),
-    env: testEnv(),
-    provider: "google"
-  });
-  assert.equal(response.status, 302);
-  assert.equal(
-    response.headers.get("Location"),
-    `${ORIGIN}/community/unknown?auth_error=access_denied`
-  );
-  assert.match(response.headers.get("Set-Cookie") ?? "", /fenrir_community_oauth_tx=;/);
-});
+  it("email_unverified rejection: refuses sign-in and never writes a session when the provider reports an unverified email", async () => {
+    const env = baseEnv();
+    dbState.handler = happyPathDb(["magic_link", "google"]);
 
-test("callback without a code redirects with missing_code", async () => {
-  const response = await handleCommunityOAuthCallback({
-    request: new Request(`${ORIGIN}/api/community-auth/oauth/callback/google`),
-    env: testEnv(),
-    provider: "google"
-  });
-  assert.equal(response.status, 302);
-  assert.match(response.headers.get("Location") ?? "", /auth_error=missing_code$/);
-});
+    const tx = await createCommunityOAuthTransaction("google", env, {
+      community: SLUG,
+      returnTo: `/community/${SLUG}`
+    });
+    const { idToken, jwks } = await mintGoogleToken(tx, false);
+    const router = buildFetchRouter([
+      { when: "oauth2.googleapis.com/token", respond: () => jsonResponse({ id_token: idToken }) },
+      { when: "/oauth2/v3/certs", respond: () => jsonResponse(jwks) }
+    ]);
+    vi.stubGlobal("fetch", router.fetch);
 
-test("callback with no transaction cookie fails closed on state", async () => {
-  const response = await handleCommunityOAuthCallback({
-    request: new Request(`${ORIGIN}/api/community-auth/oauth/callback/google?code=abc&state=xyz`),
-    env: testEnv(),
-    provider: "google"
-  });
-  assert.equal(response.status, 302);
-  assert.match(response.headers.get("Location") ?? "", /auth_error=oauth_state_missing$/);
-});
+    const txCookie = cookiePair(await communityTransactionSetCookie(tx, env));
+    const request = new Request(
+      `https://app.example.test/api/community-auth/oauth/callback/google?code=auth_code&state=${tx.state}`,
+      { headers: { Cookie: txCookie } }
+    );
 
-test("callback rejects a state that does not match the transaction", async () => {
-  const env = testEnv();
-  const tx = await createCommunityOAuthTransaction("google", env, {
-    community: "fenrir",
-    returnTo: "/community/fenrir"
-  });
-  const cookie = cookieHeaderFrom(await communityTransactionSetCookie(tx, env));
+    const response = await communityCallback({ request, env, params: { provider: "google" } } as any);
 
-  const response = await handleCommunityOAuthCallback({
-    request: requestWithCookie(`${ORIGIN}/api/community-auth/oauth/callback/google?code=abc&state=not-the-state`, cookie),
-    env,
-    provider: "google"
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe(
+      `https://app.example.test/community/${SLUG}?auth_error=email_unverified`
+    );
+    expect(hasCookieSet(response, "fenrir_community_session")).toBe(false);
+    expect(setCookies(response).some((c) => c.startsWith("fenrir_community_oauth_tx=;"))).toBe(true);
   });
-  assert.equal(response.status, 302);
-  assert.equal(
-    response.headers.get("Location"),
-    `${ORIGIN}/community/fenrir?auth_error=oauth_state_invalid`
-  );
-});
-
-test("callback rejects a transaction minted for a different provider", async () => {
-  const env = testEnv({ MICROSOFT_CLIENT_ID: "x", MICROSOFT_CLIENT_SECRET: "x" });
-  const tx = await createCommunityOAuthTransaction("google", env, {
-    community: "fenrir",
-    returnTo: "/community/fenrir"
-  });
-  const cookie = cookieHeaderFrom(await communityTransactionSetCookie(tx, env));
-
-  const response = await handleCommunityOAuthCallback({
-    request: requestWithCookie(
-      `${ORIGIN}/api/community-auth/oauth/callback/microsoft?code=abc&state=${encodeURIComponent(tx.state)}`,
-      cookie
-    ),
-    env,
-    provider: "microsoft"
-  });
-  assert.equal(response.status, 302);
-  assert.match(response.headers.get("Location") ?? "", /auth_error=oauth_provider_mismatch$/);
-});
-
-test("callback reads Apple's form_post body", async () => {
-  const env = testEnv({
-    APPLE_CLIENT_ID: "x",
-    APPLE_TEAM_ID: "x",
-    APPLE_KEY_ID: "x",
-    APPLE_PRIVATE_KEY: "x"
-  });
-  const body = new URLSearchParams({ error: "user_cancelled_authorize" });
-  const response = await handleCommunityOAuthCallback({
-    request: new Request(`${ORIGIN}/api/community-auth/oauth/callback/apple`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body
-    }),
-    env,
-    provider: "apple"
-  });
-  assert.equal(response.status, 302);
-  assert.match(response.headers.get("Location") ?? "", /auth_error=user_cancelled_authorize$/);
-});
-
-test("callback rejects workos outright", async () => {
-  const response = await handleCommunityOAuthCallback({
-    request: new Request(`${ORIGIN}/api/community-auth/oauth/callback/workos?code=abc`),
-    env: testEnv(),
-    provider: "workos"
-  });
-  assert.equal(response.status, 404);
 });

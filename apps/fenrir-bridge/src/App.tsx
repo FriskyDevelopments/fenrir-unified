@@ -771,10 +771,10 @@ const liveRoomProviders: Array<{ id: LiveRoomProvider; name: string; icon: strin
 const domainTagPresets = ["launch", "client", "vip", "community", "paid", "internal"] as const;
 
 const providerLogoPresets: Record<LiveRoomProvider, string> = {
-  zoom: "https://upload.wikimedia.org/wikipedia/commons/7/7b/Zoom_Communications_Logo.svg",
-  google_meet: "https://upload.wikimedia.org/wikipedia/commons/9/9b/Google_Meet_icon_%282020%29.svg",
-  whereby: "https://assets-global.website-files.com/5c45f12b43c3101f4504272f/5c45f12b43c3106a45042802_whereby-logo.svg",
-  webex: "https://upload.wikimedia.org/wikipedia/commons/f/f9/Webex_by_Cisco_logo.svg",
+  zoom: "/provider-logos/zoom.svg",
+  google_meet: "/provider-logos/google_meet.svg",
+  whereby: "/provider-logos/whereby.svg",
+  webex: "/provider-logos/webex.svg",
   other: "/fenrir-splash-icon.svg"
 };
 
@@ -1384,7 +1384,15 @@ export function App() {
 
   async function createLiveRoom() {
     const domainId = selectedDomainRecord?.id;
-    if (!domainId || !roomTargetInput.trim()) return;
+    if (!domainId) {
+      setNotice(`${c.chooseDomain}. ${c.easyCloudflareBody ?? ""}`.trim());
+      navigateActive("dns");
+      return;
+    }
+    if (!roomTargetInput.trim()) {
+      setNotice(`${ui.liveRoomUrlHint}.`);
+      return;
+    }
     const targetUrl = safeHttpUrl(roomTargetInput);
     if (!targetUrl) {
       setNotice(ui.liveRoomUrlHint + ".");
@@ -1958,12 +1966,20 @@ export function App() {
                 <button type="button" className="compact-button ghost" key={provider.id} onClick={() => {
                   setRoomProviderInput(provider.id);
                   setRoomCoverInput(providerLogoPresets[provider.id]);
+                  setNotice(`${provider.name} logo preset applied.`);
                 }}>
                   <ProviderBadge provider={provider.id} c={c} compact />
                 </button>
               ))}
             </div>
             <div className="room-wow-preview" aria-label="Live room preview">
+              <img
+                className="room-logo-preview"
+                src={safeHttpUrl(roomCoverInput) || providerLogoPresets[roomProviderInput]}
+                alt="Room logo preview"
+                style={{ height: 40, width: "auto", maxWidth: 160, objectFit: "contain", borderRadius: 8 }}
+                onError={(event) => { (event.currentTarget as HTMLImageElement).src = providerLogoPresets[roomProviderInput]; }}
+              />
               <div className="room-wow-link">
                 <ProviderBadge provider={roomProviderInput} c={c} />
                 <span>{selectedDomainRecord?.domain ?? "vip.myfenrir.com"}/{roomSlugInput.trim() || "studio"}</span>
@@ -3395,6 +3411,18 @@ function authErrorMessage() {
   }
   if (errorCode === "supabase_session_failed") {
     return `Could not open a Fenrir admin session.${detail ? ` (${detail})` : ""}`;
+  }
+  if (errorCode === "workos_not_configured" || errorCode === "workos_login_init_failed") {
+    return "Sign-in is not fully configured yet. Please try again shortly or contact support.";
+  }
+  if (errorCode === "workos_state_invalid") {
+    return "Your sign-in attempt expired or could not be verified. Please start sign-in again.";
+  }
+  if (errorCode === "workos_exchange_failed" || errorCode === "workos_token_exchange_failed") {
+    return `Could not finish sign-in with the provider.${detail ? ` (${detail})` : " Please try again."}`;
+  }
+  if (errorCode === "missing_code") {
+    return "The provider did not return a sign-in code. Please try again.";
   }
   return "Sign-in could not finish. Try another provider or refresh the page.";
 }

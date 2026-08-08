@@ -1,33 +1,67 @@
-import { Bot, webhookCallback } from "grammy";
-import { registerHandlers } from "../../_lib/lock-bot/handlers.js";
-import { LockStore } from "../../_lib/lock-bot/store.js";
+/**
+ * Fenrir Lock Bot — Cloudflare Pages Function webhook
+ *
+ * This is a SEPARATE bot from the MyFenrir Telegram bot.
+ * It manages domain-locked invite codes for Telegram communities.
+ *
+ * Required env vars:
+ *   LOCK_BOT_TOKEN             — Bot token from @BotFather
+ *   LOCK_BOT_WEBHOOK_SECRET    — Shared secret for X-Telegram-Bot-Api-Secret-Token
+ *
+ * Set webhook:
+ *   curl -X POST https://api.telegram.org/bot<LOCK_BOT_TOKEN>/setWebhook \
+ *     -d "url=https://<your-domain>/api/lock-bot/webhook" \
+ *     -d "secret_token=<LOCK_BOT_WEBHOOK_SECRET>" \
+ *     -d 'allowed_updates=["message","callback_query"]'
+ *
+ * Route: POST /api/lock-bot/webhook
+ */
 
-interface Env {
-    DB: D1Database;
-    TELEGRAM_BOT_TOKEN: string;
+import { handleUpdate } from "../../_lib/lock-bot/handlers.js";
+
+/**
+ * Lock-bot specific env bindings.
+ * Extend with D1 or KV bindings as needed.
+ */
+export interface LockBotEnv {
+    LOCK_BOT_TOKEN?: string;
+    FENRIR_LOCK_BOT_TOKEN?: string;
+    LOCK_BOT_WEBHOOK_SECRET?: string;
+    DB?: unknown; // D1Database — typed by Cloudflare at deploy time
 }
 
-let botCache: Bot | null = null;
-let webhookCache: any = null;
-
-export const onRequestPost: PagesFunction<Env> = async (context) => {
-    const { request, env } = context;
-
-    if (!env.TELEGRAM_BOT_TOKEN) {
-        return new Response("Missing TELEGRAM_BOT_TOKEN", { status: 500 });
+export const onRequestPost: PagesFunction<LockBotEnv> = async (context) => {
+    // ── Validate webhook secret ─────────────────────────────
+    const configuredSecret = (context.env.LOCK_BOT_WEBHOOK_SECRET ?? "").trim();
+    if (configuredSecret) {
+        const received = context.request.headers.get("x-telegram-bot-api-secret-token") ?? "";
+        if (received !== configuredSecret) {
+            return Response.json(
+                { ok: false, error: "invalid_webhook_secret" },
+                { status: 401 }
+            );
+        }
     }
 
-    if (!botCache) {
-        botCache = new Bot(env.TELEGRAM_BOT_TOKEN);
-        const lockStore = new LockStore(env.DB);
-        registerHandlers(botCache, lockStore);
-
-        botCache.catch((err) => {
-            console.error(`[lock-bot] Unhandled error:`, err.error);
-        });
-
-        webhookCache = webhookCallback(botCache, "cloudflare-mod");
+    // ── Validate bot token ──────────────────────────────────
+    const token = (context.env.LOCK_BOT_TOKEN ?? context.env.FENRIR_LOCK_BOT_TOKEN ?? "").trim();
+    if (!token) {
+        return Response.json(
+            {
+                ok: false,
+                error: "lock_bot_not_configured",
+                detail: "LOCK_BOT_TOKEN is not set. Add it to your Cloudflare Pages env vars.",
+            },
+            { status: 503 }
+        );
     }
 
-    return webhookCache(request);
+    // ── Parse update ────────────────────────────────────────
+    const update: unknown = await context.request.json().catch(() => null);
+    if (!update || typeof update !== "object") {
+        return Response.json({ ok: false, error: "invalid_update" }, { status: 400 });
+    }
+
+    // ── Dispatch to handler ─────────────────────────────────
+    return handleUpdate(context.env as Record<string, string | undefined>, update as Record<string, unknown>);
 };

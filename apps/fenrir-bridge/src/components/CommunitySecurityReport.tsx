@@ -1,184 +1,192 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { communitySecurityService } from "../services/api";
 import type { CommunitySecurityReport } from "../services/types";
 
-type LoadingState = "idle" | "loading" | "success" | "error";
-
-export function CommunitySecurityReport({ communitySlug = "fenrir" }: { communitySlug?: string }) {
-  const [loadingState, setLoadingState] = useState<LoadingState>("idle");
+export function CommunitySecurityReport({ communitySlug }: { communitySlug?: string }) {
   const [report, setReport] = useState<CommunitySecurityReport | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchReport() {
-      setLoadingState("loading");
-      setError(null);
-      try {
-        const response = await communitySecurityService.getReport(communitySlug);
-        setReport(response.data);
-        setLoadingState("success");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load security report");
-        setLoadingState("error");
-      }
+    if (!communitySlug) {
+      setReport(null);
+      return;
     }
 
-    fetchReport();
+    let isMounted = true;
+    setLoading(true);
+    setError(null);
+
+    communitySecurityService
+      .getReport(communitySlug)
+      .then((res) => {
+        if (isMounted) {
+          if (res.ok) {
+            setReport(res.data);
+          } else {
+            setError("Failed to fetch security report. Please try again.");
+          }
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setError(err.message || "An unexpected error occurred.");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [communitySlug]);
 
-  if (loadingState === "loading") {
+  if (!communitySlug) {
     return (
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/3 mb-6"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-          <div className="h-32 bg-gray-200 rounded"></div>
-        </div>
+      <div className="p-8 text-center text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
+        <h3 className="text-lg font-medium mb-2">No Community Selected</h3>
+        <p>Please select a community to view its security report.</p>
       </div>
     );
   }
 
-  if (loadingState === "error") {
+  if (loading) {
     return (
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-red-800 mb-2">Error Loading Report</h2>
-          <p className="text-red-600">{error || "Unable to load security report. Please try again later."}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loadingState === "idle" || !report) {
-    return (
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-12 text-center">
-          <h2 className="text-lg font-semibold text-gray-800 mb-2">No Report Data</h2>
-          <p className="text-gray-600">Select a community to view its security report.</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Community Security Report</h1>
-        <p className="text-gray-600">
-          {report.community.name} ({report.community.slug})
-        </p>
-        <p className="text-sm text-gray-500 mt-1">
-          Generated: {new Date(report.generatedAt).toLocaleString()}
-        </p>
-      </div>
-
-      {/* Fenrir Impact Summary */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-8">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Fenrir Impact Summary</h2>
+      <div className="animate-pulse space-y-6">
+        <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="text-3xl font-bold text-green-600 mb-1">{report.impact.blockedAttempts}</div>
-            <div className="text-sm text-gray-600">Risky login attempts blocked</div>
-          </div>
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="text-3xl font-bold text-amber-600 mb-1">{report.impact.usersNeedingProfileFixes}</div>
-            <div className="text-sm text-gray-600">Users need profile fixes</div>
-          </div>
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="text-3xl font-bold text-blue-600 mb-1">{report.impact.fullyVerifiedUsers}</div>
-            <div className="text-sm text-gray-600">Fully verified users</div>
-          </div>
+          <div className="h-32 bg-gray-200 rounded-lg"></div>
+          <div className="h-32 bg-gray-200 rounded-lg"></div>
+          <div className="h-32 bg-gray-200 rounded-lg"></div>
         </div>
+        <div className="h-64 bg-gray-200 rounded-lg mt-6"></div>
       </div>
+    );
+  }
 
-      {/* User Statistics */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">User Statistics</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Users" value={report.users.total} color="gray" />
-          <StatCard label="Verified Users" value={report.users.verified} color="green" />
-          <StatCard label="Blocked Users" value={report.users.blocked} color="red" />
-          <StatCard label="Pending Users" value={report.users.pending} color="amber" />
-        </div>
+  if (error) {
+    return (
+      <div className="p-6 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+        <h3 className="text-lg font-medium mb-2">Error Loading Report</h3>
+        <p>{error}</p>
+        <p className="mt-4 text-sm opacity-80">Check your connection and ensure you have the correct permissions.</p>
       </div>
+    );
+  }
 
-      {/* Profile Quality */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Profile Quality</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <StatCard
-            label="Missing Display Name"
-            value={report.users.missingDisplayName}
-            color="amber"
-            subtitle="Users need to add their display name"
-          />
-        </div>
-      </div>
-
-      {/* Login Session Statistics */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Login Session Statistics</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <StatCard label="Total Sessions" value={report.sessions.total} color="gray" />
-          <StatCard label="Successful Logins" value={report.sessions.successful} color="green" />
-          <StatCard label="Failed Logins" value={report.sessions.failed} color="red" />
-          <StatCard label="Blocked Attempts" value={report.sessions.blocked} color="purple" />
-          <StatCard label="Expired Sessions" value={report.sessions.expired} color="gray" />
-          <StatCard label="Pending Review" value={report.sessions.pending} color="amber" />
-        </div>
-      </div>
-
-      {/* Summary Statement */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">Security Summary</h2>
-        <p className="text-gray-700">
-          Fenrir has protected this community by blocking <strong>{report.impact.blockedAttempts}</strong> risky login attempts.
-          Currently, <strong>{report.impact.usersNeedingProfileFixes}</strong> users need to update their profile information,
-          and <strong>{report.impact.fullyVerifiedUsers}</strong> users are fully verified and active.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  color,
-  subtitle
-}: {
-  label: string;
-  value: number;
-  color: "gray" | "green" | "red" | "amber" | "blue" | "purple";
-  subtitle?: string;
-}) {
-  const colorClasses = {
-    gray: "text-gray-900",
-    green: "text-green-600",
-    red: "text-red-600",
-    amber: "text-amber-600",
-    blue: "text-blue-600",
-    purple: "text-purple-600"
-  };
-
-  const bgClasses = {
-    gray: "bg-gray-50 border-gray-200",
-    green: "bg-green-50 border-green-200",
-    red: "bg-red-50 border-red-200",
-    amber: "bg-amber-50 border-amber-200",
-    blue: "bg-blue-50 border-blue-200",
-    purple: "bg-purple-50 border-purple-200"
-  };
+  if (!report) {
+    return null;
+  }
 
   return (
-    <div className={`border rounded-lg p-4 ${bgClasses[color]}`}>
-      <div className={`text-3xl font-bold ${colorClasses[color]} mb-1`}>{value}</div>
-      <div className="text-sm font-medium text-gray-700">{label}</div>
-      {subtitle && <div className="text-xs text-gray-500 mt-1">{subtitle}</div>}
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Security Report</h2>
+          <p className="text-gray-500">Overview for {report.community.name} ({report.community.slug})</p>
+        </div>
+        <div className="text-sm text-gray-400">
+          Generated at: {new Date(report.generatedAt).toLocaleString()}
+        </div>
+      </div>
+
+      {/* 1. Fenrir Impact Summary */}
+      <section>
+        <h3 className="text-xl font-semibold mb-4 text-gray-800">Fenrir Impact Summary</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 shadow-sm">
+            <div className="text-indigo-600 text-sm font-medium mb-1">Blocked Attempts</div>
+            <div className="text-3xl font-bold text-indigo-900">{report.impact.blockedAttempts}</div>
+          </div>
+          <div className="bg-orange-50 border border-orange-100 rounded-xl p-6 shadow-sm">
+            <div className="text-orange-600 text-sm font-medium mb-1">Profile Fixes Needed</div>
+            <div className="text-3xl font-bold text-orange-900">{report.impact.usersNeedingProfileFixes}</div>
+          </div>
+          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-6 shadow-sm">
+            <div className="text-emerald-600 text-sm font-medium mb-1">Fully Verified Users</div>
+            <div className="text-3xl font-bold text-emerald-900">{report.impact.fullyVerifiedUsers}</div>
+          </div>
+        </div>
+      </section>
+
+      {/* Grid for User and Session Stats */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* 2. User Statistics */}
+        <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+          <h3 className="text-lg font-semibold mb-4 text-gray-800">User Statistics</h3>
+          <ul className="space-y-3">
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Total Users</span>
+              <span className="font-semibold">{report.users.total}</span>
+            </li>
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Verified Users</span>
+              <span className="font-semibold text-emerald-600">{report.users.verified}</span>
+            </li>
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Blocked Users</span>
+              <span className="font-semibold text-red-600">{report.users.blocked}</span>
+            </li>
+            <li className="flex justify-between items-center py-2">
+              <span className="text-gray-600">Pending Users</span>
+              <span className="font-semibold text-yellow-600">{report.users.pending}</span>
+            </li>
+          </ul>
+        </section>
+
+        {/* 4. Login Session Statistics */}
+        <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+          <h3 className="text-lg font-semibold mb-4 text-gray-800">Login Sessions</h3>
+          <ul className="space-y-3">
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Total Sessions</span>
+              <span className="font-semibold">{report.sessions.total}</span>
+            </li>
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Successful</span>
+              <span className="font-semibold text-emerald-600">{report.sessions.successful}</span>
+            </li>
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Failed / Blocked</span>
+              <span className="font-semibold text-red-600">{report.sessions.failed} / {report.sessions.blocked}</span>
+            </li>
+            <li className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Expired</span>
+              <span className="font-semibold">{report.sessions.expired}</span>
+            </li>
+            <li className="flex justify-between items-center py-2">
+              <span className="text-gray-600">Pending Review</span>
+              <span className="font-semibold text-yellow-600">{report.sessions.pending}</span>
+            </li>
+          </ul>
+        </section>
+      </div>
+
+      {/* 3. Profile Quality */}
+      <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <h3 className="text-lg font-semibold mb-4 text-gray-800">Profile Quality</h3>
+        <div className="flex items-center justify-between">
+          <span className="text-gray-600">Users missing display names</span>
+          <span className="font-semibold text-orange-600">{report.users.missingDisplayName}</span>
+        </div>
+        {report.users.missingDisplayName > 0 && (
+          <p className="mt-3 text-sm text-gray-500">
+            Consider prompting these users to update their profile to improve community engagement.
+          </p>
+        )}
+      </section>
+
+      {/* 5. Security Summary */}
+      <section className="bg-blue-50 border border-blue-100 rounded-xl p-6 shadow-sm">
+        <h3 className="text-lg font-semibold mb-3 text-blue-900">Security Narrative</h3>
+        <p className="text-blue-800 leading-relaxed">
+          Fenrir is actively protecting {report.community.name}. Out of {report.sessions.total} total recorded login attempts, {report.impact.blockedAttempts} risky or unauthorized attempts were successfully blocked. Currently, {report.impact.fullyVerifiedUsers} members are fully verified, ensuring a safe and trusted community environment.
+        </p>
+      </section>
     </div>
   );
 }
