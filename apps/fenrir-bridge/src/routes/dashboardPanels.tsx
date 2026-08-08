@@ -897,7 +897,7 @@ export function LaunchWowConsole({
       communityBody: "Edit the public gate while the preview shows exactly what visitors see.",
       actionDomain: "Open Domain Wizard",
       actionRoom: "Open Live Rooms",
-      actionCommunity: "Open Login Builder",
+      actionCommunity: "Open Community Bridge",
       verified: "verified",
       locks: "locks",
       rooms: "rooms"
@@ -913,7 +913,7 @@ export function LaunchWowConsole({
       communityBody: "Edita la puerta publica mientras el preview muestra lo que ve la gente.",
       actionDomain: "Abrir Domain Wizard",
       actionRoom: "Abrir Live Rooms",
-      actionCommunity: "Abrir Login Builder",
+      actionCommunity: "Abrir Community Bridge",
       verified: "verificados",
       locks: "locks",
       rooms: "salas"
@@ -929,7 +929,7 @@ export function LaunchWowConsole({
       communityBody: "Editez la porte publique avec un apercu visiteur.",
       actionDomain: "Ouvrir Domain Wizard",
       actionRoom: "Ouvrir Live Rooms",
-      actionCommunity: "Ouvrir Login Builder",
+      actionCommunity: "Ouvrir Community Bridge",
       verified: "verifies",
       locks: "locks",
       rooms: "rooms"
@@ -945,7 +945,7 @@ export function LaunchWowConsole({
       communityBody: "Public Gate bearbeiten und Besucher-Preview sehen.",
       actionDomain: "Domain Wizard oeffnen",
       actionRoom: "Live Rooms oeffnen",
-      actionCommunity: "Login Builder oeffnen",
+      actionCommunity: "Community Bridge oeffnen",
       verified: "verifiziert",
       locks: "locks",
       rooms: "rooms"

@@ -732,7 +732,7 @@ export function DashboardRoute() {
             roomProvider={roomProviderInput}
             onDomain={() => navigateActive("domains")}
             onRoom={() => navigateActive("rooms")}
-            onCommunity={() => navigateActive("brands")}
+            onCommunity={() => { window.location.assign("https://gate.myfenrir.com/dashboard"); }}
           />
         )}
 

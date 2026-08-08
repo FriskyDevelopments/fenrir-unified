@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.1",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://jgktxeabubmkxkhlftkg.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "clipsflow-access-control",
+      "version": "0.1.0",
+      "title": "MyFenrir Access Control"
+    },
+    "tools": [
+      {
+        "name": "get_my_account",
+        "title": "Get my MyFenrir account",
+        "description": "Return the signed-in user's MyFenrir account: user id, email, portal role, and linked Telegram ID.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "link_telegram_account",
+        "title": "Link Telegram account",
+        "description": "Redeem a one-time code from the MyFenrir Telegram bot to link that Telegram account to the signed-in portal user.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20,
+              "description": "The one-time code sent by the MyFenrir bot."
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_portal_users",
+        "title": "List portal users",
+        "description": "List MyFenrir portal users with their roles and linked Telegram IDs. Only staff (admin or owner) can read more than their own record.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
