@@ -25,3 +25,7 @@ http-client.private.env.json
 # Astelar knowledge base: repo git independiente anidado, se mantiene aislado
 # a propósito (se enlaza desde la página como knowledge base, no se versiona aquí).
 apps/fenrir-bridge/astelar/
+
+# Local-only convenience symlink to the separate fenrir-gatekeeper checkout
+# (see docs/FENRIR_GATEKEEPER_LOCAL_CHECKOUT.md); never track an absolute path.
+apps/fenrir-gatekeeper-worker
