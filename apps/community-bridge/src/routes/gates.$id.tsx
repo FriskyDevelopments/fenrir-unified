@@ -25,11 +25,11 @@ export const Route = createFileRoute("/gates/$id")({
       { property: "og:title", content: "Edit Gate — MyFenrir" },
       { property: "og:description", content: "Update your public MyFenrir sign-in gate." },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: `https://gate.myfenrir.com/gates/${params.id}` },
+      { property: "og:url", content: `https://communities.myfenrir.com/gates/${params.id}` },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: `https://gate.myfenrir.com/gates/${params.id}` }],
+    links: [{ rel: "canonical", href: `https://communities.myfenrir.com/gates/${params.id}` }],
   }),
   component: EditGatePage,
 });

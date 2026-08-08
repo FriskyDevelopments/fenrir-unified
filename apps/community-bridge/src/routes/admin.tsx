@@ -55,11 +55,11 @@ export const Route = createFileRoute("/admin")({
         content: "Manage MyFenrir portal members, roles and Telegram links.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://gate.myfenrir.com/admin" },
+      { property: "og:url", content: "https://communities.myfenrir.com/admin" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: "https://gate.myfenrir.com/admin" }],
+    links: [{ rel: "canonical", href: "https://communities.myfenrir.com/admin" }],
   }),
   component: AdminPage,
 });

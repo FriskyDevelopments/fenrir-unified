@@ -106,12 +106,9 @@ export const BRANDS: BrandConfig[] = [
     id: "myfenrir",
     name: "MyFenrir",
     tagline: "Secure access and public gates for your Telegram community",
-    hosts: [
-      "myfenrir.com",
-      "www.myfenrir.com",
-      "gate.myfenrir.com",
-      "clipsflow-auth-hub.lovable.app",
-    ],
+    // The bridge is its own product at communities.myfenrir.com — it deliberately
+    // does NOT claim myfenrir.com/www, which belong to the main dashboard app.
+    hosts: ["communities.myfenrir.com", "clipsflow-auth-hub.lovable.app"],
     logo: { markUrl: markAsset.url, wordmarkUrl: wordmarkAsset.url, alt: "MyFenrir logo" },
     theme: {
       "--primary": "oklch(0.637 0.208 25.3)",

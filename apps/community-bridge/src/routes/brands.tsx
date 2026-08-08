@@ -37,7 +37,7 @@ import { RedirectPathField } from "@/components/brand/redirect-path-field";
 
 import { rowToBrandConfig } from "@/config/brand-tenant";
 
-const CANONICAL = "https://gate.myfenrir.com/brands";
+const CANONICAL = "https://communities.myfenrir.com/brands";
 
 export const Route = createFileRoute("/brands")({
   ssr: false,

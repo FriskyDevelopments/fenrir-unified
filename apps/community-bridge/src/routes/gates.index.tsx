@@ -26,11 +26,11 @@ export const Route = createFileRoute("/gates/")({
       { property: "og:title", content: "My Gates — MyFenrir" },
       { property: "og:description", content: "Manage your public MyFenrir sign-in gates." },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://gate.myfenrir.com/gates" },
+      { property: "og:url", content: "https://communities.myfenrir.com/gates" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: "https://gate.myfenrir.com/gates" }],
+    links: [{ rel: "canonical", href: "https://communities.myfenrir.com/gates" }],
   }),
   component: MyGatesPage,
 });

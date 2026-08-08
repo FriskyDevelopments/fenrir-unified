@@ -22,10 +22,10 @@ export const Route = createFileRoute("/")({
           "SSO sign-in, Telegram role automation, and beautiful public gates you can publish in one click.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://gate.myfenrir.com/" },
+      { property: "og:url", content: "https://communities.myfenrir.com/" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [{ rel: "canonical", href: "https://gate.myfenrir.com/" }],
+    links: [{ rel: "canonical", href: "https://communities.myfenrir.com/" }],
   }),
   component: Index,
 });

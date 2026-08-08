@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, KeyRound, ListChecks, ShieldCheck, Users } from "lucide-react";
 
-const URL = "https://gate.myfenrir.com/blog/telegram-role-management-guide";
+const URL = "https://communities.myfenrir.com/blog/telegram-role-management-guide";
 const TITLE = "Telegram Bot Role Management Guide";
 const DESCRIPTION =
   "Link Telegram IDs to real accounts, model roles server-side, and automate group access without leaking permissions. A practical role management guide.";
@@ -48,12 +48,12 @@ export const Route = createFileRoute("/blog/telegram-role-management-guide")({
           author: {
             "@type": "Organization",
             name: "MyFenrir",
-            url: "https://gate.myfenrir.com/",
+            url: "https://communities.myfenrir.com/",
           },
           publisher: {
             "@type": "Organization",
             name: "MyFenrir",
-            url: "https://gate.myfenrir.com/",
+            url: "https://communities.myfenrir.com/",
           },
         }),
       },
@@ -68,7 +68,7 @@ export const Route = createFileRoute("/blog/telegram-role-management-guide")({
               "@type": "ListItem",
               position: 1,
               name: "MyFenrir",
-              item: "https://gate.myfenrir.com/",
+              item: "https://communities.myfenrir.com/",
             },
             { "@type": "ListItem", position: 2, name: TITLE, item: URL },
           ],

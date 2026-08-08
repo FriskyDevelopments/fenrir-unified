@@ -79,11 +79,11 @@ export const Route = createFileRoute("/activate")({
         content: "Redeem your one-time code to link your MyFenrir account to Telegram.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://gate.myfenrir.com/activate" },
+      { property: "og:url", content: "https://communities.myfenrir.com/activate" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: "https://gate.myfenrir.com/activate" }],
+    links: [{ rel: "canonical", href: "https://communities.myfenrir.com/activate" }],
   }),
   component: ActivatePage,
 });

@@ -17,7 +17,7 @@ import { logDemoEvent } from "@/config/demo-log";
 
 /** Build-time brand: head() is static, so it uses the deployment's brand. */
 const HEAD_BRAND = getBrand(import.meta.env["VITE_BRAND_ID"]);
-const SITE = "https://gate.myfenrir.com";
+const SITE = "https://communities.myfenrir.com";
 
 export const Route = createFileRoute("/login")({
   ssr: false,
