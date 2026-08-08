@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "preview", "--prefix", "apps/fenrir-bridge", "--", "--port", "4199", "--strictPort"],
       "port": 4199
+    },
+    {
+      "name": "astelar-kb",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "apps/fenrir-bridge/astelar"],
+      "port": 4321
     }
   ]
 }

@@ -24,6 +24,7 @@ import {
 import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan } from "./services/types";
 import { AuthProviderButton } from "./components/AuthProviderButton";
 import { AuthSurface } from "./components/AuthSurface";
+import { knowledgeBaseLabel, knowledgeBaseUrl } from "./services/knowledgeBase";
 import { CinematicLanding } from "./components/CinematicLanding";
 import { GlowCard } from "./components/GlowCard";
 import { TelegramLoginWidget } from "./components/TelegramLoginWidget";
@@ -1653,6 +1654,7 @@ export function App() {
           <b>{state.user.email}</b>
           <small>{state.org.id}</small>
           <div className="legal-mini-links">
+            <a href={knowledgeBaseUrl} target="_blank" rel="noreferrer">{knowledgeBaseLabel}</a>
             <a href="/legal">{c.legal}</a>
             <a href="/terms">{c.terms}</a>
           </div>
@@ -1729,7 +1731,7 @@ export function App() {
             roomProvider={roomProviderInput}
             onDomain={() => navigateActive("domains")}
             onRoom={() => navigateActive("rooms")}
-            onCommunity={() => navigateActive("brands")}
+            onCommunity={() => { window.location.assign("https://gate.myfenrir.com/dashboard"); }}
           />
         )}
 
@@ -4366,7 +4368,7 @@ function LaunchWowConsole({
       communityBody: "Edit the public gate while the preview shows exactly what visitors see.",
       actionDomain: "Open Domain Wizard",
       actionRoom: "Open Live Rooms",
-      actionCommunity: "Open Login Builder",
+      actionCommunity: "Open Community Bridge",
       verified: "verified",
       locks: "locks",
       rooms: "rooms"
@@ -4382,7 +4384,7 @@ function LaunchWowConsole({
       communityBody: "Edita la puerta publica mientras el preview muestra lo que ve la gente.",
       actionDomain: "Abrir Domain Wizard",
       actionRoom: "Abrir Live Rooms",
-      actionCommunity: "Abrir Login Builder",
+      actionCommunity: "Abrir Community Bridge",
       verified: "verificados",
       locks: "locks",
       rooms: "salas"
@@ -4398,7 +4400,7 @@ function LaunchWowConsole({
       communityBody: "Editez la porte publique avec un apercu visiteur.",
       actionDomain: "Ouvrir Domain Wizard",
       actionRoom: "Ouvrir Live Rooms",
-      actionCommunity: "Ouvrir Login Builder",
+      actionCommunity: "Ouvrir Community Bridge",
       verified: "verifies",
       locks: "locks",
       rooms: "rooms"
@@ -4414,7 +4416,7 @@ function LaunchWowConsole({
       communityBody: "Public Gate bearbeiten und Besucher-Preview sehen.",
       actionDomain: "Domain Wizard oeffnen",
       actionRoom: "Live Rooms oeffnen",
-      actionCommunity: "Login Builder oeffnen",
+      actionCommunity: "Community Bridge oeffnen",
       verified: "verifiziert",
       locks: "locks",
       rooms: "rooms"

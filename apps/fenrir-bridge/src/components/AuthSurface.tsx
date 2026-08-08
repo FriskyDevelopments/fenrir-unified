@@ -8,6 +8,7 @@ import { ParticleField } from "./gate/ParticleField";
 import { WolfMascot } from "./gate/WolfMascot";
 import { HowlMascot } from "./gate/HowlMascot";
 import { StatusBadge } from "./gate/StatusBadge";
+import { knowledgeBaseLabel, knowledgeBaseUrl } from "../services/knowledgeBase";
 
 type AuthSurfaceProps = {
   theme: BrandTheme;
@@ -43,12 +44,17 @@ export function AuthSurface({ theme, locale, onLocale, railLabel, logoUrl, backg
   const Mascot = theme.background === "experimental" ? HowlMascot : WolfMascot;
   const mascotLabel = `${theme.productName.toUpperCase()} · PROTOCOL`;
 
-  const languageSelect = (
-    <select className="language-select" value={locale} onChange={(event) => onLocale(event.target.value as Locale)} aria-label="Language">
-      {locales.map((item) => (
-        <option value={item} key={item}>{languageNames[item]}</option>
-      ))}
-    </select>
+  const topbarActions = (
+    <div className="gate-topbar-actions">
+      <a className="gate-btn-ghost gate-kb-link" href={knowledgeBaseUrl} target="_blank" rel="noreferrer" data-testid="kb-link">
+        {knowledgeBaseLabel}
+      </a>
+      <select className="language-select" value={locale} onChange={(event) => onLocale(event.target.value as Locale)} aria-label="Language">
+        {locales.map((item) => (
+          <option value={item} key={item}>{languageNames[item]}</option>
+        ))}
+      </select>
+    </div>
   );
 
   return (
@@ -67,7 +73,7 @@ export function AuthSurface({ theme, locale, onLocale, railLabel, logoUrl, backg
       <GateShell
         brandName={theme.productName}
         brandSub={`${theme.systemRole} · Gate`}
-        topRight={languageSelect}
+        topRight={topbarActions}
         footerLeft={mascotLabel}
       >
         <section className="gate-panes">

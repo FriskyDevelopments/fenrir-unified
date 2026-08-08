@@ -7681,3 +7681,21 @@ p {
     display: none;
   }
 }
+
+.gate-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gate-kb-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  text-decoration: none;
+}

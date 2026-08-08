@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /.mcp/
+Disallow: /.lovable/
+
+Sitemap: https://clipsflow-auth-hub.lovable.app/sitemap.xml
