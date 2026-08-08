@@ -33,14 +33,19 @@ export interface LockBotEnv {
 export const onRequestPost: PagesFunction<LockBotEnv> = async (context) => {
     // ── Validate webhook secret ─────────────────────────────
     const configuredSecret = (context.env.LOCK_BOT_WEBHOOK_SECRET ?? "").trim();
-    if (configuredSecret) {
-        const received = context.request.headers.get("x-telegram-bot-api-secret-token") ?? "";
-        if (received !== configuredSecret) {
-            return Response.json(
-                { ok: false, error: "invalid_webhook_secret" },
-                { status: 401 }
-            );
-        }
+    if (!configuredSecret) {
+        return Response.json(
+            { ok: false, error: "webhook_secret_not_configured" },
+            { status: 503 }
+        );
+    }
+
+    const received = context.request.headers.get("x-telegram-bot-api-secret-token") ?? "";
+    if (received !== configuredSecret) {
+        return Response.json(
+            { ok: false, error: "invalid_webhook_secret" },
+            { status: 401 }
+        );
     }
 
     // ── Validate bot token ──────────────────────────────────

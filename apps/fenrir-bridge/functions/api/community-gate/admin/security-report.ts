@@ -1,129 +1,100 @@
-import { neon } from "@neondatabase/serverless";
-import { readSession } from "../../../_lib/auth";
+import { assertCommunityStaff, authErrorResponse, communityGateConfigured, communityGateNotConfigured, communityGateSql, parseSlug, requireCommunityGateUser } from "../../../_lib/community-gate";
 import { noStoreJson } from "../../../_lib/responses";
 
 export async function onRequestGet(context: any) {
-  const session = await readSession(context.request, context.env);
-  if (!session) {
-    return noStoreJson({ ok: false, error: "authentication_required" }, { status: 401 });
-  }
+  if (!communityGateConfigured(context.env)) return communityGateNotConfigured(context.env);
 
   const url = new URL(context.request.url);
-  const communitySlug = url.searchParams.get("communitySlug");
-  if (!communitySlug) {
-    return noStoreJson({ ok: false, error: "communitySlug_required" }, { status: 400 });
-  }
+  const communitySlug = parseSlug(url.searchParams.get("communitySlug") ?? "fenrir");
 
   try {
-    if (!context.env.NEON_DATABASE_URL) {
-      throw new Error("NEON_DATABASE_URL is not configured.");
-    }
-    const sql = neon(context.env.NEON_DATABASE_URL);
+    const user = await requireCommunityGateUser(context.request, context.env);
+    const { profile } = await assertCommunityStaff(context.env, user, communitySlug);
+    const sql = await communityGateSql(context.env);
 
-    // Run read-only analytical queries against Neon
-    const communityRes = await sql`SELECT id, slug, name FROM communities WHERE slug = ${communitySlug} LIMIT 1`;
-    if (communityRes.length === 0) {
+    // Get community ID
+    const [community] = await sql`
+      select id, name
+      from communities
+      where slug = ${communitySlug}
+      limit 1
+    `;
+
+    if (!community) {
       return noStoreJson({ ok: false, error: "community_not_found" }, { status: 404 });
     }
-    const community = communityRes[0];
 
-    // Get user stats
-    const usersRes = await sql`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN status = 'verified' THEN 1 END) as verified,
-        COUNT(CASE WHEN status = 'blocked' THEN 1 END) as blocked,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
-      FROM users 
-      WHERE community_id = ${community.id}
+    // Get total users in community
+    const [userCounts] = await sql`
+      select
+        count(*) as total_users,
+        sum(case when status = 'active' then 1 else 0 end) as active_users,
+        sum(case when status = 'denied' then 1 else 0 end) as denied_users,
+        sum(case when status = 'pending' then 1 else 0 end) as pending_users
+      from community_memberships
+      where community_id = ${community.id}
     `;
 
-    // Profile stats
-    const profileRes = await sql`
-      SELECT COUNT(*) as missing_display_name
-      FROM user_profiles 
-      WHERE community_id = ${community.id} AND (display_name IS NULL OR display_name = '')
+    // Get users with missing Telegram profile data
+    const [missingTelegramData] = await sql`
+      select
+        count(*) as total_members,
+        sum(case when p.display_name is null or p.display_name = '' then 1 else 0 end) as missing_display_name
+      from community_memberships cm
+      join profiles p on p.id = cm.profile_id
+      where cm.community_id = ${community.id}
+        and cm.status = 'active'
     `;
 
-    // Session stats
-    const sessionsRes = await sql`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN status = 'successful' THEN 1 END) as successful,
-        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
-        COUNT(CASE WHEN status = 'blocked' THEN 1 END) as blocked,
-        COUNT(CASE WHEN status = 'expired' THEN 1 END) as expired,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
-      FROM user_sessions 
-      WHERE community_id = ${community.id}
+    // Get verification session statistics
+    const [sessionStats] = await sql`
+      select
+        count(*) as total_sessions,
+        sum(case when status = 'granted' then 1 else 0 end) as granted_sessions,
+        sum(case when status = 'denied' then 1 else 0 end) as denied_sessions,
+        sum(case when status = 'flagged' then 1 else 0 end) as flagged_sessions,
+        sum(case when status = 'expired' then 1 else 0 end) as expired_sessions,
+        sum(case when status = 'pending' then 1 else 0 end) as pending_sessions
+      from verification_sessions
+      where community_id = ${community.id}
     `;
 
-    return noStoreJson({
-      ok: true,
-      data: {
-        community: {
-          id: community.id,
-          slug: community.slug,
-          name: community.name
-        },
-        users: {
-          total: Number(usersRes[0].total) || 0,
-          verified: Number(usersRes[0].verified) || 0,
-          blocked: Number(usersRes[0].blocked) || 0,
-          pending: Number(usersRes[0].pending) || 0,
-          missingDisplayName: Number(profileRes[0].missing_display_name) || 0
-        },
-        sessions: {
-          total: Number(sessionsRes[0].total) || 0,
-          successful: Number(sessionsRes[0].successful) || 0,
-          failed: Number(sessionsRes[0].failed) || 0,
-          blocked: Number(sessionsRes[0].blocked) || 0,
-          expired: Number(sessionsRes[0].expired) || 0,
-          pending: Number(sessionsRes[0].pending) || 0
-        },
-        impact: {
-          blockedAttempts: Number(sessionsRes[0].blocked) || 0,
-          usersNeedingProfileFixes: Number(profileRes[0].missing_display_name) || 0,
-          fullyVerifiedUsers: Number(usersRes[0].verified) || 0
-        },
-        generatedAt: new Date().toISOString()
-      }
-    });
-  } catch (error: any) {
-    // If the database isn't actually configured or we're missing tables, we return mock data 
-    // to satisfy the frontend UI for demonstration purposes, matching the PR_DESCRIPTION format.
-    console.warn("Neon DB error, falling back to mock data:", error.message);
-    
-    return noStoreJson({
-      ok: true,
-      data: {
-        community: {
-          id: "uuid-fallback",
-          slug: communitySlug,
-          name: communitySlug === "fenrir" ? "Fenrir Protocol" : communitySlug
-        },
-        users: {
-          total: 100,
-          verified: 85,
-          blocked: 10,
-          pending: 5,
-          missingDisplayName: 3
-        },
-        sessions: {
-          total: 500,
-          successful: 400,
-          failed: 50,
-          blocked: 30,
-          expired: 15,
-          pending: 5
-        },
-        impact: {
-          blockedAttempts: 80,
-          usersNeedingProfileFixes: 3,
-          fullyVerifiedUsers: 85
-        },
-        generatedAt: new Date().toISOString()
-      }
-    });
+    // Calculate Fenrir impact metrics
+    const blockedAttempts = (sessionStats.denied_sessions || 0) + (sessionStats.flagged_sessions || 0);
+    const usersNeedingProfileFixes = missingTelegramData.missing_display_name || 0;
+    const fullyVerifiedUsers = userCounts.active_users || 0;
+
+    const report = {
+      community: {
+        id: community.id,
+        slug: communitySlug,
+        name: community.name
+      },
+      users: {
+        total: userCounts.total_users || 0,
+        verified: userCounts.active_users || 0,
+        blocked: userCounts.denied_users || 0,
+        pending: userCounts.pending_users || 0,
+        missingDisplayName: missingTelegramData.missing_display_name || 0
+      },
+      sessions: {
+        total: sessionStats.total_sessions || 0,
+        successful: sessionStats.granted_sessions || 0,
+        failed: sessionStats.denied_sessions || 0,
+        blocked: sessionStats.flagged_sessions || 0,
+        expired: sessionStats.expired_sessions || 0,
+        pending: sessionStats.pending_sessions || 0
+      },
+      impact: {
+        blockedAttempts,
+        usersNeedingProfileFixes,
+        fullyVerifiedUsers
+      },
+      generatedAt: new Date().toISOString()
+    };
+
+    return noStoreJson({ ok: true, data: report });
+  } catch (error) {
+    return authErrorResponse(error);
   }
 }
