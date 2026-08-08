@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://www.myfenrir.com/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://www.myfenrir.com/wiki/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.myfenrir.com/waitlist</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.myfenrir.com/invitation/</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://www.myfenrir.com/legal</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://www.myfenrir.com/terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://www.myfenrir.com/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://www.myfenrir.com/acceptable-use</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+</urlset>
