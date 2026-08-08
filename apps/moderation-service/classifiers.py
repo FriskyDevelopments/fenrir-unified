@@ -36,14 +36,27 @@ class Verdict:
     # Punto medio del rango de edad estimado; None si no hubo lectura de edad.
     apparent_age: int | None
 
-    def minor_suspected(self, threshold: int) -> bool:
-        # Sin lectura de edad sobre una imagen con persona, asumimos lo peor:
-        # el fallo seguro es rechazar, no dejar pasar.
+    def decision(self, allow_at: int, reject_below: int) -> str:
+        """
+        Tres estados, no dos. La duda no se resuelve rechazando: se manda a
+        revisión humana.
+
+        - `reject`  edad claramente por debajo del mínimo legal. Se bloquea de
+                    inmediato y NO entra a la cola: nadie tiene que mirar eso
+                    para decidir.
+        - `review`  banda de incertidumbre, o hay persona y no hubo lectura de
+                    edad. Decide un admin.
+        - `allow`   por encima del umbral de confianza.
+        """
         if not self.person:
-            return False
+            return "allow"
         if self.apparent_age is None:
-            return True
-        return self.apparent_age < threshold
+            return "review"
+        if self.apparent_age < reject_below:
+            return "reject"
+        if self.apparent_age < allow_at:
+            return "review"
+        return "allow"
 
 
 class ClassifierBundle:

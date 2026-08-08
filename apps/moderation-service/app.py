@@ -30,10 +30,14 @@ from pydantic import BaseModel
 
 from classifiers import ClassifierBundle, Verdict
 
-# Edad por debajo de la cual la imagen se rechaza sin discusión. Es un umbral
-# deliberadamente conservador: el costo de un falso negativo aquí no es
-# comparable al de un falso positivo.
-MIN_APPARENT_AGE = int(os.getenv("MIN_APPARENT_AGE", "25"))
+# Dos umbrales, no uno — porque hay tres desenlaces posibles:
+#   edad >= ALLOW_AT ................ pasa
+#   REJECT_BELOW <= edad < ALLOW_AT .. revisión humana
+#   edad < REJECT_BELOW ............. se bloquea de inmediato
+# La banda intermedia es deliberadamente ancha: la incertidumbre la resuelve
+# una persona, no el umbral.
+ALLOW_AT_AGE = int(os.getenv("MIN_APPARENT_AGE", "25"))
+REJECT_BELOW_AGE = int(os.getenv("REJECT_BELOW_AGE", "18"))
 
 # Clave compartida con el llamador (image-guard manda Authorization: Bearer).
 API_KEY = os.getenv("MODERATION_API_KEY", "")
@@ -56,7 +60,8 @@ def health() -> dict[str, Any]:
     return {
         "ok": True,
         "models": bundle.describe(),
-        "min_apparent_age": MIN_APPARENT_AGE,
+        "allow_at_age": ALLOW_AT_AGE,
+        "reject_below_age": REJECT_BELOW_AGE,
     }
 
 
@@ -71,6 +76,7 @@ def chat_completions(
     image = _extract_image(body.messages)
     started = time.perf_counter()
     verdict = bundle.classify(image)
+    decision = verdict.decision(ALLOW_AT_AGE, REJECT_BELOW_AGE)
     latency_ms = int((time.perf_counter() - started) * 1000)
 
     return {
@@ -80,7 +86,7 @@ def chat_completions(
         "choices": [
             {
                 "index": 0,
-                "message": {"role": "assistant", "content": _render(verdict)},
+                "message": {"role": "assistant", "content": _render(verdict, decision)},
                 "finish_reason": "stop",
             }
         ],
@@ -88,32 +94,44 @@ def chat_completions(
         # Extra fuera del contrato de OpenAI: el llamador puede ignorarlo, pero
         # sirve para auditar decisiones sin re-inferir.
         "fenrir": {
+            "decision": decision,  # allow · review · reject
             "person": verdict.person,
             "explicit": verdict.explicit,
             "apparent_age": verdict.apparent_age,
-            "min_apparent_age": MIN_APPARENT_AGE,
-            "minor_suspected": verdict.minor_suspected(MIN_APPARENT_AGE),
+            "allow_at_age": ALLOW_AT_AGE,
+            "reject_below_age": REJECT_BELOW_AGE,
+            "needs_human_review": decision == "review",
+            "review_reason": _review_reason(verdict, decision),
             "latency_ms": latency_ms,
         },
     }
 
 
-def _render(verdict: Verdict) -> str:
+def _review_reason(verdict: Verdict, decision: str) -> str | None:
+    """Por qué se manda a una persona. Es lo primero que el admin necesita ver."""
+    if decision != "review":
+        return None
+    if verdict.apparent_age is None:
+        return "no_age_reading"
+    return "age_near_threshold"
+
+
+def _render(verdict: Verdict, decision: str) -> str:
     """
     Formato que image-guard ya sabe parsear (PERSON/APPROPRIATE/ENTERING),
     más los campos propios de esta política.
 
     APPROPRIATE se decide SOLO por edad aparente, no por desnudez: el contenido
-    sexual adulto está permitido en estas comunidades.
+    sexual adulto está permitido en estas comunidades. En `review` va como `No`
+    para que el llamador no publique mientras espera al humano.
     """
-    appropriate = not verdict.minor_suspected(MIN_APPARENT_AGE)
     lines = [
         f"PERSON:{'Yes' if verdict.person else 'No'}",
-        f"APPROPRIATE:{'Yes' if appropriate else 'No'}",
+        f"APPROPRIATE:{'Yes' if decision == 'allow' else 'No'}",
         "ENTERING:Yes",  # no aplica a este perfil; se mantiene por compatibilidad
+        f"DECISION:{decision.upper()}",
         f"EXPLICIT:{'Yes' if verdict.explicit else 'No'}",
         f"APPARENT_AGE:{verdict.apparent_age if verdict.apparent_age is not None else 'Unknown'}",
-        f"MINOR_SUSPECTED:{'Yes' if verdict.minor_suspected(MIN_APPARENT_AGE) else 'No'}",
     ]
     return "\n".join(lines)
 

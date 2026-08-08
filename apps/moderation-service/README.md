@@ -22,13 +22,26 @@ grande justo donde más duele. Ver el README de `apps/community-bridge`.
 
 ## La política que implementa
 
+Tres desenlaces, no dos: **la incertidumbre no se resuelve rechazando, se manda
+a una persona.**
+
 | Señal | Decisión |
 | --- | --- |
-| Contenido sexual explícito entre adultos | **Permitido** — se registra, no se rechaza |
-| Edad aparente por debajo del umbral | **Rechazo** |
-| Hay persona pero no se pudo estimar edad | **Rechazo** (el fallo seguro es rechazar) |
+| Contenido sexual explícito entre adultos | `allow` — se registra, no se rechaza |
+| Edad aparente ≥ `MIN_APPARENT_AGE` (25) | `allow` |
+| Edad aparente entre `REJECT_BELOW_AGE` y el umbral (18–24) | **`review`** → cola de admin |
+| Hay persona y no se pudo estimar edad | **`review`** → cola de admin |
+| Edad aparente < `REJECT_BELOW_AGE` (18) | `reject` — bloqueo inmediato |
 
 `APPROPRIATE` se decide **solo por edad aparente, nunca por desnudez**.
+
+Lo que cae en `reject` **no entra a la cola**: se bloquea de inmediato y nadie
+tiene que mirarlo para decidir. La cola es para la duda, no para lo evidente.
+
+La cola vive en Neon (`cb_moderation_reviews`) y guarda una **referencia** al
+objeto, nunca una copia de la imagen. El campo `review_reason` dice por qué
+llegó (`no_age_reading` o `age_near_threshold`), que es lo primero que el admin
+necesita ver.
 
 ## Modelos
 
@@ -64,7 +77,8 @@ vision: {
 
 La respuesta trae los campos que `image-guard` ya parsea
 (`PERSON` / `APPROPRIATE` / `ENTERING`) más los de esta política
-(`EXPLICIT`, `APPARENT_AGE`, `MINOR_SUSPECTED`), y un bloque `fenrir` en el JSON
+(`DECISION`, `EXPLICIT`, `APPARENT_AGE`), y un bloque `fenrir` en el JSON con
+`decision`, `needs_human_review` y `review_reason`,
 para auditar decisiones sin volver a inferir.
 
 ## Desplegar
@@ -88,7 +102,9 @@ build, así que un arranque en frío no depende de que Hugging Face responda.
       El servicio peca de estricto (rechaza de más), que es el lado correcto en
       el que fallar, pero genera ruido. Un detector de rostros antes de estimar
       edad lo arregla.
-- [ ] Calibrar `MIN_APPARENT_AGE` contra un set de evaluación propio
+- [ ] Calibrar `MIN_APPARENT_AGE` y `REJECT_BELOW_AGE` contra un set propio
+- [ ] Construir la UI de la cola de revisión (tabla `cb_moderation_reviews` ya
+      creada en Neon; falta la vista de admin y el escribir en ella)
 - [ ] Activar Cloudflare CSAM Scanning (capa 1) y servir los uploads por la zona
       propia para que ese escaneo los alcance
 - [ ] Ajustar el prompt de `image-guard` a esta política (hoy rechaza toda

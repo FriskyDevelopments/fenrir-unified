@@ -84,3 +84,27 @@ create table if not exists cb_brand_tenant_audit (
   created_at timestamptz not null default now()
 );
 create index if not exists cb_brand_tenant_audit_time_idx on cb_brand_tenant_audit (created_at desc);
+
+-- Cola de revisión humana. La incertidumbre del clasificador NO se resuelve
+-- rechazando: aterriza aquí y decide una persona.
+-- Lo que el clasificador marca como `reject` (edad claramente por debajo del
+-- mínimo) NO entra aquí: se bloquea de inmediato, nadie tiene que mirarlo.
+create table if not exists cb_moderation_reviews (
+  id uuid primary key default gen_random_uuid(),
+  community_id text not null,
+  -- Referencia al objeto, nunca la imagen: el material dudoso no se copia a
+  -- otra tabla. Se apunta a donde ya vive.
+  subject_ref text not null,
+  subject_kind text not null check (subject_kind in ('gate_media', 'brand_asset', 'telegram_photo', 'username')),
+  reason text not null check (reason in ('no_age_reading', 'age_near_threshold', 'reported', 'other')),
+  apparent_age int,
+  explicit boolean,
+  classifier_model text,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  decided_by uuid,
+  decided_at timestamptz,
+  decision_note text,
+  created_at timestamptz not null default now()
+);
+create index if not exists cb_moderation_reviews_queue_idx
+  on cb_moderation_reviews (community_id, status, created_at);
