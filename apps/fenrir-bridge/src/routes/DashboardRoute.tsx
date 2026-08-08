@@ -21,6 +21,7 @@ import {
   type TelegramIdentityLinkPayload
 } from "../services/api";
 import type { AppState, FriskyBridge, FriskyDomain, FriskyLiveRoom, LiveRoomProvider, Plan } from "../services/types";
+import { communityBridgeDashboardUrl } from "../services/communityBridge";
 import { uiCopy, type UiCopy } from "../app/uiCopy";
 import {
   defaultServiceOrg,
@@ -732,7 +733,7 @@ export function DashboardRoute() {
             roomProvider={roomProviderInput}
             onDomain={() => navigateActive("domains")}
             onRoom={() => navigateActive("rooms")}
-            onCommunity={() => { window.location.assign("https://gate.myfenrir.com/dashboard"); }}
+            onCommunity={() => window.location.assign(communityBridgeDashboardUrl)}
           />
         )}
 
