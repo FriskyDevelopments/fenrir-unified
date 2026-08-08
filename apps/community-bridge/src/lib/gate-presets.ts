@@ -80,21 +80,6 @@ export const GATE_PRESETS: GatePreset[] = [
     brandId: "clipsflow",
   },
   {
-    id: "casa-warm",
-    name: "Casa warm",
-    tagline: "Terracotta and olive — for casas and stays",
-    logoUrl: DEFAULT_LOGO_URL,
-    mascot: "shield",
-    atmosphere:
-      "radial-gradient(ellipse 70% 55% at 50% 0%, oklch(0.72 0.14 55 / 32%), transparent 70%), linear-gradient(180deg, oklch(0.24 0.03 60), oklch(0.16 0.02 70))",
-    accent: "oklch(0.72 0.14 55)",
-    overlay:
-      "linear-gradient(180deg, oklch(0.18 0.02 65 / 74%), oklch(0.14 0.015 70 / 94%))",
-    thumb:
-      "radial-gradient(circle at 28% 18%, oklch(0.75 0.15 55 / 65%), transparent 60%), linear-gradient(160deg, oklch(0.26 0.03 60), oklch(0.15 0.02 70))",
-    brandId: "casa-verde",
-  },
-  {
     id: "ember-noir",
     name: "Ember noir",
     tagline: "Near-black with a single molten highlight",
