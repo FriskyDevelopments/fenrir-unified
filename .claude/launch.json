@@ -8,6 +8,12 @@
       "port": 4199
     },
     {
+      "name": "community-bridge",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "apps/community-bridge", "--", "--port", "4210", "--strictPort"],
+      "port": 4210
+    },
+    {
       "name": "astelar-kb",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "apps/fenrir-bridge/astelar"],

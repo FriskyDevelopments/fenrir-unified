@@ -23,11 +23,14 @@ import {
   listUsersWithRoles,
   adminUpdateUserRole,
   adminSetUserTelegramId,
+  adminSetUserBlocked,
 } from "@/lib/admin.functions";
 import { useAuth, type AppRole } from "@/hooks/use-auth";
+import { BRANDS } from "@/config/brands";
+import { getAdmissionRequirements, saveAdmissionRequirements } from "@/lib/admission.functions";
 import { RequireRole } from "@/components/auth/require-auth";
 import { formatAuthError } from "@/lib/auth-errors";
-import { ArrowLeft, Loader2, Save, X } from "lucide-react";
+import { ArrowLeft, Loader2, Save, ShieldBan, ShieldCheck, X } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
@@ -45,11 +48,11 @@ export const Route = createFileRoute("/admin")({
         content: "Manage MyFenrir portal members, roles and Telegram links.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://clipsflow-auth-hub.lovable.app/admin" },
+      { property: "og:url", content: "https://gate.myfenrir.com/admin" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: "https://clipsflow-auth-hub.lovable.app/admin" }],
+    links: [{ rel: "canonical", href: "https://gate.myfenrir.com/admin" }],
   }),
   component: AdminPage,
 });
@@ -59,6 +62,7 @@ interface UserRow {
   email: string;
   role: AppRole;
   telegram_id: number | null;
+  blocked_at: string | null;
   created_at: string;
 }
 
@@ -82,6 +86,7 @@ function AdminConsole() {
   const fetchUsers = useServerFn(listUsersWithRoles);
   const updateRole = useServerFn(adminUpdateUserRole);
   const setTelegram = useServerFn(adminSetUserTelegramId);
+  const setBlocked = useServerFn(adminSetUserBlocked);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -89,7 +94,9 @@ function AdminConsole() {
       const list = await fetchUsers();
       setRows(list);
       setTgDrafts(
-        Object.fromEntries(list.map((r) => [r.user_id, r.telegram_id ? String(r.telegram_id) : ""])),
+        Object.fromEntries(
+          list.map((r) => [r.user_id, r.telegram_id ? String(r.telegram_id) : ""]),
+        ),
       );
     } catch (err) {
       setLoadError(formatAuthError(err instanceof Error ? err.message : String(err)));
@@ -141,7 +148,32 @@ function AdminConsole() {
     setBusyId(row.user_id);
     try {
       await setTelegram({ data: { target: row.user_id, telegramId: value } });
-      showFlash("ok", value === null ? `Telegram link cleared for ${row.email}.` : `Linked ${row.email}.`);
+      showFlash(
+        "ok",
+        value === null ? `Telegram link cleared for ${row.email}.` : `Linked ${row.email}.`,
+      );
+      void load();
+    } catch (err) {
+      showFlash("err", formatAuthError(err instanceof Error ? err.message : String(err)));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function toggleBlocked(row: UserRow) {
+    if (row.user_id === user?.id) {
+      showFlash("err", "You can't block yourself.");
+      return;
+    }
+    if (row.role === "owner") {
+      showFlash("err", "Owners can't be blocked.");
+      return;
+    }
+    const blocking = !row.blocked_at;
+    setBusyId(row.user_id);
+    try {
+      await setBlocked({ data: { target: row.user_id, blocked: blocking } });
+      showFlash("ok", blocking ? `Blocked ${row.email}.` : `Unblocked ${row.email}.`);
       void load();
     } catch (err) {
       showFlash("err", formatAuthError(err instanceof Error ? err.message : String(err)));
@@ -160,8 +192,8 @@ function AdminConsole() {
               Back
             </Button>
             <div className="text-lg font-semibold tracking-tight">
-              <span className="text-foreground">Clips</span>
-              <span className="text-primary">Flow</span>
+              <span className="text-foreground">My</span>
+              <span className="text-primary">Fenrir</span>
               <span className="ml-2 text-sm font-normal text-muted-foreground">Admin</span>
             </div>
           </div>
@@ -209,19 +241,23 @@ function AdminConsole() {
                 <TableHead className="w-[160px]">Role</TableHead>
                 <TableHead className="w-[280px]">Telegram ID</TableHead>
                 <TableHead className="w-[160px]">Created</TableHead>
+                <TableHead className="w-[140px]">Access</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows === null && (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-10 text-center">
+                  <TableCell colSpan={5} className="py-10 text-center">
                     <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
                   </TableCell>
                 </TableRow>
               )}
               {rows && rows.length === 0 && !loadError && (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                  <TableCell
+                    colSpan={5}
+                    className="py-10 text-center text-sm text-muted-foreground"
+                  >
                     No users yet.
                   </TableCell>
                 </TableRow>
@@ -293,13 +329,200 @@ function AdminConsole() {
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(row.created_at).toLocaleDateString()}
                     </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {row.blocked_at ? <Badge variant="destructive">Blocked</Badge> : null}
+                        <Button
+                          size="sm"
+                          variant={row.blocked_at ? "outline" : "ghost"}
+                          disabled={
+                            row.role === "owner" ||
+                            row.user_id === user?.id ||
+                            busyId === row.user_id
+                          }
+                          onClick={() => void toggleBlocked(row)}
+                          aria-label={row.blocked_at ? "Unblock user" : "Block user"}
+                        >
+                          {row.blocked_at ? (
+                            <>
+                              <ShieldCheck className="mr-1 h-4 w-4" /> Unblock
+                            </>
+                          ) : (
+                            <>
+                              <ShieldBan className="mr-1 h-4 w-4" /> Block
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })}
             </TableBody>
           </Table>
         </div>
+
+        <AdmissionRequirementsCard />
       </main>
     </div>
+  );
+}
+
+/**
+ * Minimum admission conditions the community bot enforces on join, per
+ * community — e.g. the member must have a Telegram username or profile photo.
+ */
+function AdmissionRequirementsCard() {
+  const [communityId, setCommunityId] = useState(BRANDS[0]!.community.id);
+  const [requireUsername, setRequireUsername] = useState(false);
+  const [requirePhoto, setRequirePhoto] = useState(false);
+  const [minAgeDays, setMinAgeDays] = useState("0");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [flash, setFlash] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
+
+  const fetchRequirements = useServerFn(getAdmissionRequirements);
+  const saveRequirements = useServerFn(saveAdmissionRequirements);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchRequirements({ data: { communityId } })
+      .then((req) => {
+        if (cancelled) return;
+        setRequireUsername(req.require_username);
+        setRequirePhoto(req.require_profile_photo);
+        setMinAgeDays(String(req.min_account_age_days));
+      })
+      .catch(() => {
+        if (!cancelled) setFlash({ kind: "err", msg: "Could not load admission requirements." });
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [communityId, fetchRequirements]);
+
+  async function save() {
+    const days = Number(minAgeDays);
+    if (!Number.isInteger(days) || days < 0 || days > 3650) {
+      setFlash({ kind: "err", msg: "Minimum account age must be 0-3650 days." });
+      return;
+    }
+    setSaving(true);
+    setFlash(null);
+    try {
+      await saveRequirements({
+        data: {
+          communityId,
+          requireUsername,
+          requireProfilePhoto: requirePhoto,
+          minAccountAgeDays: days,
+        },
+      });
+      setFlash({ kind: "ok", msg: "Admission requirements saved. The bot applies them on join." });
+    } catch (err) {
+      setFlash({
+        kind: "err",
+        msg: formatAuthError(err instanceof Error ? err.message : String(err)),
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="mt-10 rounded-xl border border-border/60 bg-card/40 p-6 backdrop-blur">
+      <h2 className="text-lg font-semibold tracking-tight">Admission requirements</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Minimum conditions — beyond signing in — that the community bot checks before admitting a
+        member.
+      </p>
+
+      {flash && (
+        <div
+          role="status"
+          className={`mt-4 rounded-md border p-3 text-sm ${
+            flash.kind === "ok"
+              ? "border-primary/40 bg-primary/10 text-primary-foreground"
+              : "border-destructive/50 bg-destructive/10 text-destructive"
+          }`}
+        >
+          {flash.msg}
+        </div>
+      )}
+
+      <div className="mt-5 grid gap-4 sm:max-w-lg">
+        <label className="grid gap-1.5 text-sm">
+          <span className="font-medium text-foreground">Community</span>
+          <Select value={communityId} onValueChange={setCommunityId}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {BRANDS.map((b) => (
+                <SelectItem key={b.community.id} value={b.community.id}>
+                  {b.community.label} ({b.community.id})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </label>
+
+        <label className="flex items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-[oklch(0.637_0.208_25.3)]"
+            checked={requireUsername}
+            disabled={loading || saving}
+            onChange={(e) => setRequireUsername(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium text-foreground">Require a Telegram username</span>
+            <span className="block text-xs text-muted-foreground">
+              Members without an @username are asked to set one before joining.
+            </span>
+          </span>
+        </label>
+
+        <label className="flex items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-[oklch(0.637_0.208_25.3)]"
+            checked={requirePhoto}
+            disabled={loading || saving}
+            onChange={(e) => setRequirePhoto(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium text-foreground">Require a profile photo</span>
+            <span className="block text-xs text-muted-foreground">
+              Members must have at least one profile photo visible to the bot.
+            </span>
+          </span>
+        </label>
+
+        <label className="grid gap-1.5 text-sm">
+          <span className="font-medium text-foreground">Minimum account age (days)</span>
+          <Input
+            inputMode="numeric"
+            value={minAgeDays}
+            disabled={loading || saving}
+            onChange={(e) => setMinAgeDays(e.target.value)}
+            className="max-w-[140px]"
+          />
+          <span className="text-xs text-muted-foreground">
+            0 disables the check. Uses the age the bot can infer for the account.
+          </span>
+        </label>
+
+        <div>
+          <Button onClick={() => void save()} loading={saving} disabled={loading}>
+            <Save className="mr-2 h-4 w-4" /> Save requirements
+          </Button>
+        </div>
+      </div>
+    </section>
   );
 }

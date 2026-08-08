@@ -48,9 +48,7 @@ export function GatePreview({
   const mascotUrl =
     config.mascot_url && isUsableMediaUrl(config.mascot_url) ? config.mascot_url : null;
   const background =
-    config.background_url && isUsableMediaUrl(config.background_url)
-      ? config.background_url
-      : null;
+    config.background_url && isUsableMediaUrl(config.background_url) ? config.background_url : null;
 
   return (
     <div
@@ -142,13 +140,9 @@ export function GatePreview({
 
         <div className="space-y-2">
           {compact ? (
-            <p className="font-semibold tracking-tight text-white text-xl">
-              {config.headline}
-            </p>
+            <p className="font-semibold tracking-tight text-white text-xl">{config.headline}</p>
           ) : (
-            <h1 className="font-semibold tracking-tight text-white text-3xl">
-              {config.headline}
-            </h1>
+            <h1 className="font-semibold tracking-tight text-white text-3xl">{config.headline}</h1>
           )}
 
           <p

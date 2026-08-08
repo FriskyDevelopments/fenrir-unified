@@ -108,7 +108,6 @@ export function BrandAuditLog({ refreshKey, tenants }: BrandAuditLogProps) {
     void load();
   }, [load, refreshKey]);
 
-
   const visibleEntries = useMemo(
     () => (entries === null ? null : themeOnly ? filterThemeEntries(entries) : entries),
     [entries, themeOnly],
@@ -126,7 +125,6 @@ export function BrandAuditLog({ refreshKey, tenants }: BrandAuditLogProps) {
     );
   }
 
-
   const hasFilters = tenant || actor || field || from || to;
   const clearFilters = () => {
     setTenant("");
@@ -143,12 +141,7 @@ export function BrandAuditLog({ refreshKey, tenants }: BrandAuditLogProps) {
           <History className="h-4 w-4" /> {themeOnly ? "Theme change history" : "Change history"}
         </h2>
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={exporting}
-            onClick={() => void exportCsv()}
-          >
+          <Button variant="ghost" size="sm" disabled={exporting} onClick={() => void exportCsv()}>
             {exporting ? (
               <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
             ) : (

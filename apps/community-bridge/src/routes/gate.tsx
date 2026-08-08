@@ -27,12 +27,10 @@ export const Route = createFileRoute("/gate")({
         content: "Preset-first public gate builder for the MyFenrir portal.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://clipsflow-auth-hub.lovable.app/gate" },
+      { property: "og:url", content: "https://gate.myfenrir.com/gate" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [
-      { rel: "canonical", href: "https://clipsflow-auth-hub.lovable.app/gate" },
-    ],
+    links: [{ rel: "canonical", href: "https://gate.myfenrir.com/gate" }],
   }),
   component: NewGatePage,
 });

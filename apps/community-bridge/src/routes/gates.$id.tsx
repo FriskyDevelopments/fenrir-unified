@@ -25,11 +25,11 @@ export const Route = createFileRoute("/gates/$id")({
       { property: "og:title", content: "Edit Gate — MyFenrir" },
       { property: "og:description", content: "Update your public MyFenrir sign-in gate." },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: `https://clipsflow-auth-hub.lovable.app/gates/${params.id}` },
+      { property: "og:url", content: `https://gate.myfenrir.com/gates/${params.id}` },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: `https://clipsflow-auth-hub.lovable.app/gates/${params.id}` }],
+    links: [{ rel: "canonical", href: `https://gate.myfenrir.com/gates/${params.id}` }],
   }),
   component: EditGatePage,
 });
@@ -182,11 +182,7 @@ function EditGatePage() {
           </div>
         </div>
 
-        <GateForm
-          config={config}
-          onChange={(next) => setConfig(next)}
-          slugStatus={slugStatus}
-        />
+        <GateForm config={config} onChange={(next) => setConfig(next)} slugStatus={slugStatus} />
       </main>
     </div>
   );

@@ -18,7 +18,9 @@ import { Route as DemoRouteImport } from './routes/demo'
 import { Route as GateRouteImport } from './routes/gate'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as BlogTelegramRoleManagementGuideRouteImport } from './routes/blog.telegram-role-management-guide'
@@ -75,9 +77,19 @@ const McpRoute = McpRouteImport.update({
   path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char91DotmcpChar93ListToolsRoute =
@@ -145,7 +157,9 @@ export interface FileRoutesByFullPath {
   '/gate': typeof GateRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/blog/telegram-role-management-guide': typeof BlogTelegramRoleManagementGuideRoute
@@ -167,7 +181,9 @@ export interface FileRoutesByTo {
   '/gate': typeof GateRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/blog/telegram-role-management-guide': typeof BlogTelegramRoleManagementGuideRoute
@@ -190,7 +206,9 @@ export interface FileRoutesById {
   '/gate': typeof GateRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/blog/telegram-role-management-guide': typeof BlogTelegramRoleManagementGuideRoute
@@ -214,7 +232,9 @@ export interface FileRouteTypes {
     | '/gate'
     | '/login'
     | '/mcp'
+    | '/privacy'
     | '/sitemap.xml'
+    | '/terms'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/blog/telegram-role-management-guide'
@@ -236,7 +256,9 @@ export interface FileRouteTypes {
     | '/gate'
     | '/login'
     | '/mcp'
+    | '/privacy'
     | '/sitemap.xml'
+    | '/terms'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/blog/telegram-role-management-guide'
@@ -258,7 +280,9 @@ export interface FileRouteTypes {
     | '/gate'
     | '/login'
     | '/mcp'
+    | '/privacy'
     | '/sitemap.xml'
+    | '/terms'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/blog/telegram-role-management-guide'
@@ -281,7 +305,9 @@ export interface RootRouteChildren {
   GateRoute: typeof GateRoute
   LoginRoute: typeof LoginRoute
   McpRoute: typeof McpRoute
+  PrivacyRoute: typeof PrivacyRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TermsRoute: typeof TermsRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   BlogTelegramRoleManagementGuideRoute: typeof BlogTelegramRoleManagementGuideRoute
@@ -359,11 +385,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sitemap.xml': {
       id: '/sitemap.xml'
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.mcp/list-tools': {
@@ -449,7 +489,9 @@ const rootRouteChildren: RootRouteChildren = {
   GateRoute: GateRoute,
   LoginRoute: LoginRoute,
   McpRoute: McpRoute,
+  PrivacyRoute: PrivacyRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TermsRoute: TermsRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,

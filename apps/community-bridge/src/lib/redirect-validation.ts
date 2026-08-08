@@ -77,7 +77,10 @@ export function validateBrandRedirects(
   if (origin && brand.hosts.length > 0) {
     try {
       const host = new URL(origin).hostname.toLowerCase();
-      const isLocal = host === "localhost" || host.endsWith(".lovable.app") || host.endsWith(".lovableproject.com");
+      const isLocal =
+        host === "localhost" ||
+        host.endsWith(".lovable.app") ||
+        host.endsWith(".lovableproject.com");
       if (!isLocal && !brand.hosts.includes(host)) {
         issues.push({
           field: "host",
@@ -100,8 +103,7 @@ export function checkRedirectPath(
   field: "afterLogin" | "oauthReturnPath",
   value: string,
 ): { message: string; suggestion: string | null } | null {
-  const allowed =
-    field === "afterLogin" ? ALLOWED_AFTER_LOGIN_PATHS : ALLOWED_OAUTH_RETURN_PATHS;
+  const allowed = field === "afterLogin" ? ALLOWED_AFTER_LOGIN_PATHS : ALLOWED_OAUTH_RETURN_PATHS;
   const label = field === "afterLogin" ? "Post-login path" : "OAuth return path";
   const path = value.trim();
 
@@ -125,7 +127,10 @@ export function checkRedirectPath(
 
 /** Best-effort "did you mean" suggestion by prefix / substring similarity. */
 function nearestAllowedPath(value: string, allowed: string[]): string | null {
-  const needle = value.trim().toLowerCase().replace(/^\/+|\/+$/g, "");
+  const needle = value
+    .trim()
+    .toLowerCase()
+    .replace(/^\/+|\/+$/g, "");
   if (!needle) return allowed[0] ?? null;
   const match = allowed.find((p) => {
     const candidate = p.toLowerCase().replace(/^\/+|\/+$/g, "");
@@ -141,4 +146,3 @@ export function brandOAuthRedirectUrl(brand: BrandConfig, origin: string): strin
     : "/";
   return new URL(path, origin).toString();
 }
-

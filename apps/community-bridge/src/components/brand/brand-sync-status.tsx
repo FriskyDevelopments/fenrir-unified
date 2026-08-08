@@ -25,9 +25,7 @@ export function BrandSyncStatus({ className }: { className?: string }) {
       role="status"
       aria-live="polite"
       title={
-        lastAt
-          ? `Last brand update applied at ${new Date(lastAt).toLocaleTimeString()}`
-          : undefined
+        lastAt ? `Last brand update applied at ${new Date(lastAt).toLocaleTimeString()}` : undefined
       }
     >
       {live ? (
@@ -41,7 +39,9 @@ export function BrandSyncStatus({ className }: { className?: string }) {
       <span className="font-medium text-foreground/90">
         {live ? "Theme sync live" : "Theme sync off"}
       </span>
-      <span aria-hidden className="text-border">•</span>
+      <span aria-hidden className="text-border">
+        •
+      </span>
       <span className="inline-flex items-center gap-1">
         {live && lastLabel ? <Radio className="h-3 w-3 text-primary" aria-hidden /> : null}
         {detail}

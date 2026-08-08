@@ -22,11 +22,11 @@ export const Route = createFileRoute("/dashboard")({
         content: "Manage your linked MyFenrir account, gates and portal access.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://clipsflow-auth-hub.lovable.app/dashboard" },
+      { property: "og:url", content: "https://gate.myfenrir.com/dashboard" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: "https://clipsflow-auth-hub.lovable.app/dashboard" }],
+    links: [{ rel: "canonical", href: "https://gate.myfenrir.com/dashboard" }],
   }),
   component: DashboardPage,
 });
@@ -91,7 +91,9 @@ function DashboardPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => signOut().then(() => navigate({ to: "/login", search: { next: undefined } }))}
+              onClick={() =>
+                signOut().then(() => navigate({ to: "/login", search: { next: undefined } }))
+              }
             >
               <LogOut className="mr-2 h-4 w-4" />
               Sign out
@@ -112,11 +114,7 @@ function DashboardPage() {
 
           <TelegramIdentityCard
             className="mx-auto mt-6 max-w-sm text-left"
-            identity={
-              demo
-                ? { ...DEMO_TELEGRAM_PROFILE, id: telegramId }
-                : { id: telegramId }
-            }
+            identity={demo ? { ...DEMO_TELEGRAM_PROFILE, id: telegramId } : { id: telegramId }}
             note={demo ? "Simulated Telegram identity (demo mode)." : undefined}
           />
         </div>

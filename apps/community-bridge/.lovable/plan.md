@@ -1,4 +1,3 @@
-
 # Adapt ClipsFlow to Your Cloudflare Infra
 
 ## Target architecture
@@ -18,12 +17,14 @@ Pages serves the static SPA. Anything that previously ran inside a TanStack `cre
 ## What changes
 
 ### 1. Build target
+
 - Remove TanStack Start SSR; keep TanStack Router in **SPA / client-only** mode.
 - New `vite.config.ts` outputs a plain static `dist/` (no `.output/server`).
 - `index.html` becomes the SPA shell; root `__root.tsx` keeps only client providers (no `<html>`/`<head>` shell from Start).
 - Drop `src/start.ts`, `src/server.ts`, `attachSupabaseAuth` global middleware — not needed in SPA.
 
 ### 2. Server functions → Pages Functions
+
 - `src/lib/admin.functions.ts` is rewritten as:
   - `functions/api/admin/list-users.ts`
   - `functions/api/admin/promote.ts`
@@ -32,10 +33,12 @@ Pages serves the static SPA. Anything that previously ran inside a TanStack `cre
 - Client calls switch from `useServerFn(...)` to `fetch('/api/admin/...', { headers: { Authorization: \`Bearer ${session.access_token}\` } })`.
 
 ### 3. Auth gating
+
 - `_authenticated/route.tsx` already uses `ssr: false` + `supabase.auth.getUser()` — works as-is in SPA mode.
 - Login flow (`/login`, `/activate`) unchanged; it's all client-side Supabase.
 
 ### 4. Pointing at YOUR Supabase
+
 - `.env` becomes:
   - `VITE_SUPABASE_URL=https://<your-ref>.supabase.co`
   - `VITE_SUPABASE_PUBLISHABLE_KEY=<your anon/publishable key>`
@@ -48,6 +51,7 @@ Pages serves the static SPA. Anything that previously ran inside a TanStack `cre
 - I'll add a short `MIGRATING.md` with the exact CLI steps.
 
 ### 5. Deployment
+
 - Add `wrangler.toml` for Pages:
   ```toml
   name = "clipsflow"
@@ -63,6 +67,7 @@ Pages serves the static SPA. Anything that previously ran inside a TanStack `cre
 ## Files I'll change / add
 
 **Replace**
+
 - `vite.config.ts` — drop Start plugin, switch to vanilla Vite + `@tanstack/router-plugin/vite` (SPA codegen)
 - `package.json` — remove `@tanstack/react-start`, `@tanstack/start-plugin-core`, server runtime deps; keep router, query, supabase-js
 - `src/router.tsx` — plain `createRouter`, no SSR hydration helpers
@@ -71,6 +76,7 @@ Pages serves the static SPA. Anything that previously ran inside a TanStack `cre
 - `src/routes/admin.tsx`, `src/routes/activate.tsx` — replace `useServerFn` calls with `fetch('/api/admin/…')`
 
 **Add**
+
 - `src/main.tsx` — SPA entry
 - `functions/api/admin/list-users.ts`
 - `functions/api/admin/promote.ts`
@@ -82,12 +88,14 @@ Pages serves the static SPA. Anything that previously ran inside a TanStack `cre
 - `MIGRATING.md` — Supabase migration + Cloudflare setup steps
 
 **Delete**
+
 - `src/lib/admin.functions.ts`
 - `src/start.ts`, `src/server.ts`
 - `src/integrations/supabase/auth-attacher.ts`, `auth-middleware.ts` (no longer used)
 - `src/routes/api/` (if any)
 
 ## What stays the same
+
 - All UI / styling / branding (ClipsFlow logo, FriskyDev mark, login design)
 - Router structure and routes
 - `has_role()` + `user_roles` security model from earlier migrations

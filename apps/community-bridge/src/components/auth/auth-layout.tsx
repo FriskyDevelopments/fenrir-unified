@@ -8,7 +8,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/config/brand-context";
 import { getPreset } from "@/lib/gate-presets";
 
-
 export function AuthLayout({
   title,
   subtitle,
@@ -26,8 +25,7 @@ export function AuthLayout({
   // column as the public gate this brand's visitors arrive from.
   const preset = getPreset(brand.gatePreset);
   const previewing =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).has("brand");
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("brand");
 
   return (
     <div
@@ -51,14 +49,12 @@ export function AuthLayout({
             backgroundImage:
               "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
             backgroundSize: "48px 48px",
-            maskImage:
-              "radial-gradient(ellipse 60% 50% at 50% 45%, #000 30%, transparent 75%)",
+            maskImage: "radial-gradient(ellipse 60% 50% at 50% 45%, #000 30%, transparent 75%)",
           }}
         />
       </div>
 
       <div className="relative flex w-full max-w-sm flex-col items-center gap-6 text-center [&>*]:w-full">
-
         <div className="flex flex-col items-center gap-2">
           <BrandSwitcher />
           {isStaff || previewing ? <BrandSyncStatus /> : null}
@@ -102,7 +98,6 @@ export function AuthLayout({
 
                 <BrandWordmark className="mb-4 max-w-[168px]" />
 
-
                 <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight text-foreground">
                   {title}
                 </h1>
@@ -116,9 +111,7 @@ export function AuthLayout({
           </Card>
         </div>
 
-        {footer ? (
-          <div className="text-center text-xs text-muted-foreground">{footer}</div>
-        ) : null}
+        {footer ? <div className="text-center text-xs text-muted-foreground">{footer}</div> : null}
 
         <div className="pt-1 text-center">
           <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-muted-foreground/70">

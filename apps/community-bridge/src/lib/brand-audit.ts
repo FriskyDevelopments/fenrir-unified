@@ -103,9 +103,7 @@ export function auditEntriesToCsv(entries: BrandAuditEntry[]): string {
       ? entry.changes
       : [{ field: "", before: null, after: null }];
     for (const change of changes) {
-      lines.push(
-        [...base, change.field, change.before, change.after].map(csvCell).join(","),
-      );
+      lines.push([...base, change.field, change.before, change.after].map(csvCell).join(","));
     }
   }
   // BOM keeps Excel happy with UTF-8 values.
@@ -113,12 +111,7 @@ export function auditEntriesToCsv(entries: BrandAuditEntry[]): string {
 }
 
 /** Fields that make up a tenant's visual theme (colors, preset, brand art). */
-export const THEME_FIELDS = new Set([
-  "theme",
-  "gate_preset",
-  "logo_url",
-  "wordmark_url",
-]);
+export const THEME_FIELDS = new Set(["theme", "gate_preset", "logo_url", "wordmark_url"]);
 
 /** True when this change touches the tenant's theme settings. */
 export function isThemeField(field: string): boolean {

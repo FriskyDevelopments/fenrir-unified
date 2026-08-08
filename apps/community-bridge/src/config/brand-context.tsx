@@ -7,12 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  BRANDS,
-  DEFAULT_BRAND_ID,
-  getBrand,
-  type BrandConfig,
-} from "./brands";
+import { BRANDS, DEFAULT_BRAND_ID, getBrand, type BrandConfig } from "./brands";
 import { mergeBrands, type BrandTenantRow } from "./brand-tenant";
 import { listPublicBrandTenants } from "@/lib/brand-tenants.functions";
 import { DRAFT_BRAND_ID, readDraftBrand } from "./brand-draft";
@@ -35,7 +30,7 @@ export function resolveBrandId(
   const fromParam = candidates.find((b) => b.id === input.param)?.id;
   if (fromParam) return fromParam;
 
-  const fromEnv = candidates.find((b) => b.id === import.meta.env['VITE_BRAND_ID'])?.id;
+  const fromEnv = candidates.find((b) => b.id === import.meta.env["VITE_BRAND_ID"])?.id;
   if (fromEnv) return fromEnv;
 
   const host = input.host?.toLowerCase().split(":")[0];
@@ -64,7 +59,6 @@ const fallback: BrandContextValue = {
   setBrandId: () => {},
   refreshBrands: async () => {},
 };
-
 
 const BrandContext = createContext<BrandContextValue>(fallback);
 
@@ -125,7 +119,6 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     [refreshBrands, brandId],
   );
 
-
   useEffect(() => {
     if (pinned) return;
     const params = new URLSearchParams(window.location.search);
@@ -177,7 +170,6 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     }),
     [brand, brands, refreshBrands],
   );
-
 
   return <BrandContext.Provider value={value}>{children}</BrandContext.Provider>;
 }

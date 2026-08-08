@@ -18,8 +18,6 @@ import {
 } from "@/config/demo-mode";
 import { logDemoEvent } from "@/config/demo-log";
 
-
-
 const supabaseConfigured = true;
 
 export type AppRole = "owner" | "admin" | "user";
@@ -32,6 +30,8 @@ interface AuthContextValue {
   role: AppRole | null;
   telegramId: number | null;
   roleLoading: boolean;
+  /** True when staff has blocked this account (enforced server-side too). */
+  blocked: boolean;
   isStaff: boolean;
   isOwner: boolean;
   signOut: () => Promise<void>;
@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
   const [telegramId, setTelegramId] = useState<number | null>(null);
+  const [blocked, setBlocked] = useState(false);
   const [roleLoading, setRoleLoading] = useState(false);
   const [demo, setDemo] = useState(false);
   const [demoLinked, setDemoLinked] = useState(false);
@@ -67,27 +68,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-
-
   const loadRole = useCallback(async (userId: string | null) => {
     if (!userId) {
       setRole(null);
       setTelegramId(null);
+      setBlocked(false);
       setRoleLoading(false);
       return;
     }
     setRoleLoading(true);
     const { data, error } = await supabase
       .from("user_roles")
-      .select("role, telegram_id")
+      .select("role, telegram_id, blocked_at")
       .eq("user_id", userId)
       .maybeSingle();
     if (!error && data) {
       setRole((data.role as AppRole) ?? "user");
       setTelegramId(data.telegram_id ? Number(data.telegram_id) : null);
+      setBlocked(Boolean(data.blocked_at));
     } else {
       setRole("user");
       setTelegramId(null);
+      setBlocked(false);
     }
     setRoleLoading(false);
   }, []);
@@ -126,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setRole(null);
     setTelegramId(null);
+    setBlocked(false);
     currentUserId.current = null;
   }, [demo]);
 
@@ -146,16 +149,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await loadRole(currentUserId.current);
   }, [demo, loadRole]);
 
-
   const value = useMemo<AuthContextValue>(
     () => ({
       session: demo ? DEMO_SESSION : session,
-      user: demo ? DEMO_SESSION.user : session?.user ?? null,
+      user: demo ? DEMO_SESSION.user : (session?.user ?? null),
       loading: demo ? false : loading,
       configured: supabaseConfigured,
       role: demo ? "owner" : role,
       telegramId: demo ? (demoLinked ? DEMO_TELEGRAM_ID : null) : telegramId,
       roleLoading: demo ? false : roleLoading,
+      blocked: demo ? false : blocked,
       isStaff: demo || role === "owner" || role === "admin",
       isOwner: demo || role === "owner",
       signOut,
@@ -170,12 +173,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role,
       telegramId,
       roleLoading,
+      blocked,
       signOut,
       refresh,
       refreshRole,
     ],
   );
-
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -52,10 +52,16 @@ export function logDemoEvent(kind: DemoEventKind, message: string, detail?: stri
   const last = events[0];
   // Collapse duplicate consecutive entries (e.g. repeated route notifications).
   if (last && last.kind === kind && last.message === message && last.detail === detail) return;
-  events = [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, kind, message, detail, at: Date.now() }, ...events].slice(
-    0,
-    MAX,
-  );
+  events = [
+    {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      kind,
+      message,
+      detail,
+      at: Date.now(),
+    },
+    ...events,
+  ].slice(0, MAX);
   persist();
   emit();
 }

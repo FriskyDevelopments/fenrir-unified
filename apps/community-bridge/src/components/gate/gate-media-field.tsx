@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { Film, ImageIcon, Loader2, Upload, X } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { verifyUploadedImage } from "@/lib/moderation.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +38,7 @@ export function GateMediaField({ id, label, hint, value, onChange }: GateMediaFi
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const verifyImage = useServerFn(verifyUploadedImage);
 
   const invalidUrl = Boolean(value) && !isUsableMediaUrl(value!);
   const isVideo = isVideoUrl(value);
@@ -48,26 +51,33 @@ export function GateMediaField({ id, label, hint, value, onChange }: GateMediaFi
       return;
     }
     if (!GATE_MEDIA_TYPE_PATTERN.test(file.type)) {
-      setError("Use a PNG, JPEG, WEBP, AVIF, SVG, GIF, MP4, WEBM or MOV file.");
+      setError("Use a PNG, JPEG, WEBP, GIF, MP4, WEBM or MOV file.");
       return;
     }
     const limit = file.type.startsWith("video/")
       ? GATE_MEDIA_MAX_BYTES.video
       : GATE_MEDIA_MAX_BYTES.image;
     if (file.size > limit) {
-      setError(`Keep ${file.type.startsWith("video/") ? "videos" : "images"} under ${Math.round(limit / (1024 * 1024))} MB.`);
+      setError(
+        `Keep ${file.type.startsWith("video/") ? "videos" : "images"} under ${Math.round(limit / (1024 * 1024))} MB.`,
+      );
       return;
     }
 
     setBusy(true);
-    const ext = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
+    const ext =
+      file.name
+        .split(".")
+        .pop()
+        ?.toLowerCase()
+        .replace(/[^a-z0-9]/g, "") || "bin";
     const path = `${userId}/${id}-${Date.now()}.${ext}`;
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
       .upload(path, file, { upsert: true, contentType: file.type });
-    setBusy(false);
 
     if (uploadError) {
+      setBusy(false);
       setError(
         /row-level security|Unauthorized|permission/i.test(uploadError.message)
           ? "Sign in again — the upload was not allowed."
@@ -75,6 +85,25 @@ export function GateMediaField({ id, label, hint, value, onChange }: GateMediaFi
       );
       return;
     }
+
+    // Content check for images — flagged files are deleted server-side and
+    // never accepted. Videos are served as-is (no frame screening yet).
+    if (file.type.startsWith("image/")) {
+      try {
+        const verdict = await verifyImage({ data: { bucket: BUCKET, path } });
+        if (!verdict.allowed) {
+          setBusy(false);
+          setError(verdict.reason ?? "This image is not allowed here.");
+          return;
+        }
+      } catch {
+        setBusy(false);
+        setError("Image verification failed — try again.");
+        return;
+      }
+    }
+
+    setBusy(false);
     onChange(`/gate-media/${path}`);
   }
 
@@ -135,12 +164,22 @@ export function GateMediaField({ id, label, hint, value, onChange }: GateMediaFi
           </p>
         </div>
 
-        <Button type="button" variant="outline" onClick={() => inputRef.current?.click()} disabled={busy}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => inputRef.current?.click()}
+          disabled={busy}
+        >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
           <span className="ml-2 hidden sm:inline">Upload</span>
         </Button>
         {value ? (
-          <Button type="button" variant="ghost" onClick={() => onChange(null)} aria-label={`Clear ${label}`}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onChange(null)}
+            aria-label={`Clear ${label}`}
+          >
             <X className="h-4 w-4" />
           </Button>
         ) : null}
@@ -155,7 +194,9 @@ export function GateMediaField({ id, label, hint, value, onChange }: GateMediaFi
         aria-invalid={invalidUrl}
       />
       {invalidUrl ? (
-        <p className="text-[11px] text-destructive">Use an uploaded file or a public https:// URL.</p>
+        <p className="text-[11px] text-destructive">
+          Use an uploaded file or a public https:// URL.
+        </p>
       ) : null}
       <input
         ref={inputRef}

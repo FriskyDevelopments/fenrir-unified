@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  isBrandSyncSupported,
-  subscribeBrandUpdates,
-  type BrandUpdateKind,
-} from "./brand-sync";
+import { isBrandSyncSupported, subscribeBrandUpdates, type BrandUpdateKind } from "./brand-sync";
 
 export interface BrandSyncStatus {
   /** True once this tab is subscribed to the shared brand channel. */
