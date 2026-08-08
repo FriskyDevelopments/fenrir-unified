@@ -30,6 +30,8 @@ export type CommunityBrandPayload = {
   subheadline: string;
   invite_prefix: string;
   enabled_auth_providers: string[];
+  /** Providers whose credentials are actually bound in this environment (server-computed). */
+  available_auth_providers?: string[];
   default_access_state: DefaultAccessState;
   communityOrgId: string | null;
   communityId: string;

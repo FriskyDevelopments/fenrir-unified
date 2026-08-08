@@ -144,3 +144,32 @@ export type AppState = {
   telegramChecks: TelegramPermissionCheck[];
   commissionLinks: FriskyCommissionLink[];
 };
+
+export type CommunitySecurityReport = {
+  community: {
+    id: string;
+    slug: string;
+    name: string;
+  };
+  users: {
+    total: number;
+    verified: number;
+    blocked: number;
+    pending: number;
+    missingDisplayName: number;
+  };
+  sessions: {
+    total: number;
+    successful: number;
+    failed: number;
+    blocked: number;
+    expired: number;
+    pending: number;
+  };
+  impact: {
+    blockedAttempts: number;
+    usersNeedingProfileFixes: number;
+    fullyVerifiedUsers: number;
+  };
+  generatedAt: string;
+};

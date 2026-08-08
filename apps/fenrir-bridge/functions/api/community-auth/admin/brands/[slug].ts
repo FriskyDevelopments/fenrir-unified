@@ -8,24 +8,29 @@ import {
   upsertCommunityBrand,
   verifyCommunityBrandWriteAuthorized
 } from "../../../../_lib/community-auth";
+import { availableCommunityAuthProviders } from "../../../../_lib/community-oauth";
 import { noStoreJson } from "../../../../_lib/responses";
 
 export async function onRequestGet(context: any) {
-  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured();
+  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured(context.env);
 
   try {
     const session = await readSession(context.request, context.env);
     const slug = String(context.params.slug ?? "");
     const authorization = await verifyCommunityBrandWriteAuthorized(session, context.env, slug);
     const brand = await ensureCommunityBrandPayload(context.env, slug);
-    return noStoreJson({ ok: true, brand, authorization });
+    return noStoreJson({
+      ok: true,
+      brand: { ...brand, available_auth_providers: availableCommunityAuthProviders(context.env) },
+      authorization
+    });
   } catch (error) {
-    return resolveCommunityAuthError(error);
+    return resolveCommunityAuthError(error, context.env);
   }
 }
 
 export async function onRequestPut(context: any) {
-  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured();
+  if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured(context.env);
 
   try {
     const session = await readSession(context.request, context.env);
@@ -34,8 +39,12 @@ export async function onRequestPut(context: any) {
     const body = await context.request.json().catch(() => null);
     const payload = assertBrandPayload(body);
     const brand = await upsertCommunityBrand(context.env, slug, payload);
-    return noStoreJson({ ok: true, brand, authorization });
+    return noStoreJson({
+      ok: true,
+      brand: { ...brand, available_auth_providers: availableCommunityAuthProviders(context.env) },
+      authorization
+    });
   } catch (error) {
-    return resolveCommunityAuthError(error);
+    return resolveCommunityAuthError(error, context.env);
   }
 }

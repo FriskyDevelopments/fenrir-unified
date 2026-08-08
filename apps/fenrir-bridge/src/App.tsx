@@ -14,9 +14,17 @@ import {
   type CommunityBrandUpdatePayload,
   type DefaultAccessState
 } from "./services/communityAuth";
+import {
+  cleanDomainSearchBase,
+  domainSearchCandidates,
+  frontDoorCandidates,
+  type DomainSearchResult,
+  type DomainVerdict
+} from "../shared/domain-search";
 import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan } from "./services/types";
 import { AuthProviderButton } from "./components/AuthProviderButton";
 import { AuthSurface } from "./components/AuthSurface";
+import { CinematicLanding } from "./components/CinematicLanding";
 import { GlowCard } from "./components/GlowCard";
 import { TelegramLoginWidget } from "./components/TelegramLoginWidget";
 import { brandThemes, themeClassName, themeCssVars } from "./theme/brandThemes";
@@ -139,15 +147,6 @@ const uiCopy: Record<Locale, {
   walkthroughStepsClient: [string, string, string, string];
   walkthroughStepsAdmin: [string, string, string, string];
   walkthroughStepsLaunch: [string, string, string, string];
-  ghostRouteTitle: string;
-  ghostRouteBody: string;
-  botOsRouteTitle: string;
-  botOsRouteSubtitle: string;
-  botOsRouteBody: string;
-  botOsRouteModulesTitle: string;
-  botOsRouteFooterGhost: string;
-  botOsRouteFooterCommunity: string;
-  botOsRouteFooterHome: string;
   communityEmailPlaceholder: string;
   neonMagicBusy: string;
   neonMagicButton: string;
@@ -279,15 +278,6 @@ const uiCopy: Record<Locale, {
     walkthroughStepsClient: ["Public link", "Branded gate", "Access check", "Private destination"],
     walkthroughStepsAdmin: ["Stable URL", "Rotate target", "Revoke leak", "Audit action"],
     walkthroughStepsLaunch: ["Customer clicks", "Fenrir explains", "Access unlocks", "Entry opens"],
-    ghostRouteTitle: "Ghost login belongs to the Bot OS surface.",
-    ghostRouteBody: "This route is intentionally separate from Fenrir Bridge. Use it for Frisky Ghost, ghost-styled onboarding, and Bot OS identity moments without touching client accounts.",
-    botOsRouteTitle: "Bot-of-bots command layer.",
-    botOsRouteSubtitle: "Modular command layer for Fenrir and Bot OS operators.",
-    botOsRouteBody: "Modular boxes are back. Ghost handles the playful login skin, Fenrir handles bridge operations, and Community Gate stays isolated on Neon.",
-    botOsRouteModulesTitle: "Bot OS modules",
-    botOsRouteFooterGhost: "Ghost login",
-    botOsRouteFooterCommunity: "Community Gate",
-    botOsRouteFooterHome: "Fenrir Bridge",
     communityEmailPlaceholder: "you@community.com",
     neonMagicBusy: "Creating Neon link...",
     neonMagicButton: "Send Neon magic link",
@@ -450,15 +440,6 @@ const uiCopy: Record<Locale, {
     walkthroughStepsClient: ["Enlace público", "Puerta con marca", "Chequeo de acceso", "Destino privado"],
     walkthroughStepsAdmin: ["URL estable", "Rotar destino", "Revocar fuga", "Acción de auditoría"],
     walkthroughStepsLaunch: ["Cliente hace clic", "Fenrir explica", "Acceso desbloqueado", "Entrada abierta"],
-    ghostRouteTitle: "El inicio de sesión de Ghost pertenece a Bot OS.",
-    ghostRouteBody: "Esta ruta está separada de Fenrir Bridge. Úsala para Frisky Ghost, onboarding con estilo Ghost y momentos de identidad de Bot OS sin tocar cuentas de cliente.",
-    botOsRouteTitle: "Capa de comandos de bots.",
-    botOsRouteSubtitle: "Capa de comandos modular para admins Fenrir y Bot OS.",
-    botOsRouteBody: "Las cajas modulares están de vuelta. Ghost maneja la piel de login lúdica, Fenrir maneja operaciones de puente, y Community Gate permanece aislado en Neon.",
-    botOsRouteModulesTitle: "Módulos de Bot OS",
-    botOsRouteFooterGhost: "Login de Ghost",
-    botOsRouteFooterCommunity: "Community Gate",
-    botOsRouteFooterHome: "Fenrir Bridge",
     communityEmailPlaceholder: "tu@comunidad.com",
     neonMagicBusy: "Creando enlace Neon...",
     neonMagicButton: "Enviar enlace mágico Neon",
@@ -595,15 +576,6 @@ const uiCopy: Record<Locale, {
     walkthroughStepsClient: ["Lien public", "Porte brandée", "Contrôle d'accès", "Destination privée"],
     walkthroughStepsAdmin: ["URL stable", "Tourner la cible", "Révoquer la fuite", "Action d'audit"],
     walkthroughStepsLaunch: ["Client clique", "Fenrir explique", "Déblocage d'accès", "Entrée ouverte"],
-    ghostRouteTitle: "La connexion Ghost appartient à la surface Bot OS.",
-    ghostRouteBody: "Cette route est séparée volontairement de Fenrir Bridge. Utilisez-la pour Frisky Ghost, l'onboarding Ghost et les moments d'identité Bot OS sans toucher les comptes clients Fenrir Bridge.",
-    botOsRouteTitle: "Couche de commandes de bots.",
-    botOsRouteSubtitle: "Couche de commande modulaire pour Fenrir et les ops Bot OS.",
-    botOsRouteBody: "Les blocs modulaires sont de retour. Ghost gère la skin de connexion, Fenrir gère les opérations de pont, et Community Gate reste isolé sur Neon.",
-    botOsRouteModulesTitle: "Modules Bot OS",
-    botOsRouteFooterGhost: "Connexion Ghost",
-    botOsRouteFooterCommunity: "Community Gate",
-    botOsRouteFooterHome: "Fenrir Bridge",
     communityEmailPlaceholder: "vous@communaute.com",
     neonMagicBusy: "Création du lien Neon...",
     neonMagicButton: "Envoyer le lien magique Neon",
@@ -740,15 +712,6 @@ const uiCopy: Record<Locale, {
     walkthroughStepsClient: ["Öffentlicher Link", "Gebānderte Tür", "Zugriffsprüfung", "Privates Ziel"],
     walkthroughStepsAdmin: ["Stabile URL", "Ziel rotieren", "Leckung widerrufen", "Audit-Aktion"],
     walkthroughStepsLaunch: ["Kunde klickt", "Fenrir erklärt", "Zugriff entsperrt", "Einstieg öffnet"],
-    ghostRouteTitle: "Ghost-Login gehört zur Bot OS Oberfläche.",
-    ghostRouteBody: "Diese Route ist absichtlich von Fenrir Bridge getrennt. Nutze sie für Frisky Ghost, Ghost-Onboarding und Bot-OS-Identitätsmomente ohne Berührung der Fenrir-Bridge-Kundenkonten.",
-    botOsRouteTitle: "Befehls-Schicht der Bots.",
-    botOsRouteSubtitle: "Modulare Befehls-Schicht für Fenrir- und Bot-OS-Operatoren.",
-    botOsRouteBody: "Modulare Boxen sind zurück. Ghost übernimmt die spielerische Login-Hülle, Fenrir die Bridge-Operationen, Community Gate bleibt isoliert auf Neon.",
-    botOsRouteModulesTitle: "Bot OS Module",
-    botOsRouteFooterGhost: "Ghost Login",
-    botOsRouteFooterCommunity: "Community Gate",
-    botOsRouteFooterHome: "Fenrir Bridge",
     communityEmailPlaceholder: "du@gemeinschaft.com",
     neonMagicBusy: "Neon-Link wird erstellt...",
     neonMagicButton: "Neon-Magic-Link senden",
@@ -806,7 +769,6 @@ const liveRoomProviders: Array<{ id: LiveRoomProvider; name: string; icon: strin
 ];
 
 const domainTagPresets = ["launch", "client", "vip", "community", "paid", "internal"] as const;
-const domainSearchTlds = ["com", "io", "app", "dev", "ai"] as const;
 
 const providerLogoPresets: Record<LiveRoomProvider, string> = {
   zoom: "/provider-logos/zoom.svg",
@@ -947,63 +909,53 @@ function defaultDomainTags(domain: FriskyDomain) {
   return tags;
 }
 
-type DomainSearchResult = {
-  domain: string;
-  status: "ready" | "dns_found" | "no_dns_signal" | "invalid" | "error";
-  summary: string;
-  records: string[];
+const domainVerdictLabels: Record<DomainVerdict, string> = {
+  available_clean: "Free & clean",
+  available_dirty: "Free, has residue",
+  registered_dropping: "Dropping soon",
+  registered_parked: "Registered (parked)",
+  registered_live: "Taken",
+  likely_available: "Likely free",
+  likely_registered: "Likely taken",
+  unknown: "Inconclusive",
+  invalid: "Invalid"
 };
 
-function cleanDomainSearchBase(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "")
-    .replace(/\/.*$/, "")
-    .replace(/[^a-z0-9.-]/g, "")
-    .replace(/^\.+|\.+$/g, "");
-}
+const domainVerdictTones: Record<DomainVerdict, string> = {
+  available_clean: "good",
+  available_dirty: "amber",
+  registered_dropping: "amber",
+  registered_parked: "amber",
+  registered_live: "danger",
+  likely_available: "good",
+  likely_registered: "danger",
+  unknown: "amber",
+  invalid: "danger"
+};
 
-function domainSearchCandidates(value: string) {
-  const base = cleanDomainSearchBase(value);
-  if (!base) return [];
-  if (base.includes(".")) return [base];
-  return domainSearchTlds.map((tld) => `${base}.${tld}`);
-}
+const domainFlagLabels: Record<string, string> = {
+  "mail-history": "had email (MX)",
+  "verification-txt-leftovers": "old verification TXT",
+  "resolves-to-host": "resolves to a host",
+  "rdap-dns-conflict": "registry and DNS disagree",
+  "registration-dropping": "in redemption/pending delete",
+  "no-rdap-service": "no RDAP for this TLD",
+  "rdap-unreachable": "registry did not answer",
+  "dns-unreachable": "resolvers did not answer"
+};
 
-async function lookupDomainDns(domain: string): Promise<DomainSearchResult> {
-  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain)) {
-    return { domain, status: "invalid", summary: "Use a valid domain name.", records: [] };
+/** One-line evidence trail so a verdict is never just a coloured badge. */
+function domainEvidence(result: DomainSearchResult) {
+  const parts: string[] = [];
+  if (result.dns.nxdomain) parts.push("NXDOMAIN on both resolvers");
+  if (result.dns.ns.length) parts.push(`NS ${result.dns.ns.slice(0, 2).join(", ")}`);
+  if (result.dns.a.length || result.dns.aaaa.length) {
+    parts.push(`A/AAAA ${result.dns.a.concat(result.dns.aaaa).slice(0, 2).join(", ")}`);
   }
-  try {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 2800);
-    const response = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=NS`, {
-      headers: { accept: "application/dns-json" },
-      signal: controller.signal
-    });
-    window.clearTimeout(timeout);
-    if (!response.ok) throw new Error("dns_lookup_failed");
-    const payload = (await response.json().catch(() => null)) as { Status?: number; Answer?: Array<{ data?: string }> } | null;
-    const records = (payload?.Answer ?? []).map((answer) => String(answer.data ?? "").replace(/\.$/, "")).filter(Boolean).slice(0, 3);
-    if (records.length) {
-      return {
-        domain,
-        status: "dns_found",
-        summary: "DNS exists. Treat as owned or already configured.",
-        records
-      };
-    }
-    return {
-      domain,
-      status: "no_dns_signal",
-      summary: "No NS signal found. Check registrar availability next.",
-      records: []
-    };
-  } catch {
-    return { domain, status: "error", summary: "Live DNS lookup timed out. Check registrar availability directly.", records: [] };
-  }
+  if (result.dns.mx.length) parts.push(`${result.dns.mx.length} MX`);
+  if (result.registration.registrar) parts.push(`registrar ${result.registration.registrar}`);
+  if (result.registration.expiresAt) parts.push(`expires ${result.registration.expiresAt.slice(0, 10)}`);
+  return parts.join(" · ");
 }
 
 type Celebration = {
@@ -1091,8 +1043,6 @@ export function App() {
   const roomMatch = path.match(/^\/room\/([^/]+)/);
   const vaultMatch = path.match(/^\/vault\/?$/);
   const communityGateMatch = path.match(/^\/(?:community|gate)(?:\/group)?\/([^/]+)/);
-  const ghostRoute = host === "friskyghost.com" || path === "/ghost" || path.startsWith("/ghost/");
-  const botOsRoute = path === "/bot-os" || path.startsWith("/bot-os/") || path === "/bots" || path.startsWith("/bots/");
   const legalMatch = legalRoutes.has(path);
   const [state, setState] = useState<AppState | null>(null);
   const [auth, setAuth] = useState<AuthSession | null>(null);
@@ -1100,9 +1050,12 @@ export function App() {
   const [domainInput, setDomainInput] = useState("");
   const [domainTagsInput, setDomainTagsInput] = useState("launch, paid");
   const [domainTagsById, setDomainTagsById] = useState<Record<string, string[]>>({});
-  const [domainSearchInput, setDomainSearchInput] = useState("myfenrir");
+  const [domainSearchInput, setDomainSearchInput] = useState("fenrir");
   const [domainSearchResults, setDomainSearchResults] = useState<DomainSearchResult[]>([]);
   const [domainSearchBusy, setDomainSearchBusy] = useState(false);
+  const [domainSearchMode, setDomainSearchMode] = useState<"front-door" | "exact">("front-door");
+  const [domainSearchMeta, setDomainSearchMeta] = useState<{ checkedAt: string; viaFallback: boolean } | null>(null);
+  const [wizardQueue, setWizardQueue] = useState<string[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [slugInput, setSlugInput] = useState("");
   const [groupNameInput, setGroupNameInput] = useState("");
@@ -1286,14 +1239,6 @@ export function App() {
     return <PublicVaultPage links={decodeVaultLinks()} c={c} ui={ui} />;
   }
 
-  if (ghostRoute) {
-    return <FriskyGhostRoute c={c} ui={ui} />;
-  }
-
-  if (botOsRoute) {
-    return <FriskyBotOsRoute c={c} ui={ui} />;
-  }
-
   if (communityGateMatch) {
     const slug = decodeURIComponent(communityGateMatch[1]);
     return <CommunityNeonGateRoute slug={slug} locale={locale} onLocale={(next) => setLocale(next)} c={c} ui={ui} />;
@@ -1325,6 +1270,10 @@ export function App() {
     return <PublicRoomRoute slug={slug} c={c} ui={ui} />;
   }
 
+  if (path === "/") {
+    return <CinematicLanding />;
+  }
+
   if (!auth) {
     return <div className="boot">{c.boot}</div>;
   }
@@ -1352,18 +1301,49 @@ export function App() {
     }
   }
 
-  async function runDomainSearch(seed = domainSearchInput) {
-    const candidates = domainSearchCandidates(seed);
-    if (!candidates.length) {
+  async function runDomainSearch(seed = domainSearchInput, mode = domainSearchMode) {
+    if (!cleanDomainSearchBase(seed)) {
       setNotice("Enter a domain or brand name before searching.");
       return;
     }
     setDomainSearchBusy(true);
     setDomainSearchResults([]);
-    const results = await Promise.all(candidates.slice(0, 5).map(lookupDomainDns));
-    setDomainSearchResults(results);
+    setDomainSearchMeta(null);
+    const response = await domainService.search({ seed, mode, limit: mode === "front-door" ? 18 : 12 });
     setDomainSearchBusy(false);
-    setNotice(`Live domain search checked ${results.length} option${results.length === 1 ? "" : "s"}.`);
+
+    if (!response.ok) {
+      setNotice(response.error?.message ?? "Live domain search failed.");
+      return;
+    }
+
+    setDomainSearchResults(response.results);
+    setDomainSearchMeta({ checkedAt: response.checkedAt, viaFallback: Boolean(response.viaBrowserFallback) });
+    const clean = response.promising.length;
+    setNotice(
+      `Checked ${response.checked} name${response.checked === 1 ? "" : "s"} against public DNS and RDAP — ` +
+        `${clean} clean front door${clean === 1 ? "" : "s"} found.`
+    );
+  }
+
+  /** Step 2 of the flow: hand a name to the domain wizard so it can be registered and wired. */
+  function sendToWizard(domain: string) {
+    setDomainInput(domain);
+    setDomainTagsInput(addDomainTag(domainTagsInput, "launch"));
+    setWizardQueue((current) => (current.includes(domain) ? current : [...current, domain]));
+    setNotice(`${domain} moved into the Fenrir domain wizard.`);
+  }
+
+  function sendPromisingToWizard() {
+    const clean = domainSearchResults.filter((result) => result.promising).map((result) => result.domain);
+    if (!clean.length) {
+      setNotice("No clean candidates in the current results.");
+      return;
+    }
+    setWizardQueue((current) => Array.from(new Set([...current, ...clean])));
+    setDomainInput(clean[0]);
+    setDomainTagsInput(addDomainTag(domainTagsInput, "launch"));
+    setNotice(`${clean.length} clean name${clean.length === 1 ? "" : "s"} queued in the domain wizard. ${clean[0]} is loaded first.`);
   }
 
   async function checkDns(domain: FriskyDomain) {
@@ -1870,13 +1850,15 @@ export function App() {
               value={domainSearchInput}
               results={domainSearchResults}
               busy={domainSearchBusy}
+              mode={domainSearchMode}
+              meta={domainSearchMeta}
+              queue={wizardQueue}
               onValue={setDomainSearchInput}
+              onMode={setDomainSearchMode}
               onSearch={() => void runDomainSearch()}
-              onPick={(domain) => {
-                setDomainInput(domain);
-                setDomainTagsInput(addDomainTag(domainTagsInput, "launch"));
-                setNotice(`${domain} moved into the Fenrir domain wizard.`);
-              }}
+              onPick={sendToWizard}
+              onSendPromising={sendPromisingToWizard}
+              onClearQueue={() => setWizardQueue([])}
               onOpenRegistrar={(domain) => {
                 const query = encodeURIComponent(domain);
                 openSafeUrl(`https://www.dynadot.com/domain/search?domain=${query}`);
@@ -2441,117 +2423,6 @@ function ProtocolActivated() {
   );
 }
 
-function FriskyGhostRoute({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] }) {
-  const theme = brandThemes.friskyGhost;
-  return (
-    <main className={`product-route ghost-route ${themeClassName(theme)}`} style={themeCssVars(theme)} data-theme={theme.key}>
-      <GlowCard className="product-route-card">
-        <span className="status good">Frisky Ghost</span>
-        <h1>{ui.ghostRouteTitle}</h1>
-        <p>{ui.ghostRouteBody}</p>
-        <div className="product-route-actions">
-          <a className="button-link" href="/bot-os">{ui.botOsRouteFooterGhost}</a>
-          <a className="button-link ghost" href="/">{ui.botOsRouteFooterHome}</a>
-        </div>
-      </GlowCard>
-    </main>
-  );
-}
-
-function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: typeof uiCopy[Locale] }) {
-  const theme = brandThemes.friskyGhost;
-  const botModules = [
-    {
-      code: "MOD 01",
-      title: "Identity Router",
-      status: "Ghost login",
-      body: "Routes Frisky Ghost, Fenrir, and future product skins without mixing auth scopes.",
-      actions: ["Brand skin", "Product landing", "Safe redirect"]
-    },
-    {
-      code: "MOD 02",
-      title: "Fenrir Bot",
-      status: "Telegram ops",
-      body: "Guides admins through stable links, invite rotation, Stars checkout, and DNS setup.",
-      actions: ["/setup", "/plans", "/status"]
-    },
-    {
-      code: "MOD 03",
-      title: "Payment Box",
-      status: "Stars first",
-      body: "Opens the official Telegram Stars payment box and waits for backend entitlement truth.",
-      actions: ["/subscribe", "Pro", "Operator"]
-    },
-    {
-      code: "MOD 04",
-      title: "DNS Wizard",
-      status: "Fenrir Bridge DNS",
-      body: "Keeps registrar choice open while routing CNAME records through Fenrir Bridge infrastructure.",
-      actions: ["TXT _fenrir", "CNAME join", "SSL"]
-    },
-    {
-      code: "MOD 05",
-      title: "Community Gate",
-      status: "Neon scope",
-      body: "Separate realauth for community gates. Different database, tables, and session cookie.",
-      actions: ["/community/fenrir", "Invite codes", "Neon"]
-    },
-    {
-      code: "MOD 06",
-      title: "Operator Console",
-      status: "Bot of bots",
-      body: "A modular command layer for setup, support, routing, billing state, and handoffs.",
-      actions: ["Cursor", "Gemini", "Frisky Signal"]
-    }
-  ];
-
-  return (
-    <main className={`product-route bot-route ${themeClassName(theme)}`} style={themeCssVars(theme)} data-theme={theme.key}>
-      <section className="bot-os-shell">
-        <div className="bot-os-header">
-          <div>
-            <span className="status amber">Frisky Bot OS</span>
-            <h1>{ui.botOsRouteTitle}</h1>
-            <p>{ui.botOsRouteBody}</p>
-            <h3>{ui.botOsRouteModulesTitle}</h3>
-          </div>
-          <div className="bot-os-terminal" aria-label="Bot OS menu">
-            <b>MENU</b>
-            <code>/menu</code>
-            <code>/setup</code>
-            <code>/plans</code>
-            <code>/status</code>
-          </div>
-        </div>
-
-        <div className="bot-module-grid">
-          {botModules.map((module) => (
-            <GlowCard as="article" className="bot-module-card" key={module.code}>
-              <div className="bot-module-topline">
-                <span>{module.code}</span>
-                <b>{module.status}</b>
-              </div>
-              <h2>{module.title}</h2>
-              <p>{module.body}</p>
-              <div className="bot-module-actions">
-                {module.actions.map((action) => (
-                  <span key={action}>{action}</span>
-                ))}
-              </div>
-            </GlowCard>
-          ))}
-        </div>
-
-        <div className="product-route-actions">
-          <a className="button-link" href="/ghost">{ui.botOsRouteFooterGhost}</a>
-          <a className="button-link" href="/community/fenrir">{ui.botOsRouteFooterCommunity}</a>
-          <a className="button-link ghost" href="/">{ui.botOsRouteFooterHome}</a>
-        </div>
-      </section>
-    </main>
-  );
-}
-
 function mergeNeonBrandTheme(base: typeof brandThemes.neonNexus, brand: CommunityBrandPayload | null) {
   if (!brand) return base;
   return {
@@ -2610,7 +2481,33 @@ const accessStateHelp: Record<DefaultAccessState, string> = {
 
 function communityAuthProviderLabel(provider: string) {
   if (provider === "magic_link") return "Magic link";
+  if (provider === "microsoft") return "Microsoft";
   return provider[0]?.toUpperCase() + provider.slice(1);
+}
+
+/** Providers the Community Gate OAuth bridge can complete end-to-end. */
+const communityOAuthProviders = ["google", "microsoft", "apple"] as const;
+
+function communityOAuthStartUrl(provider: string, slug: string) {
+  const params = new URLSearchParams({ slug, return_to: `/community/${slug}` });
+  return `/api/community-auth/oauth/${provider}?${params.toString()}`;
+}
+
+/** Human-readable copy for the ?auth_error= the bridge callback redirects back with. */
+function communityOAuthErrorMessage(search: string) {
+  const raw = new URLSearchParams(search).get("auth_error");
+  if (!raw) return null;
+  const code = raw.split(":", 1)[0];
+  if (code === "provider_not_configured") return "That provider is not connected yet. Use the magic link, or ask the community owner to finish the provider setup.";
+  if (code === "provider_not_enabled") return "That provider is switched off for this community. Use another sign-in option.";
+  if (code === "email_unverified") return "The provider did not confirm that email address. Verify it with the provider, then try again.";
+  if (code === "access_denied") return "You cancelled at the provider consent screen. Try again to continue.";
+  if (code === "community_org_required") return "This community is not fully provisioned yet. Ask the owner to finish setup.";
+  if (code === "oauth_state_missing" || code === "oauth_state_invalid" || code === "oauth_provider_mismatch") {
+    return "That sign-in attempt expired. Start again from this page.";
+  }
+  if (code === "missing_code") return "The provider returned without an authorization code. Try again.";
+  return `Sign-in did not complete (${raw}). Try again or use the magic link.`;
 }
 
 const legacyNeonPromoAsset = "/mj-neon-hero.gif";
@@ -2653,6 +2550,36 @@ const brandStylePresets = [
   { name: "Arcade Pulse", primary: "#a855f7", secondary: "#06b6d4", accent: "#f472b6", note: "More playful, obvious community flavor." }
 ] as const;
 
+// One-tap "looks" — each sets logo + mascot + background + colors together from
+// assets ALREADY bundled in /public, so a new gate looks great with zero hosting
+// and zero URLs. Power users can still paste their own art under "Advanced".
+const brandVisualPresets = [
+  {
+    name: "LORE Neon",
+    note: "Neon ghost · magenta → cyan",
+    logo_url: "/fenrir-splash-icon.svg",
+    mascot_url: "/lore-ghost-neon-signal.svg",
+    background_url: null as string | null,
+    primary_color: "#FF2E6E", secondary_color: "#9D00FF", accent_color: "#00E5FF"
+  },
+  {
+    name: "Fenrir Dark",
+    note: "Cyber guardian · steel + signal",
+    logo_url: "/fenrir-cut-wordmark.svg",
+    mascot_url: "/fenrir-cyber-guardian-hero.svg",
+    background_url: null as string | null,
+    primary_color: "#22c7a8", secondary_color: "#8cb9ff", accent_color: "#f1b75c"
+  },
+  {
+    name: "Minimal",
+    note: "Clean mark · no clutter",
+    logo_url: "/fenrir-splash-icon.svg",
+    mascot_url: null as string | null,
+    background_url: null as string | null,
+    primary_color: "#141414", secondary_color: "#666666", accent_color: "#c9d1d9"
+  }
+] as const;
+
 const communityGateWalkthrough = [
   {
     label: "What it is",
@@ -2684,6 +2611,28 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
   const [authorizationReason, setAuthorizationReason] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const seededDefaultRef = useRef(false);
+
+  // Ship a good default: the first time the builder reaches the look step with
+  // nothing chosen (and nothing loaded from an existing gate), apply the default
+  // preset so the gate looks great with zero input. One-shot; never overrides a
+  // loaded brand or a choice the admin already made.
+  useEffect(() => {
+    if (step !== "Images" || seededDefaultRef.current) return;
+    seededDefaultRef.current = true;
+    const has = (k: keyof CommunityBrandPayload) => Boolean((draft as Record<string, unknown>)[k] ?? (loadedBrand as Record<string, unknown> | null)?.[k]);
+    if (!has("logo_url") && !has("mascot_url") && !has("background_url")) {
+      const p = brandVisualPresets[0];
+      setDraft((c) => ({
+        ...c,
+        logo_url: p.logo_url, mascot_url: p.mascot_url, background_url: p.background_url,
+        primary_color: c.primary_color ?? p.primary_color,
+        secondary_color: c.secondary_color ?? p.secondary_color,
+        accent_color: c.accent_color ?? p.accent_color
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   const previewBrand = useMemo<CommunityBrandPayload>(() => ({
     slug,
@@ -2771,54 +2720,35 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
   return (
     <section className="panel wide community-brand-wizard">
       <PanelTitle title="Community Gate Builder" subtitle="Customize the public gate people use before Neon decides access." />
-      <div className="community-gate-walkthrough" aria-label="Community Gate walkthrough">
-        <div className="community-gate-walkthrough-head">
-          <span className="status good">Community Gate walkthrough</span>
-          <h3>How the gate protects and grows the community.</h3>
-          <p>
-            Use this before styling: it explains the setup, the access flow, the subscription value,
-            and what Neon owns behind the scenes.
-          </p>
-        </div>
-        <div className="community-gate-walkthrough-grid">
-          {communityGateWalkthrough.map((item, index) => (
-            <article key={item.label}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <b>{item.label}</b>
-              <h4>{item.title}</h4>
-              <p>{item.body}</p>
-            </article>
-          ))}
-        </div>
-        <div className="community-gate-flow" aria-label="Community Gate access flow">
-          {[
-            "Visitor opens branded gate",
-            "Identity proof",
-            "Neon membership check",
-            "Approve, review, or block",
-            "Audit trail stays separate"
-          ].map((item, index) => (
-            <span key={item}>{index + 1}. {item}</span>
-          ))}
-        </div>
-        <div className="community-gate-wow" aria-label="Community Gate subscription value">
-          <div>
-            <span>Gate</span>
-            <b>Branded entry</b>
-            <small>Logo, colors, copy, and trusted login in one public URL.</small>
+      <details className="community-gate-guide">
+        <summary>
+          <span>How Community Gate works</span>
+          <small>Fenrir handles the branded door. Neon owns member truth.</small>
+        </summary>
+        <div className="community-gate-guide-body">
+          <div className="community-gate-walkthrough-grid">
+            {communityGateWalkthrough.map((item, index) => (
+              <article key={item.label}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <b>{item.label}</b>
+                <h4>{item.title}</h4>
+                <p>{item.body}</p>
+              </article>
+            ))}
           </div>
-          <div>
-            <span>Neon</span>
-            <b>Member truth</b>
-            <small>Membership, invite status, review state, and audit history stay isolated.</small>
-          </div>
-          <div>
-            <span>Subscribe</span>
-            <b>Paid community ready</b>
-            <small>Unlock private gates, review workflows, safer onboarding, and upgrade paths.</small>
+          <div className="community-gate-flow" aria-label="Community Gate access flow">
+            {[
+              "Branded gate",
+              "Identity proof",
+              "Neon member check",
+              "Approve or block",
+              "Separate audit trail"
+            ].map((item, index) => (
+              <span key={item}>{index + 1}. {item}</span>
+            ))}
           </div>
         </div>
-      </div>
+      </details>
       <div className="brand-wizard-layout">
         <div className="brand-wizard-main">
           <div className="brand-wizard-overview" aria-label="Current Community Gate setup">
@@ -2879,40 +2809,77 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
 
           {step === "Images" && (
             <div className="brand-wizard-image-builder">
-              <div className="brand-asset-help-card">
-                <span className="brand-asset-help-icon">＋</span>
-                <div>
-                  <b>Add your own art</b>
-                  <small>Upload the file to /public, Cloudflare R2, Supabase Storage, or any public HTTPS CDN. Then paste that final URL below. Local files cannot be served to visitors until they are hosted.</small>
-                </div>
+              <div className="brand-visual-preset-head">
+                <b>Pick a look</b>
+                <small>One tap sets the logo, mascot, and atmosphere — it works instantly. You can swap in your own brand files anytime.</small>
               </div>
-              <div className="brand-asset-grid">
-                {brandImageFields.map((field) => {
-                  const value = String(draft[field.key] ?? "");
+              <div className="brand-visual-preset-grid">
+                {brandVisualPresets.map((preset) => {
+                  const active = (draft.logo_url ?? null) === preset.logo_url
+                    && (draft.mascot_url ?? null) === preset.mascot_url
+                    && (draft.background_url ?? null) === preset.background_url;
                   return (
-                    <label className={value ? "brand-asset-card filled" : "brand-asset-card"} key={field.key}>
-                      <span className="brand-asset-icon">{field.icon}</span>
-                      <span className="brand-asset-copy">
-                        <b>{field.title}</b>
-                        <small>{field.help}</small>
+                    <button
+                      type="button"
+                      key={preset.name}
+                      className={active ? "brand-visual-preset active" : "brand-visual-preset"}
+                      aria-pressed={active}
+                      onClick={() => setDraft((c) => ({
+                        ...c,
+                        logo_url: preset.logo_url, mascot_url: preset.mascot_url, background_url: preset.background_url,
+                        primary_color: preset.primary_color, secondary_color: preset.secondary_color, accent_color: preset.accent_color
+                      }))}
+                    >
+                      <span className="brand-visual-thumb" style={{ background: `linear-gradient(135deg, ${preset.primary_color}, ${preset.secondary_color})` }}>
+                        <img src={preset.mascot_url ?? preset.logo_url} alt="" loading="lazy" className={preset.mascot_url ? "" : "logo-only"} />
                       </span>
-                      <input
-                        value={value}
-                        onChange={(event) => setDraft((current) => ({ ...current, [field.key]: event.target.value || null }))}
-                        placeholder={field.placeholder}
-                      />
-                    </label>
+                      <b>{preset.name}</b>
+                      <small>{preset.note}</small>
+                    </button>
                   );
                 })}
               </div>
-              <div className="brand-wizard-suggestions brand-asset-actions">
-                <span>Quick art actions</span>
-                <div>
-                  <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: "/fenrir-cut-wordmark.svg", mascot_url: null, background_url: null }))}>Use clean Fenrir mark</button>
-                  <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: "/fenrir-splash-icon.svg", mascot_url: null, background_url: "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop" }))}>Abstract background</button>
-                  <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: null, mascot_url: null, background_url: null }))}>Clear all images</button>
+              <p className="brand-visual-footnote">Bundled art — no hosting needed. Final brand files can replace these later, and never block launch.</p>
+
+              <details className="brand-advanced">
+                <summary>Advanced — use your own art</summary>
+                <div className="brand-advanced-body">
+                  <div className="brand-asset-help-card">
+                    <span className="brand-asset-help-icon">＋</span>
+                    <div>
+                      <b>Add your own art</b>
+                      <small>Upload the file to /public, Cloudflare R2, Supabase Storage, or any public HTTPS CDN. Then paste that final URL below. Local files cannot be served to visitors until they are hosted.</small>
+                    </div>
+                  </div>
+                  <div className="brand-asset-grid">
+                    {brandImageFields.map((field) => {
+                      const value = String(draft[field.key] ?? "");
+                      return (
+                        <label className={value ? "brand-asset-card filled" : "brand-asset-card"} key={field.key}>
+                          <span className="brand-asset-icon">{field.icon}</span>
+                          <span className="brand-asset-copy">
+                            <b>{field.title}</b>
+                            <small>{field.help}</small>
+                          </span>
+                          <input
+                            value={value}
+                            onChange={(event) => setDraft((current) => ({ ...current, [field.key]: event.target.value || null }))}
+                            placeholder={field.placeholder}
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="brand-wizard-suggestions brand-asset-actions">
+                    <span>Quick art actions</span>
+                    <div>
+                      <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: "/fenrir-cut-wordmark.svg", mascot_url: null, background_url: null }))}>Use clean Fenrir mark</button>
+                      <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: "/fenrir-splash-icon.svg", mascot_url: null, background_url: "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop" }))}>Abstract background</button>
+                      <button type="button" className="compact-button ghost" onClick={() => setDraft(c => ({ ...c, logo_url: null, mascot_url: null, background_url: null }))}>Clear all images</button>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </details>
             </div>
           )}
 
@@ -2995,13 +2962,14 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
                   {["magic_link", "google", "apple", "microsoft"].map((provider) => {
                     const providers = Array.isArray(draft.enabled_auth_providers) ? draft.enabled_auth_providers : (previewBrand.enabled_auth_providers || []);
                     const checked = providers.includes(provider);
-                    const live = provider === "magic_link";
+                    // The bridge is wired for all four; a provider is only "live" once its
+                    // credentials exist in the environment.
+                    const live = (loadedBrand?.available_auth_providers ?? ["magic_link"]).includes(provider);
                     return (
                       <label className={live ? "live" : "planned"} key={provider}>
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={!live}
                           onChange={(e) => {
                             const next = e.target.checked
                               ? [...providers, provider]
@@ -3013,12 +2981,12 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
                           }}
                         />
                         <span>{communityAuthProviderLabel(provider)}</span>
-                        <small>{live ? "Live now" : "Requires OAuth bridge"}</small>
+                        <small>{live ? "Live now" : "Awaiting provider credentials"}</small>
                       </label>
                     );
                   })}
                 </div>
-                <small>Magic link is the live Community Gate method today. OAuth providers stay visible as planned options until their Neon session bridge is wired.</small>
+                <small>The Neon OAuth bridge is wired for Google, Microsoft and Apple. A provider only appears on the public gate once you enable it here AND its credentials are set in the environment.</small>
               </div>
             </div>
           )}
@@ -3039,35 +3007,41 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
           </div>
         </div>
 
-        <aside className="brand-wizard-preview" aria-label="Public gate preview">
-          <AuthSurface
-            theme={previewTheme}
-            locale={locale}
-            onLocale={() => {}}
-            railLabel="Preview"
-            logoUrl={previewBrand.logo_url}
-            backgroundUrl={previewBrand.background_url}
-          >
-            <GlowCard className="auth-card" aria-label="Community gate preview">
-              <div className="auth-card-header">
-                <span className="status good">Preview</span>
-                <span className="auth-card-kicker">/{slug}</span>
-              </div>
-              <h2 className="auth-enter-title">
-                <span>{previewBrand.headline}</span>
-              </h2>
-              <p className="muted">{previewBrand.subheadline}</p>
-              <div className="brand-wizard-preview-style" aria-label="Selected visual style">
-                <span style={{ background: previewBrand.primary_color }} />
-                <span style={{ background: previewBrand.secondary_color }} />
-                <span style={{ background: previewBrand.accent_color }} />
-              </div>
-              <div className="brand-wizard-preview-meta">
-                <span>{previewBrand.default_access_state.replace("_", " ")}</span>
-                <span>{selectedProviders || "Magic link"}</span>
-              </div>
-            </GlowCard>
-          </AuthSurface>
+        <aside className="brand-wizard-preview-column" aria-label="Public gate preview">
+          <div className="brand-wizard-preview-toolbar">
+            <span>Live preview</span>
+            <a href={publicGatePath} target="_blank" rel="noreferrer">Open gate ↗</a>
+          </div>
+          <div className="brand-wizard-preview">
+            <AuthSurface
+              theme={previewTheme}
+              locale={locale}
+              onLocale={() => {}}
+              railLabel="Preview"
+              logoUrl={previewBrand.logo_url}
+              backgroundUrl={previewBrand.background_url}
+            >
+              <GlowCard className="auth-card" aria-label="Community gate preview">
+                <div className="auth-card-header">
+                  <span className="status good">Preview</span>
+                  <span className="auth-card-kicker">/{slug}</span>
+                </div>
+                <h2 className="auth-enter-title">
+                  <span>{previewBrand.headline}</span>
+                </h2>
+                <p className="muted">{previewBrand.subheadline}</p>
+                <div className="brand-wizard-preview-style" aria-label="Selected visual style">
+                  <span style={{ background: previewBrand.primary_color }} />
+                  <span style={{ background: previewBrand.secondary_color }} />
+                  <span style={{ background: previewBrand.accent_color }} />
+                </div>
+                <div className="brand-wizard-preview-meta">
+                  <span>{previewBrand.default_access_state.replace("_", " ")}</span>
+                  <span>{selectedProviders || "Magic link"}</span>
+                </div>
+              </GlowCard>
+            </AuthSurface>
+          </div>
         </aside>
       </div>
     </section>
@@ -3092,6 +3066,14 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
   const [devLink, setDevLink] = useState<string | null>(null);
   const trimmedEmail = email.trim();
   const communityName = brand?.name || theme.productName;
+  const enabledProviders = brand?.enabled_auth_providers ?? ["magic_link"];
+  // A provider needs BOTH the owner's switch and real credentials, otherwise the button
+  // would just bounce back with ?auth_error=provider_not_configured.
+  const availableProviders = brand?.available_auth_providers;
+  const enabledOAuthProviders = communityOAuthProviders.filter(
+    (provider) => enabledProviders.includes(provider) && (!availableProviders || availableProviders.includes(provider))
+  );
+  const oauthError = useMemo(() => communityOAuthErrorMessage(window.location.search), []);
   const gateText = {
     en: {
       kicker: "Private community access",
@@ -3238,6 +3220,27 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
               <small>{gateText.stepSessionBody}</small>
             </section>
           </div>
+          {oauthError ? <small className="community-auth-message error" role="alert">{oauthError}</small> : null}
+          {enabledOAuthProviders.length > 0 ? (
+            <div className="community-oauth-providers" aria-label="Social sign-in">
+              {enabledOAuthProviders.map((provider) => (
+                <a
+                  key={provider}
+                  className="button-link community-oauth-button"
+                  data-provider={provider}
+                  href={communityOAuthStartUrl(provider, slug)}
+                  rel="nofollow"
+                >
+                  Continue with {communityAuthProviderLabel(provider)}
+                </a>
+              ))}
+            </div>
+          ) : null}
+          {enabledOAuthProviders.length > 0 ? (
+            <div className="community-oauth-divider" aria-hidden="true"><span>or</span></div>
+          ) : null}
+          {/* The magic link is unconditional: it needs no provider credentials and is the
+              only method that cannot be locked out by a console misconfiguration. */}
           <form className="community-auth-form" onSubmit={requestLink}>
             <label>
               <span>{c.serviceEmail}</span>
@@ -3278,85 +3281,107 @@ function communityBrandAdminErrorMessage(error: unknown) {
 }
 
 function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
-  const theme = brandThemes.fenrir;
-  const [passkeyNote, setPasskeyNote] = useState<string | null>(() => authErrorMessage());
-
-  async function signInWithPasskey() {
-    setPasskeyNote(null);
-    try {
-      const { optionsJSON } = await webauthnService.loginOptions();
-      const assertion = await startAuthentication({ optionsJSON });
-      await webauthnService.loginVerify(assertion);
-      window.location.assign(managedDashboardPath);
-    } catch {
-      setPasskeyNote(c.passkeyError);
-    }
-  }
+  const [authNote, setAuthNote] = useState<string | null>(() => authErrorMessage());
+  const [pendingProvider, setPendingProvider] = useState<AuthProvider | null>(null);
 
   async function signInWithProvider(provider: AuthProvider) {
-    setPasskeyNote(null);
+    setAuthNote(null);
+    setPendingProvider(provider);
     try {
       await friskyClientAuthEngine.signInWithProvider(provider);
     } catch {
-      setPasskeyNote(c.authProviderError);
+      setPendingProvider(null);
+      setAuthNote(c.authProviderError);
     }
   }
 
   return (
-    <AuthSurface theme={{ ...theme, subheadline: c.authSub }} locale={locale} onLocale={onLocale} railLabel="Fenrir ecosystem">
-        <GlowCard className="auth-card" aria-label="Fenrir sign-in">
-          <div className="auth-card-header">
-            <span className="status good">{c.realAuth}</span>
-            <span className="auth-card-kicker">{theme.authKicker}</span>
-          </div>
-          <h2 className="auth-enter-title" data-text={c.authTitle}>
-            <span>{c.authTitle}</span>
-          </h2>
-          <div className="auth-actions">
-            <AuthProviderButton provider="apple" label={c.continueApple} onClick={() => void signInWithProvider("apple")} />
-            <AuthProviderButton provider="google" label={c.continueGoogle} onClick={() => void signInWithProvider("google")} />
-            <AuthProviderButton provider="microsoft" label={c.continueMicrosoft} onClick={() => void signInWithProvider("microsoft")} />
-          </div>
-          <div className="auth-passkey-row">
-            <button type="button" className="secondary" onClick={() => void signInWithPasskey()}>
-              {c.passkeySignIn}
-            </button>
-            {passkeyNote ? <small className="muted">{passkeyNote}</small> : null}
-          </div>
-          <div className="auth-2fa-recommend">
-            <p className="label">{c.twoFactorRecommendTitle}</p>
-            <p className="muted">{c.twoFactorRecommendBody}</p>
-            <nav className="two-factor-links" aria-label="2FA provider help">
-              <a href={twoFactorHelpLinks.google} target="_blank" rel="noreferrer noopener">
-                {c.twoFactorGoogleLinkLabel}
-              </a>
-              <a href={twoFactorHelpLinks.microsoft} target="_blank" rel="noreferrer noopener">
-                {c.twoFactorMicrosoftLinkLabel}
-              </a>
-              <a href={twoFactorHelpLinks.apple} target="_blank" rel="noreferrer noopener">
-                {c.twoFactorAppleLinkLabel}
-              </a>
-            </nav>
-          </div>
-          <div className="auth-node-status" aria-label="Fenrir node status">
-            <b>FENRIR NODE STATUS</b>
-            {theme.nodeStatus.map((item) => (
-              <span key={item}>{item}</span>
-            ))}
-          </div>
-          <div className="auth-foot">
-            <div>
-              <small>{c.authEnvHint}</small>
-              <nav className="legal-links" aria-label="Legal links">
-                <a href="/legal">{c.legal}</a>
-                <a href="/terms">{c.terms}</a>
-                <a href="/privacy">{c.privacy}</a>
-              </nav>
+    <main className="lovable-auth-page" data-login-source="lovable-bd06c2e4">
+      <div className="lovable-auth-atmosphere" aria-hidden="true" />
+      <div className="lovable-auth-column">
+        <LovableAuthTerminal />
+
+        <section className="lovable-auth-card-wrap" aria-label="Fenrir sign-in">
+          <div className="lovable-auth-card-glow" aria-hidden="true" />
+          <div className="lovable-auth-card-border" aria-hidden="true" />
+          <div className="lovable-auth-card">
+            <div className="lovable-auth-card-line" aria-hidden="true" />
+            <div className="lovable-auth-brand">
+              <div className="lovable-auth-mark-shell">
+                <img src="/fenrir-splash-icon.svg" alt="MyFenrir logo" />
+              </div>
+              <img className="lovable-auth-wordmark" src="/fenrir-cut-wordmark.svg" alt="MyFenrir wordmark logo" />
+              <h1>Welcome back</h1>
+              <p>Sign in to continue to MyFenrir</p>
             </div>
+
+            <div className="lovable-auth-actions">
+              {(["apple", "google", "microsoft"] as AuthProvider[]).map((provider) => (
+                <AuthProviderButton
+                  key={provider}
+                  provider={provider}
+                  label={`Continue with ${provider === "apple" ? "Apple" : provider === "google" ? "Google" : "Microsoft"}`}
+                  disabled={pendingProvider !== null}
+                  onClick={() => void signInWithProvider(provider)}
+                />
+              ))}
+            </div>
+
+            {authNote ? <div className="lovable-auth-error" role="alert">{authNote}</div> : null}
+
+            <div className="lovable-auth-divider" aria-hidden="true">
+              <span />
+              <b>Encrypted sign-in</b>
+              <span />
+            </div>
+            <p className="lovable-auth-new-user">New here? Your account is created automatically on first sign-in.</p>
           </div>
-          <BrandSignature c={c} compact />
-        </GlowCard>
-    </AuthSurface>
+        </section>
+
+        <p className="lovable-auth-legal">
+          By continuing you agree to our <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.
+        </p>
+        <div className="lovable-auth-secured">
+          <p>Secured · End-to-end encrypted</p>
+          <a href="https://myfenrir.com" aria-label="Powered by MyFenrir">
+            <img src="/fenrir-splash-icon.svg" alt="" />
+            <span>Powered by MyFenrir</span>
+          </a>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function LovableAuthTerminal() {
+  const lines = ["fenrir --login", "establishing secure channel...", "› providers: apple · google · microsoft", "awaiting identity_"];
+  const [visibleLines, setVisibleLines] = useState(1);
+
+  useEffect(() => {
+    if (visibleLines >= lines.length) return undefined;
+    const timer = window.setTimeout(() => setVisibleLines((current) => current + 1), 420);
+    return () => window.clearTimeout(timer);
+  }, [visibleLines, lines.length]);
+
+  return (
+    <div className="lovable-auth-terminal-wrap" aria-hidden="true">
+      <div className="lovable-auth-terminal-glow" />
+      <div className="lovable-auth-terminal">
+        <div className="lovable-auth-terminal-bar">
+          <i /><i /><i />
+          <span>auth_session.sh</span>
+        </div>
+        <div className="lovable-auth-terminal-body">
+          {lines.slice(0, visibleLines).map((line, index) => (
+            <div key={line} className={`terminal-line terminal-line-${index}`}>
+              {index === 0 ? <strong>➜</strong> : null}
+              <span>{line}</span>
+              {index === visibleLines - 1 && visibleLines < lines.length ? <em /> : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -4455,19 +4480,34 @@ function LiveDomainSearchPanel({
   value,
   results,
   busy,
+  mode,
+  meta,
+  queue,
   onValue,
+  onMode,
   onSearch,
   onPick,
+  onSendPromising,
+  onClearQueue,
   onOpenRegistrar
 }: {
   value: string;
   results: DomainSearchResult[];
   busy: boolean;
+  mode: "front-door" | "exact";
+  meta: { checkedAt: string; viaFallback: boolean } | null;
+  queue: string[];
   onValue: (value: string) => void;
+  onMode: (mode: "front-door" | "exact") => void;
   onSearch: () => void;
   onPick: (domain: string) => void;
+  onSendPromising: () => void;
+  onClearQueue: () => void;
   onOpenRegistrar: (domain: string) => void;
 }) {
+  const preview = mode === "front-door" ? frontDoorCandidates(value, { limit: 6 }) : domainSearchCandidates(value).slice(0, 6);
+  const promisingCount = results.filter((result) => result.promising).length;
+
   return (
     <div className="live-domain-search" aria-label="Live domain search">
       <div className="live-domain-search-head">
@@ -4487,36 +4527,94 @@ function LiveDomainSearchPanel({
             placeholder="brand, community, or full domain"
           />
           <button type="button" disabled={busy} onClick={onSearch}>
-            {busy ? "Searching..." : "Search live"}
+            {busy ? "Checking DNS + RDAP..." : "Search live"}
           </button>
         </div>
       </div>
+
+      <div className="live-domain-search-modes" role="group" aria-label="Search mode">
+        <button
+          type="button"
+          className={`compact-button ${mode === "front-door" ? "secondary" : "ghost"}`}
+          onClick={() => onMode("front-door")}
+        >
+          Front-door variants
+        </button>
+        <button
+          type="button"
+          className={`compact-button ${mode === "exact" ? "secondary" : "ghost"}`}
+          onClick={() => onMode("exact")}
+        >
+          Exact name
+        </button>
+        {meta && (
+          <small className="muted">
+            Checked {new Date(meta.checkedAt).toLocaleTimeString()}
+            {meta.viaFallback ? " · resolved from this browser" : ""}
+          </small>
+        )}
+      </div>
+
+      {results.length > 0 && (
+        <div className="live-domain-handoff" aria-label="Wizard handoff">
+          <span className="status good">{promisingCount} clean</span>
+          <button type="button" className="compact-button" disabled={!promisingCount} onClick={onSendPromising}>
+            Send clean names to the wizard
+          </button>
+          {queue.length > 0 && (
+            <>
+              <span className="muted">Queued: {queue.join(", ")}</span>
+              <button type="button" className="ghost compact-button" onClick={onClearQueue}>
+                Clear
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="live-domain-results" aria-label="Domain search results">
-        {(results.length ? results : domainSearchCandidates(value).slice(0, 5).map((domain) => ({
-          domain,
-          status: "ready" as const,
-          summary: "Ready to check live DNS.",
-          records: []
-        }))).map((result) => (
-          <article className={`live-domain-result ${result.status}`} key={result.domain}>
-            <div>
-              <b>{result.domain}</b>
-              <span className={`status ${result.status === "dns_found" ? "amber" : result.status === "no_dns_signal" ? "good" : result.status === "ready" ? "blue" : "danger"}`}>
-                {result.status === "dns_found" ? "DNS found" : result.status === "no_dns_signal" ? "No DNS signal" : result.status === "ready" ? "Ready" : result.status}
-              </span>
-            </div>
-            <p>{result.summary}</p>
-            {result.records.length ? <small>NS: {result.records.join(" / ")}</small> : <small>Registrar check still required before purchase.</small>}
-            <div className="row-actions">
-              <button type="button" className="secondary compact-button" onClick={() => onPick(result.domain)}>
-                Use in wizard
-              </button>
-              <button type="button" className="ghost compact-button" onClick={() => onOpenRegistrar(result.domain)}>
-                Check registrar
-              </button>
-            </div>
-          </article>
-        ))}
+        {results.length
+          ? results.map((result) => {
+              const evidence = domainEvidence(result);
+              return (
+                <article className={`live-domain-result ${result.verdict}`} key={result.domain}>
+                  <div>
+                    <b>{result.domain}</b>
+                    <span className={`status ${domainVerdictTones[result.verdict]}`}>{domainVerdictLabels[result.verdict]}</span>
+                  </div>
+                  <p>{result.summary}</p>
+                  <small>{evidence || "No public DNS records."}</small>
+                  {result.flags.length > 0 && (
+                    <small className="live-domain-flags">
+                      {result.flags.map((flag) => domainFlagLabels[flag] ?? flag).join(" · ")}
+                    </small>
+                  )}
+                  <div className="row-actions">
+                    <button
+                      type="button"
+                      className="secondary compact-button"
+                      disabled={!result.promising}
+                      title={result.promising ? "Load into the domain wizard" : "Only clean, buyable names go to the wizard"}
+                      onClick={() => onPick(result.domain)}
+                    >
+                      Use in wizard
+                    </button>
+                    <button type="button" className="ghost compact-button" onClick={() => onOpenRegistrar(result.domain)}>
+                      Check registrar
+                    </button>
+                  </div>
+                </article>
+              );
+            })
+          : preview.map((domain) => (
+              <article className="live-domain-result pending" key={domain}>
+                <div>
+                  <b>{domain}</b>
+                  <span className="status blue">Not checked</span>
+                </div>
+                <p>Run the live search to query public DNS and the registry.</p>
+              </article>
+            ))}
       </div>
     </div>
   );

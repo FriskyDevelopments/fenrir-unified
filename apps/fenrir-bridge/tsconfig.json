@@ -27,7 +27,8 @@
     ]
   },
   "include": [
-    "src"
+    "src",
+    "shared"
   ],
   "references": []
 }
