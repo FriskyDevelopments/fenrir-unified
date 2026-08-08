@@ -11,8 +11,8 @@
  *   - the post-login redirect
  *   - the matching Public Gate Builder preset (presets ARE the white-label themes)
  *
- * Nothing here is a code change: adding LORE, HostCasa, ClipsFlow or one
- * specific casa is a new object in BRANDS.
+ * Nothing here is a code change: adding LORE, ClipsFlow or any other brand
+ * is a new object in BRANDS.
  */
 
 import wordmarkAsset from "@/assets/fenrir-wordmark.svg.asset.json";
@@ -142,27 +142,6 @@ export const BRANDS: BrandConfig[] = [
     links: { terms: "/terms", privacy: "/privacy" },
   },
   {
-    id: "hostcasa",
-    name: "HostCasa",
-    tagline: "One sign-in for every casa you host",
-    hosts: ["hostcasa.com", "www.hostcasa.com"],
-    logo: { alt: "HostCasa logo" },
-    theme: {
-      "--primary": "oklch(0.74 0.15 62)",
-      "--accent": "oklch(0.70 0.11 165)",
-      "--ring": "oklch(0.74 0.15 62)",
-      "--background": "oklch(0.17 0.018 70)",
-      "--card": "oklch(0.235 0.026 70)",
-      "--glow-primary": "0 0 40px -8px oklch(0.74 0.15 62 / 42%)",
-    },
-    providers: BASE_PROVIDERS,
-    community: { id: "hostcasa-hosts", label: "HostCasa hosts" },
-    redirect: { afterLogin: "/dashboard", oauthReturnPath: "/" },
-    gatePreset: "casa-warm",
-    terminalCommand: "hostcasa --login",
-    links: { terms: "/terms", privacy: "/privacy" },
-  },
-  {
     id: "clipsflow",
     name: "ClipsFlow",
     tagline: "Creator access, clip drops and role automation",
@@ -181,28 +160,6 @@ export const BRANDS: BrandConfig[] = [
     redirect: { afterLogin: "/dashboard", oauthReturnPath: "/" },
     gatePreset: "minimal",
     terminalCommand: "clipsflow --login",
-    links: { terms: "/terms", privacy: "/privacy" },
-  },
-  {
-    id: "casa-verde",
-    name: "Casa Verde",
-    tagline: "Private access for Casa Verde residents and guests",
-    hosts: ["casaverde.hostcasa.com"],
-    logo: { alt: "Casa Verde logo" },
-    theme: {
-      "--primary": "oklch(0.72 0.16 150)",
-      "--accent": "oklch(0.78 0.12 100)",
-      "--ring": "oklch(0.72 0.16 150)",
-      "--background": "oklch(0.16 0.02 160)",
-      "--card": "oklch(0.225 0.03 160)",
-      "--glow-primary": "0 0 40px -8px oklch(0.72 0.16 150 / 42%)",
-    },
-    // A single casa may deliberately narrow the provider set.
-    providers: ["apple", "google"],
-    community: { id: "casa-verde", label: "Casa Verde" },
-    redirect: { afterLogin: "/dashboard", oauthReturnPath: "/" },
-    gatePreset: "casa-warm",
-    terminalCommand: "casa --unlock",
     links: { terms: "/terms", privacy: "/privacy" },
   },
 ];

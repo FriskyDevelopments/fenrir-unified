@@ -52,8 +52,7 @@ Lo mismo para los handlers globales: `process.on("uncaughtException")` y
 de Node no dan — la petición que provocó el fallo.
 
 > Donde la guía **sí** aplica tal cual es en los bots de Python (ClipsFlow,
-> friskyclaw) y en el servidor de HostCasa. Ahí sí hay proceso de larga vida,
-> cola y `shutdown()`.
+> friskyclaw). Ahí sí hay proceso de larga vida, cola y `shutdown()`.
 
 ### 1.3 `$ai_generation`: hoy no hay nada que envolver en este repo
 

@@ -344,7 +344,7 @@ function TenantForm({ draft, saving, onChange, onCancel, onSave }: TenantFormPro
           <Input
             value={draft.brand_id}
             onChange={(e) => set("brand_id", e.target.value)}
-            placeholder="casa-verde"
+            placeholder="lore-archive"
           />
         </Field>
         <Field label="Product name">
@@ -365,14 +365,14 @@ function TenantForm({ draft, saving, onChange, onCancel, onSave }: TenantFormPro
                   .filter(Boolean),
               )
             }
-            placeholder="casaverde.hostcasa.com"
+            placeholder="portal.lore.myfenrir.com"
           />
         </Field>
         <Field label="Community id (tenant isolation key)">
           <Input
             value={draft.community_id}
             onChange={(e) => set("community_id", e.target.value)}
-            placeholder="casa-verde"
+            placeholder="lore-archive"
           />
         </Field>
         <Field label="Community label">
