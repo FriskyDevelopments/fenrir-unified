@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import type { Copy, Locale } from "../i18n";
+import { copy, type Copy, type Locale } from "../i18n";
 import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, LiveRoomProvider, Plan } from "../services/types";
 import type { AuthSession, BillingStatusPayload, PaidPlan, ReadinessPayload, TelegramIdentityLinkPayload } from "../services/api";
 import type { CommunityAuthProposal } from "../services/communityAuth";
 import { brandThemes } from "../theme/brandThemes";
 import {
+  absoluteUrl,
   confettiPieces,
   defaultDomainTags,
   domainSearchCandidates,
@@ -13,6 +14,7 @@ import {
   friskySignalDevRequestUrl,
   liveRoomProviders,
   lookupDomainDns,
+  openAnyUrl,
   openSafeUrl,
   providerLogoPresets,
   safeHttpUrl,
@@ -95,7 +97,7 @@ export function SessionLabels({
   telegramIdentity: TelegramIdentityLinkPayload | null;
   onLinkTelegram: () => void;
   c: Copy;
-  ui: typeof uiCopy[Locale];
+  ui: UiCopy;
 }) {
   const activeLocks = state.bridges.filter((bridge) => bridge.status === "active").length;
   const backendLimit = billingStatus?.limits.maxTelegramLocks;
@@ -533,6 +535,8 @@ export function AccountServicePanel({
   subdomain,
   mode,
   checkoutPlan,
+  courtesyCode,
+  onCourtesyCode,
   onEmail,
   onOrg,
   onTelegram,
@@ -547,6 +551,8 @@ export function AccountServicePanel({
   subdomain: string;
   mode: "create" | "link" | null;
   checkoutPlan: PaidPlan;
+  courtesyCode: string;
+  onCourtesyCode: (value: string) => void;
   onEmail: (value: string) => void;
   onOrg: (value: string) => void;
   onTelegram: (value: string) => void;
@@ -581,6 +587,11 @@ export function AccountServicePanel({
           <span className="status amber">{c.stripeMode}</span>
           <h3>{checkoutPlan.charAt(0).toUpperCase() + checkoutPlan.slice(1)}</h3>
           <p>{c.checkoutReady}</p>
+          <label className="courtesy-code-field">
+            <span>Courtesy code (optional)</span>
+            <input value={courtesyCode} onChange={(event) => onCourtesyCode(event.target.value.toUpperCase())} placeholder="MYFENRIR-COURTESY" autoComplete="off" />
+            <small>Single-use admin courtesy. Leave blank for normal checkout.</small>
+          </label>
           <div className="stars-bridge">
             <span className="status good">{c.starsMode}</span>
             <p>{c.starsCheckoutBody}</p>

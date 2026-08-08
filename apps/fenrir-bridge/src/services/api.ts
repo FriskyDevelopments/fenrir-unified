@@ -595,10 +595,10 @@ export const billingService = {
   async getStatus(): Promise<BillingStatusPayload> {
     return apiRequest<BillingStatusPayload>("/api/billing/status");
   },
-  async checkout(plan: PaidPlan): Promise<{ ok: true; url: string }> {
+  async checkout(plan: PaidPlan, courtesyCode?: string): Promise<{ ok: true; url: string }> {
     return apiRequest<{ ok: true; url: string }>("/api/billing/checkout", {
       method: "POST",
-      body: JSON.stringify({ plan })
+      body: JSON.stringify({ plan, ...(courtesyCode ? { courtesyCode } : {}) })
     });
   },
   async portal(): Promise<{ ok: true; url: string }> {

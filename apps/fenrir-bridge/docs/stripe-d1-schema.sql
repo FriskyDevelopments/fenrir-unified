@@ -28,6 +28,24 @@ CREATE TABLE IF NOT EXISTS billing_subscriptions (
 CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_org
   ON billing_subscriptions (frisky_org_id);
 
+CREATE TABLE IF NOT EXISTS billing_courtesy_redemptions (code TEXT PRIMARY KEY, frisky_org_id TEXT NOT NULL, frisky_user_id TEXT NOT NULL, redeemed_at TEXT NOT NULL);
+
+CREATE TABLE IF NOT EXISTS billing_courtesy_codes (
+  code TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  courtesy_type TEXT NOT NULL CHECK (courtesy_type IN ('card','non_card')),
+  duration_days INTEGER NOT NULL,
+  community_name TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'unused' CHECK (status IN ('unused','redeemed','expired','revoked')),
+  redeemed_at TEXT,
+  redeemed_by_user_id TEXT,
+  created_at TEXT NOT NULL,
+  expires_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_billing_courtesy_codes_email ON billing_courtesy_codes (email);
+
 CREATE TABLE IF NOT EXISTS stripe_events (
   id TEXT PRIMARY KEY,
   received_at TEXT NOT NULL

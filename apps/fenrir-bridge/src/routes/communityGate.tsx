@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { copy, type Copy, type Locale } from "../i18n";
 import { AuthSurface } from "../components/AuthSurface";
 import { GlowCard } from "../components/GlowCard";
@@ -15,8 +15,27 @@ import {
   type DefaultAccessState
 } from "../services/communityAuth";
 import type { UiCopy } from "../app/uiCopy";
+import { vercelPreviewWithoutApi } from "../app/shared";
 import { communityBridgeDashboardUrl } from "../services/communityBridge";
 import { PanelTitle } from "./routeCommon";
+import { CommunityAuthProposalPanel } from "./dashboardPanels";
+
+function readableCommunityError(detail: unknown, fallback?: string) {
+  if (detail && typeof detail === "object" && "message" in detail && typeof detail.message === "string") return detail.message;
+  if (typeof detail === "string") return detail;
+  return fallback || "Community Gate is not ready yet.";
+}
+
+function communityBrandAdminErrorMessage(error: unknown) {
+  if (!(error instanceof CommunityBrandRequestError)) {
+    return "Network/API failure. The brand workspace could not be loaded.";
+  }
+  if (error.status === 401 || error.error === "authentication_required") return "Not signed in. Sign in to the Fenrir admin before customizing this Community Gate.";
+  if (error.status === 403 || error.error === "forbidden") return "Forbidden. Your account is not an owner or allowlisted admin for this Community Gate.";
+  if (error.status === 503 || error.error === "community_auth_not_configured") return readableCommunityError(error.detail, "Missing Community Gate config. Firebase Auth handles sign-in; Neon is only the gate data plane.");
+  if (error.error === "community_gate_schema_missing") return "Missing Neon schema. Apply the Community Gate schema before customizing this gate.";
+  return `Community Gate load failed: ${error.error || `HTTP ${error.status}`}.`;
+}
 
 function mergeNeonBrandTheme(base: typeof brandThemes.neonNexus, brand: CommunityBrandPayload | null) {
   if (!brand) return base;
@@ -160,11 +179,11 @@ export function CommunityBridgeHandoffPanel() {
       </div>
       <div className="community-bridge-handoff-body">
         <p>
-          Build and manage your community gates in the Community Bridge dashboard.
+          Start with the guided Community Bridge walkthrough and gate wizard, then manage everything from its dashboard.
           Fenrir keeps the door; Neon keeps the member state.
         </p>
         <div className="community-bridge-handoff-actions">
-          <a className="button-link" href={communityBridgeDashboardUrl}>Open Community Bridge →</a>
+          <a className="button-link" href={communityBridgeDashboardUrl}>Open Community Bridge walkthrough →</a>
         </div>
       </div>
     </section>

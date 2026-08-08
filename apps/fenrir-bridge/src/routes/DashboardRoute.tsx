@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { startRegistration } from "@simplewebauthn/browser";
-import { copy, type Copy, type Locale } from "../i18n";
+import { copy, detectLocale, languageNames, locales, type Copy, type Locale } from "../i18n";
 import {
   aiOpsService,
   appService,
@@ -24,12 +24,20 @@ import type { AppState, FriskyBridge, FriskyDomain, FriskyLiveRoom, LiveRoomProv
 import { communityBridgeDashboardUrl } from "../services/communityBridge";
 import { uiCopy, type UiCopy } from "../app/uiCopy";
 import {
+  addDomainTag,
+  commissionUrlSlug,
+  defaultDomainTags,
   defaultServiceOrg,
   defaultServiceSubdomain,
   domainSearchCandidates,
+  domainTagPresets,
+  findCommissionLink,
   friskySignalDevRequestUrl,
+  legalRoutes,
   liveRoomProviders,
   lookupDomainDns,
+  managedDashboardPath,
+  openAnyUrl,
   openSafeUrl,
   pageKeys,
   parseDomainTags,
@@ -42,9 +50,11 @@ import {
   type PersonalLink,
   type VaultLink
 } from "../app/shared";
-import { activePageFromLocation, dashboardPathFor, paidPlanFromProductLabel } from "../app/routing";
-import { CommunityBridgeHandoffPanel } from "./communityGate";
-import { ProtocolActivated } from "./publicRoutes";
+import { activePageFromLocation, dashboardPathFor, isAuthCallbackPath, paidPlanFromProductLabel } from "../app/routing";
+import { CommunityBridgeHandoffPanel, CommunityNeonGateRoute } from "./communityGate";
+import { FriskyBotOsRoute, FriskyGhostRoute, GoRoutePage, ProtocolActivated, PublicBridgeRoute, PublicRoomRoute } from "./publicRoutes";
+import { AuthGate } from "./authGate";
+import { LegalPage } from "./legalPage";
 import {
   AccountServicePanel,
   AuditLog,
@@ -59,6 +69,8 @@ import {
   ExampleDiagramCard,
   FaqPanel,
   FenrirSilhouette,
+  friendlyAccountLabel,
+  KeyValue,
   LaunchWowConsole,
   LinkVaultPanel,
   LiveDomainSearchPanel,
@@ -74,7 +86,7 @@ import {
   SetupInboxWizard,
   roomProviderPlaceholder
 } from "./dashboardPanels";
-import { buildVaultLinks } from "./vaultRoutes";
+import { buildVaultLinks, createVaultShareUrl, decodeVaultLinks, PublicVaultPage } from "./vaultRoutes";
 
 export function DashboardRoute() {
   const path = window.location.pathname;
@@ -110,6 +122,7 @@ export function DashboardRoute() {
   const [serviceSubdomain, setServiceSubdomain] = useState(defaultServiceSubdomain);
   const [serviceMode, setServiceMode] = useState<"create" | "link" | null>(null);
   const [checkoutPlan, setCheckoutPlan] = useState<PaidPlan>("starter");
+  const [courtesyCode, setCourtesyCode] = useState("");
   const [personalLinks, setPersonalLinks] = useState<PersonalLink[]>([]);
   const [personalTitle, setPersonalTitle] = useState("");
   const [personalUrl, setPersonalUrl] = useState("");
@@ -491,7 +504,7 @@ export function DashboardRoute() {
     setCheckoutPlan(plan);
     navigateActive("billing");
     try {
-      const { url } = await billingService.checkout(plan);
+      const { url } = await billingService.checkout(plan, courtesyCode);
       window.location.assign(url);
     } catch {
       setNotice(copy[locale].checkoutErrorGeneric);
@@ -840,6 +853,8 @@ export function DashboardRoute() {
             subdomain={serviceSubdomain}
             mode={serviceMode}
             checkoutPlan={checkoutPlan}
+            courtesyCode={courtesyCode}
+            onCourtesyCode={setCourtesyCode}
             onEmail={setServiceEmail}
             onOrg={setServiceOrg}
             onTelegram={setServiceTelegram}

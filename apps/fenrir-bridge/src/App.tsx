@@ -1074,6 +1074,7 @@ export function App() {
   const [serviceSubdomain, setServiceSubdomain] = useState(defaultServiceSubdomain);
   const [serviceMode, setServiceMode] = useState<"create" | "link" | null>(null);
   const [checkoutPlan, setCheckoutPlan] = useState<PaidPlan>("starter");
+  const [courtesyCode, setCourtesyCode] = useState("");
   const [personalLinks, setPersonalLinks] = useState<PersonalLink[]>([]);
   const [personalTitle, setPersonalTitle] = useState("");
   const [personalUrl, setPersonalUrl] = useState("");
@@ -1490,7 +1491,7 @@ export function App() {
     setCheckoutPlan(plan);
     navigateActive("billing");
     try {
-      const { url } = await billingService.checkout(plan);
+      const { url } = await billingService.checkout(plan, courtesyCode);
       window.location.assign(url);
     } catch {
       setNotice(copy[locale].checkoutErrorGeneric);
@@ -1840,6 +1841,8 @@ export function App() {
             subdomain={serviceSubdomain}
             mode={serviceMode}
             checkoutPlan={checkoutPlan}
+            courtesyCode={courtesyCode}
+            onCourtesyCode={setCourtesyCode}
             onEmail={setServiceEmail}
             onOrg={setServiceOrg}
             onTelegram={setServiceTelegram}
@@ -3872,6 +3875,8 @@ function AccountServicePanel({
   subdomain,
   mode,
   checkoutPlan,
+  courtesyCode,
+  onCourtesyCode,
   onEmail,
   onOrg,
   onTelegram,
@@ -3886,6 +3891,8 @@ function AccountServicePanel({
   subdomain: string;
   mode: "create" | "link" | null;
   checkoutPlan: PaidPlan;
+  courtesyCode: string;
+  onCourtesyCode: (value: string) => void;
   onEmail: (value: string) => void;
   onOrg: (value: string) => void;
   onTelegram: (value: string) => void;
@@ -3913,6 +3920,10 @@ function AccountServicePanel({
           <label>
             <span>{c.serviceDomain}</span>
             <input value={subdomain} onChange={(event) => onSubdomain(event.target.value)} />
+          </label>
+          <label>
+            <span>Admin courtesy code (optional)</span>
+            <input value={courtesyCode} onChange={(event) => onCourtesyCode(event.target.value)} placeholder="One-use code" autoComplete="off" />
           </label>
         </div>
 

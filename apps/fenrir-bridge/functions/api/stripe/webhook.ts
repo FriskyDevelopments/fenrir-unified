@@ -9,6 +9,7 @@ import {
 } from "../../_lib/billing-db";
 import { assertPaidPlanMetadata, paidPlanFromStripePriceId } from "../../_lib/plan-catalog";
 import { constructStripeWebhookEvent, getStripe } from "../../_lib/stripe";
+import { sendBillingEmail } from "../../_lib/transactional-email";
 
 function subscriptionCustomerId(sub: Stripe.Subscription) {
   return typeof sub.customer === "string" ? sub.customer : sub.customer.id;
@@ -89,6 +90,7 @@ async function handleCheckoutSessionCompleted(env: BillingEnv, stripe: Stripe, s
 
   const sub = await stripe.subscriptions.retrieve(subId);
   await persistSubscriptionFromStripe(env, stripe, sub, orgId);
+  if (email) await sendBillingEmail(env, { to: email, subject: "Welcome to MyFenrir · Access granted", title: "Welcome to the Pack", body: "Your MyFenrir subscription is active and your community access is ready.", status: "ACCESS GRANTED", detail: "Plan: " + metaPlan + " · Payment method saved securely by Stripe" });
 }
 
 async function handleInvoicePaymentFailed(env: BillingEnv, stripe: Stripe, invoice: Stripe.Invoice) {
@@ -97,6 +99,8 @@ async function handleInvoicePaymentFailed(env: BillingEnv, stripe: Stripe, invoi
   if (!subId) return;
   const sub = await stripe.subscriptions.retrieve(subId);
   await persistSubscriptionFromStripe(env, stripe, sub);
+  const email = typeof invoice.customer_email === "string" ? invoice.customer_email : "";
+  if (email) await sendBillingEmail(env, { to: email, subject: "MyFenrir · Payment needs attention", title: "Payment needs attention", body: "Your latest payment could not be completed. Your access may be affected if the payment is not updated.", status: "PAYMENT ACTION", detail: "Open your Stripe billing portal to update your payment method." });
 }
 
 export async function onRequestPost(context: { request: Request; env: BillingEnv }) {

@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
+import { lazy, Suspense, type ComponentType, type JSX, type ReactNode } from "react";
 import type { Copy, Locale } from "../i18n";
 import type { FriskyCommissionLink } from "../services/types";
 import type { UiCopy } from "../app/uiCopy";
@@ -96,7 +96,7 @@ export type AuthGateProps = {
   onLocale: (locale: Locale) => void;
 };
 
-export function renderLazy<P>(Component: ComponentType<P>, props: P) {
+export function renderLazy<P extends JSX.IntrinsicAttributes>(Component: ComponentType<P>, props: P) {
   return (
     <LazyRoute>
       <Component {...props} />
