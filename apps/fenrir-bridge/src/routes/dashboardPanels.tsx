@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import type { Copy, Locale } from "../i18n";
+import { copy, type Copy, type Locale } from "../i18n";
 import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, LiveRoomProvider, Plan } from "../services/types";
 import type { AuthSession, BillingStatusPayload, PaidPlan, ReadinessPayload, TelegramIdentityLinkPayload } from "../services/api";
 import type { CommunityAuthProposal } from "../services/communityAuth";
 import { brandThemes } from "../theme/brandThemes";
 import {
+  absoluteUrl,
   confettiPieces,
   defaultDomainTags,
   domainSearchCandidates,
@@ -13,6 +14,7 @@ import {
   friskySignalDevRequestUrl,
   liveRoomProviders,
   lookupDomainDns,
+  openAnyUrl,
   openSafeUrl,
   providerLogoPresets,
   safeHttpUrl,
@@ -95,7 +97,7 @@ export function SessionLabels({
   telegramIdentity: TelegramIdentityLinkPayload | null;
   onLinkTelegram: () => void;
   c: Copy;
-  ui: typeof uiCopy[Locale];
+  ui: UiCopy;
 }) {
   const activeLocks = state.bridges.filter((bridge) => bridge.status === "active").length;
   const backendLimit = billingStatus?.limits.maxTelegramLocks;

@@ -1,10 +1,18 @@
 import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from "@simplewebauthn/browser";
+import {
+  domainSearchCandidates,
+  frontDoorCandidates,
+  promisingResults,
+  rankResults,
+  searchDomains,
+  type DomainSearchResult
+} from "../../shared/domain-search";
 import { copy } from "../i18n";
 import { addBridge, addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
 // Auth broker is WorkOS AuthKit. The hosted flow mints the Fenrir session
 // cookie server-side in /api/auth/callback/workos, so the client no longer
 // performs any token exchange after the redirect (directAuthOrigin is declared below).
-import type { AppState, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck } from "./types";
+import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck } from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
 export const defaultBillingCheckoutErrorMessage = copy.en.checkoutErrorGeneric;
@@ -21,6 +29,18 @@ const telegramBotUsername = () =>
 const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? "").trim().replace(/\/$/, "");
 
 export type PaidPlan = Exclude<Plan, "free">;
+
+export type DomainSearchResponse = {
+  ok: true;
+  mode: "front-door" | "exact";
+  checked: number;
+  results: DomainSearchResult[];
+  /** Clean, buyable names — the ones the wizard should offer to register. */
+  promising: string[];
+  checkedAt: string;
+  viaBrowserFallback?: true;
+  fallbackReason?: string;
+};
 
 export type BillingLimits = {
   maxTelegramLocks: number | null;
@@ -416,6 +436,42 @@ export const appService = {
 };
 
 export const domainService = {
+  /**
+   * Live availability sweep: public DNS (DoH) + registry (RDAP), server-side so the
+   * resolvers see one origin instead of every visitor's browser.
+   */
+  async search(input: { seed: string; mode: "front-door" | "exact"; limit?: number }) {
+    try {
+      return await apiRequest<DomainSearchResponse>("/api/domains/search", {
+        method: "POST",
+        body: JSON.stringify(input)
+      });
+    } catch (error) {
+      // Falling back to the browser keeps the check LIVE (same module, same sources)
+      // rather than degrading to a placeholder result.
+      const candidates =
+        input.mode === "front-door"
+          ? frontDoorCandidates(input.seed, { limit: input.limit ?? 12 })
+          : domainSearchCandidates(input.seed).slice(0, input.limit ?? 12);
+      if (!candidates.length) {
+        return {
+          ok: false as const,
+          error: { code: "no_candidates", message: "Enter a brand word or a full domain first." }
+        };
+      }
+      const results = rankResults(await searchDomains(candidates, { concurrency: 4 }));
+      return {
+        ok: true as const,
+        mode: input.mode,
+        checked: results.length,
+        results,
+        promising: promisingResults(results).map((result) => result.domain),
+        checkedAt: new Date().toISOString(),
+        viaBrowserFallback: true as const,
+        fallbackReason: error instanceof Error ? error.message : "api_unavailable"
+      };
+    }
+  },
   async create(domain: string) {
     return apiRequest<{ ok: true; data: AppState["domains"][number] }>("/api/domains", {
       method: "POST",
@@ -431,6 +487,12 @@ export const domainService = {
     } catch (error) {
       return { ok: false as const, error: { code: "dns_check_failed", message: error instanceof Error ? error.message : "DNS check failed." } };
     }
+  }
+};
+
+export const communitySecurityService = {
+  async getReport(communitySlug: string = "fenrir"): Promise<{ ok: true; data: CommunitySecurityReport }> {
+    return apiRequest<{ ok: true; data: CommunitySecurityReport }>(`/api/community-gate/admin/security-report?communitySlug=${encodeURIComponent(communitySlug)}`);
   }
 };
 

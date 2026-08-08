@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { startRegistration } from "@simplewebauthn/browser";
-import { copy, type Copy, type Locale } from "../i18n";
+import { copy, detectLocale, languageNames, locales, type Copy, type Locale } from "../i18n";
 import {
   aiOpsService,
   appService,
@@ -24,12 +24,20 @@ import type { AppState, FriskyBridge, FriskyDomain, FriskyLiveRoom, LiveRoomProv
 import { communityBridgeDashboardUrl } from "../services/communityBridge";
 import { uiCopy, type UiCopy } from "../app/uiCopy";
 import {
+  addDomainTag,
+  commissionUrlSlug,
+  defaultDomainTags,
   defaultServiceOrg,
   defaultServiceSubdomain,
   domainSearchCandidates,
+  domainTagPresets,
+  findCommissionLink,
   friskySignalDevRequestUrl,
+  legalRoutes,
   liveRoomProviders,
   lookupDomainDns,
+  managedDashboardPath,
+  openAnyUrl,
   openSafeUrl,
   pageKeys,
   parseDomainTags,
@@ -42,9 +50,11 @@ import {
   type PersonalLink,
   type VaultLink
 } from "../app/shared";
-import { activePageFromLocation, dashboardPathFor, paidPlanFromProductLabel } from "../app/routing";
-import { CommunityBridgeHandoffPanel } from "./communityGate";
-import { ProtocolActivated } from "./publicRoutes";
+import { activePageFromLocation, dashboardPathFor, isAuthCallbackPath, paidPlanFromProductLabel } from "../app/routing";
+import { CommunityBridgeHandoffPanel, CommunityNeonGateRoute } from "./communityGate";
+import { FriskyBotOsRoute, FriskyGhostRoute, GoRoutePage, ProtocolActivated, PublicBridgeRoute, PublicRoomRoute } from "./publicRoutes";
+import { AuthGate } from "./authGate";
+import { LegalPage } from "./legalPage";
 import {
   AccountServicePanel,
   AuditLog,
@@ -59,6 +69,8 @@ import {
   ExampleDiagramCard,
   FaqPanel,
   FenrirSilhouette,
+  friendlyAccountLabel,
+  KeyValue,
   LaunchWowConsole,
   LinkVaultPanel,
   LiveDomainSearchPanel,
@@ -74,7 +86,7 @@ import {
   SetupInboxWizard,
   roomProviderPlaceholder
 } from "./dashboardPanels";
-import { buildVaultLinks } from "./vaultRoutes";
+import { buildVaultLinks, createVaultShareUrl, decodeVaultLinks, PublicVaultPage } from "./vaultRoutes";
 
 export function DashboardRoute() {
   const path = window.location.pathname;

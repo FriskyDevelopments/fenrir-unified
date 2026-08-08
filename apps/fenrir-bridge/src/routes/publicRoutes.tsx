@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Copy } from "../i18n";
-import { bridgeService, liveRoomService } from "../services/api";
-import type { FriskyBridge, FriskyCommissionLink, FriskyLiveRoom, FriskyTelegramInvite } from "../services/types";
-import { absoluteUrl, commissionFallbackBySlug, openAnyUrl, resolveCommissionDestination, trustedFenrirImageUrl } from "../app/shared";
+import { bridgeService, liveRoomService, type AuthSession, type BillingStatusPayload, type PaidPlan, type TelegramIdentityLinkPayload } from "../services/api";
+import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyLiveRoom, FriskyTelegramInvite, Plan } from "../services/types";
+import { absoluteUrl, commissionFallbackBySlug, openAnyUrl, resolveCommissionDestination, trustedFenrirImageUrl, type FenrirRole } from "../app/shared";
 import type { UiCopy } from "../app/uiCopy";
 import { GroupAvatar, providerLabel } from "./routeCommon";
 import { GlowCard } from "../components/GlowCard";
@@ -206,7 +206,7 @@ function BetaPreviewControls({
   );
 }
 
-function PublicBridgeRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy }) {
+export function PublicBridgeRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy }) {
   const [resolved, setResolved] = useState<{ bridge: FriskyBridge; invite: FriskyTelegramInvite | null } | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -258,7 +258,7 @@ function PublicBridgeRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy 
   );
 }
 
-function PublicRoomRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy }) {
+export function PublicRoomRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy }) {
   const [room, setRoom] = useState<FriskyLiveRoom | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -327,7 +327,7 @@ function PublicRoomRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy })
   );
 }
 
-function ProtocolActivated() {
+export function ProtocolActivated() {
   return (
     <div className="protocol-activated" aria-live="polite">
       <div className="lightning-mark" aria-hidden="true">
@@ -343,7 +343,7 @@ function ProtocolActivated() {
   );
 }
 
-function FriskyGhostRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
+export function FriskyGhostRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
   const theme = brandThemes.friskyGhost;
   return (
     <main className={`product-route ghost-route ${themeClassName(theme)}`} style={themeCssVars(theme)} data-theme={theme.key}>
@@ -360,7 +360,7 @@ function FriskyGhostRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
   );
 }
 
-function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
+export function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
   const theme = brandThemes.friskyGhost;
   const botModules = [
     {
