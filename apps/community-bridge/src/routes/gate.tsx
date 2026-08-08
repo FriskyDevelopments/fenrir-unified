@@ -5,6 +5,7 @@ import { ArrowLeft, Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { GateForm, SLUG_PATTERN, slugify, useSlugAvailability } from "@/components/gate/gate-form";
+import { CommunityStandardsStep, hasAcceptedStandards } from "@/components/gate/community-standards-step";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/config/brand-context";
 import { createGate } from "@/lib/gate.functions";
@@ -45,6 +46,13 @@ function NewGatePage() {
 
   const [config, setConfig] = useState<GateConfig>({ slug: "", ...DEFAULT_GATE });
   const [saving, setSaving] = useState(false);
+  // Se muestran una vez por navegador, y siempre en el primer arranque guiado
+  // (?onboarding=1 desde el dashboard de MyFenrir).
+  const [showStandards, setShowStandards] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const guided = new URLSearchParams(window.location.search).get("onboarding") === "1";
+    return guided || !hasAcceptedStandards();
+  });
   const slugStatus = useSlugAvailability(config.slug);
 
   useEffect(() => {
@@ -92,6 +100,16 @@ function NewGatePage() {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Las normas van ANTES del builder: quien abre una puerta debe saber qué se
+  // hace cumplir del otro lado antes de tener una puerta que administrar.
+  if (showStandards) {
+    return (
+      <div className="min-h-dvh bg-background">
+        <CommunityStandardsStep onAccept={() => setShowStandards(false)} />
       </div>
     );
   }
