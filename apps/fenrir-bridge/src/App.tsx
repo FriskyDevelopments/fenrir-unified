@@ -24,6 +24,7 @@ import {
 import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan } from "./services/types";
 import { AuthProviderButton } from "./components/AuthProviderButton";
 import { AuthSurface } from "./components/AuthSurface";
+import { CinematicLanding } from "./components/CinematicLanding";
 import { GlowCard } from "./components/GlowCard";
 import { TelegramLoginWidget } from "./components/TelegramLoginWidget";
 import { brandThemes, themeClassName, themeCssVars } from "./theme/brandThemes";
@@ -1267,6 +1268,10 @@ export function App() {
   if (roomMatch) {
     const slug = decodeURIComponent(roomMatch[1]);
     return <PublicRoomRoute slug={slug} c={c} ui={ui} />;
+  }
+
+  if (path === "/") {
+    return <CinematicLanding />;
   }
 
   if (!auth) {
@@ -2699,54 +2704,35 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
   return (
     <section className="panel wide community-brand-wizard">
       <PanelTitle title="Community Gate Builder" subtitle="Customize the public gate people use before Neon decides access." />
-      <div className="community-gate-walkthrough" aria-label="Community Gate walkthrough">
-        <div className="community-gate-walkthrough-head">
-          <span className="status good">Community Gate walkthrough</span>
-          <h3>How the gate protects and grows the community.</h3>
-          <p>
-            Use this before styling: it explains the setup, the access flow, the subscription value,
-            and what Neon owns behind the scenes.
-          </p>
-        </div>
-        <div className="community-gate-walkthrough-grid">
-          {communityGateWalkthrough.map((item, index) => (
-            <article key={item.label}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <b>{item.label}</b>
-              <h4>{item.title}</h4>
-              <p>{item.body}</p>
-            </article>
-          ))}
-        </div>
-        <div className="community-gate-flow" aria-label="Community Gate access flow">
-          {[
-            "Visitor opens branded gate",
-            "Identity proof",
-            "Neon membership check",
-            "Approve, review, or block",
-            "Audit trail stays separate"
-          ].map((item, index) => (
-            <span key={item}>{index + 1}. {item}</span>
-          ))}
-        </div>
-        <div className="community-gate-wow" aria-label="Community Gate subscription value">
-          <div>
-            <span>Gate</span>
-            <b>Branded entry</b>
-            <small>Logo, colors, copy, and trusted login in one public URL.</small>
+      <details className="community-gate-guide">
+        <summary>
+          <span>How Community Gate works</span>
+          <small>Fenrir handles the branded door. Neon owns member truth.</small>
+        </summary>
+        <div className="community-gate-guide-body">
+          <div className="community-gate-walkthrough-grid">
+            {communityGateWalkthrough.map((item, index) => (
+              <article key={item.label}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <b>{item.label}</b>
+                <h4>{item.title}</h4>
+                <p>{item.body}</p>
+              </article>
+            ))}
           </div>
-          <div>
-            <span>Neon</span>
-            <b>Member truth</b>
-            <small>Membership, invite status, review state, and audit history stay isolated.</small>
-          </div>
-          <div>
-            <span>Subscribe</span>
-            <b>Paid community ready</b>
-            <small>Unlock private gates, review workflows, safer onboarding, and upgrade paths.</small>
+          <div className="community-gate-flow" aria-label="Community Gate access flow">
+            {[
+              "Branded gate",
+              "Identity proof",
+              "Neon member check",
+              "Approve or block",
+              "Separate audit trail"
+            ].map((item, index) => (
+              <span key={item}>{index + 1}. {item}</span>
+            ))}
           </div>
         </div>
-      </div>
+      </details>
       <div className="brand-wizard-layout">
         <div className="brand-wizard-main">
           <div className="brand-wizard-overview" aria-label="Current Community Gate setup">
@@ -3005,35 +2991,41 @@ function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNot
           </div>
         </div>
 
-        <aside className="brand-wizard-preview" aria-label="Public gate preview">
-          <AuthSurface
-            theme={previewTheme}
-            locale={locale}
-            onLocale={() => {}}
-            railLabel="Preview"
-            logoUrl={previewBrand.logo_url}
-            backgroundUrl={previewBrand.background_url}
-          >
-            <GlowCard className="auth-card" aria-label="Community gate preview">
-              <div className="auth-card-header">
-                <span className="status good">Preview</span>
-                <span className="auth-card-kicker">/{slug}</span>
-              </div>
-              <h2 className="auth-enter-title">
-                <span>{previewBrand.headline}</span>
-              </h2>
-              <p className="muted">{previewBrand.subheadline}</p>
-              <div className="brand-wizard-preview-style" aria-label="Selected visual style">
-                <span style={{ background: previewBrand.primary_color }} />
-                <span style={{ background: previewBrand.secondary_color }} />
-                <span style={{ background: previewBrand.accent_color }} />
-              </div>
-              <div className="brand-wizard-preview-meta">
-                <span>{previewBrand.default_access_state.replace("_", " ")}</span>
-                <span>{selectedProviders || "Magic link"}</span>
-              </div>
-            </GlowCard>
-          </AuthSurface>
+        <aside className="brand-wizard-preview-column" aria-label="Public gate preview">
+          <div className="brand-wizard-preview-toolbar">
+            <span>Live preview</span>
+            <a href={publicGatePath} target="_blank" rel="noreferrer">Open gate ↗</a>
+          </div>
+          <div className="brand-wizard-preview">
+            <AuthSurface
+              theme={previewTheme}
+              locale={locale}
+              onLocale={() => {}}
+              railLabel="Preview"
+              logoUrl={previewBrand.logo_url}
+              backgroundUrl={previewBrand.background_url}
+            >
+              <GlowCard className="auth-card" aria-label="Community gate preview">
+                <div className="auth-card-header">
+                  <span className="status good">Preview</span>
+                  <span className="auth-card-kicker">/{slug}</span>
+                </div>
+                <h2 className="auth-enter-title">
+                  <span>{previewBrand.headline}</span>
+                </h2>
+                <p className="muted">{previewBrand.subheadline}</p>
+                <div className="brand-wizard-preview-style" aria-label="Selected visual style">
+                  <span style={{ background: previewBrand.primary_color }} />
+                  <span style={{ background: previewBrand.secondary_color }} />
+                  <span style={{ background: previewBrand.accent_color }} />
+                </div>
+                <div className="brand-wizard-preview-meta">
+                  <span>{previewBrand.default_access_state.replace("_", " ")}</span>
+                  <span>{selectedProviders || "Magic link"}</span>
+                </div>
+              </GlowCard>
+            </AuthSurface>
+          </div>
         </aside>
       </div>
     </section>
