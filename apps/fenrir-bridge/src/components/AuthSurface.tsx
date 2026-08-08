@@ -21,6 +21,7 @@ type AuthSurfaceProps = {
 };
 
 const SHADER_BY_BACKGROUND: Record<BrandTheme["background"], ShaderKind> = {
+  ghost: "clouds",
   protocol: "grid",
   nexus: "shader",
   experimental: "ember"

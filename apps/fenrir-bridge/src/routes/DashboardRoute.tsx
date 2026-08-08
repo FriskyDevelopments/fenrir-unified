@@ -21,6 +21,7 @@ import {
   type TelegramIdentityLinkPayload
 } from "../services/api";
 import type { AppState, FriskyBridge, FriskyDomain, FriskyLiveRoom, LiveRoomProvider, Plan } from "../services/types";
+import { communityBridgeDashboardUrl } from "../services/communityBridge";
 import { uiCopy, type UiCopy } from "../app/uiCopy";
 import {
   defaultServiceOrg,
@@ -42,7 +43,7 @@ import {
   type VaultLink
 } from "../app/shared";
 import { activePageFromLocation, dashboardPathFor, paidPlanFromProductLabel } from "../app/routing";
-import { CommunityBrandWizardPanel } from "./communityGate";
+import { CommunityBridgeHandoffPanel } from "./communityGate";
 import { ProtocolActivated } from "./publicRoutes";
 import {
   AccountServicePanel,
@@ -732,7 +733,7 @@ export function DashboardRoute() {
             roomProvider={roomProviderInput}
             onDomain={() => navigateActive("domains")}
             onRoom={() => navigateActive("rooms")}
-            onCommunity={() => { window.location.assign("https://gate.myfenrir.com/dashboard"); }}
+            onCommunity={() => window.location.assign(communityBridgeDashboardUrl)}
           />
         )}
 
@@ -784,7 +785,7 @@ export function DashboardRoute() {
         </section>
 
         {show("billing") && <ProductionReadinessPanel c={c} readiness={readiness} loadFailed={readinessError} />}
-        {show("command", "brands") && <CommunityBrandWizardPanel locale={locale} onNotice={setNotice} />}
+        {show("command", "brands") && <CommunityBridgeHandoffPanel />}
 
         <div className="content-grid">
           {show("command", "locks", "telegram") && <section className="panel wide">
