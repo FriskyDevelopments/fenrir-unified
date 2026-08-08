@@ -107,7 +107,36 @@ const cinematicStyles = `
 .cinematic-landing__particle:nth-of-type(13) { left: 30%; top: 92%; animation-delay: -3s; }
 .cinematic-landing__particle:nth-of-type(14) { left: 76%; top: 92%; animation-delay: -8s; }
 
+.cinematic-landing__wolf {
+  position: absolute;
+  z-index: 0;
+  right: -2%;
+  bottom: -4%;
+  width: min(62vw, 700px);
+  opacity: .85;
+  pointer-events: none;
+  transform: translate(calc(var(--mx) * -1.8rem), calc(var(--my) * -1.2rem));
+  transition: transform 600ms cubic-bezier(.16, 1, .3, 1);
+  filter: drop-shadow(0 0 34px rgb(0 229 255 / 22%)) drop-shadow(0 0 90px rgb(123 47 255 / 18%));
+}
+
+.cinematic-landing__wolf svg {
+  display: block;
+  width: 100%;
+  animation: cinematic-wolf-arrive 1.6s cubic-bezier(.16, 1, .3, 1) .35s both;
+}
+
+.cinematic-landing__wolf .wolf-eye {
+  animation: cinematic-neon 3.2s ease-in-out 2s infinite;
+}
+
+@media (max-width: 720px) {
+  .cinematic-landing__wolf { width: 88vw; right: -14%; bottom: -3%; opacity: .6; }
+}
+
 .cinematic-landing__content {
+  position: relative;
+  z-index: 1;
   width: min(100%, 60rem);
   text-align: center;
   transform: perspective(900px) rotateX(calc(var(--my) * -1.4deg)) rotateY(calc(var(--mx) * 1.8deg));
@@ -285,6 +314,7 @@ const cinematicStyles = `
 }
 
 @keyframes cinematic-arrive { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes cinematic-wolf-arrive { from { opacity: 0; transform: translateX(46px) scale(.96); filter: blur(10px); } to { opacity: .55; transform: translateX(0) scale(1); filter: blur(0); } }
 @keyframes cinematic-letter { from { opacity: 0; transform: translateY(.35em) rotateX(45deg) scale(.9); filter: blur(6px); } to { opacity: 1; transform: translateY(0) rotateX(0) scale(1); filter: blur(0); } }
 @keyframes cinematic-line { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
 @keyframes cinematic-breathe { 50% { opacity: .62; } }
@@ -319,6 +349,36 @@ export function CinematicLanding() {
       <div className="cinematic-landing__beam" aria-hidden="true" />
       <div className="cinematic-landing__scan" aria-hidden="true" />
       {particles.map((particle) => <span className="cinematic-landing__particle" key={particle} aria-hidden="true" />)}
+      <div className="cinematic-landing__wolf" aria-hidden="true">
+        <svg viewBox="0 0 640 520">
+          <defs>
+            <linearGradient id="cine-wolf-fur" x1="120" y1="80" x2="520" y2="480" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#0a1420" />
+              <stop offset="0.48" stopColor="#12233c" />
+              <stop offset="1" stopColor="#1d3a5e" />
+            </linearGradient>
+            <linearGradient id="cine-wolf-edge" x1="118" y1="80" x2="530" y2="430" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#00e5ff" stopOpacity="0.9" />
+              <stop offset="0.55" stopColor="#7b2fff" stopOpacity="0.55" />
+              <stop offset="1" stopColor="#00e5ff" stopOpacity="0.4" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M106 382c51-29 82-58 111-110 18-33 26-68 42-110 7-17 16-41 29-72 13 40 23 70 31 90 32-46 72-79 119-99-9 44-12 77-8 99 42 12 73 31 92 57 18 24 23 53 15 87 24 14 39 30 47 48-29-9-64-10-105-2-44 8-83 28-118 59-50 45-107 59-172 43-42-11-70-41-83-90Z"
+            fill="url(#cine-wolf-fur)"
+            stroke="url(#cine-wolf-edge)"
+            strokeWidth="3.5"
+          />
+          <path
+            d="M320 183c31-45 65-72 102-83-13 37-18 67-13 90 42 8 72 25 88 50-50-10-94 0-132 32-35 29-73 42-114 39 30-21 53-64 69-128Z"
+            fill="#04070c"
+            opacity="0.85"
+          />
+          <path d="M443 235l42 8-35 15-28-2 21-21Z" fill="#7ff7ff" className="wolf-eye" />
+          <path d="M189 370c41 24 86 33 136 26 47-7 90-26 128-56" stroke="url(#cine-wolf-edge)" strokeWidth="7" strokeLinecap="round" opacity="0.5" />
+          <path d="M268 91c15 43 27 77 35 103" stroke="url(#cine-wolf-edge)" strokeWidth="5" strokeLinecap="round" opacity="0.45" />
+        </svg>
+      </div>
       <section className="cinematic-landing__content" aria-labelledby="cinematic-landing-title">
         <p className="cinematic-landing__eyebrow">MYFENRIR / PRIVATE ACCESS</p>
         <h1 className="cinematic-landing__title" id="cinematic-landing-title">
