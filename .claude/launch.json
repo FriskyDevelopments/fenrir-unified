@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "fenrir-preview-wiki",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview", "--prefix", "apps/fenrir-bridge", "--", "--port", "4207", "--strictPort"],
+      "port": 4207
+    },
+    {
       "name": "fenrir-preview",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "preview", "--prefix", "apps/fenrir-bridge", "--", "--port", "4199", "--strictPort"],
