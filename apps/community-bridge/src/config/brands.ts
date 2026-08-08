@@ -15,8 +15,9 @@
  * specific casa is a new object in BRANDS.
  */
 
-import wordmarkAsset from "@/assets/fenrir-wordmark.svg.asset.json";
-import markAsset from "@/assets/fenrir-mark.svg.asset.json";
+// Brand art ships in /public — self-hosted, no Lovable asset proxy involved.
+const markAsset = { url: "/fenrir-mark.svg" };
+const wordmarkAsset = { url: "/fenrir-cut-wordmark.svg" };
 
 export type ProviderId = "apple" | "google" | "microsoft";
 
@@ -93,7 +94,6 @@ export interface BrandConfig {
     successHeadline?: string;
   };
 
-
   links: {
     site?: string;
     terms: string;
@@ -106,7 +106,9 @@ export const BRANDS: BrandConfig[] = [
     id: "myfenrir",
     name: "MyFenrir",
     tagline: "Secure access and public gates for your Telegram community",
-    hosts: ["myfenrir.com", "www.myfenrir.com", "clipsflow-auth-hub.lovable.app"],
+    // The bridge is its own product at communities.myfenrir.com — it deliberately
+    // does NOT claim myfenrir.com/www, which belong to the main dashboard app.
+    hosts: ["communities.myfenrir.com", "clipsflow-auth-hub.lovable.app"],
     logo: { markUrl: markAsset.url, wordmarkUrl: wordmarkAsset.url, alt: "MyFenrir logo" },
     theme: {
       "--primary": "oklch(0.637 0.208 25.3)",
@@ -210,10 +212,7 @@ export const BRANDS: BrandConfig[] = [
 export const DEFAULT_BRAND_ID = "myfenrir";
 
 export function getBrand(id: string | null | undefined): BrandConfig {
-  return (
-    BRANDS.find((b) => b.id === id) ??
-    BRANDS.find((b) => b.id === DEFAULT_BRAND_ID)!
-  );
+  return BRANDS.find((b) => b.id === id) ?? BRANDS.find((b) => b.id === DEFAULT_BRAND_ID)!;
 }
 
 export function getBrandByHost(host: string | null | undefined): BrandConfig | null {
@@ -224,7 +223,10 @@ export function getBrandByHost(host: string | null | undefined): BrandConfig | n
 
 /** Two-letter fallback used when a brand has no logo file yet. */
 export function brandInitials(brand: BrandConfig): string {
-  const words = brand.name.replace(/[^a-zA-Z0-9 ]/g, " ").trim().split(/\s+/);
+  const words = brand.name
+    .replace(/[^a-zA-Z0-9 ]/g, " ")
+    .trim()
+    .split(/\s+/);
   if (words.length > 1) return (words[0]![0]! + words[1]![0]!).toUpperCase();
   return brand.name.slice(0, 2).toUpperCase();
 }
@@ -242,13 +244,13 @@ export function brandLoginCopy(brand: BrandConfig): {
 } {
   return {
     headline: brand.login?.headline?.trim() || "Welcome back",
-    subheadline:
-      brand.login?.subheadline?.trim() || `Sign in to continue to ${brand.name}`,
+    subheadline: brand.login?.subheadline?.trim() || `Sign in to continue to ${brand.name}`,
     signInLabel: brand.login?.signInLabel?.trim() || "Continue with",
     signUpLabel: brand.login?.signUpLabel?.trim() || "",
     forgotLabel: brand.login?.forgotLabel?.trim() || "",
     terminalHeader: brand.login?.terminalHeader?.trim() || "auth_session.sh",
-    terminalCommand: brand.login?.terminalCommand?.trim() || brand.terminalCommand || "auth --login",
+    terminalCommand:
+      brand.login?.terminalCommand?.trim() || brand.terminalCommand || "auth --login",
     terminalLines: brand.login?.terminalLines ?? [],
   };
 }
@@ -265,7 +267,8 @@ export function brandActivateCopy(brand: BrandConfig): {
   return {
     headline: brand.activate?.headline?.trim() || "Activate your account",
     subheadline:
-      brand.activate?.subheadline?.trim() || `Link your ${brand.name} portal to your Telegram account.`,
+      brand.activate?.subheadline?.trim() ||
+      `Link your ${brand.name} portal to your Telegram account.`,
     stepsTitle: brand.activate?.stepsTitle?.trim() || "Get your linking code",
     botLabel: brand.activate?.botLabel?.trim() || "Open Telegram bot",
     submitLabel: brand.activate?.submitLabel?.trim() || "Activate account",

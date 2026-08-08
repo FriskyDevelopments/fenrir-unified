@@ -56,9 +56,7 @@ export function GateAnalyticsPanel({
         ))}
       </div>
 
-      <p className="mt-2 text-[10px] text-muted-foreground">
-        {stats?.total ?? 0} views all time
-      </p>
+      <p className="mt-2 text-[10px] text-muted-foreground">{stats?.total ?? 0} views all time</p>
     </div>
   );
 }

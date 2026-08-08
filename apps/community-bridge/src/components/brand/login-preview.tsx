@@ -60,7 +60,6 @@ export function LoginPreview({ brand }: { brand: BrandConfig }) {
         </span>
       </div>
 
-
       <div className="relative overflow-hidden px-6 py-8">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -top-[20%] left-1/2 h-[60%] w-[70%] -translate-x-1/2 rounded-full bg-primary/15 blur-[90px]" />
@@ -198,7 +197,6 @@ export function LoginPreview({ brand }: { brand: BrandConfig }) {
           <p className="text-center text-[10px] text-muted-foreground">
             Lands on {brand.redirect.afterLogin} · community {brand.community.id || "—"}
           </p>
-
         </div>
       </div>
     </div>

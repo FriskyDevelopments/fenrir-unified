@@ -80,9 +80,7 @@ function DemoPage() {
 
         <Card className="flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
-            <p className="text-sm font-medium text-foreground">
-              Demo mode is {on ? "on" : "off"}
-            </p>
+            <p className="text-sm font-medium text-foreground">Demo mode is {on ? "on" : "off"}</p>
             <p className="text-xs text-muted-foreground">
               {on
                 ? "Protected screens open without signing in."

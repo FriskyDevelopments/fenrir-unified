@@ -58,7 +58,10 @@ function normalizeCode(raw: string): string {
 
 /** In demo mode we keep symbols so the malformed-code state is reachable. */
 function normalizeDemoCode(raw: string): string {
-  return raw.toUpperCase().replace(/\s/g, "").slice(0, CODE_LENGTH + 2);
+  return raw
+    .toUpperCase()
+    .replace(/\s/g, "")
+    .slice(0, CODE_LENGTH + 2);
 }
 
 export const Route = createFileRoute("/activate")({
@@ -76,11 +79,11 @@ export const Route = createFileRoute("/activate")({
         content: "Redeem your one-time code to link your MyFenrir account to Telegram.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://clipsflow-auth-hub.lovable.app/activate" },
+      { property: "og:url", content: "https://communities.myfenrir.com/activate" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: "https://clipsflow-auth-hub.lovable.app/activate" }],
+    links: [{ rel: "canonical", href: "https://communities.myfenrir.com/activate" }],
   }),
   component: ActivatePage,
 });
@@ -197,11 +200,7 @@ function ActivatePage() {
 
           <TelegramIdentityCard
             className="w-full text-left"
-            identity={
-              demo
-                ? DEMO_TELEGRAM_PROFILE
-                : { id: telegramId ?? DEMO_TELEGRAM_PROFILE.id }
-            }
+            identity={demo ? DEMO_TELEGRAM_PROFILE : { id: telegramId ?? DEMO_TELEGRAM_PROFILE.id }}
             note={demo ? "Simulated Telegram identity." : undefined}
           />
 

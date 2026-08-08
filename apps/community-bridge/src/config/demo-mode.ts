@@ -39,8 +39,19 @@ export interface DemoLinkCode {
   expiresAt: number;
 }
 
+/**
+ * Demo mode is only allowed in dev builds or when a deployment explicitly
+ * opts in with VITE_ALLOW_DEMO_MODE=true. In production it stays off no
+ * matter what localStorage or the URL says — it fakes a staff session
+ * client-side, which is not a surface we want reachable on the live portal.
+ */
+export function isDemoModeAllowed(): boolean {
+  return import.meta.env.DEV || import.meta.env["VITE_ALLOW_DEMO_MODE"] === "true";
+}
+
 export function isDemoMode(): boolean {
   if (typeof window === "undefined") return false;
+  if (!isDemoModeAllowed()) return false;
   if (new URLSearchParams(window.location.search).has("demo")) return true;
   try {
     return window.localStorage.getItem(KEY) === "1";
@@ -158,8 +169,6 @@ export async function demoRedeemLinkCode(code: string): Promise<DemoRedeemResult
   }
   return { ok: false, reason: "invalid" };
 }
-
-
 
 const demoUser = {
   id: "00000000-0000-4000-8000-000000000demo".slice(0, 36),

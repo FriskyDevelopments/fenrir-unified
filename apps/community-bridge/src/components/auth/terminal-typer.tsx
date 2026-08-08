@@ -73,9 +73,7 @@ export function TerminalTyper() {
           const showCursor = i === lineIdx && !done;
           return (
             <div key={i} className={line.className ?? "text-slate-200"}>
-              {line.prompt ? (
-                <span className="mr-2 text-emerald-400">{line.prompt}</span>
-              ) : null}
+              {line.prompt ? <span className="mr-2 text-emerald-400">{line.prompt}</span> : null}
               <span>{visible}</span>
               {showCursor ? (
                 <span className="ml-0.5 inline-block h-3.5 w-[3px] -mb-0.5 animate-pulse bg-indigo-400 align-middle" />

@@ -43,8 +43,7 @@ export function BrandSwitcher({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
 
   const previewParam =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).has("brand");
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("brand");
 
   if (brands.length < 2 || (!isStaff && !previewParam)) return null;
 

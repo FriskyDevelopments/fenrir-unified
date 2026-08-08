@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { Button } from "@/components/ui/button";
-import { lovable } from "@/integrations/lovable";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { formatAuthError } from "@/lib/auth-errors";
 import { useBrand } from "@/config/brand-context";
@@ -15,24 +15,23 @@ import { BRANDS, brandLoginCopy, getBrand, type ProviderId } from "@/config/bran
 import { isDemoMode } from "@/config/demo-mode";
 import { logDemoEvent } from "@/config/demo-log";
 
-
 /** Build-time brand: head() is static, so it uses the deployment's brand. */
-const HEAD_BRAND = getBrand(import.meta.env['VITE_BRAND_ID']);
-const SITE = "https://clipsflow-auth-hub.lovable.app";
+const HEAD_BRAND = getBrand(import.meta.env["VITE_BRAND_ID"]);
+const SITE = "https://communities.myfenrir.com";
 
 export const Route = createFileRoute("/login")({
   ssr: false,
-  validateSearch: (s: { next?: unknown; brand?: unknown }): {
+  validateSearch: (s: {
+    next?: unknown;
+    brand?: unknown;
+  }): {
     next?: string;
     brand?: string;
   } => ({
     next: typeof s.next === "string" ? s.next : undefined,
     brand:
-      typeof s.brand === "string" && BRANDS.some((b) => b.id === s.brand)
-        ? s.brand
-        : undefined,
+      typeof s.brand === "string" && BRANDS.some((b) => b.id === s.brand) ? s.brand : undefined,
   }),
-
 
   head: () => ({
     meta: [
@@ -62,7 +61,6 @@ type ProviderConfig = {
 };
 
 const PROVIDERS: ProviderConfig[] = [
-
   {
     id: "apple",
     label: "Apple",
@@ -77,10 +75,22 @@ const PROVIDERS: ProviderConfig[] = [
     label: "Google",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
-        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+        <path
+          fill="#4285F4"
+          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+        />
+        <path
+          fill="#34A853"
+          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+        />
+        <path
+          fill="#FBBC05"
+          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+        />
+        <path
+          fill="#EA4335"
+          d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+        />
       </svg>
     ),
   },
@@ -116,8 +126,6 @@ function LoginPage() {
   // resolving it late would let the signed-in redirect fire before we know.
   const [demo] = useState(() => isDemoMode());
 
-
-
   // Runtime check: the brand's OAuth return and post-login paths must be
   // same-origin and on the allowed sign-in URL list, or SSO silently bounces.
   useEffect(() => {
@@ -129,9 +137,6 @@ function LoginPage() {
   const providers = brand.providers
     .map((id) => PROVIDERS.find((p) => p.id === id))
     .filter((p): p is ProviderConfig => Boolean(p));
-
-
-
 
   useEffect(() => {
     // In demo mode the mock session already exists — stay here so the sign-in
@@ -159,22 +164,22 @@ function LoginPage() {
       return;
     }
 
-    const result = await lovable.auth.signInWithOAuth(provider, {
-      redirect_uri: next
-        ? new URL(next, window.location.origin).toString()
-        : brandOAuthRedirectUrl(brand, window.location.origin),
+    // Direct Supabase OAuth against the canonical MyFenrir project — no broker.
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: provider === "microsoft" ? "azure" : provider,
+      options: {
+        redirectTo: next
+          ? new URL(next, window.location.origin).toString()
+          : brandOAuthRedirectUrl(brand, window.location.origin),
+        scopes: provider === "microsoft" ? "email profile" : undefined,
+      },
     });
-    if (result.error) {
+    if (oauthError) {
       setPending(null);
-      setError(formatAuthError(result.error.message ?? String(result.error)));
-      return;
+      setError(formatAuthError(oauthError.message));
     }
-    if (result.redirected) return;
-    if (next) window.location.replace(next);
-    else navigate({ to: brand.redirect.afterLogin });
+    // On success the browser is redirected to the provider; nothing else to do.
   }
-
-
 
   const copy = brandLoginCopy(brand);
 
@@ -186,9 +191,20 @@ function LoginPage() {
         <span className="block space-y-2">
           <span className="block">
             By continuing you agree to our{" "}
-            <a href={brand.links.terms} className="text-foreground/80 underline-offset-4 hover:underline">Terms</a>
-            {" "}and{" "}
-            <a href={brand.links.privacy} className="text-foreground/80 underline-offset-4 hover:underline">Privacy Policy</a>.
+            <a
+              href={brand.links.terms}
+              className="text-foreground/80 underline-offset-4 hover:underline"
+            >
+              Terms
+            </a>{" "}
+            and{" "}
+            <a
+              href={brand.links.privacy}
+              className="text-foreground/80 underline-offset-4 hover:underline"
+            >
+              Privacy Policy
+            </a>
+            .
           </span>
           <span className="block">
             New here? Read the{" "}
@@ -202,7 +218,6 @@ function LoginPage() {
           </span>
         </span>
       }
-
     >
       {configIssues.length > 0 ? (
         <div
@@ -222,7 +237,6 @@ function LoginPage() {
 
       <div className="grid gap-2.5">
         {providers.map((p, i) => {
-
           const isPending = pending === p.id;
           return (
             <Button
@@ -247,7 +261,10 @@ function LoginPage() {
             aria-live="polite"
             className="mt-1 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
           >
-            <span aria-hidden="true" className="mt-1.5 inline-block h-1.5 w-1.5 flex-none rounded-full bg-destructive" />
+            <span
+              aria-hidden="true"
+              className="mt-1.5 inline-block h-1.5 w-1.5 flex-none rounded-full bg-destructive"
+            />
             <span>{error}</span>
           </div>
         ) : null}

@@ -7,15 +7,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  ExternalLink,
-  Loader2,
-  Sparkles,
-  Wand2,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ExternalLink, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -34,7 +26,6 @@ import { GATE_PRESETS } from "@/lib/gate-presets";
 import { validateBrandRedirects } from "@/lib/redirect-validation";
 import { RedirectPathField } from "@/components/brand/redirect-path-field";
 import { DRAFT_BRAND_ID, saveDraftBrand } from "@/config/brand-draft";
-
 
 const STEPS = ["Identity", "Look & feel", "Sign-in", "Review"] as const;
 
@@ -73,8 +64,6 @@ export function BrandSetupWizard({
     const timer = window.setTimeout(() => saveDraftBrand(draft), 250);
     return () => window.clearTimeout(timer);
   }, [draft, previewOpened]);
-
-
 
   const set = <K extends keyof BrandTenantInput>(key: K, value: BrandTenantInput[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
@@ -181,7 +170,6 @@ export function BrandSetupWizard({
           </Button>
         </div>
       </div>
-
 
       <ol className="flex flex-wrap gap-2" aria-label="Setup steps">
         {STEPS.map((label, index) => (
@@ -337,7 +325,12 @@ export function BrandSetupWizard({
                   >
                     ↓
                   </Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => toggleProvider(id)}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleProvider(id)}
+                  >
                     Remove
                   </Button>
                 </div>
@@ -475,7 +468,6 @@ export function BrandSetupWizard({
                 onChange={(v) => set("after_login_path", v)}
               />
             </Field>
-
           </div>
         </div>
       ) : null}

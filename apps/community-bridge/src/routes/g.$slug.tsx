@@ -3,7 +3,6 @@ import { GatePreview } from "@/components/gate/gate-preview";
 import { GateShare } from "@/components/gate/gate-share";
 import { useTrackGateView } from "@/hooks/use-track-gate-view";
 
-
 import { getPublicGate } from "@/lib/gate.functions";
 import { getPreset } from "@/lib/gate-presets";
 
@@ -27,10 +26,10 @@ export const Route = createFileRoute("/g/$slug")({
         content: loaderData?.subheadline ?? "Secure single sign-on gate.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: `https://clipsflow-auth-hub.lovable.app/g/${params.slug}` },
+      { property: "og:url", content: `https://communities.myfenrir.com/g/${params.slug}` },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [{ rel: "canonical", href: `https://clipsflow-auth-hub.lovable.app/g/${params.slug}` }],
+    links: [{ rel: "canonical", href: `https://communities.myfenrir.com/g/${params.slug}` }],
   }),
   errorComponent: () => <GateFallback message="This gate could not be loaded." />,
   notFoundComponent: () => <GateFallback message="No gate exists at this address." />,
@@ -56,7 +55,6 @@ function PublicGatePage() {
 
   useTrackGateView(params.slug, config.preset);
 
-
   return (
     <div className="relative">
       <GatePreview config={config} />
@@ -66,7 +64,6 @@ function PublicGatePage() {
           /* White-label handoff: the gate's preset carries its tenant to /login. */
           search={{ next: undefined, brand: preset.brandId }}
           className="pointer-events-auto rounded-full border border-white/15 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.22em] text-white/70 transition hover:text-white"
-
           style={{ background: `color-mix(in oklab, ${preset.accent} 12%, transparent)` }}
         >
           Sign in
@@ -76,4 +73,3 @@ function PublicGatePage() {
     </div>
   );
 }
-

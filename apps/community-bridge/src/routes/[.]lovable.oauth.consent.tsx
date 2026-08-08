@@ -2,6 +2,21 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+// supabase-js does not type the OAuth 2.1 authorization-server surface yet,
+// so the shape used by this screen is declared here.
+type OAuthRedirect = { redirect_url?: string; redirect_to?: string };
+type AuthorizationDetails = OAuthRedirect & { client?: { name?: string } | null };
+type OAuthResult<T> = Promise<{ data: T | null; error: { message: string } | null }>;
+type SupabaseOAuthApi = {
+  getAuthorizationDetails(id: string): OAuthResult<AuthorizationDetails>;
+  approveAuthorization(id: string): OAuthResult<OAuthRedirect>;
+  denyAuthorization(id: string): OAuthResult<OAuthRedirect>;
+};
+
+function oauthApi(): SupabaseOAuthApi {
+  return (supabase.auth as unknown as { oauth: SupabaseOAuthApi }).oauth;
+}
+
 export const Route = createFileRoute("/.lovable/oauth/consent")({
   ssr: false,
   validateSearch: (s: Record<string, unknown>) => ({
@@ -15,13 +30,8 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
   },
   loader: async ({ location }) => {
     const authorizationId = new URLSearchParams(location.search).get("authorization_id")!;
-    const oauth = (supabase.auth as unknown as {
-      oauth: {
-        getAuthorizationDetails: (id: string) => Promise<{ data: any; error: any }>;
-      };
-    }).oauth;
-    const { data, error } = await oauth.getAuthorizationDetails(authorizationId);
-    if (error) throw error;
+    const { data, error } = await oauthApi().getAuthorizationDetails(authorizationId);
+    if (error) throw new Error(error.message);
     const immediate = data?.redirect_url ?? data?.redirect_to;
     if (immediate && !data?.client) throw redirect({ href: immediate });
     return data;
@@ -37,7 +47,7 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
 });
 
 function Consent() {
-  const details = Route.useLoaderData() as any;
+  const details = Route.useLoaderData() as AuthorizationDetails | null;
   const { authorization_id } = Route.useSearch();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,12 +56,7 @@ function Consent() {
   async function decide(approve: boolean) {
     setBusy(true);
     setError(null);
-    const oauth = (supabase.auth as unknown as {
-      oauth: {
-        approveAuthorization: (id: string) => Promise<{ data: any; error: any }>;
-        denyAuthorization: (id: string) => Promise<{ data: any; error: any }>;
-      };
-    }).oauth;
+    const oauth = oauthApi();
     const { data, error: err } = approve
       ? await oauth.approveAuthorization(authorization_id)
       : await oauth.denyAuthorization(authorization_id);
@@ -72,9 +77,7 @@ function Consent() {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background px-4">
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center backdrop-blur-xl">
-        <h1 className="text-xl font-semibold text-foreground">
-          Connect {clientName} to MyFenrir
-        </h1>
+        <h1 className="text-xl font-semibold text-foreground">Connect {clientName} to MyFenrir</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           This lets {clientName} use MyFenrir as you — reading your account and portal data.
         </p>

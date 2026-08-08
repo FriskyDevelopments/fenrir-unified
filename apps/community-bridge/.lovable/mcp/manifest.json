@@ -5,9 +5,7 @@
   "auth": {
     "type": "oauth",
     "issuer": "https://jgktxeabubmkxkhlftkg.supabase.co/auth/v1",
-    "accepted_audiences": [
-      "authenticated"
-    ]
+    "accepted_audiences": ["authenticated"]
   },
   "mcp": {
     "server": {
@@ -51,9 +49,7 @@
               "description": "The one-time code sent by the MyFenrir bot."
             }
           },
-          "required": [
-            "code"
-          ],
+          "required": ["code"],
           "additionalProperties": false,
           "$schema": "http://json-schema.org/draft-07/schema#"
         },

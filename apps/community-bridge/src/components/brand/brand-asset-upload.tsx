@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { Loader2, Upload, X } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { verifyUploadedImage } from "@/lib/moderation.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ASPECT_PRESETS, ImageCropDialog } from "@/components/brand/image-crop-dialog";
@@ -19,18 +21,12 @@ interface BrandAssetUploadProps {
  * Uploads a brand image into the private `brand-assets` bucket and stores the
  * public read path (`/brand-asset/...`). Falls back to typing any https URL.
  */
-export function BrandAssetUpload({
-  label,
-  brandId,
-  kind,
-  value,
-  onChange,
-}: BrandAssetUploadProps) {
+export function BrandAssetUpload({ label, brandId, kind, value, onChange }: BrandAssetUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<File | null>(null);
-
+  const verifyImage = useServerFn(verifyUploadedImage);
 
   async function upload(file: File) {
     setError(null);
@@ -38,8 +34,9 @@ export function BrandAssetUpload({
       setError("Set the brand id first.");
       return;
     }
-    if (!/^image\/(png|jpeg|webp|svg\+xml|avif)$/.test(file.type)) {
-      setError("Use a PNG, JPEG, WEBP, AVIF or SVG image.");
+    // Only formats the moderation service can screen are accepted.
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) {
+      setError("Use a PNG, JPEG, WEBP or GIF image.");
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
@@ -48,14 +45,19 @@ export function BrandAssetUpload({
     }
 
     setBusy(true);
-    const ext = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+    const ext =
+      file.name
+        .split(".")
+        .pop()
+        ?.toLowerCase()
+        .replace(/[^a-z0-9]/g, "") || "png";
     const path = `${brandId}/${kind}-${Date.now()}.${ext}`;
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
       .upload(path, file, { upsert: true, contentType: file.type });
-    setBusy(false);
 
     if (uploadError) {
+      setBusy(false);
       setError(
         /row-level security|Unauthorized|permission/i.test(uploadError.message)
           ? "Only staff can upload brand assets."
@@ -63,6 +65,22 @@ export function BrandAssetUpload({
       );
       return;
     }
+
+    // Content check — flagged files are deleted server-side and never accepted.
+    try {
+      const verdict = await verifyImage({ data: { bucket: BUCKET, path } });
+      if (!verdict.allowed) {
+        setBusy(false);
+        setError(verdict.reason ?? "This image is not allowed here.");
+        return;
+      }
+    } catch {
+      setBusy(false);
+      setError("Image verification failed — try again.");
+      return;
+    }
+
+    setBusy(false);
     onChange(`/brand-asset/${path}`);
   }
 
@@ -97,7 +115,12 @@ export function BrandAssetUpload({
           <span className="ml-2 hidden sm:inline">Upload</span>
         </Button>
         {value ? (
-          <Button type="button" variant="ghost" onClick={() => onChange(null)} aria-label={`Clear ${label}`}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onChange(null)}
+            aria-label={`Clear ${label}`}
+          >
             <X className="h-4 w-4" />
           </Button>
         ) : null}
@@ -134,7 +157,6 @@ export function BrandAssetUpload({
         cropper; SVGs upload as-is. No image? The app falls back to the brand initials.
       </p>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
-
     </div>
   );
 }

@@ -22,10 +22,10 @@ export const Route = createFileRoute("/")({
           "SSO sign-in, Telegram role automation, and beautiful public gates you can publish in one click.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://clipsflow-auth-hub.lovable.app/" },
+      { property: "og:url", content: "https://communities.myfenrir.com/" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [{ rel: "canonical", href: "https://clipsflow-auth-hub.lovable.app/" }],
+    links: [{ rel: "canonical", href: "https://communities.myfenrir.com/" }],
   }),
   component: Index,
 });
@@ -57,7 +57,10 @@ function Index() {
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 -top-40 h-[520px] opacity-60 blur-3xl"
-        style={{ background: "var(--gradient-cosmic, radial-gradient(circle at 50% 0%, oklch(0.45 0.2 25 / 0.5), transparent 70%))" }}
+        style={{
+          background:
+            "var(--gradient-cosmic, radial-gradient(circle at 50% 0%, oklch(0.45 0.2 25 / 0.5), transparent 70%))",
+        }}
       />
 
       <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-6">
@@ -89,7 +92,25 @@ function Index() {
         </nav>
       </header>
 
-      <section className="relative z-10 mx-auto w-full max-w-3xl px-5 pb-16 pt-10 text-center sm:pt-20">
+      <section className="relative z-10 mx-auto w-full max-w-3xl px-5 pb-16 pt-10 text-center sm:pt-16">
+        {brand.id === "myfenrir" ? (
+          <div className="relative mx-auto mb-8 w-full max-w-xl">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 -z-10 rounded-full opacity-70 blur-3xl"
+              style={{
+                background:
+                  "radial-gradient(circle at 50% 55%, oklch(0.637 0.208 25.3 / 0.35), transparent 70%)",
+              }}
+            />
+            <img
+              src="/fenrir-cyber-guardian-hero.svg"
+              alt="Fenrir, the guardian of the access gate"
+              className="mx-auto w-full max-w-md rounded-3xl border border-white/5 shadow-[0_0_45px_-10px_oklch(0.637_0.208_25.3_/_0.45)] sm:max-w-lg"
+              loading="eager"
+            />
+          </div>
+        ) : null}
         <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
           Access portal
         </span>
@@ -97,8 +118,8 @@ function Index() {
           Secure access and public gates for your Telegram community
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-pretty text-base text-muted-foreground sm:text-lg">
-          Sign in with the identity you already use, link your Telegram account with a short code, and publish a
-          branded gate that looks great before you upload a single file.
+          Sign in with the identity you already use, link your Telegram account with a short code,
+          and publish a branded gate that looks great before you upload a single file.
         </p>
         <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
           {!loading && session ? (
@@ -129,7 +150,10 @@ function Index() {
 
       <section className="relative z-10 mx-auto grid w-full max-w-5xl gap-4 px-5 pb-20 sm:grid-cols-3">
         {features.map(({ icon: Icon, title, body }) => (
-          <article key={title} className="rounded-2xl border border-border bg-card/60 p-5 text-left backdrop-blur">
+          <article
+            key={title}
+            className="rounded-2xl border border-border bg-card/60 p-5 text-left backdrop-blur"
+          >
             <Icon className="h-5 w-5 text-primary" aria-hidden />
             <h2 className="mt-4 text-base font-semibold text-foreground">{title}</h2>
             <p className="mt-2 text-sm text-muted-foreground">{body}</p>
@@ -138,7 +162,8 @@ function Index() {
       </section>
 
       <footer className="relative z-10 mx-auto w-full max-w-5xl px-5 pb-10 text-center text-xs text-muted-foreground">
-        {brand.name} · Signed-in areas like the dashboard, activation, and gate builder require sign-in.
+        {brand.name} · Signed-in areas like the dashboard, activation, and gate builder require
+        sign-in.
       </footer>
     </main>
   );

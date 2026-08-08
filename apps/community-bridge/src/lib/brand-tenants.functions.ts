@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
@@ -26,7 +27,7 @@ function mapError(error: { code?: string; message: string }): string {
 }
 
 type AuthedContext = {
-  supabase: { from: (table: string) => any };
+  supabase: SupabaseClient;
   userId: string;
   claims: Record<string, unknown>;
 };
@@ -69,7 +70,6 @@ async function recordAudit(
   });
   if (error) console.error("[brand-audit] failed to record entry", error.message);
 }
-
 
 /** Active tenants, readable without a session (drives brand resolution). */
 export const listPublicBrandTenants = createServerFn({ method: "GET" }).handler(async () => {
@@ -162,10 +162,7 @@ export const deleteBrandTenant = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .maybeSingle();
 
-    const { error } = await context.supabase
-      .from("brand_tenants")
-      .delete()
-      .eq("id", data.id);
+    const { error } = await context.supabase.from("brand_tenants").delete().eq("id", data.id);
     if (error) throw new Error(mapError(error));
 
     if (previous) {
@@ -217,21 +214,13 @@ export const listBrandTenantAudit = createServerFn({ method: "GET" })
       .limit(data.limit ?? 250);
 
     if (data.tenant) {
-      q = q.or(
-        `brand_id.ilike.%${data.tenant}%,tenant_name.ilike.%${data.tenant}%`,
-      );
+      q = q.or(`brand_id.ilike.%${data.tenant}%,tenant_name.ilike.%${data.tenant}%`);
     }
     if (data.actor) {
-      q = q.or(
-        `actor_email.ilike.%${data.actor}%,actor_id.ilike.%${data.actor}%`,
-      );
+      q = q.or(`actor_email.ilike.%${data.actor}%,actor_id.ilike.%${data.actor}%`);
     }
     if (data.field) {
-      q = q.filter(
-        "changes",
-        "cs",
-        JSON.stringify([{ field: data.field }]),
-      );
+      q = q.filter("changes", "cs", JSON.stringify([{ field: data.field }]));
     }
     if (data.from) {
       const fromDate = new Date(data.from);
@@ -252,5 +241,3 @@ export const listBrandTenantAudit = createServerFn({ method: "GET" })
     if (error) throw new Error(mapError(error));
     return (rows ?? []) as unknown as BrandAuditEntry[];
   });
-
-

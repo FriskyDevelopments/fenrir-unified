@@ -3,8 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { GateConfig } from "@/lib/gate-presets";
 
-const GATE_COLUMNS =
-  "slug, preset, headline, subheadline, logo_url, mascot_url, background_url";
+const GATE_COLUMNS = "slug, preset, headline, subheadline, logo_url, mascot_url, background_url";
 const GATE_RECORD_COLUMNS = `id, updated_at, brand_id, community_id, ${GATE_COLUMNS}`;
 
 export interface GateRecord extends GateConfig {
@@ -81,9 +80,7 @@ export const listMyGates = createServerFn({ method: "GET" })
 /** One gate owned by the signed-in user in this brand (null otherwise). */
 export const getMyGate = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
-    z.object({ id: z.string().uuid(), brand_id: tenantField }).parse(data),
-  )
+  .inputValidator((data) => z.object({ id: z.string().uuid(), brand_id: tenantField }).parse(data))
   .handler(async ({ context, data }) => {
     const { data: row, error } = await context.supabase
       .from("gate_configs")
@@ -107,11 +104,7 @@ export const checkSlugAvailable = createServerFn({ method: "GET" })
     z.object({ slug: slugField, excludeId: z.string().uuid().optional() }).parse(data),
   )
   .handler(async ({ context, data }) => {
-    let query = context.supabase
-      .from("gate_configs")
-      .select("id")
-      .eq("slug", data.slug)
-      .limit(1);
+    let query = context.supabase.from("gate_configs").select("id").eq("slug", data.slug).limit(1);
     if (data.excludeId) query = query.neq("id", data.excludeId);
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
@@ -155,9 +148,7 @@ export const updateGate = createServerFn({ method: "POST" })
 
 export const deleteGate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
-    z.object({ id: z.string().uuid(), brand_id: tenantField }).parse(data),
-  )
+  .inputValidator((data) => z.object({ id: z.string().uuid(), brand_id: tenantField }).parse(data))
   .handler(async ({ context, data }) => {
     const { data: rows, error } = await context.supabase
       .from("gate_configs")

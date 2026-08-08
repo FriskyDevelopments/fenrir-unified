@@ -37,7 +37,9 @@ export function BrandWordmark({ className }: { className?: string }) {
       <img
         src={brand.logo.wordmarkUrl}
         alt={`${brand.name} wordmark logo`}
-        className={["block h-auto w-full object-contain", className ?? ""].join(" ")}
+        // Sizing is the caller's job — a `w-full h-auto` base here would fight
+        // height utilities like `h-6` (stylesheet order wins, not class order).
+        className={["block max-w-full object-contain", className ?? ""].join(" ")}
         decoding="async"
       />
     );

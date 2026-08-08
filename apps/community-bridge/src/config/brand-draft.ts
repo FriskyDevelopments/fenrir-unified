@@ -24,7 +24,6 @@ export function saveDraftBrand(draft: BrandTenantInput) {
   publishBrandUpdate("draft");
 }
 
-
 export function readDraftBrand(): BrandConfig | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);

@@ -14,7 +14,6 @@ import { getMyGateViewStats, type GateViewStats } from "@/lib/gate-analytics.fun
 import { getPreset } from "@/lib/gate-presets";
 import { isDemoMode } from "@/config/demo-mode";
 
-
 export const Route = createFileRoute("/gates/")({
   ssr: false,
   head: () => ({
@@ -27,11 +26,11 @@ export const Route = createFileRoute("/gates/")({
       { property: "og:title", content: "My Gates — MyFenrir" },
       { property: "og:description", content: "Manage your public MyFenrir sign-in gates." },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://clipsflow-auth-hub.lovable.app/gates" },
+      { property: "og:url", content: "https://communities.myfenrir.com/gates" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: "https://clipsflow-auth-hub.lovable.app/gates" }],
+    links: [{ rel: "canonical", href: "https://communities.myfenrir.com/gates" }],
   }),
   component: MyGatesPage,
 });
@@ -74,7 +73,6 @@ function MyGatesPage() {
     };
   }, [loading, session, fetchGates, fetchStats, navigate, brand.id]);
 
-
   if (loading || !gates) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
@@ -93,8 +91,7 @@ function MyGatesPage() {
             </p>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">My Gates</h1>
             <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-              Edit a gate&apos;s preset, copy and custom art at any time. Changes go live
-              instantly.
+              Edit a gate&apos;s preset, copy and custom art at any time. Changes go live instantly.
             </p>
           </div>
           <Button asChild variant="fenrir">
@@ -122,9 +119,7 @@ function MyGatesPage() {
                 <GatePreview config={gate} compact className="h-44" />
                 <div className="space-y-3 p-4">
                   <div>
-                    <p className="truncate text-sm font-semibold tracking-tight">
-                      {gate.headline}
-                    </p>
+                    <p className="truncate text-sm font-semibold tracking-tight">{gate.headline}</p>
                     <p className="truncate text-[11px] text-muted-foreground">/g/{gate.slug}</p>
                   </div>
                   <GateAnalyticsPanel

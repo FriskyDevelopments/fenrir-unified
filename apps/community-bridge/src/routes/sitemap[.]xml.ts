@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 
-const BASE_URL = "https://clipsflow-auth-hub.lovable.app";
+const BASE_URL = "https://communities.myfenrir.com";
 
 interface SitemapEntry {
   path: string;
@@ -18,7 +18,8 @@ export const Route = createFileRoute("/sitemap.xml")({
           { path: "/login", changefreq: "monthly", priority: "0.6" },
           { path: "/activate", changefreq: "monthly", priority: "0.5" },
           { path: "/blog/telegram-role-management-guide", changefreq: "monthly", priority: "0.8" },
-
+          { path: "/terms", changefreq: "yearly", priority: "0.3" },
+          { path: "/privacy", changefreq: "yearly", priority: "0.3" },
         ];
 
         const urls = entries.map((e) =>

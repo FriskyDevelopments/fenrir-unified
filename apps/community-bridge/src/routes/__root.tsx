@@ -16,7 +16,6 @@ import { BrandProvider } from "@/config/brand-context";
 import { Toaster } from "@/components/ui/sonner";
 import { DemoActivityLog } from "@/components/demo/demo-activity-log";
 
-
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -83,10 +82,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "MyFenrir" },
-      { name: "description", content: "MyFenrir — secure portal for accounts, roles, and Telegram linking." },
+      {
+        name: "description",
+        content: "MyFenrir — secure portal for accounts, roles, and Telegram linking.",
+      },
       { name: "theme-color", content: "#070b12" },
       { property: "og:title", content: "MyFenrir" },
-      { property: "og:description", content: "MyFenrir — secure portal for accounts, roles, and Telegram linking." },
+      {
+        property: "og:description",
+        content: "MyFenrir — secure portal for accounts, roles, and Telegram linking.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -100,7 +105,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
       },
     ],
-
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -133,10 +137,8 @@ function RootComponent() {
           <Outlet />
           <Toaster />
           <DemoActivityLog />
-
         </AuthProvider>
       </BrandProvider>
     </QueryClientProvider>
   );
-
 }

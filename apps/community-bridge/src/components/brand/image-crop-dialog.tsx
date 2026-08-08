@@ -114,13 +114,7 @@ export function ImageCropDialog({ open, file, kind, onCancel, onConfirm }: Image
       ctx.imageSmoothingQuality = "high";
       const left = (FRAME_WIDTH - layout.drawW) / 2 + layout.x;
       const top = (frameHeight - layout.drawH) / 2 + layout.y;
-      ctx.drawImage(
-        image,
-        left * dpr,
-        top * dpr,
-        layout.drawW * dpr,
-        layout.drawH * dpr,
-      );
+      ctx.drawImage(image, left * dpr, top * dpr, layout.drawW * dpr, layout.drawH * dpr);
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob(resolve, "image/png", 0.95),
       );

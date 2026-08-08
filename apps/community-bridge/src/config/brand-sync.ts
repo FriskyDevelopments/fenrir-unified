@@ -78,9 +78,7 @@ export function publishBrandUpdate(kind: BrandUpdateKind = "saved") {
   emit(kind);
 }
 
-export function subscribeBrandUpdates(
-  onUpdate: (kind: BrandUpdateKind) => void,
-): () => void {
+export function subscribeBrandUpdates(onUpdate: (kind: BrandUpdateKind) => void): () => void {
   wire();
   listeners.add(onUpdate);
   return () => {
