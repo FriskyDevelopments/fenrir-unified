@@ -43,7 +43,7 @@ import {
   type VaultLink
 } from "../app/shared";
 import { activePageFromLocation, dashboardPathFor, paidPlanFromProductLabel } from "../app/routing";
-import { CommunityBrandWizardPanel } from "./communityGate";
+import { CommunityBridgeHandoffPanel } from "./communityGate";
 import { ProtocolActivated } from "./publicRoutes";
 import {
   AccountServicePanel,
@@ -785,7 +785,7 @@ export function DashboardRoute() {
         </section>
 
         {show("billing") && <ProductionReadinessPanel c={c} readiness={readiness} loadFailed={readinessError} />}
-        {show("command", "brands") && <CommunityBrandWizardPanel locale={locale} onNotice={setNotice} />}
+        {show("command", "brands") && <CommunityBridgeHandoffPanel />}
 
         <div className="content-grid">
           {show("command", "locks", "telegram") && <section className="panel wide">

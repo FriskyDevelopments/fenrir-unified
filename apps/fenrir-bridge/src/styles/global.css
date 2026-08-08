@@ -7699,3 +7699,23 @@ p {
   letter-spacing: 0.25em;
   text-decoration: none;
 }
+
+/* Handoff del Community Bridge: el dashboard principal solo enlaza a la app
+   separada (gate.myfenrir.com); el wizard incrustado se retiró a propósito. */
+.community-bridge-handoff-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.community-bridge-handoff-body p {
+  margin: 0;
+  max-width: 46rem;
+  color: var(--muted);
+}
+
+.community-bridge-handoff-actions .button-link {
+  white-space: nowrap;
+}

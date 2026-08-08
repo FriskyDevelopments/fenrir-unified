@@ -15,6 +15,7 @@ import {
   type DefaultAccessState
 } from "../services/communityAuth";
 import type { UiCopy } from "../app/uiCopy";
+import { communityBridgeDashboardUrl } from "../services/communityBridge";
 import { PanelTitle } from "./routeCommon";
 
 function mergeNeonBrandTheme(base: typeof brandThemes.neonNexus, brand: CommunityBrandPayload | null) {
@@ -140,6 +141,35 @@ const communityGateWalkthrough = [
     body: "Subscription unlocks branded gates, safer onboarding, isolated community records, review workflows, and a cleaner upgrade path for paid/private communities."
   }
 ] as const;
+
+/**
+ * The Community Bridge is its OWN product surface (apps/community-bridge,
+ * Neon-based, deployed apart at gate.myfenrir.com). The main MyFenrir
+ * dashboard only hands off to it — the embedded brand wizard was retired
+ * from this surface on purpose.
+ */
+export function CommunityBridgeHandoffPanel() {
+  return (
+    <section className="panel wide community-bridge-handoff" aria-label="Community Bridge">
+      <div className="panel-title">
+        <div>
+          <h3>Community Bridge</h3>
+          <p>Gates, branding, invites and member state live in their own app — Neon-backed, separate from this dashboard.</p>
+        </div>
+        <span className="status good">Separate surface</span>
+      </div>
+      <div className="community-bridge-handoff-body">
+        <p>
+          Build and manage your community gates in the Community Bridge dashboard.
+          Fenrir keeps the door; Neon keeps the member state.
+        </p>
+        <div className="community-bridge-handoff-actions">
+          <a className="button-link" href={communityBridgeDashboardUrl}>Open Community Bridge →</a>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNotice: (message: string) => void }) {
   const [step, setStep] = useState<BrandWizardStep>("Address");
