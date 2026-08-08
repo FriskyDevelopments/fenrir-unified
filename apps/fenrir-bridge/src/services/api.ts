@@ -411,7 +411,7 @@ export const authService = {
     // signInWithOAuth against project yqevglppbhuoxxfsfnih, which holds the
     // provider apps that accept its callback. Only if the bundle was built
     // without Supabase config do we fall back to the direct per-provider stack.
-    // WorkOS is deliberately NOT in this path: it was the 1621d6a regression.
+    // The banned broker is deliberately NOT in this path (1621d6a regression).
     if (isSupabaseAuthConfigured()) {
       await signInWithSupabase(provider);
       return;
