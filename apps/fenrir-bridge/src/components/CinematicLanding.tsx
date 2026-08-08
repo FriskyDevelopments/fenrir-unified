@@ -1,4 +1,9 @@
+import { useCallback, useRef } from "react";
+import { knowledgeBaseUrl } from "../services/knowledgeBase";
+
 const particles = Array.from({ length: 14 }, (_, index) => index + 1);
+const titleLetters = ["F", "E", "N", "R", "I", "R"];
+const protocolRail = ["IDENTITY", "COMMUNITIES", "TELEGRAM LOCK", "STARS PAYMENTS", "PROTOCOL SERVICES"];
 
 const cinematicStyles = `
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Orbitron:wght@500;600;700;800&display=swap");
@@ -6,6 +11,8 @@ const cinematicStyles = `
 .cinematic-landing {
   --cyan: #00e5ff;
   --violet: #7b2fff;
+  --mx: 0;
+  --my: 0;
   min-height: 100svh;
   isolation: isolate;
   display: grid;
@@ -32,7 +39,9 @@ const cinematicStyles = `
   aspect-ratio: 1;
   background: radial-gradient(circle, rgb(0 229 255 / 16%), transparent 67%);
   filter: blur(16px);
+  transform: translate(calc(var(--mx) * 2.2rem), calc(var(--my) * 2.2rem));
   animation: cinematic-breathe 8s ease-in-out infinite;
+  transition: transform 600ms cubic-bezier(.16, 1, .3, 1);
 }
 
 .cinematic-landing::after {
@@ -40,8 +49,9 @@ const cinematicStyles = `
   aspect-ratio: 1;
   background: radial-gradient(circle, rgb(123 47 255 / 18%), transparent 68%);
   filter: blur(18px);
-  transform: translate(30%, 20%);
+  transform: translate(calc(30% + var(--mx) * -3rem), calc(20% + var(--my) * -3rem));
   animation: cinematic-breathe 10s ease-in-out -3s infinite reverse;
+  transition: transform 700ms cubic-bezier(.16, 1, .3, 1);
 }
 
 .cinematic-landing__grain {
@@ -52,6 +62,23 @@ const cinematicStyles = `
   background-image: radial-gradient(rgb(255 255 255 / 10%) 0.55px, transparent 0.55px);
   background-size: 5px 5px;
   mask-image: linear-gradient(to bottom, transparent, #000 28%, #000 72%, transparent);
+}
+
+.cinematic-landing__scan {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgb(255 255 255 / 1.6%) 3px, rgb(255 255 255 / 1.6%) 4px);
+}
+
+.cinematic-landing__beam {
+  position: absolute;
+  inset: -20% -40%;
+  z-index: -1;
+  pointer-events: none;
+  background: conic-gradient(from 210deg at 50% 40%, transparent 0deg, rgb(0 229 255 / 7%) 40deg, transparent 90deg, rgb(123 47 255 / 6%) 200deg, transparent 260deg);
+  animation: cinematic-sweep 26s linear infinite;
 }
 
 .cinematic-landing__particle {
@@ -83,7 +110,8 @@ const cinematicStyles = `
 .cinematic-landing__content {
   width: min(100%, 60rem);
   text-align: center;
-  animation: cinematic-arrive 1.1s cubic-bezier(.16, 1, .3, 1) both;
+  transform: perspective(900px) rotateX(calc(var(--my) * -1.4deg)) rotateY(calc(var(--mx) * 1.8deg));
+  transition: transform 500ms cubic-bezier(.16, 1, .3, 1);
 }
 
 .cinematic-landing__eyebrow {
@@ -92,6 +120,7 @@ const cinematicStyles = `
   font: 500 clamp(.65rem, 1.3vw, .78rem)/1 Orbitron, sans-serif;
   letter-spacing: .38em;
   text-transform: uppercase;
+  animation: cinematic-arrive .9s cubic-bezier(.16, 1, .3, 1) both;
 }
 
 .cinematic-landing__title {
@@ -100,23 +129,62 @@ const cinematicStyles = `
   font: 800 clamp(4rem, 16vw, 11.5rem)/.78 Orbitron, sans-serif;
   letter-spacing: -.07em;
   text-shadow: 0 0 10px rgb(0 229 255 / 82%), 0 0 42px rgb(0 229 255 / 44%), 0 0 100px rgb(123 47 255 / 35%);
-  animation: cinematic-neon 5s ease-in-out 1.1s infinite;
+  animation: cinematic-neon 5s ease-in-out 1.4s infinite;
 }
+
+.cinematic-landing__title span {
+  display: inline-block;
+  background: linear-gradient(115deg, #effdff 30%, var(--cyan) 50%, #effdff 62%, #b591ff 78%, #effdff 92%);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation:
+    cinematic-letter .9s cubic-bezier(.16, 1, .3, 1) both,
+    cinematic-shimmer 7s ease-in-out 1.6s infinite;
+}
+
+.cinematic-landing__title span:nth-child(1) { animation-delay: .08s, 1.6s; }
+.cinematic-landing__title span:nth-child(2) { animation-delay: .16s, 1.7s; }
+.cinematic-landing__title span:nth-child(3) { animation-delay: .24s, 1.8s; }
+.cinematic-landing__title span:nth-child(4) { animation-delay: .32s, 1.9s; }
+.cinematic-landing__title span:nth-child(5) { animation-delay: .40s, 2.0s; }
+.cinematic-landing__title span:nth-child(6) { animation-delay: .48s, 2.1s; }
 
 .cinematic-landing__line {
   width: min(15rem, 44vw);
   height: 1px;
-  margin: clamp(2rem, 5vw, 3.5rem) auto 1.5rem;
+  margin: clamp(1.6rem, 4vw, 2.6rem) auto 1.35rem;
   background: linear-gradient(90deg, transparent, var(--cyan), var(--violet), transparent);
   box-shadow: 0 0 18px rgb(0 229 255 / 58%);
+  animation: cinematic-line 1.1s cubic-bezier(.16, 1, .3, 1) .5s both;
 }
 
 .cinematic-landing__tagline {
   max-width: 27rem;
-  margin: 0 auto 2.25rem;
+  margin: 0 auto 1.1rem;
   color: rgb(225 239 247 / 72%);
   font-size: clamp(.93rem, 1.8vw, 1.08rem);
   line-height: 1.65;
+  animation: cinematic-arrive 1s cubic-bezier(.16, 1, .3, 1) .55s both;
+}
+
+.cinematic-landing__pitch {
+  max-width: 33rem;
+  margin: 0 auto 2rem;
+  color: rgb(200 220 232 / 58%);
+  font-size: clamp(.8rem, 1.5vw, .92rem);
+  line-height: 1.7;
+  animation: cinematic-arrive 1s cubic-bezier(.16, 1, .3, 1) .68s both;
+}
+
+.cinematic-landing__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: .9rem;
+  animation: cinematic-arrive 1s cubic-bezier(.16, 1, .3, 1) .8s both;
 }
 
 .cinematic-landing__enter {
@@ -135,39 +203,142 @@ const cinematicStyles = `
   letter-spacing: .18em;
   text-decoration: none;
   text-transform: uppercase;
+  position: relative;
+  overflow: hidden;
   transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
 }
 
+.cinematic-landing__enter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 14%) 50%, transparent 70%);
+  background-size: 250% 100%;
+  animation: cinematic-shimmer 4.5s ease-in-out 2s infinite;
+  pointer-events: none;
+}
+
 .cinematic-landing__enter:hover {
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(1.02);
   background: linear-gradient(100deg, rgb(0 229 255 / 32%), rgb(123 47 255 / 36%));
-  box-shadow: inset 0 0 26px rgb(0 229 255 / 14%), 0 0 34px rgb(0 229 255 / 34%);
+  box-shadow: inset 0 0 26px rgb(0 229 255 / 14%), 0 0 44px rgb(0 229 255 / 42%);
 }
 
 .cinematic-landing__enter:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
 
+.cinematic-landing__docs {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  min-height: 3.25rem;
+  border: 1px solid rgb(181 145 255 / 40%);
+  border-radius: 999px;
+  padding: .8rem 1.4rem;
+  color: rgb(225 239 247 / 82%);
+  background: rgb(123 47 255 / 8%);
+  font: 600 .7rem/1 Orbitron, sans-serif;
+  letter-spacing: .18em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.cinematic-landing__docs:hover {
+  transform: translateY(-2px);
+  border-color: rgb(181 145 255 / 80%);
+  color: #f2ecff;
+  box-shadow: 0 0 26px rgb(123 47 255 / 30%);
+}
+
+.cinematic-landing__docs:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
+
+.cinematic-landing__docs i {
+  font-style: normal;
+  transform: translateY(-1px);
+}
+
+.cinematic-landing__rail {
+  margin-top: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: .55rem 1.5rem;
+  color: rgb(218 246 255 / 40%);
+  font: 500 .6rem/1 Orbitron, sans-serif;
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  animation: cinematic-arrive 1s cubic-bezier(.16, 1, .3, 1) .95s both;
+}
+
+.cinematic-landing__rail span {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.cinematic-landing__rail span + span::before {
+  content: "◆";
+  font-size: .45rem;
+  color: rgb(0 229 255 / 45%);
+  text-shadow: 0 0 8px rgb(0 229 255 / 60%);
+}
+
 @keyframes cinematic-arrive { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-@keyframes cinematic-breathe { 50% { opacity: .62; transform: scale(1.13); } }
+@keyframes cinematic-letter { from { opacity: 0; transform: translateY(.35em) rotateX(45deg) scale(.9); filter: blur(6px); } to { opacity: 1; transform: translateY(0) rotateX(0) scale(1); filter: blur(0); } }
+@keyframes cinematic-line { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+@keyframes cinematic-breathe { 50% { opacity: .62; } }
 @keyframes cinematic-neon { 50% { opacity: .88; filter: brightness(1.2); } }
 @keyframes cinematic-drift { 50% { opacity: .38; transform: translate3d(0, -28px, 0) scale(1.8); } }
+@keyframes cinematic-shimmer { 0% { background-position: 120% 0; } 55% { background-position: -80% 0; } 100% { background-position: -80% 0; } }
+@keyframes cinematic-sweep { to { transform: rotate(360deg); } }
 
 @media (prefers-reduced-motion: reduce) {
   .cinematic-landing *, .cinematic-landing::before, .cinematic-landing::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .cinematic-landing__content { transform: none; }
 }
 `;
 
 export function CinematicLanding() {
+  const rootRef = useRef<HTMLElement | null>(null);
+
+  const onPointerMove = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    const root = rootRef.current;
+    if (!root) return;
+    const rect = root.getBoundingClientRect();
+    const mx = (event.clientX - rect.left) / rect.width - 0.5;
+    const my = (event.clientY - rect.top) / rect.height - 0.5;
+    root.style.setProperty("--mx", mx.toFixed(3));
+    root.style.setProperty("--my", my.toFixed(3));
+  }, []);
+
   return (
-    <main className="cinematic-landing">
+    <main className="cinematic-landing" ref={rootRef} onPointerMove={onPointerMove}>
       <style>{cinematicStyles}</style>
       <div className="cinematic-landing__grain" aria-hidden="true" />
+      <div className="cinematic-landing__beam" aria-hidden="true" />
+      <div className="cinematic-landing__scan" aria-hidden="true" />
       {particles.map((particle) => <span className="cinematic-landing__particle" key={particle} aria-hidden="true" />)}
       <section className="cinematic-landing__content" aria-labelledby="cinematic-landing-title">
         <p className="cinematic-landing__eyebrow">MYFENRIR / PRIVATE ACCESS</p>
-        <h1 className="cinematic-landing__title" id="cinematic-landing-title">FENRIR</h1>
+        <h1 className="cinematic-landing__title" id="cinematic-landing-title">
+          {titleLetters.map((letter, index) => <span key={`${letter}-${index}`}>{letter}</span>)}
+        </h1>
         <div className="cinematic-landing__line" aria-hidden="true" />
         <p className="cinematic-landing__tagline">The signal is yours. The way in is waiting.</p>
-        <a className="cinematic-landing__enter" href="/login">Enter</a>
+        <p className="cinematic-landing__pitch">
+          Fenrir is the front door of the Frisky ecosystem: one identity for your Telegram
+          communities, invite rotation, and Stars payments — behind a single gate.
+        </p>
+        <div className="cinematic-landing__actions">
+          <a className="cinematic-landing__enter" href="/login">Enter</a>
+          <a className="cinematic-landing__docs" href={knowledgeBaseUrl} target="_blank" rel="noreferrer">
+            Astelar Docs <i>↗</i>
+          </a>
+        </div>
+        <div className="cinematic-landing__rail" aria-hidden="true">
+          {protocolRail.map((lane) => <span key={lane}>{lane}</span>)}
+        </div>
       </section>
     </main>
   );
