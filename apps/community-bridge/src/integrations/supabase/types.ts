@@ -8,6 +8,33 @@ export type Database = {
   };
   public: {
     Tables: {
+      admission_whitelist: {
+        Row: {
+          id: string;
+          community_id: string;
+          telegram_id: number;
+          note: string | null;
+          added_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          community_id: string;
+          telegram_id: number;
+          note?: string | null;
+          added_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          community_id?: string;
+          telegram_id?: number;
+          note?: string | null;
+          added_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       admission_requirements: {
         Row: {
           community_id: string;

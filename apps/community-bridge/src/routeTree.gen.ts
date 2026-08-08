@@ -18,6 +18,7 @@ import { Route as DemoRouteImport } from './routes/demo'
 import { Route as GateRouteImport } from './routes/gate'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as NotEligibleRouteImport } from './routes/not-eligible'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TermsRouteImport } from './routes/terms'
@@ -75,6 +76,11 @@ const LoginRoute = LoginRouteImport.update({
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
   path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotEligibleRoute = NotEligibleRouteImport.update({
+  id: '/not-eligible',
+  path: '/not-eligible',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/gate': typeof GateRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/not-eligible': typeof NotEligibleRoute
   '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/gate': typeof GateRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/not-eligible': typeof NotEligibleRoute
   '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/gate': typeof GateRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/not-eligible': typeof NotEligibleRoute
   '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | '/gate'
     | '/login'
     | '/mcp'
+    | '/not-eligible'
     | '/privacy'
     | '/sitemap.xml'
     | '/terms'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
     | '/gate'
     | '/login'
     | '/mcp'
+    | '/not-eligible'
     | '/privacy'
     | '/sitemap.xml'
     | '/terms'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/gate'
     | '/login'
     | '/mcp'
+    | '/not-eligible'
     | '/privacy'
     | '/sitemap.xml'
     | '/terms'
@@ -305,6 +317,7 @@ export interface RootRouteChildren {
   GateRoute: typeof GateRoute
   LoginRoute: typeof LoginRoute
   McpRoute: typeof McpRoute
+  NotEligibleRoute: typeof NotEligibleRoute
   PrivacyRoute: typeof PrivacyRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
@@ -383,6 +396,13 @@ declare module '@tanstack/react-router' {
       path: '/mcp'
       fullPath: '/mcp'
       preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/not-eligible': {
+      id: '/not-eligible'
+      path: '/not-eligible'
+      fullPath: '/not-eligible'
+      preLoaderRoute: typeof NotEligibleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -489,6 +509,7 @@ const rootRouteChildren: RootRouteChildren = {
   GateRoute: GateRoute,
   LoginRoute: LoginRoute,
   McpRoute: McpRoute,
+  NotEligibleRoute: NotEligibleRoute,
   PrivacyRoute: PrivacyRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,

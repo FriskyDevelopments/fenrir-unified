@@ -541,6 +541,43 @@ create trigger update_admission_requirements_updated_at
   before update on public.admission_requirements
   for each row execute function public.update_updated_at_column();
 
+-- Whitelist: Telegram accounts staff exempt from the admission checks. The
+-- bot consults this first (service_role) and admits a whitelisted member
+-- without further checks; a bot /whitelist command writes the same table.
+create table if not exists public.admission_whitelist (
+  id uuid primary key default gen_random_uuid(),
+  community_id text not null,
+  telegram_id bigint not null,
+  note text,
+  added_by uuid,
+  created_at timestamptz not null default now(),
+  constraint admission_whitelist_unique unique (community_id, telegram_id)
+);
+
+grant select, insert, delete on public.admission_whitelist to authenticated;
+grant all on public.admission_whitelist to service_role;
+
+alter table public.admission_whitelist enable row level security;
+
+-- Staff-only in every direction — the whitelist holds Telegram ids.
+drop policy if exists "staff read admission whitelist" on public.admission_whitelist;
+create policy "staff read admission whitelist"
+  on public.admission_whitelist for select to authenticated
+  using (private.is_staff(auth.uid()));
+
+drop policy if exists "staff insert admission whitelist" on public.admission_whitelist;
+create policy "staff insert admission whitelist"
+  on public.admission_whitelist for insert to authenticated
+  with check (private.is_staff(auth.uid()) and added_by = auth.uid());
+
+drop policy if exists "staff delete admission whitelist" on public.admission_whitelist;
+create policy "staff delete admission whitelist"
+  on public.admission_whitelist for delete to authenticated
+  using (private.is_staff(auth.uid()));
+
+create index if not exists admission_whitelist_community_idx
+  on public.admission_whitelist (community_id, telegram_id);
+
 -- =========================================================================
 -- 13. Storage buckets + policies (assets served through the app's server
 --     routes with service_role, so both buckets stay private)

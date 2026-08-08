@@ -27,7 +27,14 @@ import {
 } from "@/lib/admin.functions";
 import { useAuth, type AppRole } from "@/hooks/use-auth";
 import { BRANDS } from "@/config/brands";
-import { getAdmissionRequirements, saveAdmissionRequirements } from "@/lib/admission.functions";
+import {
+  getAdmissionRequirements,
+  saveAdmissionRequirements,
+  listAdmissionWhitelist,
+  addToAdmissionWhitelist,
+  removeFromAdmissionWhitelist,
+  type WhitelistEntry,
+} from "@/lib/admission.functions";
 import { RequireRole } from "@/components/auth/require-auth";
 import { formatAuthError } from "@/lib/auth-errors";
 import { ArrowLeft, Loader2, Save, ShieldBan, ShieldCheck, X } from "lucide-react";
@@ -523,6 +530,147 @@ function AdmissionRequirementsCard() {
           </Button>
         </div>
       </div>
+
+      <WhitelistManager communityId={communityId} />
     </section>
+  );
+}
+
+/**
+ * Staff whitelist: Telegram accounts the bot admits without running the
+ * admission checks. A bot /whitelist command writes this same table.
+ */
+function WhitelistManager({ communityId }: { communityId: string }) {
+  const [entries, setEntries] = useState<WhitelistEntry[] | null>(null);
+  const [draftId, setDraftId] = useState("");
+  const [draftNote, setDraftNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchWhitelist = useServerFn(listAdmissionWhitelist);
+  const addEntry = useServerFn(addToAdmissionWhitelist);
+  const removeEntry = useServerFn(removeFromAdmissionWhitelist);
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      setEntries(await fetchWhitelist({ data: { communityId } }));
+    } catch (err) {
+      setEntries([]);
+      setError(formatAuthError(err instanceof Error ? err.message : String(err)));
+    }
+  }, [communityId, fetchWhitelist]);
+
+  useEffect(() => {
+    setEntries(null);
+    void load();
+  }, [load]);
+
+  async function add() {
+    const raw = draftId.trim();
+    if (!/^\d+$/.test(raw) || !Number.isSafeInteger(Number(raw))) {
+      setError("Telegram ID must be digits only.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await addEntry({
+        data: {
+          communityId,
+          telegramId: Number(raw),
+          note: draftNote.trim() || undefined,
+        },
+      });
+      setDraftId("");
+      setDraftNote("");
+      void load();
+    } catch (err) {
+      setError(formatAuthError(err instanceof Error ? err.message : String(err)));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await removeEntry({ data: { id } });
+      void load();
+    } catch (err) {
+      setError(formatAuthError(err instanceof Error ? err.message : String(err)));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-8 border-t border-border/60 pt-6">
+      <h3 className="text-base font-semibold tracking-tight">Whitelist</h3>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Whitelisted Telegram accounts skip every admission check for this community.
+      </p>
+
+      {error && (
+        <div className="mt-3 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 sm:max-w-lg">
+        <Input
+          inputMode="numeric"
+          placeholder="Telegram ID"
+          value={draftId}
+          disabled={busy}
+          onChange={(e) => setDraftId(e.target.value)}
+          className="max-w-[180px]"
+        />
+        <Input
+          placeholder="Note (optional)"
+          value={draftNote}
+          disabled={busy}
+          onChange={(e) => setDraftNote(e.target.value)}
+          className="max-w-[220px]"
+        />
+        <Button size="sm" loading={busy} disabled={!draftId.trim()} onClick={() => void add()}>
+          Whitelist
+        </Button>
+      </div>
+
+      <ul className="mt-4 space-y-2 sm:max-w-lg">
+        {entries === null && (
+          <li className="py-3 text-center">
+            <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
+          </li>
+        )}
+        {entries?.length === 0 && !error && (
+          <li className="text-sm text-muted-foreground">No whitelisted accounts.</li>
+        )}
+        {entries?.map((entry) => (
+          <li
+            key={entry.id}
+            className="flex items-center justify-between rounded-lg border border-border/60 bg-card/60 px-3 py-2"
+          >
+            <span className="text-sm">
+              <span className="font-medium text-foreground">{entry.telegram_id}</span>
+              {entry.note ? (
+                <span className="ml-2 text-xs text-muted-foreground">{entry.note}</span>
+              ) : null}
+            </span>
+            <Button
+              size="icon"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => void remove(entry.id)}
+              aria-label={`Remove ${entry.telegram_id} from whitelist`}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
