@@ -1,0 +1,2908 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <meta name="theme-color" content="#050508" />
+  <title>FENRIR PROTOCOL — Wiki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+  <style>
+    /* ═══════════════════════════════
+   TOKENS — Frisky Design System (Canonical)
+   Deep Tech / Cyber — Play·Wolf palette
+═══════════════════════════════ */
+    :root {
+      /* Backgrounds */
+      --b: #050505;
+      --b1: #080808;
+      --b2: #0d0d0d;
+      --b3: #111111;
+      /* Primary accent — purple-400 */
+      --purple: #c084fc;
+      --purple2: #d4a5ff;
+      --purple-dim: rgba(192, 132, 252, .12);
+      /* Secondary accent — emerald-400 */
+      --emerald: #34d399;
+      --emerald2: #6ee7b7;
+      --emerald-dim: rgba(52, 211, 153, .1);
+      /* Gradient shorthand — Play/Wolf */
+      --grad: linear-gradient(135deg, #c084fc, #34d399);
+      --grad-text: linear-gradient(135deg, #c084fc 0%, #34d399 100%);
+      /* Legacy aliases (keep existing var() refs working) */
+      --lime: #34d399;
+      --lime2: #6ee7b7;
+      --lime-dim: rgba(52, 211, 153, .12);
+      --blue: #c084fc;
+      --blue2: #d4a5ff;
+      --blue-dim: rgba(192, 132, 252, .1);
+      /* Text */
+      --w: #ffffff;
+      --w2: #cbd5e1;
+      --w3: rgba(203, 213, 225, .6);
+      --mu: rgba(203, 213, 225, .5);
+      --md: rgba(203, 213, 225, .3);
+      /* Borders / glass */
+      --ln: rgba(255, 255, 255, .07);
+      --ln2: rgba(255, 255, 255, .10);
+      --ln-lime: rgba(52, 211, 153, .2);
+      --ln-blue: rgba(192, 132, 252, .2);
+      /* Cards — glassmorphism */
+      --card: rgba(255, 255, 255, .05);
+      --card-border: rgba(255, 255, 255, .10);
+      --card-glow: 0 0 30px rgba(192, 132, 252, 0.10);
+      /* Status */
+      --good: #34d399;
+      --warn: #fbbf24;
+      --err: #f87171;
+      --max: 1200px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    html {
+      scroll-behavior: smooth
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--b);
+      color: var(--w2);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    ::selection {
+      background: rgba(192, 132, 252, .2);
+      color: var(--purple)
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit
+    }
+
+    /* ═══ CURSOR ═══ */
+    * {
+      cursor: none !important
+    }
+
+    #c1,
+    #c2 {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      border-radius: 50%;
+      transition: opacity .3s
+    }
+
+    #c1 {
+      width: 8px;
+      height: 8px;
+      background: var(--grad);
+      box-shadow: 0 0 8px var(--purple);
+      transition: transform .08s
+    }
+
+    #c2 {
+      width: 28px;
+      height: 28px;
+      border: 1px solid rgba(192, 132, 252, .45);
+      transform: translate(-10px, -10px);
+      transition: transform .16s ease, width .18s, height .18s
+    }
+
+    body:has(.btn:hover) #c2,
+    body:has(a:hover) #c2 {
+      width: 46px;
+      height: 46px;
+      transform: translate(-19px, -19px);
+      border-color: rgba(192, 132, 252, .8);
+      background: rgba(192, 132, 252, .06)
+    }
+
+    /* ═══ SCROLL PROGRESS ═══ */
+    #prog {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--grad);
+      transform: scaleX(0);
+      transform-origin: left;
+      z-index: 9001;
+      box-shadow: 0 0 10px var(--purple)
+    }
+
+    /* ═══ SCANLINE OVERLAY ═══ */
+    #scan {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, .06) 2px, rgba(0, 0, 0, .06) 4px);
+      opacity: .4
+    }
+
+    /* ═══ GRID BG ═══ */
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(192, 132, 252, .04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(52, 211, 153, .04) 1px, transparent 1px);
+      background-size: 44px 44px
+    }
+
+    /* ═══ AMBIENT ═══ */
+    .ambient {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden
+    }
+
+    .amb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(160px)
+    }
+
+    .amb:nth-child(1) {
+      width: 50vw;
+      height: 50vw;
+      background: rgba(192, 132, 252, .08);
+      top: -10%;
+      left: -10%;
+      animation: adrift 18s ease-in-out infinite
+    }
+
+    .amb:nth-child(2) {
+      width: 40vw;
+      height: 40vw;
+      background: rgba(52, 211, 153, .06);
+      bottom: -8%;
+      right: -8%;
+      animation: adrift 14s ease-in-out infinite reverse
+    }
+
+    @keyframes adrift {
+
+      0%,
+      100% {
+        transform: scale(1)
+      }
+
+      50% {
+        transform: scale(1.1) translate(2%, 2%)
+      }
+    }
+
+    /* ═══ NAV ═══ */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 800;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      padding: 0 32px;
+      gap: 16px;
+      background: rgba(5, 5, 8, .92);
+      border-bottom: 1px solid var(--ln);
+      backdrop-filter: blur(10px)
+    }
+
+    .n-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Sora';
+      font-weight: 900;
+      font-size: 14px;
+      letter-spacing: 1.5px;
+      color: var(--lime);
+      text-transform: uppercase
+    }
+
+    .n-mark {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--ln-lime);
+      border-radius: 6px;
+      background: rgba(52, 211, 153, .07)
+    }
+
+    .n-logo small {
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      font-weight: 400;
+      color: var(--mu);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-left: 4px
+    }
+
+    .n-links {
+      margin-left: auto;
+      display: flex;
+      gap: 0;
+      align-items: center
+    }
+
+    .n-links a {
+      font-family: 'JetBrains Mono';
+      font-size: 11px;
+      color: var(--mu);
+      padding: 7px 14px;
+      letter-spacing: .5px;
+      transition: .15s;
+      border-left: 1px solid var(--ln)
+    }
+
+    .n-links a:hover {
+      color: var(--lime);
+      background: var(--lime-dim)
+    }
+
+    .n-links a:last-child {
+      border-right: 1px solid var(--ln)
+    }
+
+    .n-status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-family: 'JetBrains Mono';
+      font-size: 10.5px;
+      color: var(--lime);
+      margin-left: 16px;
+      border: 1px solid var(--ln-lime);
+      padding: 5px 12px;
+      border-radius: 3px
+    }
+
+    .n-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--lime);
+      box-shadow: 0 0 8px var(--lime);
+      animation: blink 2s step-end infinite
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .3
+      }
+    }
+
+    @media(max-width:800px) {
+      .n-links a:not(:last-child) {
+        display: none
+      }
+    }
+
+    /* ═══ TICKER ═══ */
+    .ticker {
+      overflow: hidden;
+      white-space: nowrap;
+      border-bottom: 1px solid var(--ln);
+      background: rgba(5, 5, 8, .95);
+      height: 28px;
+      display: flex;
+      align-items: center
+    }
+
+    .tick-in {
+      display: inline-flex;
+      animation: tick 40s linear infinite;
+      gap: 0
+    }
+
+    .tick-in span {
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--md);
+      padding: 0 24px;
+      border-right: 1px solid var(--ln)
+    }
+
+    .tick-in .hi {
+      color: rgba(52, 211, 153, .6)
+    }
+
+    @keyframes tick {
+      from {
+        transform: translateX(0)
+      }
+
+      to {
+        transform: translateX(-50%)
+      }
+    }
+
+    /* ═══ WRAP ═══ */
+    .z {
+      position: relative;
+      z-index: 2
+    }
+
+    .w {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0 40px
+    }
+
+    @media(max-width:600px) {
+      .w {
+        padding: 0 18px
+      }
+    }
+
+    /* ═══ HERO ═══ */
+    .hero {
+      padding: 52px 0 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column
+    }
+
+    .hero-body {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 40px;
+      align-items: center;
+      padding: 64px 40px 48px;
+      max-width: var(--max);
+      margin: 0 auto;
+      width: 100%
+    }
+
+    @media(max-width:880px) {
+      .hero-body {
+        grid-template-columns: 1fr;
+        padding: 40px 18px 32px
+      }
+    }
+
+    .hero-tag {
+      font-family: 'JetBrains Mono';
+      font-size: 10.5px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--lime);
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: .8
+    }
+
+    .hero-tag::before {
+      content: "//";
+      color: rgba(52, 211, 153, .4)
+    }
+
+    h1 {
+      font-family: 'Sora';
+      font-weight: 900;
+      font-size: clamp(48px, 8vw, 100px);
+      line-height: .92;
+      letter-spacing: -3px;
+      margin-bottom: 28px;
+      color: var(--w)
+    }
+
+    h1 .acc {
+      color: var(--lime);
+      text-shadow: 0 0 30px rgba(52, 211, 153, .4)
+    }
+
+    h1 .dim {
+      color: var(--md)
+    }
+
+    .hero-sub {
+      font-size: 16px;
+      color: var(--w2);
+      max-width: 500px;
+      line-height: 1.7;
+      margin-bottom: 36px
+    }
+
+    .hero-sub b {
+      color: var(--w);
+      font-weight: 600
+    }
+
+    .hero-sub code {
+      font-family: 'JetBrains Mono';
+      font-size: 13px;
+      color: var(--lime);
+      background: var(--lime-dim);
+      border: 1px solid var(--ln-lime);
+      padding: 1px 6px;
+      border-radius: 3px
+    }
+
+    .btns {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap
+    }
+
+    @media(max-width:880px) {
+      .btns {
+        justify-content: flex-start
+      }
+    }
+
+    .btn {
+      font-family: 'Sora';
+      font-weight: 700;
+      font-size: 13px;
+      padding: 12px 22px;
+      border-radius: 3px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: .5px;
+      border: 1px solid transparent;
+      transition: .2s;
+      text-transform: uppercase
+    }
+
+    .btn-p {
+      background: var(--lime);
+      color: #050508;
+      border-color: var(--lime);
+      box-shadow: 0 0 20px rgba(52, 211, 153, .25)
+    }
+
+    .btn-p:hover {
+      background: var(--lime2);
+      box-shadow: 0 0 32px rgba(52, 211, 153, .45);
+      transform: translateY(-2px)
+    }
+
+    .btn-g {
+      background: transparent;
+      border-color: var(--ln2);
+      color: var(--w2)
+    }
+
+    .btn-g:hover {
+      border-color: rgba(52, 211, 153, .4);
+      color: var(--lime);
+      background: var(--lime-dim)
+    }
+
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      margin-top: 44px;
+      border: 1px solid var(--ln);
+      border-radius: 3px;
+      overflow: hidden
+    }
+
+    .hs {
+      padding: 20px 24px;
+      border-right: 1px solid var(--ln);
+      background: var(--card)
+    }
+
+    .hs:last-child {
+      border-right: none
+    }
+
+    .hs-n {
+      font-family: 'Sora';
+      font-weight: 900;
+      font-size: 34px;
+      color: var(--lime);
+      letter-spacing: -1px;
+      text-shadow: 0 0 20px rgba(52, 211, 153, .3);
+      line-height: 1
+    }
+
+    .hs-l {
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      color: var(--mu);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-top: 4px
+    }
+
+    /* ═══ HERO TERMINAL ═══ */
+    .terminal {
+      background: var(--b1);
+      border: 1px solid var(--ln-lime);
+      border-radius: 4px;
+      overflow: hidden;
+      font-family: 'JetBrains Mono';
+      font-size: 12.5px
+    }
+
+    .term-bar {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 14px;
+      background: var(--b2);
+      border-bottom: 1px solid var(--ln)
+    }
+
+    .tdb {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%
+    }
+
+    .tdb:nth-child(1) {
+      background: #ff5555
+    }
+
+    .tdb:nth-child(2) {
+      background: #ffbd2e
+    }
+
+    .tdb:nth-child(3) {
+      background: var(--lime);
+      box-shadow: 0 0 6px rgba(52, 211, 153, .5)
+    }
+
+    .term-title {
+      font-size: 10px;
+      color: var(--mu);
+      margin-left: 6px;
+      letter-spacing: .5px
+    }
+
+    .term-body {
+      padding: 20px 18px;
+      display: grid;
+      gap: 6px
+    }
+
+    .tl {
+      display: flex;
+      gap: 12px
+    }
+
+    .tl-p {
+      color: rgba(52, 211, 153, .45)
+    }
+
+    .tl-c {
+      color: var(--mu)
+    }
+
+    .tl-k {
+      color: var(--lime)
+    }
+
+    .tl-v {
+      color: var(--blue)
+    }
+
+    .tl-s {
+      color: var(--w2)
+    }
+
+    .tl-d {
+      color: rgba(203, 213, 225, .25)
+    }
+
+    .tl-ok {
+      color: var(--lime);
+      font-weight: 500
+    }
+
+    .tl-warn {
+      color: var(--warn)
+    }
+
+    .tl-err {
+      color: var(--err)
+    }
+
+    .cursor-blink {
+      display: inline-block;
+      width: 8px;
+      height: 13px;
+      background: var(--lime);
+      vertical-align: text-bottom;
+      animation: blink 1.2s step-end infinite;
+      margin-left: 2px;
+      opacity: .8
+    }
+
+    /* ═══ SECTIONS ═══ */
+    section {
+      padding: 88px 0;
+      position: relative
+    }
+
+    .sn {
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--lime);
+      opacity: .7;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 14px
+    }
+
+    .sn::before {
+      content: "//"
+    }
+
+    .sec-bg {
+      position: absolute;
+      right: -10px;
+      top: 0;
+      font-family: 'Sora';
+      font-size: clamp(120px, 20vw, 240px);
+      font-weight: 900;
+      color: rgba(52, 211, 153, .025);
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+      letter-spacing: -10px;
+      overflow: hidden;
+      max-width: 100%
+    }
+
+    h2 {
+      font-family: 'Sora';
+      font-weight: 800;
+      font-size: clamp(28px, 4vw, 48px);
+      line-height: 1.06;
+      letter-spacing: -1px;
+      margin-bottom: 14px;
+      color: var(--w)
+    }
+
+    h2 .g {
+      color: var(--lime)
+    }
+
+    .sec-lead {
+      font-size: 16px;
+      color: var(--w2);
+      max-width: 600px;
+      line-height: 1.7;
+      margin-bottom: 48px
+    }
+
+    /* ═══ DOCTRINE ═══ */
+    .doc-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--ln)
+    }
+
+    @media(max-width:760px) {
+      .doc-grid {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .doc {
+      background: var(--b1);
+      padding: 36px;
+      position: relative;
+      overflow: hidden;
+      transition: .25s
+    }
+
+    .doc:hover {
+      background: var(--b2)
+    }
+
+    .doc::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      transition: .3s
+    }
+
+    .doc:hover::after {
+      background: var(--lime)
+    }
+
+    .doc-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      border-radius: 2px;
+      margin-bottom: 20px
+    }
+
+    .dt-live {
+      color: var(--lime);
+      background: rgba(52, 211, 153, .1);
+      border: 1px solid rgba(52, 211, 153, .25)
+    }
+
+    .dt-build {
+      color: var(--warn);
+      background: rgba(255, 216, 74, .08);
+      border: 1px solid rgba(255, 216, 74, .25)
+    }
+
+    .dt-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%
+    }
+
+    .dt-dot.l {
+      background: var(--lime);
+      box-shadow: 0 0 6px var(--lime)
+    }
+
+    .dt-dot.b {
+      background: var(--warn)
+    }
+
+    .doc-n {
+      position: absolute;
+      bottom: 20px;
+      right: 24px;
+      font-family: 'Sora';
+      font-size: 90px;
+      font-weight: 900;
+      color: rgba(52, 211, 153, .04);
+      line-height: 1;
+      pointer-events: none;
+      letter-spacing: -4px
+    }
+
+    .doc h3 {
+      font-family: 'Sora';
+      font-weight: 800;
+      font-size: 28px;
+      letter-spacing: -.6px;
+      margin-bottom: 7px;
+      color: var(--w)
+    }
+
+    .doc-handle {
+      font-family: 'JetBrains Mono';
+      font-size: 12px;
+      color: rgba(52, 211, 153, .5);
+      margin-bottom: 18px
+    }
+
+    .doc-handle::before {
+      content: "@"
+    }
+
+    .doc p {
+      color: var(--w2);
+      font-size: 14.5px;
+      line-height: 1.7;
+      margin-bottom: 22px
+    }
+
+    .doc-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px
+    }
+
+    .chip {
+      font-family: 'JetBrains Mono';
+      font-size: 11px;
+      padding: 4px 9px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, .04);
+      border: 1px solid var(--ln);
+      color: var(--mu)
+    }
+
+    /* ═══ GATES ═══ */
+    .gate-list {
+      display: grid;
+      gap: 1px;
+      background: var(--ln)
+    }
+
+    .gate {
+      display: grid;
+      grid-template-columns: 64px 1fr auto;
+      align-items: stretch;
+      background: var(--b1);
+      transition: .2s
+    }
+
+    .gate:hover {
+      background: var(--b2)
+    }
+
+    .gate:hover .gl {
+      color: var(--lime);
+      text-shadow: 0 0 20px rgba(52, 211, 153, .5)
+    }
+
+    .gate:hover {
+      border-left: 2px solid var(--lime)
+    }
+
+    .gate-l {
+      display: grid;
+      place-items: center;
+      background: rgba(52, 211, 153, .04);
+      border-right: 1px solid var(--ln)
+    }
+
+    .gl {
+      font-family: 'Sora';
+      font-weight: 900;
+      font-size: 38px;
+      color: rgba(52, 211, 153, .2);
+      transition: .3s;
+      letter-spacing: -1px
+    }
+
+    .gate-body {
+      padding: 24px 28px
+    }
+
+    .gate-sub {
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--mu);
+      margin-bottom: 5px
+    }
+
+    .gate-body h3 {
+      font-family: 'Sora';
+      font-weight: 700;
+      font-size: 19px;
+      margin-bottom: 8px;
+      color: var(--w)
+    }
+
+    .gate-body p {
+      font-size: 13.5px;
+      color: var(--w2);
+      line-height: 1.6
+    }
+
+    .gate-meta {
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 8px;
+      border-left: 1px solid var(--ln);
+      min-width: 160px
+    }
+
+    @media(max-width:640px) {
+      .gate {
+        grid-template-columns: 52px 1fr
+      }
+
+      .gate-meta {
+        display: none
+      }
+    }
+
+    .gate-stack {
+      font-family: 'JetBrains Mono';
+      font-size: 10.5px;
+      color: var(--mu);
+      padding: 4px 8px;
+      border: 1px solid var(--ln);
+      border-radius: 2px
+    }
+
+    .gate-state {
+      font-family: 'JetBrains Mono';
+      font-size: 10.5px;
+      font-weight: 500
+    }
+
+    .gs-ok {
+      color: var(--lime)
+    }
+
+    .gs-todo {
+      color: var(--warn)
+    }
+
+    /* ═══ ARCH DIAGRAM ═══ */
+    .arch-box {
+      background: var(--b1);
+      border: 1px solid var(--ln);
+      border-radius: 2px;
+      overflow: hidden
+    }
+
+    .arch-topbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--b2);
+      border-bottom: 1px solid var(--ln);
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      color: var(--mu);
+      letter-spacing: .5px
+    }
+
+    .arch-svg {
+      display: block;
+      width: 100%;
+      overflow-x: auto
+    }
+
+    .arch-legend {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      padding: 16px 20px;
+      border-top: 1px solid var(--ln);
+      background: var(--b2)
+    }
+
+    .al-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      color: var(--mu);
+      letter-spacing: .5px
+    }
+
+    .al-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 1px
+    }
+
+    /* ═══ SCHEMA ═══ */
+    .schema-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--ln)
+    }
+
+    @media(max-width:760px) {
+      .schema-grid {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .sc {
+      background: var(--b1);
+      padding: 28px
+    }
+
+    .sc-title {
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--lime);
+      opacity: .7;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px
+    }
+
+    .sc-name {
+      font-family: 'Sora';
+      font-weight: 700;
+      font-size: 17px;
+      color: var(--w);
+      margin-bottom: 18px
+    }
+
+    .field {
+      display: grid;
+      grid-template-columns: 140px 70px 1fr;
+      gap: 8px;
+      align-items: baseline;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--ln);
+      font-family: 'JetBrains Mono';
+      font-size: 11.5px
+    }
+
+    .field:last-child {
+      border: none
+    }
+
+    .f-name {
+      color: var(--lime)
+    }
+
+    .f-type {
+      color: var(--blue);
+      opacity: .8
+    }
+
+    .f-note {
+      color: var(--mu);
+      font-size: 10.5px
+    }
+
+    .f-pk {
+      font-size: 9px;
+      background: rgba(52, 211, 153, .15);
+      color: var(--lime);
+      border: 1px solid var(--ln-lime);
+      padding: 1px 5px;
+      border-radius: 2px;
+      margin-left: 4px
+    }
+
+    .sc-note {
+      margin-top: 16px;
+      padding: 10px 12px;
+      background: rgba(52, 211, 153, .05);
+      border: 1px solid var(--ln-lime);
+      border-radius: 2px;
+      font-family: 'JetBrains Mono';
+      font-size: 11px;
+      color: rgba(52, 211, 153, .6);
+      line-height: 1.5
+    }
+
+    /* ═══ SECURITY ═══ */
+    .sec-table {
+      display: grid;
+      gap: 1px;
+      background: var(--ln)
+    }
+
+    .si {
+      display: grid;
+      grid-template-columns: 52px 1fr;
+      align-items: stretch;
+      background: var(--b1);
+      transition: .2s
+    }
+
+    .si:hover {
+      background: var(--b2)
+    }
+
+    .si-check {
+      display: grid;
+      place-items: center;
+      padding: 0;
+      background: rgba(0, 0, 0, .2);
+      border-right: 1px solid var(--ln)
+    }
+
+    .chk {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 2px;
+      font-family: 'JetBrains Mono';
+      font-size: 14px;
+      font-weight: 500
+    }
+
+    .cy {
+      background: rgba(52, 211, 153, .1);
+      color: var(--lime);
+      border: 1px solid rgba(52, 211, 153, .3)
+    }
+
+    .cn {
+      background: rgba(255, 216, 74, .08);
+      color: var(--warn);
+      border: 1px solid rgba(255, 216, 74, .25)
+    }
+
+    .si-body {
+      padding: 16px 20px
+    }
+
+    .si-body b {
+      font-family: 'Sora';
+      font-weight: 700;
+      font-size: 13.5px;
+      display: block;
+      margin-bottom: 3px;
+      color: var(--w)
+    }
+
+    .si-body span {
+      font-size: 12.5px;
+      color: var(--w2);
+      line-height: 1.5
+    }
+
+    /* ═══ BRAND ═══ */
+    .brand-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--ln)
+    }
+
+    @media(max-width:760px) {
+      .brand-layout {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .bp {
+      background: var(--b1);
+      padding: 28px
+    }
+
+    .bp-title {
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--mu);
+      margin-bottom: 16px
+    }
+
+    .swatches {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px
+    }
+
+    .sw {
+      height: 80px;
+      border-radius: 3px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: .3px;
+      border: 1px solid rgba(255, 255, 255, .08);
+      transition: .2s;
+      cursor: default
+    }
+
+    .sw:hover {
+      transform: scale(1.04)
+    }
+
+    .sw small {
+      display: block;
+      opacity: .55;
+      font-size: 9.5px;
+      margin-top: 2px
+    }
+
+    .type-row {
+      margin-bottom: 14px
+    }
+
+    .trl {
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      color: var(--mu);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 5px
+    }
+
+    .voice-line {
+      font-family: 'Sora';
+      font-size: 14.5px;
+      font-weight: 700;
+      padding: 9px 12px;
+      border-left: 2px solid var(--lime);
+      margin-bottom: 7px;
+      background: rgba(52, 211, 153, .04);
+      color: var(--w)
+    }
+
+    .voice-line em {
+      font-style: normal;
+      font-weight: 400;
+      font-family: 'JetBrains Mono';
+      font-size: 10.5px;
+      color: var(--mu);
+      margin-left: 8px;
+      letter-spacing: .5px
+    }
+
+    /* ═══ TIMELINE ═══ */
+    .tl-wrap {
+      position: relative;
+      padding-left: 28px
+    }
+
+    .tl-wrap::before {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: linear-gradient(180deg, var(--lime) 0%, rgba(52, 211, 153, .1) 100%)
+    }
+
+    .phase {
+      position: relative;
+      margin-bottom: 28px;
+      padding-left: 32px
+    }
+
+    .phase::before {
+      content: "";
+      position: absolute;
+      left: -28px;
+      top: 5px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--b);
+      border: 2px solid rgba(52, 211, 153, .3);
+      transition: .3s
+    }
+
+    .phase.done::before {
+      background: var(--lime);
+      border-color: var(--lime);
+      box-shadow: 0 0 12px rgba(52, 211, 153, .5)
+    }
+
+    .phase:hover::before {
+      transform: scale(1.4)
+    }
+
+    .ph-n {
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--lime);
+      opacity: .6;
+      margin-bottom: 4px
+    }
+
+    .phase h4 {
+      font-family: 'Sora';
+      font-weight: 700;
+      font-size: 16px;
+      margin-bottom: 5px;
+      color: var(--w)
+    }
+
+    .phase p {
+      font-size: 13px;
+      color: var(--w2);
+      line-height: 1.55
+    }
+
+    .ph-tag {
+      display: inline-flex;
+      margin-top: 8px;
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: .5px;
+      padding: 3px 9px;
+      border-radius: 2px
+    }
+
+    .pt-d {
+      background: rgba(52, 211, 153, .1);
+      color: var(--lime);
+      border: 1px solid rgba(52, 211, 153, .25)
+    }
+
+    .pt-n {
+      background: rgba(255, 216, 74, .08);
+      color: var(--warn);
+      border: 1px solid rgba(255, 216, 74, .2)
+    }
+
+    .pt-p {
+      background: rgba(255, 255, 255, .04);
+      color: var(--mu);
+      border: 1px solid var(--ln)
+    }
+
+    /* ═══ DASHBOARD ═══ */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--ln);
+      margin-bottom: 28px;
+      border-radius: 2px;
+      overflow: hidden
+    }
+
+    .met {
+      background: var(--b1);
+      padding: 24px 20px;
+      text-align: center
+    }
+
+    .met-v {
+      font-family: 'Sora';
+      font-weight: 900;
+      font-size: 44px;
+      letter-spacing: -2px;
+      color: var(--lime);
+      text-shadow: 0 0 20px rgba(52, 211, 153, .3);
+      line-height: 1
+    }
+
+    .met-l {
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--mu);
+      margin-top: 6px
+    }
+
+    @media(max-width:640px) {
+      .metrics {
+        grid-template-columns: 1fr 1fr
+      }
+    }
+
+    .dash-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1px;
+      background: var(--ln);
+      border-radius: 2px;
+      overflow: hidden
+    }
+
+    @media(max-width:820px) {
+      .dash-grid {
+        grid-template-columns: 1fr 1fr
+      }
+    }
+
+    @media(max-width:480px) {
+      .dash-grid {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .dc {
+      background: var(--b1);
+      padding: 22px;
+      transition: .2s;
+      position: relative;
+      overflow: hidden
+    }
+
+    .dc::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px
+    }
+
+    .dc-live::after {
+      background: var(--lime);
+      box-shadow: 0 0 8px rgba(52, 211, 153, .5)
+    }
+
+    .dc-build::after {
+      background: var(--warn)
+    }
+
+    .dc-plan::after {
+      background: var(--blue)
+    }
+
+    .dc:hover {
+      background: var(--b2)
+    }
+
+    .dc-ico {
+      font-size: 22px;
+      margin-bottom: 12px;
+      display: block
+    }
+
+    .dc h4 {
+      font-family: 'Sora';
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 5px;
+      color: var(--w)
+    }
+
+    .dc p {
+      font-size: 12.5px;
+      color: var(--w2);
+      line-height: 1.5
+    }
+
+    .dc-st {
+      margin-top: 12px;
+      font-family: 'JetBrains Mono';
+      font-size: 10.5px;
+      letter-spacing: .5px;
+      font-weight: 500
+    }
+
+    .ds-l {
+      color: var(--lime)
+    }
+
+    .ds-b {
+      color: var(--warn)
+    }
+
+    .ds-p {
+      color: var(--blue)
+    }
+
+    /* ═══ FOOTER ═══ */
+    footer {
+      padding: 64px 0 48px;
+      border-top: 1px solid var(--ln);
+      margin-top: 32px
+    }
+
+    .foot-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 40px
+    }
+
+    @media(max-width:760px) {
+      .foot-grid {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .foot-brand {
+      font-family: 'Sora';
+      font-weight: 900;
+      font-size: 28px;
+      letter-spacing: -1px;
+      color: var(--lime);
+      text-shadow: 0 0 20px rgba(52, 211, 153, .3)
+    }
+
+    .foot-sub {
+      font-family: 'JetBrains Mono';
+      font-size: 11px;
+      color: var(--mu);
+      margin-top: 8px;
+      line-height: 1.8;
+      letter-spacing: .3px
+    }
+
+    .foot-title {
+      font-family: 'JetBrains Mono';
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--mu);
+      margin-bottom: 14px
+    }
+
+    .foot-links {
+      display: grid;
+      gap: 8px
+    }
+
+    .foot-links a {
+      font-size: 13.5px;
+      color: var(--w2);
+      transition: .15s
+    }
+
+    .foot-links a:hover {
+      color: var(--lime)
+    }
+
+    .pack-voice {
+      display: grid;
+      gap: 6px
+    }
+
+    .pv {
+      font-family: 'Sora';
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--lime);
+      opacity: .8
+    }
+
+    .pv small {
+      font-family: 'JetBrains Mono';
+      font-weight: 400;
+      font-size: 10px;
+      color: var(--mu);
+      margin-left: 6px;
+      letter-spacing: .5px
+    }
+
+    .foot-bottom {
+      margin-top: 44px;
+      padding-top: 20px;
+      border-top: 1px solid var(--ln);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px
+    }
+
+    .foot-copy {
+      font-family: 'JetBrains Mono';
+      font-size: 11px;
+      color: var(--md);
+      letter-spacing: .5px
+    }
+
+    /* ═══ REVEAL ═══ */
+    .rev {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity .7s cubic-bezier(.22, 1, .36, 1), transform .7s cubic-bezier(.22, 1, .36, 1)
+    }
+
+    .rev.in {
+      opacity: 1;
+      transform: none
+    }
+
+    .revl {
+      opacity: 0;
+      transform: translateX(-16px);
+      transition: opacity .7s cubic-bezier(.22, 1, .36, 1), transform .7s cubic-bezier(.22, 1, .36, 1)
+    }
+
+    .revl.in {
+      opacity: 1;
+      transform: none
+    }
+
+    @media(prefers-reduced-motion:reduce) {
+
+      .rev,
+      .revl {
+        opacity: 1;
+        transform: none;
+        transition: none
+      }
+    }
+
+    /* ═══ SCROLLBAR ═══ */
+    ::-webkit-scrollbar {
+      width: 4px
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--b)
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(52, 211, 153, .3);
+      border-radius: 2px
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--lime)
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="c1"></div>
+  <div id="c2"></div>
+  <div id="prog"></div>
+  <div id="scan" aria-hidden="true"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="ambient" aria-hidden="true">
+    <div class="amb"></div>
+    <div class="amb"></div>
+  </div>
+
+  <!-- NAV -->
+  <nav class="z">
+    <div class="n-logo">
+      <div class="n-mark">
+        <!-- Frisky wolf mark (neon-lime, faceted) -->
+        <svg width="16" height="16" viewBox="0 0 128 128" aria-hidden="true">
+          <defs>
+            <linearGradient id="nm" x1="13" y1="16" x2="110" y2="116" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#cbd5e1" />
+              <stop offset=".5" stop-color="#ffffff" />
+              <stop offset="1" stop-color="#34d399" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#nm)"
+            d="M22 18l27 27c8 8 22 8 30 0l27-27 12 64-39 32-8-19c-2-4-12-4-14 0l-8 19-39-32 12-64Z" />
+          <path fill="#050508" d="M31 56h37c7 0 10 4 10 10v12H64v-7c0-2-1-3-4-3H29l2-12Z" />
+        </svg>
+      </div>
+      FENRIR <small>PROTOCOL · WIKI</small>
+    </div>
+    <div class="n-links">
+      <a href="#doctrine">Doctrine</a>
+      <a href="#gates">Gates</a>
+      <a href="#arch">Arch</a>
+      <a href="#data">Data</a>
+      <a href="#brand">Brand</a>
+      <a href="#status">Status</a>
+    </div>
+    <div class="n-status"><span class="n-dot"></span>PACK ONLINE</div>
+  </nav>
+
+  <!-- TICKER -->
+  <div class="ticker z" style="position:fixed;top:52px;left:0;right:0;z-index:790">
+    <div class="tick-in">
+      <span class="hi">FENRIR PROTOCOL</span>
+      <span>COMMUNITY SECURITY + VERIFICATION SAAS</span>
+      <span class="hi">NOT A LOGIN PAGE</span>
+      <span>SERIOUS · PRECISE · PROTECTIVE</span>
+      <span class="hi">CLOUDFLARE EDGE</span>
+      <span>TURNSTILE + SUPABASE + RULES + HAIKU</span>
+      <span class="hi">FRISKY DEVELOPMENTS</span>
+      <span>GATE.MYFENRIR.COM</span>
+      <span class="hi">FENRIR PROTOCOL</span>
+      <span>COMMUNITY SECURITY + VERIFICATION SAAS</span>
+      <span class="hi">NOT A LOGIN PAGE</span>
+      <span>SERIOUS · PRECISE · PROTECTIVE</span>
+      <span class="hi">CLOUDFLARE EDGE</span>
+      <span>TURNSTILE + SUPABASE + RULES + HAIKU</span>
+      <span class="hi">FRISKY DEVELOPMENTS</span>
+      <span>GATE.MYFENRIR.COM</span>
+    </div>
+  </div>
+
+  <div style="height:80px"></div>
+
+  <!-- ═══ HERO ═══ -->
+  <div class="hero z">
+    <div class="hero-body">
+      <!-- LEFT -->
+      <div class="revl" style="transition-delay:.05s">
+        <div class="hero-tag">Frisky Developments // Fenrir Protocol</div>
+        <h1>
+          COMMUNITY<br>
+          <span class="acc">SECURITY.</span><br>
+          <span class="dim">VERIFIED.</span>
+        </h1>
+        <p class="hero-sub">
+          <b>Fenrir Protocol</b> is the verification and security layer for the MyFenrir community —
+          not an aesthetic onboarding flow. <code>4 gates</code> between the public and the pack.
+          Serious. Precise. Protective.
+        </p>
+        <div class="btns">
+          <a class="btn btn-p" href="#gates">The four gates
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M5 12h14M13 6l6 6-6 6" stroke="#050508" stroke-width="2.2" stroke-linecap="round"
+                stroke-linejoin="round" />
+            </svg>
+          </a>
+          <a class="btn btn-g" href="#status">Go-live status</a>
+        </div>
+        <div class="hero-stats">
+          <div class="hs">
+            <div class="hs-n">4</div>
+            <div class="hs-l">Gates to pass</div>
+          </div>
+          <div class="hs">
+            <div class="hs-n">2</div>
+            <div class="hs-l">Bot surfaces</div>
+          </div>
+          <div class="hs">
+            <div class="hs-n">9</div>
+            <div class="hs-l">Build phases</div>
+          </div>
+        </div>
+      </div>
+      <!-- TERMINAL -->
+      <div class="rev" style="transition-delay:.2s">
+        <div class="terminal">
+          <div class="term-bar">
+            <div class="tdb"></div>
+            <div class="tdb"></div>
+            <div class="tdb"></div>
+            <span class="term-title">fenrir-gatekeeper // status</span>
+          </div>
+          <div class="term-body">
+            <div class="tl"><span class="tl-p">$</span><span class="tl-k">fenrir</span><span class="tl-s">status
+                --all</span></div>
+            <div class="tl"><span class="tl-d">──────────────────────────────</span></div>
+            <div class="tl"><span class="tl-c">community_bot</span><span
+                style="color:rgba(183,255,42,.5);margin-left:8px">@Fenrir_Community_BOT</span></div>
+            <div class="tl" style="padding-left:16px"><span class="tl-ok">✓ LIVE</span><span class="tl-d"
+                style="margin-left:10px">friskyclaw · systemd</span></div>
+            <div class="tl" style="margin-top:4px"><span class="tl-c">gatekeeper_bot</span><span
+                style="color:rgba(183,255,42,.5);margin-left:8px">@Myfenrir_bot</span></div>
+            <div class="tl" style="padding-left:16px"><span class="tl-warn">⚡ SPEC READY</span><span class="tl-d"
+                style="margin-left:10px">pending build</span></div>
+            <div class="tl"><span class="tl-d">──────────────────────────────</span></div>
+            <div class="tl"><span class="tl-c">gates</span></div>
+            <div class="tl" style="padding-left:16px"><span class="tl-ok">A</span><span class="tl-d"
+                style="margin-left:8px">turnstile</span><span class="tl-ok" style="margin-left:6px">ok</span></div>
+            <div class="tl" style="padding-left:16px"><span class="tl-ok">B</span><span class="tl-d"
+                style="margin-left:8px">supabase·sso</span><span class="tl-ok" style="margin-left:6px">client
+                live</span></div>
+            <div class="tl" style="padding-left:16px"><span class="tl-warn">C</span><span class="tl-d"
+                style="margin-left:8px">rules</span><span class="tl-warn" style="margin-left:6px">rules.md needed</span>
+            </div>
+            <div class="tl" style="padding-left:16px"><span class="tl-warn">D</span><span class="tl-d"
+                style="margin-left:8px">vibe·haiku</span><span class="tl-warn" style="margin-left:6px">norms
+                needed</span></div>
+            <div class="tl"><span class="tl-d">──────────────────────────────</span></div>
+            <div class="tl"><span class="tl-c">invite</span></div>
+            <div class="tl" style="padding-left:16px"><span class="tl-v">member_limit</span><span class="tl-d"
+                style="margin-left:6px">=</span><span class="tl-ok" style="margin-left:6px">1</span></div>
+            <div class="tl" style="padding-left:16px"><span class="tl-v">expire_secs</span><span class="tl-d"
+                style="margin-left:8px">=</span><span class="tl-ok" style="margin-left:6px">600</span></div>
+            <div class="tl" style="padding-left:16px"><span class="tl-v">nonce_reuse</span><span class="tl-d"
+                style="margin-left:6px">=</span><span class="tl-err" style="margin-left:6px">NEVER</span></div>
+            <div class="tl"><span class="tl-d">──────────────────────────────</span></div>
+            <div class="tl"><span class="tl-p">$</span><span class="cursor-blink"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- bottom border -->
+    <div class="w" style="padding-bottom:0">
+      <div style="height:1px;background:var(--ln)"></div>
+    </div>
+  </div>
+
+  <!-- ═══ §01 DOCTRINE ═══ -->
+  <section class="z" id="doctrine">
+    <div class="w">
+      <div class="sec-bg" aria-hidden="true">01</div>
+      <div class="sn rev">01 // The Concept</div>
+      <h2 class="rev">A door. A hearth.<br>The <span class="g">same wolf.</span></h2>
+      <p class="sec-lead rev">Most communities bolt a captcha onto the door and call it done. Fenrir Protocol treats the
+        threshold as an actual security operation — and keeps the same wolf as concierge once you're inside.</p>
+      <div class="doc-grid">
+        <div class="doc rev">
+          <div class="doc-tag dt-build"><span class="dt-dot b"></span>In Build — Spec v1.0</div>
+          <h3>The Gate</h3>
+          <div class="doc-handle">FenrirGatekeeper_bot</div>
+          <p>A new member lands in a public waiting room, muted. The wolf posts a welcome and opens a Telegram Mini App
+            at <strong>gate.myfenrir.com</strong> — four gates run in sequence. All four pass → one short-lived invite
+            link. Nonce burned immediately.</p>
+          <div class="doc-chips">
+            <span class="chip">CF Worker</span>
+            <span class="chip">gate.myfenrir.com</span>
+            <span class="chip">Telegram Mini App</span>
+            <span class="chip">webhook · no polling</span>
+          </div>
+          <div class="doc-n">01</div>
+        </div>
+        <div class="doc rev">
+          <div class="doc-tag dt-live"><span class="dt-dot l"></span>Live in the pack</div>
+          <h3>The Hearth</h3>
+          <div class="doc-handle">Fenrir_Community_BOT</div>
+          <p>Once inside, the wolf is the in-group assistant. Self-hosted on the friskyclaw box with local models. No
+            cloud dependency for replies, no polling conflict, supervised via systemd for stable uptime. Replies stay
+            private infrastructure.</p>
+          <div class="doc-chips">
+            <span class="chip">OpenClaw gateway</span>
+            <span class="chip">local models</span>
+            <span class="chip">friskyclaw · Netcup</span>
+            <span class="chip">systemd supervised</span>
+          </div>
+          <div class="doc-n">02</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ §02 GATES ═══ -->
+  <section class="z" id="gates">
+    <div class="w">
+      <div class="sec-bg" aria-hidden="true">02</div>
+      <div class="sn rev">02 // The Threshold</div>
+      <h2 class="rev">Four gates.<br><span class="g">All must pass.</span></h2>
+      <p class="sec-lead rev">Not a flow. Not a wizard. A security state machine. Each gate must pass independently. If
+        any fails — no invite. Nonce single-use. Anti-replay enforced.</p>
+      <div class="gate-list rev">
+        <div class="gate">
+          <div class="gate-l">
+            <div class="gl">A</div>
+          </div>
+          <div class="gate-body">
+            <div class="gate-sub">Gate A // Bot or Human</div>
+            <h3>Cloudflare Turnstile</h3>
+            <p>Managed-mode widget, verified <em>server-side</em>. Asserts action=gate_verify and
+              hostname=gate.myfenrir.com. Secret key never in the SPA. error-codes → hard reject.</p>
+          </div>
+          <div class="gate-meta">
+            <span class="gate-stack">CF Turnstile</span>
+            <span class="gate-state gs-ok">✓ Ready to wire</span>
+          </div>
+        </div>
+        <div class="gate">
+          <div class="gate-l">
+            <div class="gl">B</div>
+          </div>
+          <div class="gate-body">
+            <div class="gate-sub">Gate B // Real Identity</div>
+            <h3>Supabase Auth</h3>
+            <p>Same AuthKit client as myfenrir.com. Google / Microsoft / Apple. tg_user_id bound to one verified Supabase
+              identity in the durable audit table. One human, one account.</p>
+          </div>
+          <div class="gate-meta">
+            <span class="gate-stack">Supabase · Frisky AUTH</span>
+            <span class="gate-state gs-ok">✓ Client live</span>
+          </div>
+        </div>
+        <div class="gate">
+          <div class="gate-l">
+            <div class="gl">C</div>
+          </div>
+          <div class="gate-body">
+            <div class="gate-sub">Gate C // The Pact</div>
+            <h3>Rules acceptance</h3>
+            <p>Community rules displayed in full. Explicit checkbox required — Continue locked until accepted.
+              rules_version tracked — if rules change, the pact is re-confirmed at next join. Logged to Supabase with
+              timestamp.</p>
+          </div>
+          <div class="gate-meta">
+            <span class="gate-stack">Supabase audit</span>
+            <span class="gate-state gs-todo">→ rules.md needed</span>
+          </div>
+        </div>
+        <div class="gate">
+          <div class="gate-l">
+            <div class="gl">D</div>
+          </div>
+          <div class="gate-body">
+            <div class="gate-sub">Gate D // Vibe Check</div>
+            <h3>Claude Haiku classifier</h3>
+            <p>Hard gates (18+, intent selector) then free-text "why join?" classified by Claude Haiku against the
+              community norms. pass → proceed. reject → decline. review → mod channel hold, invite only on manual
+              approve.</p>
+          </div>
+          <div class="gate-meta">
+            <span class="gate-stack">claude-haiku-4-5</span>
+            <span class="gate-state gs-todo">→ norms needed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ §03 ARCHITECTURE ═══ -->
+  <section class="z" id="arch">
+    <div class="w">
+      <div class="sec-bg" aria-hidden="true">03</div>
+      <div class="sn rev">03 // Architecture</div>
+      <h2 class="rev">Cloudflare edge.<br><span class="g">No always-on box.</span></h2>
+      <p class="sec-lead rev">Worker webhook — no polling conflicts, no getUpdates thrash. Reuses the auth, identity,
+        and data plane the rest of MyFenrir runs on. The hearth runs independently on its own box.</p>
+      <div class="arch-box rev">
+        <div class="arch-topbar">
+          <span style="color:var(--lime)">●</span>
+          <span>FENRIR-GATEKEEPER // system topology</span>
+          <span style="margin-left:auto;color:rgba(183,255,42,.5)">2026-06-17</span>
+        </div>
+        <div style="overflow-x:auto;padding:24px 20px">
+          <svg viewBox="0 0 1100 460" style="min-width:700px;width:100%;display:block" role="img"
+            aria-label="Fenrir architecture diagram">
+            <defs>
+              <marker id="a1" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L7,3z" fill="rgba(183,255,42,.6)" />
+              </marker>
+              <marker id="a2" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L7,3z" fill="rgba(71,191,255,.6)" />
+              </marker>
+              <filter id="glo">
+                <feGaussianBlur stdDeviation="2" />
+              </filter>
+            </defs>
+            <!-- CF zone label -->
+            <rect x="220" y="38" width="590" height="388" rx="4" fill="none" stroke="rgba(183,255,42,.18)"
+              stroke-width="1" stroke-dasharray="8 5" />
+            <text x="512" y="62" font-family="JetBrains Mono" font-size="10" fill="rgba(183,255,42,.45)"
+              text-anchor="middle" letter-spacing="2">CLOUDFLARE EDGE // MYFENRIR</text>
+
+            <!-- USER -->
+            <rect x="20" y="168" width="140" height="124" rx="3" fill="#0d0d12" stroke="rgba(255,255,255,.1)"
+              stroke-width="1" />
+            <text x="90" y="194" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.3)"
+              text-anchor="middle" letter-spacing="1.5">USER</text>
+            <text x="90" y="214" font-family="Sora" font-size="13" font-weight="700" fill="#cbd5e1"
+              text-anchor="middle">Telegram</text>
+            <text x="90" y="232" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.35)"
+              text-anchor="middle">joins waiting room</text>
+            <text x="90" y="248" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.35)"
+              text-anchor="middle">taps Verify</text>
+            <text x="90" y="274" font-family="JetBrains Mono" font-size="8" fill="rgba(183,255,42,.5)"
+              text-anchor="middle">@Myfenrir_bot</text>
+
+            <!-- WORKER -->
+            <rect x="248" y="88" width="170" height="144" rx="3" fill="#0d0d12" stroke="rgba(183,255,42,.35)"
+              stroke-width="1" />
+            <text x="333" y="113" font-family="JetBrains Mono" font-size="9" fill="rgba(183,255,42,.6)"
+              text-anchor="middle" letter-spacing="1.5">WORKER</text>
+            <text x="333" y="132" font-family="Sora" font-size="12" font-weight="700" fill="#cbd5e1"
+              text-anchor="middle">fenrir-gatekeeper</text>
+            <text x="333" y="150" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.35)"
+              text-anchor="middle">webhook /tg</text>
+            <text x="333" y="166" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.35)"
+              text-anchor="middle">/api/gate/* router</text>
+            <text x="333" y="182" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.35)"
+              text-anchor="middle">mute · post card · invite</text>
+            <text x="333" y="220" font-family="JetBrains Mono" font-size="8" fill="rgba(71,191,255,.55)"
+              text-anchor="middle">wrangler deploy</text>
+
+            <!-- PAGES -->
+            <rect x="458" y="88" width="170" height="144" rx="3" fill="#0d0d12" stroke="rgba(71,191,255,.35)"
+              stroke-width="1" />
+            <text x="543" y="113" font-family="JetBrains Mono" font-size="9" fill="rgba(71,191,255,.6)"
+              text-anchor="middle" letter-spacing="1.5">PAGES // MINI APP</text>
+            <text x="543" y="132" font-family="Sora" font-size="12" font-weight="700" fill="#cbd5e1"
+              text-anchor="middle">gate.myfenrir.com</text>
+            <text x="543" y="150" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.35)"
+              text-anchor="middle">Vite + React SPA</text>
+            <text x="543" y="166" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.35)"
+              text-anchor="middle">4-gate wizard</text>
+            <text x="543" y="182" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.35)"
+              text-anchor="middle">dedicated subdomain</text>
+            <text x="543" y="220" font-family="JetBrains Mono" font-size="8" fill="rgba(71,191,255,.55)"
+              text-anchor="middle">Pages deploy</text>
+
+            <!-- KV -->
+            <rect x="248" y="284" width="160" height="110" rx="3" fill="#0d0d12" stroke="rgba(183,255,42,.2)"
+              stroke-width="1" />
+            <text x="328" y="308" font-family="JetBrains Mono" font-size="9" fill="rgba(183,255,42,.45)"
+              text-anchor="middle" letter-spacing="1.5">KV STORE</text>
+            <text x="328" y="326" font-family="Sora" font-size="12" font-weight="700" fill="#cbd5e1"
+              text-anchor="middle">GATE_SESSIONS</text>
+            <text x="328" y="344" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.3)"
+              text-anchor="middle">ephemeral nonce</text>
+            <text x="328" y="360" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.3)"
+              text-anchor="middle">~15min TTL · burned</text>
+            <text x="328" y="380" font-family="JetBrains Mono" font-size="8" fill="rgba(183,255,42,.45)"
+              text-anchor="middle">anti-replay · single-use</text>
+
+            <!-- SUPABASE -->
+            <rect x="458" y="284" width="160" height="110" rx="3" fill="#0d0d12" stroke="rgba(71,191,255,.2)"
+              stroke-width="1" />
+            <text x="538" y="308" font-family="JetBrains Mono" font-size="9" fill="rgba(71,191,255,.45)"
+              text-anchor="middle" letter-spacing="1.5">AUTH</text>
+            <text x="538" y="326" font-family="Sora" font-size="12" font-weight="700" fill="#cbd5e1"
+              text-anchor="middle">Supabase Auth</text>
+            <text x="538" y="344" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.3)"
+              text-anchor="middle">Google · MS · Apple</text>
+            <text x="538" y="360" font-family="JetBrains Mono" font-size="8" fill="rgba(255,255,255,.25)"
+              text-anchor="middle">client_01KSSSJENYS…</text>
+            <text x="538" y="380" font-family="JetBrains Mono" font-size="8" fill="rgba(71,191,255,.45)"
+              text-anchor="middle">Frisky AUTH app</text>
+
+            <!-- SUPABASE -->
+            <rect x="848" y="168" width="150" height="100" rx="3" fill="#0d0d12" stroke="rgba(183,255,42,.2)"
+              stroke-width="1" />
+            <text x="923" y="192" font-family="JetBrains Mono" font-size="9" fill="rgba(183,255,42,.45)"
+              text-anchor="middle" letter-spacing="1.5">SUPABASE</text>
+            <text x="923" y="210" font-family="Sora" font-size="12" font-weight="700" fill="#cbd5e1"
+              text-anchor="middle">gate_admissions</text>
+            <text x="923" y="228" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.3)"
+              text-anchor="middle">durable audit log</text>
+            <text x="923" y="244" font-family="JetBrains Mono" font-size="8" fill="rgba(255,255,255,.25)"
+              text-anchor="middle">FriskyDEV · service-role</text>
+            <text x="923" y="258" font-family="JetBrains Mono" font-size="8" fill="rgba(183,255,42,.45)"
+              text-anchor="middle">RLS locked</text>
+
+            <!-- CLAUDE -->
+            <rect x="848" y="294" width="150" height="90" rx="3" fill="#0d0d12" stroke="rgba(71,191,255,.2)"
+              stroke-width="1" />
+            <text x="923" y="318" font-family="JetBrains Mono" font-size="9" fill="rgba(71,191,255,.45)"
+              text-anchor="middle" letter-spacing="1.5">AI JUDGE</text>
+            <text x="923" y="336" font-family="Sora" font-size="12" font-weight="700" fill="#cbd5e1"
+              text-anchor="middle">Claude Haiku</text>
+            <text x="923" y="354" font-family="JetBrains Mono" font-size="9" fill="rgba(255,255,255,.3)"
+              text-anchor="middle">vibe classifier</text>
+            <text x="923" y="370" font-family="JetBrains Mono" font-size="8" fill="rgba(71,191,255,.45)"
+              text-anchor="middle">pass · review · reject</text>
+
+            <!-- ARROWS -->
+            <line x1="160" y1="210" x2="246" y2="175" stroke="rgba(183,255,42,.5)" stroke-width="1.4"
+              marker-end="url(#a1)" />
+            <text x="192" y="186" font-family="JetBrains Mono" font-size="8" fill="rgba(183,255,42,.5)">webhook</text>
+            <line x1="160" y1="240" x2="456" y2="190" stroke="rgba(71,191,255,.4)" stroke-width="1.4"
+              marker-end="url(#a2)" stroke-dasharray="5 3" />
+            <text x="300" y="207" font-family="JetBrains Mono" font-size="8" fill="rgba(71,191,255,.45)">web_app</text>
+            <line x1="418" y1="162" x2="456" y2="162" stroke="rgba(255,255,255,.2)" stroke-width="1.2"
+              marker-end="url(#a1)" />
+            <line x1="333" y1="233" x2="330" y2="282" stroke="rgba(183,255,42,.4)" stroke-width="1.2"
+              marker-end="url(#a1)" />
+            <line x1="543" y1="233" x2="543" y2="282" stroke="rgba(71,191,255,.4)" stroke-width="1.2"
+              marker-end="url(#a2)" />
+            <line x1="810" y1="180" x2="846" y2="200" stroke="rgba(183,255,42,.3)" stroke-width="1.2"
+              marker-end="url(#a1)" stroke-dasharray="4 3" />
+            <text x="826" y="190" font-family="JetBrains Mono" font-size="8" fill="rgba(183,255,42,.4)">audit</text>
+            <line x1="810" y1="305" x2="846" y2="316" stroke="rgba(71,191,255,.3)" stroke-width="1.2"
+              marker-end="url(#a2)" stroke-dasharray="4 3" />
+            <text x="822" y="310" font-family="JetBrains Mono" font-size="8" fill="rgba(71,191,255,.4)">vibe</text>
+          </svg>
+        </div>
+        <div class="arch-legend">
+          <div class="al-item"><span class="al-dot" style="background:rgba(183,255,42,.6)"></span>Worker / invite logic
+          </div>
+          <div class="al-item"><span class="al-dot" style="background:rgba(71,191,255,.6)"></span>Mini App / auth flow
+          </div>
+          <div class="al-item"><span class="al-dot"
+              style="border:1px dashed rgba(183,255,42,.4);background:transparent"></span>External service calls</div>
+          <div class="al-item"><span class="al-dot" style="background:rgba(255,255,255,.2)"></span>Edge routing</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ §04 DATA MODEL ═══ -->
+  <section class="z" id="data">
+    <div class="w">
+      <div class="sec-bg" aria-hidden="true">04</div>
+      <div class="sn rev">04 // Data Model</div>
+      <h2 class="rev">Two stores.<br><span class="g">Two lifetimes.</span></h2>
+      <p class="sec-lead rev">Ephemeral sessions burn on use. Durable audit log preserves every consent and verdict.
+        Service-role write only — no anon access.</p>
+      <div class="schema-grid">
+        <div class="sc rev">
+          <div class="sc-title">// Cloudflare KV // GATE_SESSIONS</div>
+          <div class="sc-name">Session (ephemeral)</div>
+          <div class="field"><span class="f-name">nonce</span><span class="f-type">uuid</span><span class="f-note">KEY
+              <span class="f-pk">KEY</span></span></div>
+          <div class="field"><span class="f-name">tg_user_id</span><span class="f-type">int</span><span
+              class="f-note">from initData — never client</span></div>
+          <div class="field"><span class="f-name">tg_username</span><span class="f-type">string</span></div>
+          <div class="field"><span class="f-name">tg_chat_id</span><span class="f-type">int</span><span
+              class="f-note">waiting room group</span></div>
+          <div class="field"><span class="f-name">turnstile</span><span class="f-type">bool</span></div>
+          <div class="field"><span class="f-name">supabase</span><span class="f-type">obj|null</span><span
+              class="f-note">{email, user_id}</span></div>
+          <div class="field"><span class="f-name">rules</span><span class="f-type">bool</span></div>
+          <div class="field"><span class="f-name">vibe</span><span class="f-type">str|null</span><span
+              class="f-note">pass|review|reject</span></div>
+          <div class="field"><span class="f-name">created_at</span><span class="f-type">unix</span></div>
+          <div class="sc-note">TTL ~900s · single-use · burned after invite issuance</div>
+        </div>
+        <div class="sc rev">
+          <div class="sc-title">// Supabase FriskyDEV // gate_admissions</div>
+          <div class="sc-name">Admission (durable)</div>
+          <div class="field"><span class="f-name">id</span><span class="f-type">uuid</span><span class="f-note"><span
+                class="f-pk">PK</span></span></div>
+          <div class="field"><span class="f-name">tg_user_id</span><span class="f-type">bigint</span></div>
+          <div class="field"><span class="f-name">supabase_user_id</span><span class="f-type">text</span></div>
+          <div class="field"><span class="f-name">email</span><span class="f-type">text</span></div>
+          <div class="field"><span class="f-name">rules_version</span><span class="f-type">text</span></div>
+          <div class="field"><span class="f-name">rules_accepted_at</span><span class="f-type">timestamptz</span></div>
+          <div class="field"><span class="f-name">vibe_verdict</span><span class="f-type">text</span><span
+              class="f-note">pass|review|reject</span></div>
+          <div class="field"><span class="f-name">vibe_model</span><span class="f-type">text</span><span
+              class="f-note">claude-haiku-4-5-20251001</span></div>
+          <div class="field"><span class="f-name">status</span><span class="f-type">enum</span><span
+              class="f-note">pending|admitted|rejected|review</span></div>
+          <div class="sc-note">RLS: service_role write only · anon = no access</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ §05 AUDIT ═══ -->
+  <section class="z" id="audit">
+    <div class="w">
+      <div class="sec-bg" aria-hidden="true">05</div>
+      <div class="sn rev">05 // Full Site Audit</div>
+      <h2 class="rev">myfenrir.com — <span class="g">Full Audit Report</span></h2>
+      <p class="sec-lead rev">Comprehensive audit conducted 2026-07-16 across SEO, Security, Performance, UX/UI,
+        Accessibility, and Infrastructure.</p>
+
+      <!-- EXECUTIVE SUMMARY -->
+      <div class="rev"
+        style="background:var(--b1);border:1px solid var(--ln);border-radius:2px;padding:28px;margin-bottom:32px">
+        <div
+          style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--lime);opacity:.7;margin-bottom:16px">
+          // 1. Executive Summary</div>
+        <p style="font-size:14px;color:var(--w2);line-height:1.7;margin-bottom:24px"><b>myfenrir.com</b> is a
+          <b>Telegram Mini App</b> titled "Fenrir Bridge by Frisky" — a React SPA built with Vite. It serves as a
+          bridge/connectivity tool within the Telegram ecosystem, authenticated via Telegram Web App SDK and backed by
+          Supabase on Cloudflare infrastructure.</p>
+        <div
+          style="display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--ln);border-radius:2px;overflow:hidden;margin-bottom:20px">
+          <div style="background:var(--b2);padding:18px 14px;text-align:center">
+            <div style="font-family:'Sora';font-weight:900;font-size:28px;color:var(--lime)">✅</div>
+            <div style="font-family:'JetBrains Mono';font-size:9px;color:var(--mu);margin-top:4px;letter-spacing:.5px">
+              Security</div>
+            <div style="font-family:'JetBrains Mono';font-size:8px;color:var(--w2)">2 minor</div>
+          </div>
+          <div style="background:var(--b2);padding:18px 14px;text-align:center">
+            <div style="font-family:'Sora';font-weight:900;font-size:28px;color:var(--warn)">⚠️</div>
+            <div style="font-family:'JetBrains Mono';font-size:9px;color:var(--mu);margin-top:4px;letter-spacing:.5px">
+              Performance</div>
+            <div style="font-family:'JetBrains Mono';font-size:8px;color:var(--w2)">3 medium</div>
+          </div>
+          <div style="background:var(--b2);padding:18px 14px;text-align:center">
+            <div style="font-family:'Sora';font-weight:900;font-size:28px;color:var(--err)">❌</div>
+            <div style="font-family:'JetBrains Mono';font-size:9px;color:var(--mu);margin-top:4px;letter-spacing:.5px">
+              SEO</div>
+            <div style="font-family:'JetBrains Mono';font-size:8px;color:var(--w2)">8 critical</div>
+          </div>
+          <div style="background:var(--b2);padding:18px 14px;text-align:center">
+            <div style="font-family:'Sora';font-weight:900;font-size:28px;color:var(--warn)">⚠️</div>
+            <div style="font-family:'JetBrains Mono';font-size:9px;color:var(--mu);margin-top:4px;letter-spacing:.5px">
+              UX/UI</div>
+            <div style="font-family:'JetBrains Mono';font-size:8px;color:var(--w2)">3 medium</div>
+          </div>
+          <div style="background:var(--b2);padding:18px 14px;text-align:center">
+            <div style="font-family:'Sora';font-weight:900;font-size:28px;color:var(--warn)">⚠️</div>
+            <div style="font-family:'JetBrains Mono';font-size:9px;color:var(--mu);margin-top:4px;letter-spacing:.5px">
+              Accessibility</div>
+            <div style="font-family:'JetBrains Mono';font-size:8px;color:var(--w2)">2 medium</div>
+          </div>
+          <div style="background:var(--b2);padding:18px 14px;text-align:center">
+            <div style="font-family:'Sora';font-weight:900;font-size:28px;color:var(--lime)">✅</div>
+            <div style="font-family:'JetBrains Mono';font-size:9px;color:var(--mu);margin-top:4px;letter-spacing:.5px">
+              Infrastructure</div>
+            <div style="font-family:'JetBrains Mono';font-size:8px;color:var(--w2)">1 minor</div>
+          </div>
+        </div>
+        <div style="font-family:'Sora';font-weight:700;font-size:18px;color:var(--w)">Total Issues: <span
+            style="color:var(--err)">19</span> <span
+            style="font-family:'JetBrains Mono';font-size:12px;color:var(--mu)">(8 Critical, 5 Medium, 6
+            Minor/Low)</span></div>
+      </div>
+
+      <!-- SITE OVERVIEW -->
+      <div class="rev"
+        style="background:var(--b1);border:1px solid var(--ln);border-radius:2px;padding:28px;margin-bottom:32px">
+        <div
+          style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--lime);opacity:.7;margin-bottom:16px">
+          // 2. Site Overview</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 28px">
+          <div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--ln)">
+            <span style="font-family:'JetBrains Mono';font-size:11px;color:var(--mu);min-width:120px">Domain</span>
+            <span style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--lime)">myfenrir.com → 301 →
+              www.myfenrir.com</span>
+          </div>
+          <div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--ln)">
+            <span style="font-family:'JetBrains Mono';font-size:11px;color:var(--mu);min-width:120px">Site Title</span>
+            <span style="font-size:13px;color:var(--w)">Fenrir Bridge by Frisky</span>
+          </div>
+          <div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--ln)">
+            <span style="font-family:'JetBrains Mono';font-size:11px;color:var(--mu);min-width:120px">Type</span>
+            <span style="font-size:13px;color:var(--w)">Telegram Mini App (SPA)</span>
+          </div>
+          <div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--ln)">
+            <span style="font-family:'JetBrains Mono';font-size:11px;color:var(--mu);min-width:120px">Framework</span>
+            <span style="font-size:13px;color:var(--w)">React (Vite build)</span>
+          </div>
+          <div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--ln)">
+            <span style="font-family:'JetBrains Mono';font-size:11px;color:var(--mu);min-width:120px">JS Bundle</span>
+            <span style="font-size:13px;color:var(--warn)">/assets/index-BaHQU_J-.js (~593 KB)</span>
+          </div>
+          <div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--ln)">
+            <span
+              style="font-family:'JetBrains Mono';font-size:11px;color:var(--mu);min-width:120px">Infrastructure</span>
+            <span style="font-size:13px;color:var(--w)">Cloudflare DNS + CDN, Supabase</span>
+          </div>
+          <div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--ln)">
+            <span style="font-family:'JetBrains Mono';font-size:11px;color:var(--mu);min-width:120px">SSL</span>
+            <span style="font-size:13px;color:var(--lime)">TLSv1.3 · AES-256-GCM · Google Trust</span>
+          </div>
+          <div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--ln)">
+            <span style="font-family:'JetBrains Mono';font-size:11px;color:var(--mu);min-width:120px">Auth</span>
+            <span style="font-size:13px;color:var(--w)">Telegram Web App SDK · Supabase Auth</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEO AUDIT -->
+      <div class="rev"
+        style="background:var(--b1);border:1px solid var(--ln);border-radius:2px;padding:28px;margin-bottom:32px">
+        <div
+          style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--err);opacity:.9;margin-bottom:16px">
+          // 3. SEO Audit — CRITICAL (8 issues)</div>
+        <div style="display:grid;gap:1px;background:var(--ln);border-radius:2px;overflow:hidden;margin-bottom:16px">
+          <div
+            style="display:grid;grid-template-columns:180px 60px 1fr;gap:0;background:var(--b2);padding:8px 14px;font-family:'JetBrains Mono';font-size:10px;color:var(--mu);letter-spacing:.5px">
+            <span>Tag</span><span>Status</span><span>Value</span>
+          </div>
+          <div
+            style="display:grid;grid-template-columns:180px 60px 1fr;gap:0;background:var(--b1);padding:8px 14px;font-family:'JetBrains Mono';font-size:11px;border-top:1px solid var(--ln)">
+            <span style="color:var(--lime)">
+              &lt;title&gt;
+            </span><span style="color:var(--lime)">✅</span><span style="color:var(--w)">Fenrir Bridge by Frisky</span>
+          </div>
+          <div
+            style="display:grid;grid-template-columns:180px 60px 1fr;gap:0;background:var(--b1);padding:8px 14px;font-family:'JetBrains Mono';font-size:11px;border-top:1px solid var(--ln)">
+            <span style="color:var(--warn)">
+              &lt;meta description&gt;
+            </span><span style="color:var(--err)">❌</span><span style="color:var(--mu)">Missing — critical</span>
+          </div>
+          <div
+            style="display:grid;grid-template-columns:180px 60px 1fr;gap:0;background:var(--b1);padding:8px 14px;font-family:'JetBrains Mono';font-size:11px;border-top:1px solid var(--ln)">
+            <span style="color:var(--warn)">og:title / og:description</span><span style="color:var(--err)">❌</span><span
+              style="color:var(--mu)">No Open Graph tags — no social previews</span>
+          </div>
+          <div
+            style="display:grid;grid-template-columns:180px 60px 1fr;gap:0;background:var(--b1);padding:8px 14px;font-family:'JetBrains Mono';font-size:11px;border-top:1px solid var(--ln)">
+            <span style="color:var(--warn)">twitter:card</span><span style="color:var(--err)">❌</span><span
+              style="color:var(--mu)">No Twitter Card tags</span>
+          </div>
+          <div
+            style="display:grid;grid-template-columns:180px 60px 1fr;gap:0;background:var(--b1);padding:8px 14px;font-family:'JetBrains Mono';font-size:11px;border-top:1px solid var(--ln)">
+            <span style="color:var(--warn)">canonical URL</span><span style="color:var(--err)">❌</span><span
+              style="color:var(--mu)">Missing — duplicate content risk</span>
+          </div>
+          <div
+            style="display:grid;grid-template-columns:180px 60px 1fr;gap:0;background:var(--b1);padding:8px 14px;font-family:'JetBrains Mono';font-size:11px;border-top:1px solid var(--ln)">
+            <span style="color:var(--warn)">robots.txt</span><span style="color:var(--err)">❌</span><span
+              style="color:var(--mu)">Returns HTML shell instead of directives</span>
+          </div>
+          <div
+            style="display:grid;grid-template-columns:180px 60px 1fr;gap:0;background:var(--b1);padding:8px 14px;font-family:'JetBrains Mono';font-size:11px;border-top:1px solid var(--ln)">
+            <span style="color:var(--warn)">sitemap.xml</span><span style="color:var(--err)">❌</span><span
+              style="color:var(--mu)">Returns HTML instead of XML</span>
+          </div>
+          <div
+            style="display:grid;grid-template-columns:180px 60px 1fr;gap:0;background:var(--b1);padding:8px 14px;font-family:'JetBrains Mono';font-size:11px;border-top:1px solid var(--ln)">
+            <span style="color:var(--warn)">JSON-LD</span><span style="color:var(--err)">❌</span><span
+              style="color:var(--mu)">No structured data (WebSite, WebApplication)</span>
+          </div>
+        </div>
+        <div
+          style="background:rgba(255,85,85,.08);border:1px solid rgba(255,85,85,.25);padding:12px 16px;border-radius:2px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2);line-height:1.6">
+          <span style="color:var(--err);font-weight:600">⚠ SPA with no SSR/prerendering</span> — Page is empty <div
+            id="root"> until JS executes. Content discovery unreliable.
+          </div>
+        </div>
+
+        <!-- SECURITY -->
+        <div class="rev"
+          style="background:var(--b1);border:1px solid var(--ln);border-radius:2px;padding:28px;margin-bottom:32px">
+          <div
+            style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--lime);opacity:.9;margin-bottom:16px">
+            // 4. Security — GOOD (2 minor issues)</div>
+          <div
+            style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ln);border-radius:2px;overflow:hidden;margin-bottom:16px">
+            <div style="background:var(--b2);padding:12px 16px;display:flex;gap:10px;align-items:center">
+              <span style="color:var(--lime);font-size:16px">✓</span>
+              <div>
+                <div style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">HTTPS Enforced</div>
+                <div style="font-family:'JetBrains Mono';font-size:10px;color:var(--mu)">HTTP→301→HTTPS via Cloudflare
+                </div>
+              </div>
+            </div>
+            <div style="background:var(--b2);padding:12px 16px;display:flex;gap:10px;align-items:center">
+              <span style="color:var(--lime);font-size:16px">✓</span>
+              <div>
+                <div style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">TLS v1.3</div>
+                <div style="font-family:'JetBrains Mono';font-size:10px;color:var(--mu)">AES-256-GCM · strongest
+                  available</div>
+              </div>
+            </div>
+            <div style="background:var(--b2);padding:12px 16px;display:flex;gap:10px;align-items:center">
+              <span style="color:var(--lime);font-size:16px">✓</span>
+              <div>
+                <div style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">HSTS Preloaded</div>
+                <div style="font-family:'JetBrains Mono';font-size:10px;color:var(--mu)">Strict-Transport-Security
+                  active</div>
+              </div>
+            </div>
+            <div style="background:var(--b2);padding:12px 16px;display:flex;gap:10px;align-items:center">
+              <span style="color:var(--lime);font-size:16px">✓</span>
+              <div>
+                <div style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">CSP Present</div>
+                <div style="font-family:'JetBrains Mono';font-size:10px;color:var(--mu)">Content-Security-Policy strict
+                </div>
+              </div>
+            </div>
+            <div style="background:var(--b2);padding:12px 16px;display:flex;gap:10px;align-items:center">
+              <span style="color:var(--lime);font-size:16px">✓</span>
+              <div>
+                <div style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">X-Frame-Options: DENY
+                </div>
+                <div style="font-family:'JetBrains Mono';font-size:10px;color:var(--mu)">Clickjacking protection</div>
+              </div>
+            </div>
+            <div style="background:var(--b2);padding:12px 16px;display:flex;gap:10px;align-items:center">
+              <span style="color:var(--lime);font-size:16px">✓</span>
+              <div>
+                <div style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">DDoS + WAF</div>
+                <div style="font-family:'JetBrains Mono';font-size:10px;color:var(--mu)">Cloudflare edge protection
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;gap:1px;background:var(--ln);border-radius:2px;overflow:hidden">
+            <div style="background:var(--b1);padding:12px 16px;display:flex;gap:12px;align-items:flex-start">
+              <span style="color:var(--warn);font-size:16px;flex-shrink:0">⚠</span>
+              <div>
+                <div style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">Missing Permissions-Policy
+                  header</div>
+                <div style="font-size:12px;color:var(--w2);line-height:1.5">Cannot restrict access to device APIs
+                  (camera, mic, geolocation)</div>
+              </div>
+            </div>
+            <div style="background:var(--b1);padding:12px 16px;display:flex;gap:12px;align-items:flex-start">
+              <span style="color:var(--warn);font-size:16px;flex-shrink:0">⚠</span>
+              <div>
+                <div style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">Missing Referrer-Policy
+                  header</div>
+                <div style="font-size:12px;color:var(--w2);line-height:1.5">Cannot control referrer info leakage to
+                  external links</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PERFORMANCE -->
+        <div class="rev"
+          style="background:var(--b1);border:1px solid var(--ln);border-radius:2px;padding:28px;margin-bottom:32px">
+          <div
+            style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--warn);opacity:.9;margin-bottom:16px">
+            // 5. Performance — FAIR (3 medium issues)</div>
+          <div
+            style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--ln);border-radius:2px;overflow:hidden;margin-bottom:16px">
+            <div style="background:var(--b2);padding:18px;text-align:center">
+              <div style="font-family:'Sora';font-weight:900;font-size:36px;color:var(--warn)">593 KB</div>
+              <div style="font-family:'JetBrains Mono';font-size:9px;color:var(--mu);margin-top:4px">JS bundle
+                (uncompressed)</div>
+            </div>
+            <div style="background:var(--b2);padding:18px;text-align:center">
+              <div style="font-family:'Sora';font-weight:900;font-size:36px;color:var(--lime)">726 B</div>
+              <div style="font-family:'JetBrains Mono';font-size:9px;color:var(--mu);margin-top:4px">HTML shell</div>
+            </div>
+            <div style="background:var(--b2);padding:18px;text-align:center">
+              <div style="font-family:'Sora';font-weight:900;font-size:36px;color:var(--err)">~600 KB+</div>
+              <div style="font-family:'JetBrains Mono';font-size:9px;color:var(--mu);margin-top:4px">Total initial
+                payload</div>
+            </div>
+          </div>
+          <div style="display:grid;gap:1px;background:var(--ln);border-radius:2px;overflow:hidden">
+            <div style="background:var(--b1);padding:12px 16px;display:flex;gap:12px;align-items:flex-start">
+              <span style="color:var(--err);font-size:16px;flex-shrink:0">🔴</span>
+              <div>
+                <div style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">Monolithic 593 KB JS
+                  bundle</div>
+                <div style="font-size:12px;color:var(--w2);line-height:1.5">No code splitting — entire app downloaded
+                  before any content renders</div>
+              </div>
+            </div>
+            <div style="background:var(--b1);padding:12px 16px;display:flex;gap:12px;align-items:flex-start">
+              <span style="color:var(--warn);font-size:16px;flex-shrink:0">🟡</span>
+              <div>
+                <div style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">No loading state in HTML
+                </div>
+                <div style="font-size:12px;color:var(--w2);line-height:1.5">Blank white screen until JS loads and React
+                  hydrates</div>
+              </div>
+            </div>
+            <div style="background:var(--b1);padding:12px 16px;display:flex;gap:12px;align-items:flex-start">
+              <span style="color:var(--warn);font-size:16px;flex-shrink:0">🟡</span>
+              <div>
+                <div style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">No resource hints</div>
+                <div style="font-size:12px;color:var(--w2);line-height:1.5">No preload, preconnect, or dns-prefetch for
+                  critical path</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RECOMMENDATIONS -->
+        <div class="rev"
+          style="background:var(--b1);border:1px solid var(--ln);border-radius:2px;padding:28px;margin-bottom:32px">
+          <div
+            style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--err);opacity:.9;margin-bottom:16px">
+            // 6. Recommendations</div>
+          <div style="font-family:'Sora';font-weight:700;font-size:16px;color:var(--err);margin-bottom:12px">🔴 Critical
+            — Fix Immediately</div>
+          <div style="display:grid;gap:1px;background:var(--ln);border-radius:2px;overflow:hidden;margin-bottom:20px">
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              1. Add meta description tag</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              2. Add Open Graph tags (og:title, og:description, og:image, og:url)</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              3. Add Twitter Card tags</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              4. Fix robots.txt — serve proper crawling directives</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              5. Fix sitemap.xml — serve valid XML sitemap</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              6. Add canonical URLs</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              7. Implement SSR or prerendering</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              8. Add structured data (JSON-LD)</div>
+          </div>
+          <div style="font-family:'Sora';font-weight:700;font-size:16px;color:var(--warn);margin-bottom:12px">🟡 Medium
+            — Fix Soon</div>
+          <div style="display:grid;gap:1px;background:var(--ln);border-radius:2px;overflow:hidden;margin-bottom:20px">
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              9. Code splitting — split 593 KB bundle by route</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              10. Add loading states (CSS spinner/skeleton in HTML)</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              11. Add Permissions-Policy header</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              12. Add Referrer-Policy header</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              13. Add resource hints (preconnect, preload)</div>
+          </div>
+          <div style="font-family:'Sora';font-weight:700;font-size:16px;color:var(--lime);margin-bottom:12px">🟢 Low —
+            Nice to Have</div>
+          <div style="display:grid;gap:1px;background:var(--ln);border-radius:2px;overflow:hidden;margin-bottom:16px">
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              14. PWA enhancements — service worker for offline support</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              15. Add ARIA landmarks — improve screen reader navigation</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              16. Verify CSP allows Telegram SDK</div>
+            <div
+              style="background:var(--b1);padding:10px 14px;font-family:'JetBrains Mono';font-size:11px;color:var(--w2)">
+              17. Audit Supabase RLS policies</div>
+          </div>
+        </div>
+
+        <!-- SCORECARD -->
+        <div class="rev" style="background:var(--b1);border:1px solid var(--ln);border-radius:2px;padding:28px">
+          <div
+            style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--lime);opacity:.7;margin-bottom:16px">
+            // 7. Scorecard Summary</div>
+          <div
+            style="display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ln);border-radius:2px;overflow:hidden;max-width:500px">
+            <div
+              style="background:var(--b2);padding:14px 18px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">Security</span>
+              <span style="font-family:'Sora';font-weight:900;font-size:18px;color:var(--lime)">B+</span>
+            </div>
+            <div
+              style="background:var(--b2);padding:14px 18px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">Performance</span>
+              <span style="font-family:'Sora';font-weight:900;font-size:18px;color:var(--warn)">C</span>
+            </div>
+            <div
+              style="background:var(--b2);padding:14px 18px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">SEO</span>
+              <span style="font-family:'Sora';font-weight:900;font-size:18px;color:var(--err)">F</span>
+            </div>
+            <div
+              style="background:var(--b2);padding:14px 18px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">UX/UI</span>
+              <span style="font-family:'Sora';font-weight:900;font-size:18px;color:var(--warn)">C</span>
+            </div>
+            <div
+              style="background:var(--b2);padding:14px 18px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">Accessibility</span>
+              <span style="font-family:'Sora';font-weight:900;font-size:18px;color:var(--err)">D</span>
+            </div>
+            <div
+              style="background:var(--b2);padding:14px 18px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-family:'Sora';font-weight:600;font-size:13px;color:var(--w)">Infrastructure</span>
+              <span style="font-family:'Sora';font-weight:900;font-size:18px;color:var(--lime)">B+</span>
+            </div>
+          </div>
+          <div
+            style="margin-top:16px;padding:14px 18px;background:var(--b2);border:1px solid var(--ln);border-radius:2px;display:flex;justify-content:space-between;align-items:center;max-width:500px">
+            <span style="font-family:'Sora';font-weight:800;font-size:16px;color:var(--w)">Overall</span>
+            <span style="font-family:'Sora';font-weight:900;font-size:24px;color:var(--warn)">5.3/10 — C</span>
+          </div>
+          <div
+            style="margin-top:18px;padding:12px 16px;background:rgba(183,255,42,.05);border:1px solid var(--ln-lime);border-radius:2px;font-family:'JetBrains Mono';font-size:10px;color:var(--mu);line-height:1.6">
+            Audit generated 2026-07-16 via automated orchestrated workflow using curl, openssl, DNS analysis, and HTTP
+            header inspection.
+          </div>
+        </div>
+      </div>
+  </section>
+
+  <!-- ═══ §06 SECURITY ═══ -->
+  <section class="z">
+    <div class="w">
+      <div class="sec-bg" aria-hidden="true">05</div>
+      <div class="sn rev">05 // Security</div>
+      <h2 class="rev">Seven invariants.<br><span class="g">Non-negotiable.</span></h2>
+      <div class="sec-table rev">
+        <div class="si">
+          <div class="si-check">
+            <div class="chk cy">✓</div>
+          </div>
+          <div class="si-body"><b>Webhook secret token verified</b><span>Every /tg POST checks
+              X-Telegram-Bot-Api-Secret-Token header. Unauthenticated → 403 immediately.</span></div>
+        </div>
+        <div class="si">
+          <div class="si-check">
+            <div class="chk cy">✓</div>
+          </div>
+          <div class="si-body"><b>initData HMAC + auth_date freshness</b><span>HMAC_SHA256(bot_token,"WebAppData").
+              tg_user_id from initData.user — never client-sent. auth_date must be &lt;10 min old.</span></div>
+        </div>
+        <div class="si">
+          <div class="si-check">
+            <div class="chk cy">✓</div>
+          </div>
+          <div class="si-body"><b>Turnstile server-side only</b><span>Token verified via siteverify with secret key
+              (never in SPA). Asserts action + hostname before Gate A passes.</span></div>
+        </div>
+        <div class="si">
+          <div class="si-check">
+            <div class="chk cy">✓</div>
+          </div>
+          <div class="si-body"><b>Supabase state cookie host-pinned to gate.myfenrir.com</b><span>Avoids
+              state_invalid (the same bug that hit fenrir-bridge). All auth stays on one host.</span></div>
+        </div>
+        <div class="si">
+          <div class="si-check">
+            <div class="chk cy">✓</div>
+          </div>
+          <div class="si-body"><b>One-time invite · member_limit=1 · short
+              expiry</b><span>createChatInviteLink(member_limit=1, expire=now+10m). Nonce invalidated immediately. Never
+              reused.</span></div>
+        </div>
+        <div class="si">
+          <div class="si-check">
+            <div class="chk cn">→</div>
+          </div>
+          <div class="si-body"><b>Rate limiting per tg_user_id + IP</b><span>Spec written, not deployed. CF Worker rate
+              limiting prevents invite farming / brute-force session abuse.</span></div>
+        </div>
+        <div class="si">
+          <div class="si-check">
+            <div class="chk cn">→</div>
+          </div>
+          <div class="si-body"><b>Secrets via CF Secrets + 1Password pipeline</b><span>BOT_TOKEN, TURNSTILE_SECRET,
+              SUPABASE_API_KEY, SUPABASE_SERVICE_KEY, ANTHROPIC_API_KEY — wrangler secret put. No secrets in repo.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ §06 BRAND ═══ -->
+  <section class="z" id="brand">
+    <div class="w">
+      <div class="sec-bg" aria-hidden="true">06</div>
+      <div class="sn rev">06 // Brand</div>
+      <h2 class="rev">Serious. Precise.<br><span class="g">Protective.</span></h2>
+      <p class="sec-lead rev">Fenrir Protocol's brand is NOT cute. NOT aesthetic onboarding. The Mini App uses the
+        MyFenrir Community Bridge tokens (midnight/violet-cyan) — the <em>product</em> tone is security-first. The
+        parent brand is Frisky Developments.</p>
+      <div class="brand-layout">
+        <div class="bp rev">
+          <div class="bp-title">// Frisky Dev · parent mark</div>
+          <div
+            style="margin-bottom:18px;padding:24px;background:var(--b2);border:1px solid var(--ln-lime);border-radius:3px;display:flex;align-items:center;gap:20px">
+            <svg width="52" height="52" viewBox="0 0 128 128" aria-label="Frisky Dev mark" role="img">
+              <defs>
+                <linearGradient id="fm" x1="13" y1="16" x2="110" y2="116" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stop-color="#cbd5e1" />
+                  <stop offset=".48" stop-color="#ffffff" />
+                  <stop offset="1" stop-color="#34d399" />
+                </linearGradient>
+              </defs>
+              <path fill="url(#fm)"
+                d="M22 18l27 27c8 8 22 8 30 0l27-27 12 64-39 32-8-19c-2-4-12-4-14 0l-8 19-39-32 12-64Z" />
+              <path fill="#050508" d="M31 56h37c7 0 10 4 10 10v12H64v-7c0-2-1-3-4-3H29l2-12Z" />
+              <path fill="#050508" d="M42 84L21 75l29 30-8-21Z" />
+              <path fill="#050508" d="M97 56c-3 12-12 19-27 21-7 1-10 5-10 12l-1 20 27-16c15-9 24-21 28-37H97Z" />
+              <path fill="url(#fm)" d="M72 70c13-2 20-6 25-16-10 3-18 4-24 4-8 0-12 4-13 12 3-1 7-1 12 0Z" />
+              <path fill="#050508" d="M50 88c4-7 24-7 28 0-3 6-8 9-14 9s-11-3-14-9Z" />
+            </svg>
+            <div>
+              <div style="font-family:'Sora';font-weight:900;font-size:22px;color:var(--lime);letter-spacing:.5px">
+                Frisky Dev</div>
+              <div
+                style="font-family:'JetBrains Mono';font-size:10px;color:var(--mu);margin-top:4px;letter-spacing:1px">
+                PARENT ENTITY · #34d399 → #ffffff on #050508</div>
+            </div>
+          </div>
+          <div class="swatches">
+            <div class="sw" style="background:#34d399;color:#050508">Lime<small>#34d399</small></div>
+            <div class="sw" style="background:#c084fc;color:#050508">Electric<small>#c084fc</small></div>
+            <div class="sw" style="background:#050508;color:#34d399;border-color:rgba(183,255,42,.2)">
+              Near-black<small>#050508</small></div>
+          </div>
+        </div>
+        <div class="bp rev">
+          <div class="bp-title">// MyFenrir Mini App · gate surface</div>
+          <div class="swatches" style="margin-bottom:14px">
+            <div class="sw" style="background:#080B16;color:#ECEEFF;border-color:rgba(255,255,255,.1)">
+              Midnight<small>#080B16</small></div>
+            <div class="sw" style="background:#8B7CFF;color:#080B16">Violet<small>#8B7CFF</small></div>
+            <div class="sw" style="background:#4FD7E0;color:#080B16">Cyan<small>#4FD7E0</small></div>
+          </div>
+          <div
+            style="padding:12px;background:var(--b2);border:1px solid var(--ln);border-radius:2px;font-family:'JetBrains Mono';font-size:11px;color:var(--mu);line-height:1.7">
+            gate.myfenrir.com Mini App inherits<br>Community Bridge tokens (midnight/aurora).<br>
+            <span style="color:rgba(183,255,42,.5)">// Aurora = violet + cyan ONLY. No magenta.</span>
+          </div>
+          <div style="margin-top:16px">
+            <div class="bp-title" style="margin-bottom:10px">// Pack language</div>
+            <div class="voice-line">"Entra a la manada."<em>// hero greeting</em></div>
+            <div class="voice-line">"The pack is waiting."<em>// success state</em></div>
+            <div class="voice-line">"El lobo ha hablado."<em>// reject</em></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ §07 PHASES ═══ -->
+  <section class="z">
+    <div class="w">
+      <div class="sec-bg" aria-hidden="true">07</div>
+      <div class="sn rev">07 // Build Phases</div>
+      <h2 class="rev">Nine phases.<br><span class="g">Ship in order.</span></h2>
+      <div style="max-width:680px" class="rev">
+        <div class="tl-wrap">
+          <div class="phase done">
+            <div class="ph-n">Phase 01</div>
+            <h4>Scaffold + Webhook Echo</h4>
+            <p>Worker receives /tg, verifies secret token. wrangler.jsonc, KV binding, env vars scaffolded.</p><span
+              class="ph-tag pt-d">✓ Spec ready</span>
+          </div>
+          <div class="phase done">
+            <div class="ph-n">Phase 02</div>
+            <h4>Waiting-Room Mechanics</h4>
+            <p>chat_member → restrict (mute) user → post pinned welcome card with web_app button → gate.myfenrir.com.
+            </p><span class="ph-tag pt-d">✓ Spec ready</span>
+          </div>
+          <div class="phase done">
+            <div class="ph-n">Phase 03</div>
+            <h4>Mini App Shell</h4>
+            <p>SPA opens, reads initData, POST /api/gate/open → nonce. Gate wizard skeleton, Community Bridge styling.
+            </p><span class="ph-tag pt-d">✓ Spec ready</span>
+          </div>
+          <div class="phase">
+            <div class="ph-n">Phase 04</div>
+            <h4>Gate A · Turnstile</h4>
+            <p>Managed widget, server-side siteverify. Pass → session updated, proceed to B.</p><span
+              class="ph-tag pt-n">→ Build next</span>
+          </div>
+          <div class="phase">
+            <div class="ph-n">Phase 05</div>
+            <h4>Gate B · Supabase Identity</h4>
+            <p>Add redirect URI to Frisky AUTH. Popup AuthKit in Mini App, bind tg_user_id ↔ Supabase identity in audit.
+            </p><span class="ph-tag pt-n">→ Build next</span>
+          </div>
+          <div class="phase">
+            <div class="ph-n">Phase 06</div>
+            <h4>Gate C · Rules + Audit</h4>
+            <p>Rules displayed, checkbox required, POST /api/gate/rules records {rules_version, accepted_at} to
+              Supabase.</p><span class="ph-tag pt-p">Planned</span>
+          </div>
+          <div class="phase">
+            <div class="ph-n">Phase 07</div>
+            <h4>Gate D · Vibe + Claude</h4>
+            <p>Hard gates then free-text. Claude Haiku classifies against norms. review → mod channel hold.</p><span
+              class="ph-tag pt-p">Planned</span>
+          </div>
+          <div class="phase">
+            <div class="ph-n">Phase 08</div>
+            <h4>Invite Issuance</h4>
+            <p>/api/gate/complete: all gates pass → createChatInviteLink(limit=1, expire+10m) → audit admitted → DM
+              link.</p><span class="ph-tag pt-p">Planned</span>
+          </div>
+          <div class="phase">
+            <div class="ph-n">Phase 09</div>
+            <h4>Hardening + Rate Limits</h4>
+            <p>Rate limits per tg_user_id+IP, secrets via 1Password→CF, mod channel, RULES.md final, prod stress test.
+            </p><span class="ph-tag pt-p">Planned</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ §08 STATUS ═══ -->
+  <section class="z" id="status">
+    <div class="w">
+      <div class="sec-bg" aria-hidden="true">08</div>
+      <div class="sn rev">08 // Status</div>
+      <h2 class="rev">Pack online.<br><span class="g">Gate: build ready.</span></h2>
+      <div class="metrics rev">
+        <div class="met">
+          <div class="met-v">2</div>
+          <div class="met-l">Bot surfaces</div>
+        </div>
+        <div class="met">
+          <div class="met-v">4</div>
+          <div class="met-l">Gates</div>
+        </div>
+        <div class="met">
+          <div class="met-v">7</div>
+          <div class="met-l">Sec checks</div>
+        </div>
+        <div class="met">
+          <div class="met-v">9</div>
+          <div class="met-l">Build phases</div>
+        </div>
+      </div>
+      <div class="dash-grid rev">
+        <div class="dc dc-live"><span class="dc-ico">🐺</span>
+          <h4>Fenrir Community BOT</h4>
+          <p>@Fenrir_Community_BOT live on friskyclaw. Local models, systemd supervised.</p>
+          <div class="dc-st ds-l">● LIVE · friskyclaw</div>
+        </div>
+        <div class="dc dc-live"><span class="dc-ico">🔐</span>
+          <h4>Supabase Auth</h4>
+          <p>Frisky AUTH app live — Google/Microsoft/Apple. client_01KSSSJENYSQC0YXDYM8ZACYS9.</p>
+          <div class="dc-st ds-l">● LIVE · myfenrir.com</div>
+        </div>
+        <div class="dc dc-live"><span class="dc-ico">📋</span>
+          <h4>Gate Spec v1.0</h4>
+          <p>Architecture, data model, security checklist, design spec, all 9 build phases complete.</p>
+          <div class="dc-st ds-l">● SPEC COMPLETE</div>
+        </div>
+        <div class="dc dc-build"><span class="dc-ico">🤖</span>
+          <h4>@Myfenrir_bot</h4>
+          <p>BotFather: username, /setdomain → gate.myfenrir.com, /newapp short name "verify".</p>
+          <div class="dc-st ds-b">→ NEEDS BOTFATHER</div>
+        </div>
+        <div class="dc dc-build"><span class="dc-ico">🌐</span>
+          <h4>gate.myfenrir.com DNS</h4>
+          <p>DNS → CF Pages. Needs CF token with Zone:DNS:Edit (on-machine wrangler lacks dns write).</p>
+          <div class="dc-st ds-b">→ NEEDS DNS TOKEN</div>
+        </div>
+        <div class="dc dc-build"><span class="dc-ico">↗</span>
+          <h4>Supabase Redirect URI</h4>
+          <p>Add gate.myfenrir.com/auth/callback to Frisky AUTH application (dashboard-only, no API).</p>
+          <div class="dc-st ds-b">→ NEEDS DASHBOARD</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="z">
+    <div class="w">
+      <div class="foot-grid">
+        <div>
+          <div class="foot-brand">FENRIR</div>
+          <div class="foot-sub">
+            PROTOCOL<br>
+            Frisky Developments · 2026<br>
+            Community security + verification SaaS
+          </div>
+        </div>
+        <div>
+          <div class="foot-title">// Sections</div>
+          <div class="foot-links">
+            <a href="#doctrine">01 // The Concept</a>
+            <a href="#gates">02 // The Gates</a>
+            <a href="#arch">03 // Architecture</a>
+            <a href="#data">04 // Data Model</a>
+            <a href="#brand">06 // Brand</a>
+            <a href="#status">08 // Status</a>
+          </div>
+        </div>
+        <div>
+          <div class="foot-title">// Library</div>
+          <div class="foot-links">
+            <a href="/docs/">MyFenrir Docs</a>
+            <a href="/guidebook/">Gated Access guide</a>
+            <a href="/admin-guide.html">Admin guidebook</a>
+          </div>
+        </div>
+        <div>
+          <div class="foot-title">// Pack language</div>
+          <div class="pack-voice">
+            <div class="pv">"Entra a la manada."<small>// hero</small></div>
+            <div class="pv">"The pack is waiting."<small>// success</small></div>
+            <div class="pv">"El lobo ha hablado."<small>// reject</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span class="foot-copy">© 2026 FRISKY DEVELOPMENTS · FENRIR PROTOCOL · MYFENRIR</span>
+        <span class="foot-copy">PROTECTED BY SUPABASE · SSO</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/wiki/wiki.js" defer></script>
+</body>
+
+</html>

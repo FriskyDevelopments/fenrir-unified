@@ -52,9 +52,11 @@ export function isOAuthProvider(value: unknown): value is OAuthProvider {
   return value === "google" || value === "microsoft" || value === "apple";
 }
 
-/** Providers offered by the Community Gate. */
+/**
+ * Providers offered by the Community Gate. Deliberately narrower than isOAuthProvider():
+ */
 export function isCommunityOAuthProvider(value: unknown): value is OAuthProvider {
-  return isOAuthProvider(value);
+  return value === "google" || value === "microsoft" || value === "apple";
 }
 
 export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): boolean {
@@ -67,7 +69,7 @@ export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): 
   if (provider === "apple") {
     return Boolean(env.APPLE_CLIENT_ID?.trim() && env.APPLE_TEAM_ID?.trim() && env.APPLE_KEY_ID?.trim() && env.APPLE_PRIVATE_KEY?.trim());
   }
-  return false;
+    return false;
 }
 
 export async function createOAuthTransaction(provider: OAuthProvider, env: OAuthEnv, returnTo: string): Promise<OAuthTransaction> {
@@ -76,11 +78,15 @@ export async function createOAuthTransaction(provider: OAuthProvider, env: OAuth
     state: randomUrlToken(32),
     verifier: randomUrlToken(64),
     nonce: randomUrlToken(32),
-    returnTo: safeAllowedReturnTo(returnTo, env),
+    returnTo: safeReturnPath(returnTo),
     exp: Math.floor(Date.now() / 1000) + transactionMaxAge
   };
 }
 
+/**
+ * Community Gate variant: carries the community slug through the round trip and
+ * constrains returnTo to a relative /community/... path (never cross-origin).
+ */
 export async function createCommunityOAuthTransaction(
   provider: OAuthProvider,
   _env: OAuthEnv,
@@ -149,13 +155,13 @@ export async function getAuthorizationUrl(provider: OAuthProvider, env: OAuthEnv
     return `https://appleid.apple.com/auth/authorize?${params.toString()}`;
   }
 
-  throw new Error(`unsupported_provider:${provider}`);
+    throw new Error(`unsupported_provider:${provider}`);
 }
 
 export async function transactionSetCookie(tx: OAuthTransaction, env: OAuthEnv, domain?: string) {
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(tx)));
   const signature = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
-  let header = `${transactionCookie}=${encoded}.${signature}; Path=/api/auth; HttpOnly; Secure; SameSite=Lax; Max-Age=${transactionMaxAge}`;
+  let header = `${transactionCookie}=${encoded}.${signature}; Path=/api/auth; HttpOnly; Secure; SameSite=${transactionSameSite(tx.provider)}; Max-Age=${transactionMaxAge}`;
   if (domain) header += `; Domain=${domain}`;
   return header;
 }
@@ -163,7 +169,7 @@ export async function transactionSetCookie(tx: OAuthTransaction, env: OAuthEnv, 
 export async function signSessionTransfer(session: SessionPayload, returnTo: string, env: OAuthEnv) {
   const payload: OAuthSessionTransfer = {
     session,
-    returnTo: safeAllowedReturnTo(returnTo, env),
+    returnTo: safeReturnPath(returnTo),
     exp: Math.floor(Date.now() / 1000) + 60
   };
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(payload)));
@@ -176,12 +182,18 @@ export async function readSessionTransfer(token: string, env: OAuthEnv): Promise
   if (!encoded || !signature) return null;
   const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
-  const transfer = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthSessionTransfer;
+  let transfer: OAuthSessionTransfer;
+  try {
+    transfer = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthSessionTransfer;
+  } catch {
+    return null;
+  }
+  if (!transfer || typeof transfer !== "object") return null;
   if (!transfer.exp || transfer.exp < Math.floor(Date.now() / 1000)) return null;
   if (!transfer.session?.email || !transfer.session?.frisky_user_id || !transfer.session?.frisky_org_id) return null;
   return {
     session: transfer.session,
-    returnTo: safeAllowedReturnTo(transfer.returnTo, env),
+    returnTo: safeReturnPath(transfer.returnTo),
     exp: transfer.exp
   };
 }
@@ -198,9 +210,19 @@ const communityTransactionPath = "/api/community-auth";
 export async function communityTransactionSetCookie(tx: OAuthTransaction, env: OAuthEnv, domain?: string) {
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(tx)));
   const signature = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
-  let header = `${communityTransactionCookie}=${encoded}.${signature}; Path=${communityTransactionPath}; HttpOnly; Secure; SameSite=Lax; Max-Age=${transactionMaxAge}`;
+  let header = `${communityTransactionCookie}=${encoded}.${signature}; Path=${communityTransactionPath}; HttpOnly; Secure; SameSite=${transactionSameSite(tx.provider)}; Max-Age=${transactionMaxAge}`;
   if (domain) header += `; Domain=${domain}`;
   return header;
+}
+
+/**
+ * Apple returns via response_mode=form_post, i.e. a cross-site POST. A SameSite=Lax
+ * cookie is withheld on cross-site POSTs, so the transaction would never reach the
+ * callback and every Apple sign-in would fail with oauth_state_missing. SameSite=None
+ * is required there; the cookie stays HttpOnly + Secure + HMAC-signed + state-checked.
+ */
+function transactionSameSite(provider: OAuthProvider) {
+  return provider === "apple" ? "None" : "Lax";
 }
 
 export async function readCommunityOAuthTransaction(request: Request, env: OAuthEnv): Promise<OAuthTransaction | null> {
@@ -210,9 +232,9 @@ export async function readCommunityOAuthTransaction(request: Request, env: OAuth
   if (!encoded || !signature) return null;
   const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
-  const tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
-  if (!isOAuthProvider(tx.provider)) return null;
-  if (!tx.exp || tx.exp < Math.floor(Date.now() / 1000)) return null;
+  const tx = decodeTransaction(encoded);
+  if (!tx) return null;
+  if (!isCommunityOAuthProvider(tx.provider)) return null;
   return tx;
 }
 
@@ -222,7 +244,11 @@ export function clearCommunityTransactionCookie(domain?: string) {
   return header;
 }
 
-/** Only allow relative paths under /community for the community OAuth returnTo. */
+/**
+ * Community OAuth returnTo allow-list: relative paths under /community only.
+ * Never emits an absolute URL — an attacker-supplied ?return_to=https://evil.tld
+ * would otherwise turn the callback into an open redirect.
+ */
 export function safeCommunityReturnPath(value: string | null | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
   const pathname = value.split(/[?#]/, 1)[0] || "/";
@@ -237,8 +263,21 @@ export async function readOAuthTransaction(request: Request, env: OAuthEnv): Pro
   if (!encoded || !signature) return null;
   const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
-  const tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
+  const tx = decodeTransaction(encoded);
+  if (!tx) return null;
   if (!isOAuthProvider(tx.provider)) return null;
+  return tx;
+}
+
+/** Decode + shape-check a signed transaction blob. Returns null on garbage or expiry. */
+function decodeTransaction(encoded: string): OAuthTransaction | null {
+  let tx: OAuthTransaction;
+  try {
+    tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
+  } catch {
+    return null;
+  }
+  if (!tx || typeof tx !== "object") return null;
   if (!tx.exp || tx.exp < Math.floor(Date.now() / 1000)) return null;
   return tx;
 }
@@ -249,6 +288,12 @@ export function validateOAuthTransaction(tx: OAuthTransaction | null, provider: 
   if (!state || !timingSafeEqual(tx.state, state)) throw new Error("oauth_state_invalid");
 }
 
+/**
+ * Verify the provider round trip and return the raw identity, WITHOUT minting an
+ * operator session or applying the operator admin allow-list. The Community Gate
+ * bridge builds its own Neon session from this; exchangeCodeForSession() is the
+ * operator path and keeps the allow-list check.
+ */
 export async function exchangeCodeForIdentity(
   provider: OAuthProvider,
   env: OAuthEnv,
@@ -283,53 +328,10 @@ export async function exchangeCodeForSession(
 }
 
 export function safeReturnPath(value: string | null | undefined) {
-  if (!value) return "/main";
-  // SECURITY: this helper must NEVER emit an absolute (cross-origin) URL. Any
-  // absolute returnTo has to be allow-listed via safeAllowedReturnTo()/
-  // validateRedirectUri(); returning it verbatim here is an open redirect and a
-  // session-transfer exfiltration sink (attacker ?return_to=https://evil.tld).
-  if (!value.startsWith("/") || value.startsWith("//")) return "/main";
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/main";
   const pathname = value.split(/[?#]/, 1)[0] || "/";
   if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) return "/main";
   return value;
-}
-
-export function safeAllowedReturnTo(value: string | null | undefined, env: OAuthEnv) {
-  if (!value) return validateRedirectUri(null, env);
-  if (value.startsWith("http://") || value.startsWith("https://")) return validateRedirectUri(value, env);
-  return safeReturnPath(value);
-}
-
-export function validateRedirectUri(uri: string | null | undefined, env: OAuthEnv): string {
-  const defaultUri = env.PUBLIC_SITE_URL || "";
-  const allowed = (env.ALLOWED_REDIRECT_URIS || defaultUri)
-    .split(",")
-    .map((u) => u.trim())
-    .filter(Boolean);
-
-  if (!uri) {
-    if (!defaultUri) {
-      throw new Error("No Redirect URI provided and no default configured.");
-    }
-    return defaultUri;
-  }
-
-  if (allowed.includes(uri)) {
-    return uri;
-  }
-
-  // Allow sub-paths if the base domain is allowed (simple check)
-  for (const base of allowed) {
-    if (uri.startsWith(base) && (uri.length === base.length || uri[base.length] === "/" || uri[base.length] === "?")) {
-      return uri;
-    }
-  }
-
-  if (!defaultUri) {
-    throw new Error("Redirect URI not allowed and no default configured.");
-  }
-
-  return defaultUri;
 }
 
 async function exchangeGoogleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
@@ -359,6 +361,7 @@ async function exchangeGoogleCode(env: OAuthEnv, code: string, redirectUri: stri
     email,
     name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
     identityId,
+    // Google only omits email_verified for unverified accounts — default closed.
     emailVerified: parseBoolClaim(claims.email_verified, false)
   };
 }
@@ -392,6 +395,7 @@ async function exchangeMicrosoftCode(env: OAuthEnv, code: string, redirectUri: s
     email,
     name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
     identityId,
+    // Entra ID only emits email_verified/xms_edov for federated-domain edge cases.
     emailVerified: parseBoolClaim(claims.email_verified ?? claims.xms_edov, true)
   };
 }
@@ -423,13 +427,16 @@ async function exchangeAppleCode(env: OAuthEnv, code: string, redirectUri: strin
     email,
     name: email.split("@")[0],
     identityId,
+    // Apple omits email_verified for the private-relay alias, which is verified by construction.
     emailVerified: parseBoolClaim(claims.email_verified, true)
   };
 }
 
+
+
 let fetchOverride: typeof fetch | null = null;
 
-/** Test hook: override global fetch for OAuth token/JWKS calls. */
+/** Test hook: route OAuth token/JWKS calls through a stub instead of the network. */
 export function __setFetchForTests(fetchFn: typeof fetch | null) {
   fetchOverride = fetchFn;
 }
@@ -569,6 +576,7 @@ function stringClaim(value: unknown, error: string) {
   return value;
 }
 
+/** id_token booleans arrive as either true/false or the strings "true"/"false". */
 function parseBoolClaim(value: unknown, fallback: boolean): boolean {
   if (typeof value === "boolean") return value;
   if (typeof value === "string") {

@@ -24,6 +24,8 @@ import {
 import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan } from "./services/types";
 import { AuthProviderButton } from "./components/AuthProviderButton";
 import { AuthSurface } from "./components/AuthSurface";
+import { communityBridgeDashboardUrl } from "./services/communityBridge";
+import { CommunityBridgeHandoffPanel } from "./routes/communityGate";
 import { knowledgeBaseLabel, knowledgeBaseUrl } from "./services/knowledgeBase";
 import { CinematicLanding } from "./components/CinematicLanding";
 import { GlowCard } from "./components/GlowCard";
@@ -1731,7 +1733,7 @@ export function App() {
             roomProvider={roomProviderInput}
             onDomain={() => navigateActive("domains")}
             onRoom={() => navigateActive("rooms")}
-            onCommunity={() => { window.open("https://communities.myfenrir.com/dashboard", "_blank", "noopener"); }}
+            onCommunity={() => window.open(communityBridgeDashboardUrl, "_blank", "noopener")}
           />
         )}
 
@@ -1783,7 +1785,7 @@ export function App() {
         </section>
 
         {show("billing") && <ProductionReadinessPanel c={c} readiness={readiness} loadFailed={readinessError} />}
-        {show("command", "brands") && <CommunityBrandWizardPanel locale={locale} onNotice={setNotice} />}
+        {show("command", "brands") && <CommunityBridgeHandoffPanel />}
 
         <div className="content-grid">
           {show("command", "locks", "telegram") && <section className="panel wide">

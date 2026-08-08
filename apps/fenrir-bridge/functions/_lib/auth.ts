@@ -1,6 +1,6 @@
 type OAuthProvider = "google" | "microsoft" | "apple" | "telegram";
 
-/** OAuth (via Supabase or direct) or passkey — session cookie may reference any after sign-in. */
+/** OAuth or passkey — session cookie may reference either after sign-in. */
 export type SessionProvider = OAuthProvider | "passkey";
 
 export type AuthEnv = {

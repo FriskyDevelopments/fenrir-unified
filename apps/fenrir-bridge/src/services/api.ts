@@ -1,12 +1,16 @@
 import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from "@simplewebauthn/browser";
+import {
+  domainSearchCandidates,
+  frontDoorCandidates,
+  promisingResults,
+  rankResults,
+  searchDomains,
+  type DomainSearchResult
+} from "../../shared/domain-search";
 import { copy } from "../i18n";
 import { addBridge, addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
-// HARD RULE: the login broker is Supabase Auth on the canonical MyFenrir
-// project (yqevglppbhuoxxfsfnih) — signInWithOAuth in supabaseAuth.ts. No
-// external auth broker may ever be wired here again (same banned status as
-// Vercel); Supabase is the only login path.
-import { completeSupabaseSession, hasSupabaseCallbackInLocation, signInWithSupabase, signOutSupabase } from "./supabaseAuth";
-import type { AppState, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck } from "./types";
+import { completeSupabaseSession, hasSupabaseCallbackInLocation, isSupabaseAuthConfigured, signInWithSupabase, signOutSupabase } from "./supabaseAuth";
+import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck } from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
 export const defaultBillingCheckoutErrorMessage = copy.en.checkoutErrorGeneric;
@@ -20,7 +24,21 @@ const telegramBotUsername = () =>
     .replace(/^@/, "")
     .trim();
 
+const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? "").trim().replace(/\/$/, "");
+
 export type PaidPlan = Exclude<Plan, "free">;
+
+export type DomainSearchResponse = {
+  ok: true;
+  mode: "front-door" | "exact";
+  checked: number;
+  results: DomainSearchResult[];
+  /** Clean, buyable names — the ones the wizard should offer to register. */
+  promising: string[];
+  checkedAt: string;
+  viaBrowserFallback?: true;
+  fallbackReason?: string;
+};
 
 export type BillingLimits = {
   maxTelegramLocks: number | null;
@@ -37,6 +55,7 @@ export type ReadinessPayload = {
     googleConfigured: boolean;
     microsoftConfigured: boolean;
     appleConfigured: boolean;
+    friskyAuthEnabled?: boolean;
   };
   billing: {
     stripeSecretConfigured: boolean;
@@ -388,8 +407,17 @@ export const authService = {
     }
   },
   async login(provider: "google" | "microsoft" | "apple") {
-    // Supabase signInWithOAuth on yqevglppbhuoxxfsfnih — the only login path.
-    await signInWithSupabase(provider);
+    // Supabase Auth is the restored login broker (the original working flow):
+    // signInWithOAuth against project yqevglppbhuoxxfsfnih, which holds the
+    // provider apps that accept its callback. Only if the bundle was built
+    // without Supabase config do we fall back to the direct per-provider stack.
+    // No external auth broker in this path — banned (the 1621d6a regression).
+    if (isSupabaseAuthConfigured()) {
+      await signInWithSupabase(provider);
+      return;
+    }
+    const returnTo = safeCurrentAuthReturnPath();
+    window.location.assign(`${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
   },
   async telegramLogin(payload: TelegramLoginPayload) {
     return apiRequest<{ ok: true; authenticated: true; user: AuthSession["user"]; org: AuthSession["org"] }>("/api/auth/telegram-session", {
@@ -398,6 +426,11 @@ export const authService = {
     });
   },
   async logout() {
+    try {
+      window.localStorage.removeItem("fenrir_post_auth_destination");
+    } catch {
+      // Optional cleanup only.
+    }
     await signOutSupabase();
     await apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }).catch(() => null);
   }
@@ -428,6 +461,42 @@ export const appService = {
 };
 
 export const domainService = {
+  /**
+   * Live availability sweep: public DNS (DoH) + registry (RDAP), server-side so the
+   * resolvers see one origin instead of every visitor's browser.
+   */
+  async search(input: { seed: string; mode: "front-door" | "exact"; limit?: number }) {
+    try {
+      return await apiRequest<DomainSearchResponse>("/api/domains/search", {
+        method: "POST",
+        body: JSON.stringify(input)
+      });
+    } catch (error) {
+      // Falling back to the browser keeps the check LIVE (same module, same sources)
+      // rather than degrading to a placeholder result.
+      const candidates =
+        input.mode === "front-door"
+          ? frontDoorCandidates(input.seed, { limit: input.limit ?? 12 })
+          : domainSearchCandidates(input.seed).slice(0, input.limit ?? 12);
+      if (!candidates.length) {
+        return {
+          ok: false as const,
+          error: { code: "no_candidates", message: "Enter a brand word or a full domain first." }
+        };
+      }
+      const results = rankResults(await searchDomains(candidates, { concurrency: 4 }));
+      return {
+        ok: true as const,
+        mode: input.mode,
+        checked: results.length,
+        results,
+        promising: promisingResults(results).map((result) => result.domain),
+        checkedAt: new Date().toISOString(),
+        viaBrowserFallback: true as const,
+        fallbackReason: error instanceof Error ? error.message : "api_unavailable"
+      };
+    }
+  },
   async create(domain: string) {
     return apiRequest<{ ok: true; data: AppState["domains"][number] }>("/api/domains", {
       method: "POST",
@@ -552,5 +621,11 @@ export const telegramIdentityService = {
       method: "POST",
       body: JSON.stringify(input)
     });
+  }
+};
+
+export const communitySecurityService = {
+  async getReport(communitySlug: string = "fenrir"): Promise<{ ok: true; data: CommunitySecurityReport }> {
+    return apiRequest<{ ok: true; data: CommunitySecurityReport }>(`/api/community-gate/admin/security-report?communitySlug=${encodeURIComponent(communitySlug)}`);
   }
 };

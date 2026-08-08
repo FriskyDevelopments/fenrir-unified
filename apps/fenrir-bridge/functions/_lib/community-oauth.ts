@@ -44,6 +44,25 @@ const defaultDeps: Required<CommunityOAuthDeps> = {
   communitySql
 };
 
+/** Path the bridge callback registers with every provider console. */
+export function communityOAuthCallbackPath(provider: OAuthProvider) {
+  return `/api/community-auth/oauth/callback/${provider}`;
+}
+
+const COMMUNITY_OAUTH_PROVIDERS: OAuthProvider[] = ["google", "microsoft", "apple"];
+
+/**
+ * Which providers actually have credentials bound in this environment. Lets the gate
+ * hide buttons that would dead-end on `provider_not_configured`, and lets the brand
+ * endpoints report what a community can actually offer.
+ */
+export function availableCommunityAuthProviders(env: CommunityOAuthEnv): string[] {
+  return [
+    "magic_link",
+    ...COMMUNITY_OAUTH_PROVIDERS.filter((provider) => isDirectOAuthAvailable(provider, env))
+  ];
+}
+
 export function communityOAuthErrorLocation(origin: string, slug: string, error: string) {
   const params = new URLSearchParams({ auth_error: error });
   return `${origin.replace(/\/$/, "")}/community/${slug}?${params.toString()}`;

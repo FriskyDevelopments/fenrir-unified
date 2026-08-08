@@ -55,15 +55,15 @@ const checks = [
     pass: apiSource.includes('apiRequest<AuthSession & { ok: boolean }>("/api/auth/me")')
   },
   {
-    name: "server-side login initiation only forwards to /login",
-    pass: directOauthLoginSource.includes('Location: `${requestUrl.origin}/login`') &&
-      !directOauthLoginSource.includes("authorize")
+    name: "server-side direct OAuth fallback carries no banned broker",
+    pass: directOauthLoginSource.includes("isDirectOAuthAvailable") &&
+      !/authkit/i.test(directOauthLoginSource) &&
+      !/authkit/i.test(directOauthCallbackSource)
   },
   {
-    name: "retired per-provider callback stays dead (410, no session mint)",
-    pass: directOauthCallbackSource.includes("direct_oauth_retired") &&
-      directOauthCallbackSource.includes("410") &&
-      !directOauthCallbackSource.includes("signSession")
+    name: "direct OAuth callback validates the transaction before minting",
+    pass: directOauthCallbackSource.includes("validateOAuthTransaction") &&
+      directOauthCallbackSource.includes("exchangeCodeForSession")
   },
   {
     name: "authenticated app shell never normalizes login success back to public root",
