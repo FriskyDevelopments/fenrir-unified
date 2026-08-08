@@ -53,11 +53,14 @@ function Index() {
   const brand = useBrand();
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background">
+    <main id="main" className="relative min-h-screen overflow-hidden bg-background">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 -top-40 h-[520px] opacity-60 blur-3xl"
-        style={{ background: "var(--gradient-cosmic, radial-gradient(circle at 50% 0%, oklch(0.45 0.2 25 / 0.5), transparent 70%))" }}
+        style={{
+          background:
+            "var(--gradient-cosmic, radial-gradient(circle at 50% 0%, oklch(0.45 0.2 25 / 0.5), transparent 70%))",
+        }}
       />
 
       <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-6">
@@ -97,8 +100,8 @@ function Index() {
           Secure access and public gates for your Telegram community
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-pretty text-base text-muted-foreground sm:text-lg">
-          Sign in with the identity you already use, link your Telegram account with a short code, and publish a
-          branded gate that looks great before you upload a single file.
+          Sign in with the identity you already use, link your Telegram account with a short code,
+          and publish a branded gate that looks great before you upload a single file.
         </p>
         <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
           {!loading && session ? (
@@ -129,7 +132,10 @@ function Index() {
 
       <section className="relative z-10 mx-auto grid w-full max-w-5xl gap-4 px-5 pb-20 sm:grid-cols-3">
         {features.map(({ icon: Icon, title, body }) => (
-          <article key={title} className="rounded-2xl border border-border bg-card/60 p-5 text-left backdrop-blur">
+          <article
+            key={title}
+            className="rounded-2xl border border-border bg-card/60 p-5 text-left backdrop-blur"
+          >
             <Icon className="h-5 w-5 text-primary" aria-hidden />
             <h2 className="mt-4 text-base font-semibold text-foreground">{title}</h2>
             <p className="mt-2 text-sm text-muted-foreground">{body}</p>
@@ -138,7 +144,8 @@ function Index() {
       </section>
 
       <footer className="relative z-10 mx-auto w-full max-w-5xl px-5 pb-10 text-center text-xs text-muted-foreground">
-        {brand.name} · Signed-in areas like the dashboard, activation, and gate builder require sign-in.
+        {brand.name} · Signed-in areas like the dashboard, activation, and gate builder require
+        sign-in.
       </footer>
     </main>
   );

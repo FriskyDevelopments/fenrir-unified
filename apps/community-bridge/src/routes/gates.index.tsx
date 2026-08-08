@@ -14,7 +14,6 @@ import { getMyGateViewStats, type GateViewStats } from "@/lib/gate-analytics.fun
 import { getPreset } from "@/lib/gate-presets";
 import { isDemoMode } from "@/config/demo-mode";
 
-
 export const Route = createFileRoute("/gates/")({
   ssr: false,
   head: () => ({
@@ -74,7 +73,6 @@ function MyGatesPage() {
     };
   }, [loading, session, fetchGates, fetchStats, navigate, brand.id]);
 
-
   if (loading || !gates) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
@@ -85,7 +83,7 @@ function MyGatesPage() {
 
   return (
     <div className="min-h-dvh bg-background">
-      <main className="mx-auto max-w-6xl px-5 py-10 sm:px-6 sm:py-14">
+      <main id="main" className="mx-auto max-w-6xl px-5 py-10 sm:px-6 sm:py-14">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-muted-foreground">
@@ -93,8 +91,7 @@ function MyGatesPage() {
             </p>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">My Gates</h1>
             <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-              Edit a gate&apos;s preset, copy and custom art at any time. Changes go live
-              instantly.
+              Edit a gate&apos;s preset, copy and custom art at any time. Changes go live instantly.
             </p>
           </div>
           <Button asChild variant="fenrir">
@@ -122,9 +119,7 @@ function MyGatesPage() {
                 <GatePreview config={gate} compact className="h-44" />
                 <div className="space-y-3 p-4">
                   <div>
-                    <p className="truncate text-sm font-semibold tracking-tight">
-                      {gate.headline}
-                    </p>
+                    <p className="truncate text-sm font-semibold tracking-tight">{gate.headline}</p>
                     <p className="truncate text-[11px] text-muted-foreground">/g/{gate.slug}</p>
                   </div>
                   <GateAnalyticsPanel

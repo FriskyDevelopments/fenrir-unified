@@ -118,18 +118,18 @@ function GuidePage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-5 py-12 sm:px-6 sm:py-16">
+      <main id="main" className="mx-auto max-w-3xl px-5 py-12 sm:px-6 sm:py-16">
         <article>
           <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-muted-foreground">
             Guide · Telegram automation
           </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{TITLE}</h1>
           <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-            Telegram is where communities actually talk, but it was never built to be your source
-            of truth for who someone is or what they are allowed to do. Group admin flags are
-            coarse, they live only inside one chat, and they say nothing about the account behind
-            the handle. This guide covers the pattern that fixes that: pair the bot with a portal
-            that owns identity and roles, and let automation follow from it.
+            Telegram is where communities actually talk, but it was never built to be your source of
+            truth for who someone is or what they are allowed to do. Group admin flags are coarse,
+            they live only inside one chat, and they say nothing about the account behind the
+            handle. This guide covers the pattern that fixes that: pair the bot with a portal that
+            owns identity and roles, and let automation follow from it.
           </p>
 
           <section className="mt-12">
@@ -139,14 +139,14 @@ function GuidePage() {
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               A Telegram ID is a stable, useful identifier — but on its own it is an anonymous
               number. Promote someone to admin in a group and you have granted power inside that
-              group only, with no audit trail, no expiry, and no link to the email, subscription
-              or seat they signed up with. When the same person needs access across several chats
-              plus a dashboard, hand-managed admin flags stop scaling almost immediately: someone
-              leaves, and you are hunting through chats trying to remember what they held.
+              group only, with no audit trail, no expiry, and no link to the email, subscription or
+              seat they signed up with. When the same person needs access across several chats plus
+              a dashboard, hand-managed admin flags stop scaling almost immediately: someone leaves,
+              and you are hunting through chats trying to remember what they held.
             </p>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Role management means one authoritative record per person, one place to change it,
-              and every surface — bot, portal, API — reading that same record.
+              Role management means one authoritative record per person, one place to change it, and
+              every surface — bot, portal, API — reading that same record.
             </p>
           </section>
 
@@ -190,9 +190,9 @@ function GuidePage() {
                 Separate table, no self-writes.
               </li>
               <li>
-                <strong className="text-foreground">Codes that never expire.</strong> A linking
-                code pasted into a public chat and still valid a week later is a free account
-                takeover. Short expiry plus single use.
+                <strong className="text-foreground">Codes that never expire.</strong> A linking code
+                pasted into a public chat and still valid a week later is a free account takeover.
+                Short expiry plus single use.
               </li>
               <li>
                 <strong className="text-foreground">Admin checks in the browser.</strong> Hiding a
@@ -212,21 +212,19 @@ function GuidePage() {
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               With linked identities and server-side roles in place, the automation you actually
-              wanted becomes straightforward: onboard a new member by role instead of by hand,
-              gate a chat or a feature behind a paid tier, expire access when a subscription
-              lapses, and give staff a single console that shows every member, their role and
-              whether their Telegram account is linked. The bot becomes an interface to your
-              access model rather than a second, divergent copy of it.
+              wanted becomes straightforward: onboard a new member by role instead of by hand, gate
+              a chat or a feature behind a paid tier, expire access when a subscription lapses, and
+              give staff a single console that shows every member, their role and whether their
+              Telegram account is linked. The bot becomes an interface to your access model rather
+              than a second, divergent copy of it.
             </p>
           </section>
 
           <Card variant="glow" className="mt-12 p-6 text-center">
-            <h2 className="text-lg font-semibold tracking-tight">
-              Run this pattern on MyFenrir
-            </h2>
+            <h2 className="text-lg font-semibold tracking-tight">Run this pattern on MyFenrir</h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-              MyFenrir ships the whole flow: single sign-on, one-time Telegram linking codes,
-              roles in a dedicated table, and a staff console for managing them.
+              MyFenrir ships the whole flow: single sign-on, one-time Telegram linking codes, roles
+              in a dedicated table, and a staff console for managing them.
             </p>
             <Button asChild variant="fenrir" className="mt-5">
               <Link to="/login" search={{ next: undefined }}>

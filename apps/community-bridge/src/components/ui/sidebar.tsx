@@ -315,6 +315,7 @@ const SidebarInset = React.forwardRef<HTMLDivElement, React.ComponentProps<"main
   ({ className, ...props }, ref) => {
     return (
       <main
+        id="main"
         ref={ref}
         className={cn(
           "relative flex w-full flex-1 flex-col bg-background",

@@ -15,11 +15,13 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
   },
   loader: async ({ location }) => {
     const authorizationId = new URLSearchParams(location.search).get("authorization_id")!;
-    const oauth = (supabase.auth as unknown as {
-      oauth: {
-        getAuthorizationDetails: (id: string) => Promise<{ data: any; error: any }>;
-      };
-    }).oauth;
+    const oauth = (
+      supabase.auth as unknown as {
+        oauth: {
+          getAuthorizationDetails: (id: string) => Promise<{ data: any; error: any }>;
+        };
+      }
+    ).oauth;
     const { data, error } = await oauth.getAuthorizationDetails(authorizationId);
     if (error) throw error;
     const immediate = data?.redirect_url ?? data?.redirect_to;
@@ -28,7 +30,7 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
   },
   component: Consent,
   errorComponent: ({ error }) => (
-    <main className="flex min-h-dvh items-center justify-center px-4 text-center">
+    <main id="main" className="flex min-h-dvh items-center justify-center px-4 text-center">
       <p className="text-sm text-muted-foreground">
         Could not load this authorization request: {String((error as Error)?.message ?? error)}
       </p>
@@ -46,12 +48,14 @@ function Consent() {
   async function decide(approve: boolean) {
     setBusy(true);
     setError(null);
-    const oauth = (supabase.auth as unknown as {
-      oauth: {
-        approveAuthorization: (id: string) => Promise<{ data: any; error: any }>;
-        denyAuthorization: (id: string) => Promise<{ data: any; error: any }>;
-      };
-    }).oauth;
+    const oauth = (
+      supabase.auth as unknown as {
+        oauth: {
+          approveAuthorization: (id: string) => Promise<{ data: any; error: any }>;
+          denyAuthorization: (id: string) => Promise<{ data: any; error: any }>;
+        };
+      }
+    ).oauth;
     const { data, error: err } = approve
       ? await oauth.approveAuthorization(authorization_id)
       : await oauth.denyAuthorization(authorization_id);
@@ -70,11 +74,9 @@ function Consent() {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-background px-4">
+    <main id="main" className="flex min-h-dvh items-center justify-center bg-background px-4">
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center backdrop-blur-xl">
-        <h1 className="text-xl font-semibold text-foreground">
-          Connect {clientName} to MyFenrir
-        </h1>
+        <h1 className="text-xl font-semibold text-foreground">Connect {clientName} to MyFenrir</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           This lets {clientName} use MyFenrir as you — reading your account and portal data.
         </p>

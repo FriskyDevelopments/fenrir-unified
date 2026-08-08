@@ -129,18 +129,13 @@
     oklch(0.773 0.153 163.2),
     oklch(0.637 0.208 25.3)
   );
-  --gradient-nexus: linear-gradient(
-    135deg,
-    oklch(0.637 0.208 25.3),
-    oklch(0.773 0.153 163.2)
-  );
+  --gradient-nexus: linear-gradient(135deg, oklch(0.637 0.208 25.3), oklch(0.773 0.153 163.2));
 
   /* Elevation / glow */
   --glow-primary: 0 0 40px -8px oklch(0.637 0.208 25.3 / 45%);
   --glow-accent: 0 0 40px -8px oklch(0.723 0.192 149.6 / 40%);
   --drop-elev: 0 24px 60px -20px oklch(0.05 0.02 260 / 80%);
 }
-
 
 @layer base {
   * {
@@ -159,4 +154,20 @@
   samp {
     font-family: var(--font-mono);
   }
+}
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #000;
+  color: #fff;
+  padding: 8px 16px;
+  z-index: 10000;
+  text-decoration: none;
+  transition: top 0.2s;
+}
+
+.skip-link:focus {
+  top: 0;
 }

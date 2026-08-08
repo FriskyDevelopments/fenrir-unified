@@ -29,7 +29,9 @@ export const Route = createFileRoute("/gates/$id")({
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: `https://clipsflow-auth-hub.lovable.app/gates/${params.id}` }],
+    links: [
+      { rel: "canonical", href: `https://clipsflow-auth-hub.lovable.app/gates/${params.id}` },
+    ],
   }),
   component: EditGatePage,
 });
@@ -151,7 +153,7 @@ function EditGatePage() {
 
   return (
     <div className="min-h-dvh bg-background">
-      <main className="mx-auto max-w-6xl px-5 py-10 sm:px-6 sm:py-14">
+      <main id="main" className="mx-auto max-w-6xl px-5 py-10 sm:px-6 sm:py-14">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <Link
@@ -182,11 +184,7 @@ function EditGatePage() {
           </div>
         </div>
 
-        <GateForm
-          config={config}
-          onChange={(next) => setConfig(next)}
-          slugStatus={slugStatus}
-        />
+        <GateForm config={config} onChange={(next) => setConfig(next)} slugStatus={slugStatus} />
       </main>
     </div>
   );

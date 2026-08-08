@@ -30,9 +30,7 @@ export const Route = createFileRoute("/gate")({
       { property: "og:url", content: "https://clipsflow-auth-hub.lovable.app/gate" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [
-      { rel: "canonical", href: "https://clipsflow-auth-hub.lovable.app/gate" },
-    ],
+    links: [{ rel: "canonical", href: "https://clipsflow-auth-hub.lovable.app/gate" }],
   }),
   component: NewGatePage,
 });
@@ -98,7 +96,7 @@ function NewGatePage() {
 
   return (
     <div className="min-h-dvh bg-background">
-      <main className="mx-auto max-w-6xl px-5 py-10 sm:px-6 sm:py-14">
+      <main id="main" className="mx-auto max-w-6xl px-5 py-10 sm:px-6 sm:py-14">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <Link

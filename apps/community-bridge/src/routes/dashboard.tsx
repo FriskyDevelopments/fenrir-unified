@@ -91,7 +91,9 @@ function DashboardPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => signOut().then(() => navigate({ to: "/login", search: { next: undefined } }))}
+              onClick={() =>
+                signOut().then(() => navigate({ to: "/login", search: { next: undefined } }))
+              }
             >
               <LogOut className="mr-2 h-4 w-4" />
               Sign out
@@ -100,7 +102,7 @@ function DashboardPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-12">
+      <main id="main" className="mx-auto max-w-6xl px-6 py-12">
         <div className="rounded-2xl border border-border/60 bg-card/40 p-10 text-center backdrop-blur">
           <div className="mx-auto mb-4 inline-flex rounded-full bg-primary/10 p-3">
             <Sparkles className="h-6 w-6 text-primary" />
@@ -112,11 +114,7 @@ function DashboardPage() {
 
           <TelegramIdentityCard
             className="mx-auto mt-6 max-w-sm text-left"
-            identity={
-              demo
-                ? { ...DEMO_TELEGRAM_PROFILE, id: telegramId }
-                : { id: telegramId }
-            }
+            identity={demo ? { ...DEMO_TELEGRAM_PROFILE, id: telegramId } : { id: telegramId }}
             note={demo ? "Simulated Telegram identity (demo mode)." : undefined}
           />
         </div>

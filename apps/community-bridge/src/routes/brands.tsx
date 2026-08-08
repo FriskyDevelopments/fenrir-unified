@@ -82,7 +82,6 @@ function BrandTenantsConsole() {
   const [saving, setSaving] = useState(false);
   const [auditKey, setAuditKey] = useState(0);
 
-
   const load = useCallback(async () => {
     try {
       setRows(await fetchAll());
@@ -111,8 +110,6 @@ function BrandTenantsConsole() {
       setAuditKey((k) => k + 1);
       await Promise.all([load(), refreshBrands()]);
       publishBrandUpdate();
-
-
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save the tenant");
     } finally {
@@ -133,8 +130,6 @@ function BrandTenantsConsole() {
       setAuditKey((k) => k + 1);
       await Promise.all([load(), refreshBrands()]);
       publishBrandUpdate();
-
-
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not delete the tenant");
     }
@@ -150,7 +145,7 @@ function BrandTenantsConsole() {
 
   return (
     <div className="min-h-dvh bg-background">
-      <main className="mx-auto max-w-5xl px-5 py-10 sm:px-6 sm:py-14">
+      <main id="main" className="mx-auto max-w-5xl px-5 py-10 sm:px-6 sm:py-14">
         <Link
           to="/dashboard"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -304,7 +299,6 @@ function BrandTenantsConsole() {
 
         <BrandAuditLog refreshKey={auditKey} tenants={rows} />
       </main>
-
     </div>
   );
 }
@@ -320,7 +314,6 @@ interface TenantFormProps {
 function TenantForm({ draft, saving, onChange, onCancel, onSave }: TenantFormProps) {
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     onChange({ ...draft, [key]: value });
-
 
   function toggleProvider(id: (typeof PROVIDER_IDS)[number]) {
     const list = draft.providers.includes(id)
@@ -657,9 +650,7 @@ function RedirectWarnings({ draft }: { draft: Draft }) {
   );
   if (issues.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground">
-        Redirects match the allowed sign-in URLs.
-      </p>
+      <p className="text-xs text-muted-foreground">Redirects match the allowed sign-in URLs.</p>
     );
   }
   return (

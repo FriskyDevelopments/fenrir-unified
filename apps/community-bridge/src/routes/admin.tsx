@@ -89,7 +89,9 @@ function AdminConsole() {
       const list = await fetchUsers();
       setRows(list);
       setTgDrafts(
-        Object.fromEntries(list.map((r) => [r.user_id, r.telegram_id ? String(r.telegram_id) : ""])),
+        Object.fromEntries(
+          list.map((r) => [r.user_id, r.telegram_id ? String(r.telegram_id) : ""]),
+        ),
       );
     } catch (err) {
       setLoadError(formatAuthError(err instanceof Error ? err.message : String(err)));
@@ -141,7 +143,10 @@ function AdminConsole() {
     setBusyId(row.user_id);
     try {
       await setTelegram({ data: { target: row.user_id, telegramId: value } });
-      showFlash("ok", value === null ? `Telegram link cleared for ${row.email}.` : `Linked ${row.email}.`);
+      showFlash(
+        "ok",
+        value === null ? `Telegram link cleared for ${row.email}.` : `Linked ${row.email}.`,
+      );
       void load();
     } catch (err) {
       showFlash("err", formatAuthError(err instanceof Error ? err.message : String(err)));
@@ -169,7 +174,7 @@ function AdminConsole() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main id="main" className="mx-auto max-w-6xl px-6 py-10">
         <div className="mb-6 flex items-baseline justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
@@ -221,7 +226,10 @@ function AdminConsole() {
               )}
               {rows && rows.length === 0 && !loadError && (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                  <TableCell
+                    colSpan={4}
+                    className="py-10 text-center text-sm text-muted-foreground"
+                  >
                     No users yet.
                   </TableCell>
                 </TableRow>
