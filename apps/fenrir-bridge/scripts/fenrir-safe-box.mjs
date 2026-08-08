@@ -28,13 +28,6 @@ const secretGroups = [
     ]
   },
   {
-    title: "WorkOS auth (primary login broker)",
-    fields: [
-      ["WORKOS_CLIENT_ID", "WorkOS AuthKit client ID (client_...)"],
-      ["WORKOS_API_KEY", "WorkOS API key (sk_...). Used server-side for the code exchange."]
-    ]
-  },
-  {
     title: "Supabase (optional profile store only)",
     fields: [
       ["SUPABASE_URL", "Server Supabase project URL (optional; profile upserts only)"],

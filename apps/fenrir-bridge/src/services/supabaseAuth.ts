@@ -5,7 +5,7 @@ type AuthProvider = "google" | "microsoft" | "apple";
 
 // Production defaults are baked in so a build made WITHOUT .env still produces
 // the working Supabase login instead of silently falling back to another broker
-// (that silent fallback is exactly how the WorkOS regression shipped). Both
+// (a silent fallback is exactly how the old broker regression shipped). Both
 // values are public by design — they are embedded in every client bundle.
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://yqevglppbhuoxxfsfnih.supabase.co";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_t8xng5GIhOmAtT4Nsf7Zgg_TO36FTTE";
