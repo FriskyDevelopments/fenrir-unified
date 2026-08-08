@@ -68,7 +68,7 @@ que **no hay que tocar TypeScript**: basta apuntar la config.
 
 ```ts
 vision: {
-  baseUrl: "http://127.0.0.1:8080/v1",   // o la URL interna del proxy
+  baseUrl: "http://127.0.0.1:8090/v1",   // o la URL interna del proxy
   apiKey: process.env.MODERATION_API_KEY,
   primaryModel: "fenrir-moderation",
   fallbackModels: [],
@@ -86,12 +86,26 @@ para auditar decisiones sin volver a inferir.
 ```bash
 export MODERATION_API_KEY="$(openssl rand -hex 32)"
 docker compose up -d --build
-curl -s localhost:8080/health | jq
+curl -s localhost:8090/health | jq
 ```
 
-Escucha **solo en loopback** (`127.0.0.1:8080`): el acceso entra por el reverse
+Escucha **solo en loopback** en el puerto 8090 (en hermes el 8080 ya lo usa
+el dashboard de la mega-factory) (`127.0.0.1:8090`): el acceso entra por el reverse
 proxy de la caja, nunca directo desde internet. Los pesos se bajan durante el
 build, así que un arranque en frío no depende de que Hugging Face responda.
+
+## Desplegado
+
+Corriendo en **hermes**, `/opt/fenrir-moderation`, puerto **8090** solo en
+loopback (el 8080 lo ocupa el dashboard de la mega-factory). La clave está en
+1Password: `Personal/Fenrir Moderation Service`.
+
+```bash
+ssh hermes 'cd /opt/fenrir-moderation && docker compose logs -f'
+```
+
+Medido en esa caja (8 vCPU, sin GPU): **~1.7 s por imagen** en caliente. Sobra
+para moderación, que no es un camino interactivo.
 
 ## Pendiente antes de producción
 
