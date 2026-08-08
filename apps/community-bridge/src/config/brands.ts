@@ -17,7 +17,8 @@
 
 // Use assets shipped by this app. The old /__l5e path only exists in the
 // design workspace and returns 404 on gate.myfenrir.com.
-const MYFENRIR_MARK_URL = "/favicon.png";
+// La marca cuadrada de Fenrir (el favicon heredado era el icono de ClipsFlow).
+const MYFENRIR_MARK_URL = "/fenrir-mark.svg";
 const MYFENRIR_WORDMARK_URL = "/fenrir-cut-wordmark.svg";
 
 export type ProviderId = "apple" | "google" | "microsoft";
