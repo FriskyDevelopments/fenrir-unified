@@ -110,6 +110,7 @@ export function DashboardRoute() {
   const [serviceSubdomain, setServiceSubdomain] = useState(defaultServiceSubdomain);
   const [serviceMode, setServiceMode] = useState<"create" | "link" | null>(null);
   const [checkoutPlan, setCheckoutPlan] = useState<PaidPlan>("starter");
+  const [courtesyCode, setCourtesyCode] = useState("");
   const [personalLinks, setPersonalLinks] = useState<PersonalLink[]>([]);
   const [personalTitle, setPersonalTitle] = useState("");
   const [personalUrl, setPersonalUrl] = useState("");
@@ -491,7 +492,7 @@ export function DashboardRoute() {
     setCheckoutPlan(plan);
     navigateActive("billing");
     try {
-      const { url } = await billingService.checkout(plan);
+      const { url } = await billingService.checkout(plan, courtesyCode);
       window.location.assign(url);
     } catch {
       setNotice(copy[locale].checkoutErrorGeneric);
@@ -840,6 +841,8 @@ export function DashboardRoute() {
             subdomain={serviceSubdomain}
             mode={serviceMode}
             checkoutPlan={checkoutPlan}
+            courtesyCode={courtesyCode}
+            onCourtesyCode={setCourtesyCode}
             onEmail={setServiceEmail}
             onOrg={setServiceOrg}
             onTelegram={setServiceTelegram}
