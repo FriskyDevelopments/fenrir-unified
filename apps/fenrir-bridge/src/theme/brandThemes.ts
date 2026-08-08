@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-export type BrandKey = "fenrir" | "neonNexus" | "stixMagic";
+export type BrandKey = "fenrir" | "friskyGhost" | "neonNexus" | "stixMagic";
 
 export type BrandTheme = {
   key: BrandKey;
@@ -21,6 +21,7 @@ export type BrandTheme = {
   glow: string;
   background:
     | "protocol"
+    | "ghost"
     | "nexus"
     | "experimental";
 };
@@ -44,6 +45,25 @@ export const brandThemes: Record<BrandKey, BrandTheme> = {
     accent: "#8a6e3c",
     glow: "rgba(194, 164, 105, .22)",
     background: "protocol"
+  },
+  // Frisky Ghost bot-OS skin, restaurada del histórico (pre-6dabefe): la purga
+  // LORE retiró la entrada pero /ghost y /bot-os (publicRoutes) siguen usándola.
+  friskyGhost: {
+    key: "friskyGhost",
+    productName: "Frisky Ghost",
+    systemRole: "operational layer",
+    logoSrc: "/fenrir-cut-wordmark.svg",
+    logoAlt: "Frisky Ghost",
+    headline: "Ghost login for the bot operating layer.",
+    subheadline: "One auth engine, separate product landing, and operational routes for bot-of-bots workflows.",
+    lanes: ["BOT OS", "OPERATIONS", "SIGNALS", "WORKERS", "ROUTES"],
+    nodeStatus: ["GHOST ONLINE", "BOT OS READY", "ROUTES ISOLATED", "SIGNAL CLEAN"],
+    authKicker: "Ghost skin",
+    primary: "#f3f6f9",
+    secondary: "#8cb9ff",
+    accent: "#9b8cff",
+    glow: "rgba(140, 185, 255, .22)",
+    background: "ghost"
   },
   neonNexus: {
     key: "neonNexus",
