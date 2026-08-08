@@ -97,16 +97,16 @@ function Index() {
           Secure access and public gates for your Telegram community
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-pretty text-base text-muted-foreground sm:text-lg">
-          Sign in with the identity you already use, link your Telegram account with a short code, and publish a
-          branded gate that looks great before you upload a single file.
+          Start by creating your own gate. Choose the look, set your community standards, and publish a branded
+          access point for your Telegram community.
         </p>
         <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
           {!loading && session ? (
             <Link
-              to="/gates"
+              to="/gate"
               className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 font-medium text-primary-foreground transition-opacity hover:opacity-90 sm:w-auto"
             >
-              Manage my gates <ArrowRight className="h-4 w-4" />
+              Create my first gate <ArrowRight className="h-4 w-4" />
             </Link>
           ) : (
             <Link
@@ -114,7 +114,7 @@ function Index() {
               search={{}}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 font-medium text-primary-foreground transition-opacity hover:opacity-90 sm:w-auto"
             >
-              Get started <ArrowRight className="h-4 w-4" />
+              Create your gate <ArrowRight className="h-4 w-4" />
             </Link>
           )}
 

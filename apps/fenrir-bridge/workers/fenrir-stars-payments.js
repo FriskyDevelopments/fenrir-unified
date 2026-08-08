@@ -309,6 +309,7 @@ async function sendBotMenu(env, channel, message, entitlement) {
           { text: "MOD 04 · Status", callback_data: "fenrir_status" }
         ]
       ]
+    }
   });
 }
 
@@ -621,6 +622,11 @@ export default {
           fallbackEnabled: true
         }
       });
+    }
+
+    // Telegram Mini App links must open the app shell, not the worker health response.
+    if (url.pathname === "/" && request.method === "GET") {
+      return Response.redirect("https://www.myfenrir.com/gate/app", 302);
     }
 
     return json({ ok: true, service: "fenrir-stars-payments" });
