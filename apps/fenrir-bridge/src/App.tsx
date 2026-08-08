@@ -24,6 +24,7 @@ import {
 import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan } from "./services/types";
 import { AuthProviderButton } from "./components/AuthProviderButton";
 import { AuthSurface } from "./components/AuthSurface";
+import { knowledgeBaseLabel, knowledgeBaseUrl } from "./services/knowledgeBase";
 import { CinematicLanding } from "./components/CinematicLanding";
 import { GlowCard } from "./components/GlowCard";
 import { TelegramLoginWidget } from "./components/TelegramLoginWidget";
@@ -1653,6 +1654,7 @@ export function App() {
           <b>{state.user.email}</b>
           <small>{state.org.id}</small>
           <div className="legal-mini-links">
+            <a href={knowledgeBaseUrl} target="_blank" rel="noreferrer">{knowledgeBaseLabel}</a>
             <a href="/legal">{c.legal}</a>
             <a href="/terms">{c.terms}</a>
           </div>
