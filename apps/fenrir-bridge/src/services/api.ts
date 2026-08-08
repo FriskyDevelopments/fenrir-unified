@@ -9,9 +9,7 @@ import {
 } from "../../shared/domain-search";
 import { copy } from "../i18n";
 import { addBridge, addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
-// Auth broker is WorkOS AuthKit. The hosted flow mints the Fenrir session
-// cookie server-side in /api/auth/callback/workos, so the client no longer
-// performs any token exchange after the redirect (directAuthOrigin is declared below).
+import { completeSupabaseSession, hasSupabaseCallbackInLocation, isSupabaseAuthConfigured, signInWithSupabase, signOutSupabase } from "./supabaseAuth";
 import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck } from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
@@ -57,6 +55,7 @@ export type ReadinessPayload = {
     googleConfigured: boolean;
     microsoftConfigured: boolean;
     appleConfigured: boolean;
+    friskyAuthEnabled?: boolean;
   };
   billing: {
     stripeSecretConfigured: boolean;
@@ -385,20 +384,40 @@ export const webauthnService = {
 
 export const authService = {
   async me() {
-    // WorkOS AuthKit mints the Fenrir session cookie on the server callback,
-    // so the browser only needs to read the resulting session.
+    // Supabase Auth is the login broker: after the provider redirects back to
+    // /auth/callback, exchange the Supabase session for the Fenrir cookie.
+    if (hasSupabaseCallbackInLocation()) {
+      const completed = await completeSupabaseSession();
+      if (completed) {
+        return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
+      }
+    }
+
     try {
       const result = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
+      if (!result.authenticated) {
+        const completed = await completeSupabaseSession();
+        if (completed) {
+          return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
+        }
+      }
       return { ok: true as const, data: result };
     } catch {
       return { ok: true as const, data: { authenticated: false } as AuthSession };
     }
   },
   async login(provider: "google" | "microsoft" | "apple") {
+    // Supabase Auth is the restored login broker (the original working flow):
+    // signInWithOAuth against project yqevglppbhuoxxfsfnih, which holds the
+    // provider apps that accept its callback. Only if the bundle was built
+    // without Supabase config do we fall back to the direct per-provider stack.
+    // The banned broker is deliberately NOT in this path (1621d6a regression).
+    if (isSupabaseAuthConfigured()) {
+      await signInWithSupabase(provider);
+      return;
+    }
     const returnTo = safeCurrentAuthReturnPath();
-    // Route social sign-in through WorkOS AuthKit; the provider hint jumps
-    // straight to the matching hosted connection.
-    window.location.assign(`${directAuthOrigin}/api/auth/workos/login?provider=${provider}&return_to=${encodeURIComponent(returnTo)}`);
+    window.location.assign(`${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
   },
   async telegramLogin(payload: TelegramLoginPayload) {
     return apiRequest<{ ok: true; authenticated: true; user: AuthSession["user"]; org: AuthSession["org"] }>("/api/auth/telegram-session", {
@@ -407,6 +426,12 @@ export const authService = {
     });
   },
   async logout() {
+    try {
+      window.localStorage.removeItem("fenrir_post_auth_destination");
+    } catch {
+      // Optional cleanup only.
+    }
+    await signOutSupabase();
     await apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }).catch(() => null);
   }
 };
@@ -602,5 +627,11 @@ export const telegramIdentityService = {
       method: "POST",
       body: JSON.stringify(input)
     });
+  }
+};
+
+export const communitySecurityService = {
+  async getReport(communitySlug: string = "fenrir"): Promise<{ ok: true; data: CommunitySecurityReport }> {
+    return apiRequest<{ ok: true; data: CommunitySecurityReport }>(`/api/community-gate/admin/security-report?communitySlug=${encodeURIComponent(communitySlug)}`);
   }
 };

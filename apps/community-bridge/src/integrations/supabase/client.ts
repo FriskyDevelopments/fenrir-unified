@@ -31,8 +31,11 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 function createSupabaseClient() {
   // Use import.meta.env for client-side (Vite build-time replacement)
   // Fall back to process.env for SSR (server-side rendering)
-  const SUPABASE_URL = import.meta.env['VITE_SUPABASE_URL'] || process.env['SUPABASE_URL'];
-  const SUPABASE_PUBLISHABLE_KEY = import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] || process.env['SUPABASE_PUBLISHABLE_KEY'];
+  // Últimos defaults: la identidad canónica MyFenrir (yqevglppbhuoxxfsfnih) —
+  // un build sin .env no debe degradar (misma lección que fenrir-bridge).
+  // La publishable key es pública por diseño.
+  const SUPABASE_URL = import.meta.env['VITE_SUPABASE_URL'] || process.env['SUPABASE_URL'] || 'https://yqevglppbhuoxxfsfnih.supabase.co';
+  const SUPABASE_PUBLISHABLE_KEY = import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] || process.env['SUPABASE_PUBLISHABLE_KEY'] || 'sb_publishable_t8xng5GIhOmAtT4Nsf7Zgg_TO36FTTE';
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     const missing = [
