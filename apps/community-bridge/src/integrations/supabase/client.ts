@@ -48,9 +48,14 @@ function createSupabaseClient() {
       fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
     },
     auth: {
-      storage: typeof window !== 'undefined' ? localStorage : undefined,
+      // Keep one stable browser key so the session survives route changes,
+      // reloads, and the onboarding -> dashboard handoff. Never use
+      // sessionStorage here: closing the tab must not log the operator out.
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      storageKey: 'myfenrir-community-bridge-auth',
       persistSession: true,
       autoRefreshToken: true,
+      detectSessionInUrl: true,
     }
   });
 }
@@ -65,4 +70,3 @@ export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>,
     return Reflect.get(_supabase, prop, receiver);
   },
 });
-

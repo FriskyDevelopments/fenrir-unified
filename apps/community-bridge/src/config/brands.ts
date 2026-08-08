@@ -15,8 +15,10 @@
  * specific casa is a new object in BRANDS.
  */
 
-import wordmarkAsset from "@/assets/fenrir-wordmark.svg.asset.json";
-import markAsset from "@/assets/fenrir-mark.svg.asset.json";
+// Use assets shipped by this app. The old /__l5e path only exists in the
+// design workspace and returns 404 on gate.myfenrir.com.
+const MYFENRIR_MARK_URL = "/favicon.png";
+const MYFENRIR_WORDMARK_URL = "/fenrir-cut-wordmark.svg";
 
 export type ProviderId = "apple" | "google" | "microsoft";
 
@@ -107,7 +109,7 @@ export const BRANDS: BrandConfig[] = [
     name: "MyFenrir",
     tagline: "Secure access and public gates for your Telegram community",
     hosts: ["myfenrir.com", "www.myfenrir.com", "clipsflow-auth-hub.lovable.app"],
-    logo: { markUrl: markAsset.url, wordmarkUrl: wordmarkAsset.url, alt: "MyFenrir logo" },
+    logo: { markUrl: MYFENRIR_MARK_URL, wordmarkUrl: MYFENRIR_WORDMARK_URL, alt: "MyFenrir logo" },
     theme: {
       "--primary": "oklch(0.637 0.208 25.3)",
       "--ring": "oklch(0.637 0.208 25.3)",
