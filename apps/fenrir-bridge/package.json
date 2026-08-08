@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "bash scripts/run-with-node-lts.sh vite --host 0.0.0.0",
     "build": "bash scripts/run-with-node-lts.sh vite build",
-    "build:kb": "npm run build --prefix astelar && rm -rf public/kb && mkdir -p public/kb/docs && cp -R astelar/dist/. public/kb/docs/ && cp astelar/site/index.html public/kb/index.html",
     "typecheck": "bash scripts/run-with-node-lts.sh tsc --noEmit",
     "test": "bash scripts/run-with-node-lts.sh vitest run",
     "test:watch": "bash scripts/run-with-node-lts.sh vitest",

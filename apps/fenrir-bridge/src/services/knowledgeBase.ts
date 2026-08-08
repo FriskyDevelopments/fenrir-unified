@@ -1,9 +1,9 @@
 /**
- * Astelar — the Fenrir knowledge base. It lives as an ISOLATED submodule
- * (apps/fenrir-bridge/astelar) and its static build is mounted at /kb
- * (public/kb, regenerate with `npm run build:kb`). VITE_ASTELAR_KB_URL
- * overrides the destination if Astelar ever gets its own deploy.
+ * La base de conocimiento de MyFenrir es la Wiki "Guardian Protocol"
+ * (public/wiki, también servida en prod en myfenrir.com/wiki).
+ * VITE_KNOWLEDGE_BASE_URL permite apuntar a otro destino si hiciera falta.
+ * (Astelar es un producto aparte — no es la KB de MyFenrir.)
  */
-export const knowledgeBaseUrl: string = import.meta.env.VITE_ASTELAR_KB_URL || "/kb/";
+export const knowledgeBaseUrl: string = import.meta.env.VITE_KNOWLEDGE_BASE_URL || "/wiki";
 
-export const knowledgeBaseLabel = "Knowledge Base";
+export const knowledgeBaseLabel = "Wiki";

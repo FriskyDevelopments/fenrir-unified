@@ -393,7 +393,7 @@ export function CinematicLanding() {
         <div className="cinematic-landing__actions">
           <a className="cinematic-landing__enter" href="/login">Enter</a>
           <a className="cinematic-landing__docs" href={knowledgeBaseUrl} target="_blank" rel="noreferrer">
-            Astelar Docs <i>↗</i>
+            Wiki <i>↗</i>
           </a>
         </div>
         <div className="cinematic-landing__rail" aria-hidden="true">
