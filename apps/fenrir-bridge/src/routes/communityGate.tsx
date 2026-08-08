@@ -160,11 +160,11 @@ export function CommunityBridgeHandoffPanel() {
       </div>
       <div className="community-bridge-handoff-body">
         <p>
-          Build and manage your community gates in the Community Bridge dashboard.
+          Start with the guided Community Bridge walkthrough and gate wizard, then manage everything from its dashboard.
           Fenrir keeps the door; Neon keeps the member state.
         </p>
         <div className="community-bridge-handoff-actions">
-          <a className="button-link" href={communityBridgeDashboardUrl}>Open Community Bridge →</a>
+          <a className="button-link" href={communityBridgeDashboardUrl}>Open Community Bridge walkthrough →</a>
         </div>
       </div>
     </section>

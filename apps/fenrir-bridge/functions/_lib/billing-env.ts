@@ -1,12 +1,15 @@
 import type { AuthEnv } from "./auth";
 
 export type BillingEnv = AuthEnv & {
+  EMAIL?: { send(message: { to: string; from: { email: string; name?: string }; subject: string; html: string; text: string }): Promise<unknown> };
   DB?: D1Database;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_STARTER_PRICE_ID?: string;
   STRIPE_PRO_PRICE_ID?: string;
   STRIPE_OPERATOR_PRICE_ID?: string;
+  STRIPE_COURTESY_COUPON_ID?: string;
+  FENRIR_COURTESY_CODE?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_PROD_BOT_TOKEN?: string;
   TELEGRAM_DEV_BOT_TOKEN?: string;

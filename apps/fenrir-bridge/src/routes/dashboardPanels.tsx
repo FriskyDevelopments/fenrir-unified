@@ -533,6 +533,8 @@ export function AccountServicePanel({
   subdomain,
   mode,
   checkoutPlan,
+  courtesyCode,
+  onCourtesyCode,
   onEmail,
   onOrg,
   onTelegram,
@@ -547,6 +549,8 @@ export function AccountServicePanel({
   subdomain: string;
   mode: "create" | "link" | null;
   checkoutPlan: PaidPlan;
+  courtesyCode: string;
+  onCourtesyCode: (value: string) => void;
   onEmail: (value: string) => void;
   onOrg: (value: string) => void;
   onTelegram: (value: string) => void;
@@ -581,6 +585,11 @@ export function AccountServicePanel({
           <span className="status amber">{c.stripeMode}</span>
           <h3>{checkoutPlan.charAt(0).toUpperCase() + checkoutPlan.slice(1)}</h3>
           <p>{c.checkoutReady}</p>
+          <label className="courtesy-code-field">
+            <span>Courtesy code (optional)</span>
+            <input value={courtesyCode} onChange={(event) => onCourtesyCode(event.target.value.toUpperCase())} placeholder="MYFENRIR-COURTESY" autoComplete="off" />
+            <small>Single-use admin courtesy. Leave blank for normal checkout.</small>
+          </label>
           <div className="stars-bridge">
             <span className="status good">{c.starsMode}</span>
             <p>{c.starsCheckoutBody}</p>
