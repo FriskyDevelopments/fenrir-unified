@@ -1,0 +1,20 @@
+services:
+  moderation:
+    build: .
+    container_name: fenrir-moderation
+    restart: unless-stopped
+    # Solo loopback: quien consuma esto entra por el reverse proxy de la caja,
+    # nunca directo desde internet.
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      # Umbral conservador a propósito: el costo de un falso negativo aquí no es
+      # comparable al de un falso positivo.
+      MIN_APPARENT_AGE: "${MIN_APPARENT_AGE:-25}"
+      MODERATION_API_KEY: "${MODERATION_API_KEY:?define MODERATION_API_KEY}"
+      TORCH_THREADS: "${TORCH_THREADS:-4}"
+    volumes:
+      - models:/models
+
+volumes:
+  models:
