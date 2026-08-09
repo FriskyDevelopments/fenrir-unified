@@ -1,3 +1,4 @@
+import { FENRIR_MAIL_FROM } from "../../../_lib/transactional-email";
 import {
   communityAuthConfigured,
   communityAuthNotConfigured,
@@ -59,7 +60,7 @@ export async function onRequestPost(context: any) {
   try {
     await context.env.EMAIL.send({
       to: email,
-      from: { email: "noreply@myfenrir.com", name: "MyFenrir" },
+      from: FENRIR_MAIL_FROM,
       subject: "Tu acceso a MyFenrir",
       html: `<p>Hola,</p><p>Usa este enlace para entrar a la comunidad:</p><p><a href="${magicLink}">Entrar a MyFenrir</a></p><p>Este enlace caduca en 15 minutos.</p>`,
       text: `Entra a MyFenrir: ${magicLink} (caduca en 15 minutos).`
