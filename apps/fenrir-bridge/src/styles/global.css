@@ -162,10 +162,6 @@ select:focus {
 
 /* Lovable project bd06c2e4-a1cc-42c5-aa8f-95c7bdd6c9b3 — MyFenrir login.
    Scoped so the rest of Fenrir Bridge keeps its existing design system. */
-body:has(.lovable-auth-page) .partner-perk-banner {
-  display: none;
-}
-
 .lovable-auth-page {
   --lovable-primary: #ef4444;
   --lovable-success: #34d399;
