@@ -108,3 +108,20 @@ create table if not exists cb_moderation_reviews (
 );
 create index if not exists cb_moderation_reviews_queue_idx
   on cb_moderation_reviews (community_id, status, created_at);
+
+-- Términos bloqueados en nombres de usuario / handles.
+-- En tabla y no en código A PROPÓSITO: los términos codificados rotan
+-- constantemente y hay que poder añadirlos sin desplegar.
+create table if not exists cb_blocked_terms (
+  id uuid primary key default gen_random_uuid(),
+  -- Se compara en minúsculas y sin separadores, así que guardar así.
+  term text not null unique,
+  -- `substring` atrapa variantes pegadas; `word` evita falsos positivos en
+  -- términos cortos que aparecen dentro de palabras legítimas.
+  match_kind text not null default 'substring' check (match_kind in ('substring', 'word')),
+  severity text not null default 'block' check (severity in ('block', 'review')),
+  note text,
+  added_by uuid,
+  created_at timestamptz not null default now()
+);
+create index if not exists cb_blocked_terms_kind_idx on cb_blocked_terms (match_kind);
