@@ -20,6 +20,11 @@ const botToken = (env, channel) => {
 
 const normalizeText = (value) => (value || "").trim();
 const BRIDGE_TARGET = "bridge.myfenrir.com";
+const DEFAULT_WELCOME_IMAGE_URL =
+  "https://fenrir-stars-payments.hrgrrtks2p.workers.dev/fenrir-community-auth.jpg";
+
+const welcomeImageUrl = (env) =>
+  normalizeText(env.FENRIR_WELCOME_IMAGE_URL) || DEFAULT_WELCOME_IMAGE_URL;
 
 const FENRIR_BOT_BRIEF = [
   "You are Fenrir Bot by Frisky.",
@@ -295,9 +300,11 @@ function modularMenuText(text, entitlement) {
 }
 
 async function sendBotMenu(env, channel, message, entitlement) {
-  await telegramApi(env, channel, "sendMessage", {
+  await telegramApi(env, channel, "sendPhoto", {
     chat_id: message.chat.id,
-    text: modularMenuText(message.text || "", entitlement),
+    photo: welcomeImageUrl(env),
+    caption: modularMenuText(message.text || "", entitlement),
+    protect_content: true,
     reply_markup: {
       inline_keyboard: [
         [
