@@ -7,5 +7,8 @@
 /invitation /invitation/ 301
 /invitation/ /invitation/index.html 200
 /adminguidebook /adminguidebook.html 200
+/privacy /privacy/index.html 200
+/terms /terms/index.html 200
+/legal /legal/index.html 200
 /* /index.html 200
 

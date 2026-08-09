@@ -9,7 +9,7 @@
   // absent, so billing emails no-op until the EMAIL binding gets a real home
   // (Pages dashboard binding or a dedicated Worker).
   "vars": {
-    "PUBLIC_SITE_URL": "https://myfenrir.com",
+    "PUBLIC_SITE_URL": "https://www.myfenrir.com",
     "ALLOWED_REDIRECT_URIS": "https://myfenrir.com,https://www.myfenrir.com,http://localhost:5173"
   },
   "d1_databases": [
@@ -17,6 +17,17 @@
       "binding": "DB",
       "database_name": "fenrir-bridge",
       "database_id": "1238059e-2638-4317-982e-e74dda046ccb"
+    }
+  ],
+  // MyFenrir member media (avatars / covers / uploads). Bucket lives in R2
+  // account e2a7eccb24c4836847fd14d08c499bd0, created via OAuth (no API token).
+  // Reads are public via /api/media/r2/<key>; writes go through the
+  // authenticated /api/media/upload Pages Function (R2 has no RLS — the Worker
+  // is the trust boundary and namespaces every object under <frisky_user_id>/).
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "myfenrir-media"
     }
   ]
 }

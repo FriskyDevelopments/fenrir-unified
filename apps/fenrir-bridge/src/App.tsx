@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import { copy, detectLocale, languageNames, locales, type Copy, type Locale } from "./i18n";
 import { aiOpsService, appService, authService, billingService, bridgeService, commerceService, domainService, liveRoomService, readinessService, telegramIdentityService, telegramService, webauthnService, type AuthSession, type BillingStatusPayload, type PaidPlan, type ReadinessPayload, type TelegramIdentityLinkPayload } from "./services/api";
 import { friskyClientAuthEngine, type AuthProvider } from "./services/authGateway";
@@ -1573,6 +1572,9 @@ export function App() {
     try {
       setNotice(c.passkeyBusy);
       const { optionsJSON } = await webauthnService.registerOptions();
+      // Carga diferida: @simplewebauthn/browser sale del chunk inicial y sólo
+      // se descarga al registrar un passkey.
+      const { startRegistration } = await import("@simplewebauthn/browser");
       const registration = await startRegistration({ optionsJSON });
       await webauthnService.registerVerify(registration);
       setNotice(c.passkeySuccess);

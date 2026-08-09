@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { startRegistration } from "@simplewebauthn/browser";
 import { copy, detectLocale, languageNames, locales, type Copy, type Locale } from "../i18n";
 import {
   aiOpsService,
@@ -586,6 +585,9 @@ export function DashboardRoute() {
     try {
       setNotice(c.passkeyBusy);
       const { optionsJSON } = await webauthnService.registerOptions();
+      // Carga diferida: @simplewebauthn/browser sale del chunk inicial y sólo
+      // se descarga al registrar un passkey desde el dashboard.
+      const { startRegistration } = await import("@simplewebauthn/browser");
       const registration = await startRegistration({ optionsJSON });
       await webauthnService.registerVerify(registration);
       setNotice(c.passkeySuccess);

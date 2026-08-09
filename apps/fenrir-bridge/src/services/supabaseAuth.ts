@@ -1,4 +1,9 @@
-import { createClient, type Provider, type SupabaseClient } from "@supabase/supabase-js";
+// `@supabase/supabase-js` se importa SOLO como tipo aquí: los tipos se borran
+// en compilación y no arrastran la librería al chunk inicial. El runtime
+// (`createClient`) se carga con dynamic import dentro de `supabaseClient()`, que
+// únicamente se invoca en flujos de auth (login / callback / logout). Así la
+// landing no paga el peso de supabase-js hasta que el usuario interactúa.
+import type { Provider, SupabaseClient } from "@supabase/supabase-js";
 import { sharedSessionStorage, sharedStorageKey } from "./sharedSession";
 
 type AuthProvider = "google" | "microsoft" | "apple";
@@ -100,7 +105,7 @@ function callbackDestinationPath(pathname: string, hasCallbackParams = false) {
 }
 
 export async function signInWithSupabase(providerName: AuthProvider) {
-  const supabase = supabaseClient();
+  const supabase = await supabaseClient();
   rememberPostAuthDestination();
   const { error } = await supabase.auth.signInWithOAuth({
     provider: supabaseProvider(providerName),
@@ -124,7 +129,7 @@ export async function completeSupabaseSession() {
     return false;
   }
 
-  const supabase = supabaseClient();
+  const supabase = await supabaseClient();
   const code = params.code;
 
   if (code) {
@@ -168,14 +173,17 @@ export async function signOutSupabase() {
   } catch {
     // Ignore storage cleanup failures.
   }
-  await supabaseClient().auth.signOut();
+  await (await supabaseClient()).auth.signOut();
 }
 
-function supabaseClient() {
+async function supabaseClient() {
   if (!isSupabaseAuthConfigured()) {
     console.warn("Supabase auth is not configured correctly. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env. Placeholder 'example.supabase.co' is not allowed.");
     throw new Error("supabase_auth_not_configured");
   }
+  // Carga diferida de supabase-js: sale del chunk inicial y sólo se descarga
+  // cuando de verdad se necesita un cliente (login/callback/logout).
+  const { createClient } = await import("@supabase/supabase-js");
   // La sesión se guarda en una cookie de `.myfenrir.com` para que valga en
   // todas las superficies (communities.myfenrir.com incluida) — ver
   // services/sharedSession.ts. La clave es la que Supabase usa por defecto,

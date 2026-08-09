@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { startAuthentication } from "@simplewebauthn/browser";
 import type { Copy, Locale } from "../i18n";
 import { webauthnService } from "../services/api";
 import { friskyClientAuthEngine, type AuthProvider } from "../services/authGateway";
@@ -18,6 +17,9 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
     setPasskeyNote(null);
     try {
       const { optionsJSON } = await webauthnService.loginOptions();
+      // Carga diferida: @simplewebauthn/browser sale del chunk inicial y sólo
+      // se descarga al usar el passkey para entrar.
+      const { startAuthentication } = await import("@simplewebauthn/browser");
       const assertion = await startAuthentication({ optionsJSON });
       await webauthnService.loginVerify(assertion);
       window.location.assign(managedDashboardPath);
