@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Check, Loader2, ShieldQuestion, X } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldQuestion } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -103,7 +103,7 @@ function ModerationQueue() {
       if (result.alreadyDecided) {
         toast.message("Someone else already resolved this one.");
       } else {
-        toast.success(decision === "approved" ? "Approved" : "Rejected");
+        toast.success(decision === "approved" ? "🛡️ Approved" : "🔑 Rejected");
       }
       setRows((current) => current.filter((item) => item.id !== row.id));
     } catch (error) {
@@ -214,7 +214,7 @@ function ModerationQueue() {
                               disabled={busyId === row.id}
                               onClick={() => resolve(row, "approved")}
                             >
-                              <Check className="mr-1 h-3.5 w-3.5" /> Approve
+                              <span className="mr-1" aria-hidden="true">🛡️</span> Approve
                             </Button>
                             <Button
                               size="sm"
@@ -222,7 +222,7 @@ function ModerationQueue() {
                               disabled={busyId === row.id}
                               onClick={() => resolve(row, "rejected")}
                             >
-                              <X className="mr-1 h-3.5 w-3.5" /> Reject
+                              <span className="mr-1" aria-hidden="true">🔑</span> Reject
                             </Button>
                           </div>
                         </div>
