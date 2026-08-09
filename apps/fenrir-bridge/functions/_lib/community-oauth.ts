@@ -44,6 +44,25 @@ const defaultDeps: Required<CommunityOAuthDeps> = {
   communitySql
 };
 
+/** Ordered list of Community Gate OAuth providers (mirrors isCommunityOAuthProvider). */
+const COMMUNITY_OAUTH_PROVIDERS: OAuthProvider[] = ["google", "microsoft", "apple", "workos"];
+
+/**
+ * Providers currently available for Community Gate sign-in: the subset actually
+ * configured in this environment (client id/secret present), reusing the same
+ * check as the OAuth start flow (isDirectOAuthAvailable). This is distinct from a
+ * brand's per-brand `enabled_auth_providers` toggles — it reports what the server
+ * can offer at all. Used only to decorate the brand payload returned by the
+ * community-auth brand endpoints (brand/[slug] and admin/brands/[slug]).
+ *
+ * NOTE: added to restore a missing export that those two endpoints import (the
+ * build broke mid login-500 WIP). Purely additive and read-only — it does not
+ * touch the sign-in/callback flow, so it cannot regress the login path.
+ */
+export function availableCommunityAuthProviders(env: CommunityOAuthEnv): OAuthProvider[] {
+  return COMMUNITY_OAUTH_PROVIDERS.filter((provider) => isDirectOAuthAvailable(provider, env));
+}
+
 export function communityOAuthErrorLocation(origin: string, slug: string, error: string) {
   const params = new URLSearchParams({ auth_error: error });
   return `${origin.replace(/\/$/, "")}/community/${slug}?${params.toString()}`;

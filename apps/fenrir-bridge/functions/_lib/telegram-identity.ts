@@ -71,6 +71,22 @@ export async function getTelegramIdentityLink(db: D1Database, friskyUserId: stri
     .first<TelegramIdentityLinkRow>();
 }
 
+/**
+ * Look up the identity link by Telegram user id (the table's ON CONFLICT key).
+ * The Telegram webhook uses this to distinguish a first-time verification
+ * (no row yet) from a returning, already-verified user (row present) — with no
+ * schema change. NOTE: consumeTelegramAccountLinkCode() deletes + re-inserts the
+ * row on every link, so `linked_at` is NOT a reliable first-time signal; the
+ * pre-consume existence check is. Once MyFenrir's canonical Supabase
+ * `account_links` table lands, this can be reconciled against it.
+ */
+export async function getTelegramIdentityLinkByTelegramUserId(db: D1Database, telegramUserId: string) {
+  return db
+    .prepare(`SELECT * FROM telegram_identity_links WHERE telegram_user_id = ?`)
+    .bind(telegramUserId)
+    .first<TelegramIdentityLinkRow>();
+}
+
 export async function consumeTelegramAccountLinkCode(env: BillingEnv, db: D1Database, code: string, claim: TelegramLinkClaim) {
   const pending = await db
     .prepare(

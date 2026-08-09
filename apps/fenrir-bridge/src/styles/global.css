@@ -2883,6 +2883,27 @@ main {
   isolation: isolate;
 }
 
+/* Shared login + Community Bridge visual language for the operational dashboard. */
+.app { grid-template-columns: 252px minmax(0, 1fr); background: radial-gradient(ellipse 70% 55% at 68% -8%, rgba(239,68,68,.12), transparent 68%), radial-gradient(ellipse 55% 50% at 98% 90%, rgba(52,211,153,.09), transparent 72%), #070b12; }
+.sidebar { padding: 24px 16px; background: linear-gradient(180deg, rgba(15,23,42,.96), rgba(7,11,18,.98)); border-right: 1px solid rgba(148,163,184,.14); box-shadow: 18px 0 60px rgba(0,0,0,.22); }
+.brand { margin: 0 4px 28px; padding: 8px 4px 18px; border-bottom: 1px solid rgba(148,163,184,.14); }
+.brand-wordmark { width: 108px; filter: drop-shadow(0 10px 26px rgba(239,68,68,.25)); }
+.brand-lockup b { color: #f8fafc; letter-spacing: .01em; }
+.brand-lockup small { color: #94a3b8; margin-top: 3px; }
+nav { gap: 7px; }
+nav button { min-height: 42px; padding: 10px 12px; border-radius: 12px; color: #94a3b8; font-size: 13px; transition: background .18s ease, color .18s ease, transform .18s ease; }
+nav button.active, nav button:hover { color: #f8fafc; background: linear-gradient(90deg, rgba(239,68,68,.18), rgba(34,197,94,.08)); border-color: rgba(239,68,68,.22); transform: translateX(2px); }
+.operator-card { left: 16px; right: 16px; bottom: 18px; padding: 14px; border-radius: 14px; background: rgba(15,23,42,.72); border-color: rgba(148,163,184,.16); box-shadow: 0 16px 34px rgba(0,0,0,.2); }
+.operator-card span { color: #94a3b8; }
+.operator-card b { color: #e2e8f0; }
+main { padding: 28px clamp(18px, 3vw, 42px); }
+.topbar { min-height: 190px; padding: 26px 28px; border-radius: 20px; border-color: rgba(148,163,184,.16); background: radial-gradient(ellipse 55% 120% at 86% 0%, rgba(239,68,68,.18), transparent 70%), linear-gradient(135deg, rgba(15,23,42,.94), rgba(15,23,42,.72)); box-shadow: 0 24px 70px rgba(0,0,0,.32); }
+.label { color: #34d399; letter-spacing: .14em; }
+h1 { font-family: var(--display); font-size: clamp(30px, 4vw, 58px); letter-spacing: -.035em; text-transform: none; }
+.hero-owner { color: #cbd5e1; font-weight: 500; }
+.notice { border-radius: 12px; border-color: rgba(52,211,153,.2); background: rgba(15,23,42,.72); }
+@media (max-width: 860px) { .app { display: block; } .sidebar { position: relative; width: 100%; height: auto; padding: 14px 16px; } .brand { margin-bottom: 12px; padding-bottom: 12px; } nav { display: flex; overflow-x: auto; padding-bottom: 4px; } nav button { flex: 0 0 auto; min-height: 38px; } .operator-card { display: none; } main { padding: 18px 14px; } .topbar { padding: 22px 18px; } .hero-wolf-silhouette { opacity: .22; right: -8%; } }
+
 .label {
   margin: 0 0 7px;
   color: var(--teal);

@@ -1,5 +1,5 @@
 import { dbNotConfiguredResponse, missingEnvResponse, siteOrigin, type BillingEnv } from "../../_lib/billing-env";
-import { consumeTelegramAccountLinkCode } from "../../_lib/telegram-identity";
+import { consumeTelegramAccountLinkCode, getTelegramIdentityLinkByTelegramUserId } from "../../_lib/telegram-identity";
 import { applyStarsEntitlementForTelegramUser } from "../../_lib/stars-billing";
 import {
   createStarsOrder,
@@ -82,12 +82,64 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
   const textLower = text.toLowerCase();
   const linkCode = linkCodeFromStart(textLower);
   if (linkCode) {
+    const linkTelegramUserId = String(message.from?.id ?? message.chat.id);
+    // First-verification detection: does an identity link ALREADY exist for this
+    // Telegram user BEFORE we consume the code? consumeTelegramAccountLinkCode()
+    // deletes + re-inserts the row (resetting linked_at), so this pre-consume check
+    // is the only reliable "first time" signal. Best-effort: a DB read must never
+    // block the link flow — on error we treat the user as returning (NOT first).
+    let isFirstVerification = false;
+    try {
+      const priorLink = await getTelegramIdentityLinkByTelegramUserId(env.DB!, linkTelegramUserId);
+      isFirstVerification = !priorLink;
+    } catch (err) {
+      console.warn("first-verification lookup failed; treating as returning user", err);
+    }
     const result = await consumeTelegramAccountLinkCode(env, env.DB!, linkCode, {
-      telegramUserId: String(message.from?.id ?? message.chat.id),
+      telegramUserId: linkTelegramUserId,
       telegramChatId: String(message.chat.id),
       telegramUsername: message.from?.username,
       telegramFirstName: message.from?.first_name
     });
+    if (result.ok) {
+      // Celebration animation — ONLY on successful account link. Best-effort: a media
+      // hiccup must never block the "Telegram linked" confirmation below.
+      // Soundless MP4s served from Cloudflare Pages; Telegram renders them as a GIF/animation.
+      // Two variants, picked at random on each link so the reveal alternates between them.
+      const celebrationBase = `${origin.replace(/\/$/, "")}/celebrations`;
+      const celebrationClips = [
+        `${celebrationBase}/link-success.mp4`,
+        `${celebrationBase}/generated_video_10.mp4`
+      ];
+      const celebrationUrl = celebrationClips[Math.floor(Math.random() * celebrationClips.length)];
+      try {
+        await telegramApi(env, "sendAnimation", {
+          chat_id: message.chat.id,
+          animation: celebrationUrl
+        }, channel);
+      } catch (err) {
+        console.warn("link-success celebration animation failed", err);
+      }
+
+      // First-verification celebration — fires ONLY the very first time this
+      // Telegram user completes verification. Coexists with the per-link success
+      // rotation above (which fires on every successful link). Soundless MP4 served
+      // from Cloudflare Pages; Telegram autoplays it as an animation. Best-effort.
+      // (To show ONLY this hero clip on the first link, wrap the rotation above in
+      //  `if (!isFirstVerification) { ... }` — kept additive here so the parallel
+      //  success-GIF / rotation behavior is not changed.)
+      if (isFirstVerification) {
+        const firstVerifiedUrl = `${origin.replace(/\/$/, "")}/celebrations/first-verified.mp4`;
+        try {
+          await telegramApi(env, "sendAnimation", {
+            chat_id: message.chat.id,
+            animation: firstVerifiedUrl
+          }, channel);
+        } catch (err) {
+          console.warn("first-verified celebration animation failed", err);
+        }
+      }
+    }
     await telegramApi(env, "sendMessage", {
       chat_id: message.chat.id,
       parse_mode: "Markdown",
@@ -140,24 +192,64 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
   if (!textLower.startsWith("/subscribe") && !textLower.startsWith("/unlock") && !textLower.startsWith("/start fenrir_stars")) {
     if (textLower.startsWith("/start")) {
       const name = escapeMd(message.from?.first_name?.trim() || "there");
-      await telegramApi(env, "sendMessage", {
-        chat_id: message.chat.id,
-        parse_mode: "Markdown",
-        text: [
-          `🐺 *MyFenrir* · hey ${name}`,
-          "",
-          "*Telegram Lock* — share one stable URL. Fenrir keeps the real invite fresh, rotated, and revocable.",
-          "",
-          "· Open the dashboard to create locks",
-          "· Link Telegram so Stars and admin roster match this chat",
-          "· Unlock a plan with Stars when you are ready",
-          "",
-          "_One verified link, every product._"
-        ].join("\n"),
-        reply_markup: {
-          inline_keyboard: startActionButtons(env, origin)
-        }
-      }, channel);
+
+      // Is this Telegram user already verified/onboarded (an identity link exists)?
+      // Returning verified users get a distinct "welcome back" — NOT the newcomer
+      // welcome. Best-effort: on a DB read error, fall back to the newcomer path.
+      let alreadyVerified = false;
+      try {
+        const existingLink = await getTelegramIdentityLinkByTelegramUserId(
+          env.DB!,
+          String(message.from?.id ?? message.chat.id)
+        );
+        alreadyVerified = Boolean(existingLink);
+      } catch (err) {
+        console.warn("verified-state lookup failed; showing newcomer welcome", err);
+      }
+
+      if (alreadyVerified) {
+        // Changed welcome — already-verified / returning user (distinct copy).
+        // TODO(Francisco): adjust this returning-user copy to taste.
+        await telegramApi(env, "sendMessage", {
+          chat_id: message.chat.id,
+          parse_mode: "Markdown",
+          text: [
+            `🐺 *MyFenrir* · welcome back, ${name}`,
+            "",
+            "You're verified — this Telegram is already linked to your workspace.",
+            "",
+            "· Open the dashboard to manage your locks",
+            "· Rotate or revoke an invite anytime",
+            "· Stars top-ups apply straight to this workspace",
+            "",
+            "_One verified link, every product._"
+          ].join("\n"),
+          reply_markup: {
+            inline_keyboard: startActionButtons(env, origin)
+          }
+        }, channel);
+      } else {
+        // Newcomer welcome (recién llegado) — unchanged. If a welcome-media / video
+        // rotation task adds clips to /start, this is the branch it belongs in.
+        await telegramApi(env, "sendMessage", {
+          chat_id: message.chat.id,
+          parse_mode: "Markdown",
+          text: [
+            `🐺 *MyFenrir* · hey ${name}`,
+            "",
+            "*Telegram Lock* — share one stable URL. Fenrir keeps the real invite fresh, rotated, and revocable.",
+            "",
+            "· Open the dashboard to create locks",
+            "· Link Telegram so Stars and admin roster match this chat",
+            "· Unlock a plan with Stars when you are ready",
+            "",
+            "_One verified link, every product._"
+          ].join("\n"),
+          reply_markup: {
+            inline_keyboard: startActionButtons(env, origin)
+          }
+        }, channel);
+      }
     }
     return;
   }
