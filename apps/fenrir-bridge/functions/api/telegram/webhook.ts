@@ -10,9 +10,9 @@ import {
   starsDescription,
   starsLabel,
   starsPrice,
-  starsTitle,
   telegramApi
 } from "../../_lib/telegram-stars";
+import { timingSafeEqual } from "../../_lib/auth";
 
 type TelegramUpdate = {
   message?: TelegramMessage;
@@ -46,8 +46,8 @@ export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
   if (!configuredSecret) {
     return missingEnvResponse("TELEGRAM_WEBHOOK_SECRET");
   }
-  const received = context.request.headers.get("x-telegram-bot-api-secret-token");
-  if (received !== configuredSecret) {
+  const received = context.request.headers.get("x-telegram-bot-api-secret-token") ?? "";
+  if (!timingSafeEqual(received, configuredSecret)) {
     return Response.json({ ok: false, error: "invalid_telegram_webhook_secret" }, { status: 401 });
   }
 

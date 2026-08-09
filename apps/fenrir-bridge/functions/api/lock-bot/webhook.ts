@@ -19,6 +19,17 @@
 
 import { handleUpdate } from "../../_lib/lock-bot/handlers.js";
 
+function timingSafeEqual(left: string, right: string) {
+  const leftBytes = new TextEncoder().encode(left);
+  const rightBytes = new TextEncoder().encode(right);
+  const length = Math.max(leftBytes.length, rightBytes.length);
+  let difference = leftBytes.length ^ rightBytes.length;
+  for (let index = 0; index < length; index += 1) {
+    difference |= (leftBytes[index] ?? 0) ^ (rightBytes[index] ?? 0);
+  }
+  return difference === 0;
+}
+
 /**
  * Lock-bot specific env bindings.
  * Extend with D1 or KV bindings as needed.
@@ -35,7 +46,7 @@ export const onRequestPost: PagesFunction<LockBotEnv> = async (context) => {
     const configuredSecret = (context.env.LOCK_BOT_WEBHOOK_SECRET ?? "").trim();
     if (configuredSecret) {
         const received = context.request.headers.get("x-telegram-bot-api-secret-token") ?? "";
-        if (received !== configuredSecret) {
+        if (!timingSafeEqual(received, configuredSecret)) {
             return Response.json(
                 { ok: false, error: "invalid_webhook_secret" },
                 { status: 401 }

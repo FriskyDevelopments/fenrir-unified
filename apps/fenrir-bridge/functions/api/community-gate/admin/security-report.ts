@@ -1,60 +1,61 @@
 import { neon } from "@neondatabase/serverless";
 import { readSession } from "../../../_lib/auth";
+import { assertCommunityStaff, authErrorResponse, communityGateConfigured, communityGateNotConfigured, communityGateSql, parseSlug } from "../../../_lib/community-gate";
 import { noStoreJson } from "../../../_lib/responses";
 
 export async function onRequestGet(context: any) {
-  const session = await readSession(context.request, context.env);
-  if (!session) {
-    return noStoreJson({ ok: false, error: "authentication_required" }, { status: 401 });
-  }
+  if (!communityGateConfigured(context.env)) return communityGateNotConfigured(context.env);
 
   const url = new URL(context.request.url);
-  const communitySlug = url.searchParams.get("communitySlug");
+  const communitySlug = parseSlug(url.searchParams.get("communitySlug") ?? "fenrir");
   if (!communitySlug) {
-    return noStoreJson({ ok: false, error: "communitySlug_required" }, { status: 400 });
+    return noStoreJson({ ok: false, error: "community_slug_invalid" }, { status: 400 });
   }
 
   try {
+    const user = await readSession(context.request, context.env);
+    if (!user) {
+      return noStoreJson({ ok: false, error: "authentication_required" }, { status: 401 });
+    }
+
+    await assertCommunityStaff(context.env, user, communitySlug);
+
     if (!context.env.NEON_DATABASE_URL) {
       throw new Error("NEON_DATABASE_URL is not configured.");
     }
     const sql = neon(context.env.NEON_DATABASE_URL);
 
-    // Run read-only analytical queries against Neon
     const communityRes = await sql`SELECT id, slug, name FROM communities WHERE slug = ${communitySlug} LIMIT 1`;
     if (communityRes.length === 0) {
       return noStoreJson({ ok: false, error: "community_not_found" }, { status: 404 });
     }
     const community = communityRes[0];
 
-    // Get user stats
     const usersRes = await sql`
-      SELECT 
+      SELECT
         COUNT(*) as total,
         COUNT(CASE WHEN status = 'verified' THEN 1 END) as verified,
         COUNT(CASE WHEN status = 'blocked' THEN 1 END) as blocked,
         COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
-      FROM users 
+      FROM users
       WHERE community_id = ${community.id}
     `;
 
-    // Profile stats
     const profileRes = await sql`
       SELECT COUNT(*) as missing_display_name
-      FROM user_profiles 
+      FROM user_profiles
       WHERE community_id = ${community.id} AND (display_name IS NULL OR display_name = '')
     `;
 
-    // Session stats
     const sessionsRes = await sql`
-      SELECT 
+      SELECT
         COUNT(*) as total,
         COUNT(CASE WHEN status = 'successful' THEN 1 END) as successful,
         COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
         COUNT(CASE WHEN status = 'blocked' THEN 1 END) as blocked,
         COUNT(CASE WHEN status = 'expired' THEN 1 END) as expired,
         COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
-      FROM user_sessions 
+      FROM user_sessions
       WHERE community_id = ${community.id}
     `;
 
@@ -90,40 +91,6 @@ export async function onRequestGet(context: any) {
       }
     });
   } catch (error: any) {
-    // If the database isn't actually configured or we're missing tables, we return mock data 
-    // to satisfy the frontend UI for demonstration purposes, matching the PR_DESCRIPTION format.
-    console.warn("Neon DB error, falling back to mock data:", error.message);
-    
-    return noStoreJson({
-      ok: true,
-      data: {
-        community: {
-          id: "uuid-fallback",
-          slug: communitySlug,
-          name: communitySlug === "fenrir" ? "Fenrir Protocol" : communitySlug
-        },
-        users: {
-          total: 100,
-          verified: 85,
-          blocked: 10,
-          pending: 5,
-          missingDisplayName: 3
-        },
-        sessions: {
-          total: 500,
-          successful: 400,
-          failed: 50,
-          blocked: 30,
-          expired: 15,
-          pending: 5
-        },
-        impact: {
-          blockedAttempts: 80,
-          usersNeedingProfileFixes: 3,
-          fullyVerifiedUsers: 85
-        },
-        generatedAt: new Date().toISOString()
-      }
-    });
+    return authErrorResponse(error);
   }
 }
