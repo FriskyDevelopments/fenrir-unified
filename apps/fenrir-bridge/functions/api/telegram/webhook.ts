@@ -38,6 +38,9 @@ type TelegramMessage = {
   };
 };
 
+const FENRIR_WELCOME_IMAGE_URL =
+  "https://fenrir-stars-payments.hrgrrtks2p.workers.dev/fenrir-community-auth.jpg";
+
 export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
   if (!context.env.DB) return dbNotConfiguredResponse();
   const url = new URL(context.request.url);
@@ -140,10 +143,11 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
   if (!textLower.startsWith("/subscribe") && !textLower.startsWith("/unlock") && !textLower.startsWith("/start fenrir_stars")) {
     if (textLower.startsWith("/start")) {
       const name = escapeMd(message.from?.first_name?.trim() || "there");
-      await telegramApi(env, "sendMessage", {
+      await telegramApi(env, "sendPhoto", {
         chat_id: message.chat.id,
         parse_mode: "Markdown",
-        text: [
+        photo: FENRIR_WELCOME_IMAGE_URL,
+        caption: [
           `🐺 *MyFenrir* · hey ${name}`,
           "",
           "*Telegram Lock* — share one stable URL. Fenrir keeps the real invite fresh, rotated, and revocable.",
