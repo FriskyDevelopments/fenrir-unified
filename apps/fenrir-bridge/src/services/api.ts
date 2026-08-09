@@ -623,9 +623,3 @@ export const telegramIdentityService = {
     });
   }
 };
-
-export const communitySecurityService = {
-  async getReport(communitySlug: string = "fenrir"): Promise<{ ok: true; data: CommunitySecurityReport }> {
-    return apiRequest<{ ok: true; data: CommunitySecurityReport }>(`/api/community-gate/admin/security-report?communitySlug=${encodeURIComponent(communitySlug)}`);
-  }
-};

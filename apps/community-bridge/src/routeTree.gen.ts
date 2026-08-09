@@ -18,6 +18,7 @@ import { Route as DemoRouteImport } from './routes/demo'
 import { Route as GateRouteImport } from './routes/gate'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as ModerationRouteImport } from './routes/moderation'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
@@ -73,6 +74,11 @@ const LoginRoute = LoginRouteImport.update({
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
   path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ModerationRoute = ModerationRouteImport.update({
+  id: '/moderation',
+  path: '/moderation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -145,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/gate': typeof GateRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/moderation': typeof ModerationRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -167,6 +174,7 @@ export interface FileRoutesByTo {
   '/gate': typeof GateRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/moderation': typeof ModerationRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -190,6 +198,7 @@ export interface FileRoutesById {
   '/gate': typeof GateRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/moderation': typeof ModerationRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -214,6 +223,7 @@ export interface FileRouteTypes {
     | '/gate'
     | '/login'
     | '/mcp'
+    | '/moderation'
     | '/sitemap.xml'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -236,6 +246,7 @@ export interface FileRouteTypes {
     | '/gate'
     | '/login'
     | '/mcp'
+    | '/moderation'
     | '/sitemap.xml'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '/gate'
     | '/login'
     | '/mcp'
+    | '/moderation'
     | '/sitemap.xml'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -281,6 +293,7 @@ export interface RootRouteChildren {
   GateRoute: typeof GateRoute
   LoginRoute: typeof LoginRoute
   McpRoute: typeof McpRoute
+  ModerationRoute: typeof ModerationRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -357,6 +370,13 @@ declare module '@tanstack/react-router' {
       path: '/mcp'
       fullPath: '/mcp'
       preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/moderation': {
+      id: '/moderation'
+      path: '/moderation'
+      fullPath: '/moderation'
+      preLoaderRoute: typeof ModerationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -449,6 +469,7 @@ const rootRouteChildren: RootRouteChildren = {
   GateRoute: GateRoute,
   LoginRoute: LoginRoute,
   McpRoute: McpRoute,
+  ModerationRoute: ModerationRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:

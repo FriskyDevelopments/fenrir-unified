@@ -1,10 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Loader2, Wand2 } from "lucide-react";
+import { ArrowLeft, Check, Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { GateForm, SLUG_PATTERN, slugify, useSlugAvailability } from "@/components/gate/gate-form";
+import { CommunityStandardsStep, hasAcceptedStandards } from "@/components/gate/community-standards-step";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/config/brand-context";
 import { createGate } from "@/lib/gate.functions";
@@ -45,6 +47,14 @@ function NewGatePage() {
 
   const [config, setConfig] = useState<GateConfig>({ slug: "", ...DEFAULT_GATE });
   const [saving, setSaving] = useState(false);
+  const [createdGate, setCreatedGate] = useState<{ id: string; slug: string } | null>(null);
+  // Se muestran una vez por navegador, y siempre en el primer arranque guiado
+  // (?onboarding=1 desde el dashboard de MyFenrir).
+  const [showStandards, setShowStandards] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const guided = new URLSearchParams(window.location.search).get("onboarding") === "1";
+    return guided || !hasAcceptedStandards();
+  });
   const slugStatus = useSlugAvailability(config.slug);
 
   useEffect(() => {
@@ -80,7 +90,7 @@ function NewGatePage() {
         data: { ...config, brand_id: brand.id, community_id: brand.community.id },
       });
       toast.success("Gate published");
-      navigate({ to: "/gates/$id", params: { id: saved.id } });
+      setCreatedGate({ id: saved.id, slug: saved.slug });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save gate");
     } finally {
@@ -92,6 +102,49 @@ function NewGatePage() {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Las normas van ANTES del builder: quien abre una puerta debe saber qué se
+  // hace cumplir del otro lado antes de tener una puerta que administrar.
+  if (showStandards) {
+    return (
+      <div className="min-h-dvh bg-background">
+        <CommunityStandardsStep onAccept={() => setShowStandards(false)} />
+      </div>
+    );
+  }
+
+  if (createdGate) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-background px-5">
+        <Card className="w-full max-w-lg p-8">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <Check className="h-5 w-5" />
+          </div>
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight">Your gate is live</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            We created <span className="font-medium text-foreground">/{createdGate.slug}</span> for your community.
+          </p>
+          <div className="mt-6 rounded-xl border border-border bg-card/60 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Account email</p>
+            <p className="mt-1 text-sm text-foreground">{user?.email ?? "Email from your sign-in provider"}</p>
+          </div>
+          <div className="mt-6 rounded-xl border border-primary/30 bg-primary/10 p-5">
+            <h2 className="text-base font-semibold text-foreground">Ready to upgrade?</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Unlock branded domains, advanced access rules, analytics, and team controls for this gate.
+            </p>
+            <Button asChild variant="fenrir" className="mt-4">
+              <Link to="/dashboard">See upgrade options</Link>
+            </Button>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Button asChild variant="outline"><Link to="/gates/$id" params={{ id: createdGate.id }}>Edit gate</Link></Button>
+            <Button asChild variant="ghost"><Link to="/gates">View all gates</Link></Button>
+          </div>
+        </Card>
       </div>
     );
   }

@@ -2,6 +2,7 @@ import { readSession, type SessionPayload } from "./auth";
 import { noStoreJson } from "./responses";
 
 export type CommunityAuthEnv = {
+  EMAIL?: { send: (message: { to: string; from: { email: string; name?: string }; subject: string; html: string; text: string }) => Promise<unknown> };
   NEON_DATABASE_URL?: string;
   FENRIR_COMMUNITY_AUTH_SECRET?: string;
   FENRIR_COMMUNITY_AUTH_DEV_RETURN_LINK?: string;
