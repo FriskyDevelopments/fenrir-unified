@@ -12,6 +12,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+import cv2
+import numpy as np
 import torch
 from PIL import Image
 from transformers import pipeline
@@ -44,12 +46,15 @@ class Verdict:
         - `reject`  edad claramente por debajo del mínimo legal. Se bloquea de
                     inmediato y NO entra a la cola: nadie tiene que mirar eso
                     para decidir.
-        - `review`  banda de incertidumbre, o hay persona y no hubo lectura de
-                    edad. Decide un admin.
-        - `allow`   por encima del umbral de confianza.
+        - `review`  banda de incertidumbre, o contenido explícito cuya edad no
+                    se puede verificar. Decide un admin.
+        - `allow`   por encima del umbral, o imagen sin personas ni explícito.
         """
         if not self.person:
-            return "allow"
+            # Sin rostro detectable: un paisaje pasa, pero contenido explícito
+            # cuya edad NO se puede verificar va a revisión. Que el detector
+            # falle no puede convertirse en vía libre.
+            return "review" if self.explicit else "allow"
         if self.apparent_age is None:
             return "review"
         if self.apparent_age < reject_below:
@@ -73,16 +78,32 @@ class ClassifierBundle:
         nsfw_scores = {r["label"].lower(): r["score"] for r in self.nsfw(image)}
         explicit = nsfw_scores.get("nsfw", 0.0) >= 0.5
 
-        age_results = self.age(image)
-        apparent_age = _age_from_labels(age_results)
-        # LIMITACIÓN CONOCIDA: un clasificador siempre devuelve alguna etiqueta,
-        # también sobre una foto sin personas — así que esto sobre-detecta y el
-        # servicio peca de estricto (rechaza de más, no de menos). Aceptable
-        # como punto de partida, pero antes de producción hay que anteponer un
-        # detector de rostros real y solo entonces estimar edad.
-        person = apparent_age is not None
+        # El detector de rostros decide SI se estima edad. Antes "hay persona"
+        # se infería de que el clasificador devolvió etiqueta — pero un
+        # clasificador siempre devuelve algo, también sobre un paisaje.
+        person = _has_face(image)
+        apparent_age = _age_from_labels(self.age(image)) if person else None
 
         return Verdict(person=person, explicit=explicit, apparent_age=apparent_age)
+
+
+_FACE_CASCADE = cv2.CascadeClassifier(
+    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+)
+
+
+def _has_face(image: Image.Image) -> bool:
+    """
+    ¿Hay al menos un rostro? Haar cascade de OpenCV: va incluido en el paquete,
+    licencia permisiva y corre en milisegundos en CPU.
+
+    Detecta rostros frontales; los de perfil o muy oscuros se le escapan. Por
+    eso `decision()` manda a revisión el explícito sin rostro en vez de dejarlo
+    pasar: un fallo del detector no puede volverse vía libre.
+    """
+    frame = np.array(image.convert("L"))
+    faces = _FACE_CASCADE.detectMultiScale(frame, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))
+    return len(faces) > 0
 
 
 def _age_from_labels(results: list[dict]) -> int | None:

@@ -1,7 +1,10 @@
 import { useRef, useState } from "react";
 import { Film, ImageIcon, Loader2, Upload, X } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useBrand } from "@/config/brand-context";
+import { moderateUpload } from "@/lib/moderate-upload.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,8 +33,20 @@ interface GateMediaFieldProps {
  * and keeps the public read path (`/gate-media/...`) in the config. Pasting an
  * `https://` URL still works for already-hosted files.
  */
+/** El navegador solo manda bytes; la URL y la clave del clasificador viven en el servidor. */
+function asDataUri(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("read_failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function GateMediaField({ id, label, hint, value, onChange }: GateMediaFieldProps) {
   const { session } = useAuth();
+  const brand = useBrand();
+  const moderate = useServerFn(moderateUpload);
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -75,7 +90,40 @@ export function GateMediaField({ id, label, hint, value, onChange }: GateMediaFi
       );
       return;
     }
-    onChange(`/gate-media/${path}`);
+
+    const publicPath = `/gate-media/${path}`;
+
+    // Moderación DESPUÉS de guardar y ANTES de publicar: solo las imágenes
+    // pasan por el clasificador (el vídeo necesita muestreo de fotogramas, que
+    // todavía no está). Un fallo aquí nunca publica en silencio.
+    if (!file.type.startsWith("video/")) {
+      setBusy(true);
+      try {
+        const verdict = await moderate({
+          data: {
+            image: await asDataUri(file),
+            subject_ref: publicPath,
+            subject_kind: "gate_media",
+            community_id: brand.community.id,
+          },
+        });
+        if (verdict.decision === "reject") {
+          setError("That image cannot be used here.");
+          return;
+        }
+        if (verdict.decision === "review") {
+          setError("Sent for review — a moderator will approve it shortly.");
+          return;
+        }
+      } catch {
+        setError("We could not check that image. Try again in a moment.");
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    onChange(publicPath);
   }
 
   return (
