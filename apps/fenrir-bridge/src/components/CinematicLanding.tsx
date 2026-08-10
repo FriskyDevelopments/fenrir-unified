@@ -143,6 +143,20 @@ const cinematicStyles = `
   transition: transform 500ms cubic-bezier(.16, 1, .3, 1);
 }
 
+.cinematic-landing__wolf {
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: 48%;
+  width: min(68vw, 58rem);
+  max-width: none;
+  transform: translate(-50%, -50%);
+  opacity: .29;
+  filter: saturate(.72) contrast(1.32) brightness(.9) drop-shadow(0 0 34px rgb(0 229 255 / 18%));
+  mask-image: radial-gradient(ellipse 55% 58% at 50% 50%, #000 46%, rgb(0 0 0 / 76%) 64%, transparent 83%);
+  pointer-events: none;
+}
+
 .cinematic-landing__eyebrow {
   margin: 0 0 1.5rem;
   color: rgb(218 246 255 / 72%);
@@ -327,6 +341,17 @@ const cinematicStyles = `
   .cinematic-landing *, .cinematic-landing::before, .cinematic-landing::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .cinematic-landing__content { transform: none; }
 }
+
+@media (max-width: 640px) {
+  .cinematic-landing { padding: 1.35rem 1rem; }
+  .cinematic-landing__wolf {
+    top: 43%;
+    width: 154vw;
+    opacity: .27;
+    filter: saturate(.68) contrast(1.4) brightness(.84) drop-shadow(0 0 24px rgb(0 229 255 / 20%));
+    mask-image: radial-gradient(ellipse 45% 53% at 50% 50%, #000 44%, rgb(0 0 0 / 78%) 65%, transparent 84%);
+  }
+}
 `;
 
 export function CinematicLanding() {
@@ -348,6 +373,12 @@ export function CinematicLanding() {
       <div className="cinematic-landing__grain" aria-hidden="true" />
       <div className="cinematic-landing__beam" aria-hidden="true" />
       <div className="cinematic-landing__scan" aria-hidden="true" />
+      <img
+        className="cinematic-landing__wolf"
+        src="/fenrir-cyber-guardian-hero.svg"
+        alt=""
+        aria-hidden="true"
+      />
       {particles.map((particle) => <span className="cinematic-landing__particle" key={particle} aria-hidden="true" />)}
       <div className="cinematic-landing__wolf" aria-hidden="true">
         <svg viewBox="0 0 640 520">

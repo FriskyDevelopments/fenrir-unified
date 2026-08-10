@@ -14,7 +14,8 @@ type AuthProvider = "google" | "microsoft" | "apple";
 // values are public by design — they are embedded in every client bundle.
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://yqevglppbhuoxxfsfnih.supabase.co";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_t8xng5GIhOmAtT4Nsf7Zgg_TO36FTTE";
-const authRedirectOrigin = (import.meta.env.VITE_AUTH_REDIRECT_ORIGIN ?? "https://www.myfenrir.com").trim();
+const authRedirectOrigin = (import.meta.env.VITE_AUTH_REDIRECT_ORIGIN ?? "").trim();
+const previewAuthEnabled = import.meta.env.VITE_PREVIEW_AUTH_ENABLED === "true";
 const authRedirectPath = (import.meta.env.VITE_AUTH_REDIRECT_PATH ?? "/auth/callback").trim();
 const fenrirManagedUrl = (import.meta.env.VITE_FENRIR_MANAGED_URL ?? "/main").trim();
 const postAuthDestinationKey = "fenrir_post_auth_destination";
@@ -105,6 +106,9 @@ function callbackDestinationPath(pathname: string, hasCallbackParams = false) {
 }
 
 export async function signInWithSupabase(providerName: AuthProvider) {
+  if (window.location.hostname.endsWith(".pages.dev") && !previewAuthEnabled) {
+    throw new Error("preview_auth_not_configured");
+  }
   const supabase = await supabaseClient();
   rememberPostAuthDestination();
   const { error } = await supabase.auth.signInWithOAuth({
