@@ -44,6 +44,16 @@ const defaultDeps: Required<CommunityOAuthDeps> = {
   communitySql
 };
 
+const COMMUNITY_OAUTH_PROVIDERS: OAuthProvider[] = ["google", "microsoft", "apple"];
+
+/** Existing routes expose only providers whose bindings are actually present. */
+export function availableCommunityAuthProviders(env: CommunityOAuthEnv): string[] {
+  return [
+    "magic_link",
+    ...COMMUNITY_OAUTH_PROVIDERS.filter((provider) => isDirectOAuthAvailable(provider, env))
+  ];
+}
+
 export function communityOAuthErrorLocation(origin: string, slug: string, error: string) {
   const params = new URLSearchParams({ auth_error: error });
   return `${origin.replace(/\/$/, "")}/community/${slug}?${params.toString()}`;

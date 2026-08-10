@@ -1,9 +1,7 @@
 import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from "@simplewebauthn/browser";
 import { copy } from "../i18n";
 import { addBridge, addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
-// Auth broker is WorkOS AuthKit. The hosted flow mints the Fenrir session
-// cookie server-side in /api/auth/callback/workos, so the client no longer
-// performs any token exchange after the redirect (directAuthOrigin is declared below).
+import { completeSupabaseSession, hasSupabaseCallbackInLocation, signInWithSupabase, signOutSupabase } from "./supabaseAuth";
 import type { AppState, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck } from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
@@ -18,7 +16,6 @@ const telegramBotUsername = () =>
     .replace(/^@/, "")
     .trim();
 
-const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? "").trim().replace(/\/$/, "");
 
 export type PaidPlan = Exclude<Plan, "free">;
 
@@ -156,16 +153,6 @@ function devAuthSession(): AuthSession & { ok: true } {
       plan: store.org.plan
     }
   };
-}
-
-function safeCurrentAuthReturnPath() {
-  const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-  if (!path.startsWith("/") || path.startsWith("//")) return "/main";
-  const pathname = window.location.pathname || "/";
-  if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) {
-    return "/main";
-  }
-  return path;
 }
 
 function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: string): T {
@@ -365,20 +352,27 @@ export const webauthnService = {
 
 export const authService = {
   async me() {
-    // WorkOS AuthKit mints the Fenrir session cookie on the server callback,
-    // so the browser only needs to read the resulting session.
+    if (hasSupabaseCallbackInLocation()) {
+      const completed = await completeSupabaseSession();
+      if (completed) {
+        return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
+      }
+    }
     try {
       const result = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
+      if (!result.authenticated) {
+        const completed = await completeSupabaseSession();
+        if (completed) {
+          return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
+        }
+      }
       return { ok: true as const, data: result };
     } catch {
       return { ok: true as const, data: { authenticated: false } as AuthSession };
     }
   },
   async login(provider: "google" | "microsoft" | "apple") {
-    const returnTo = safeCurrentAuthReturnPath();
-    // Route social sign-in through WorkOS AuthKit; the provider hint jumps
-    // straight to the matching hosted connection.
-    window.location.assign(`${directAuthOrigin}/api/auth/workos/login?provider=${provider}&return_to=${encodeURIComponent(returnTo)}`);
+    await signInWithSupabase(provider);
   },
   async telegramLogin(payload: TelegramLoginPayload) {
     return apiRequest<{ ok: true; authenticated: true; user: AuthSession["user"]; org: AuthSession["org"] }>("/api/auth/telegram-session", {
@@ -387,7 +381,13 @@ export const authService = {
     });
   },
   async logout() {
+    // The Fenrir cookie is authoritative for protected routes, so revoke it
+    // even when Supabase storage cleanup is slow or offline.
     await apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }).catch(() => null);
+    await Promise.race([
+      signOutSupabase().catch(() => undefined),
+      new Promise<void>((resolve) => window.setTimeout(resolve, 3_000))
+    ]);
   }
 };
 
