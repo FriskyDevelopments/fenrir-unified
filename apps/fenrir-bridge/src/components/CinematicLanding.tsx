@@ -1,5 +1,6 @@
 import { useCallback, useRef } from "react";
 import { knowledgeBaseUrl } from "../services/knowledgeBase";
+import { FenrirSilhouette } from "./FenrirSilhouette";
 
 const particles = Array.from({ length: 14 }, (_, index) => index + 1);
 const titleLetters = ["F", "E", "N", "R", "I", "R"];
@@ -148,13 +149,16 @@ const cinematicStyles = `
   z-index: 0;
   left: 50%;
   top: 48%;
-  width: min(68vw, 58rem);
+  width: min(68vw, 54rem);
   max-width: none;
   transform: translate(-50%, -50%);
-  opacity: .29;
-  filter: saturate(.72) contrast(1.32) brightness(.9) drop-shadow(0 0 34px rgb(0 229 255 / 18%));
-  mask-image: radial-gradient(ellipse 55% 58% at 50% 50%, #000 46%, rgb(0 0 0 / 76%) 64%, transparent 83%);
+  opacity: .86;
+  filter: saturate(.9) contrast(1.18) brightness(1.2) drop-shadow(0 0 28px rgb(255 23 68 / 24%));
   pointer-events: none;
+}
+
+.cinematic-landing__wolf .silhouette-edge {
+  opacity: .95;
 }
 
 .cinematic-landing__eyebrow {
@@ -346,10 +350,9 @@ const cinematicStyles = `
   .cinematic-landing { padding: 1.35rem 1rem; }
   .cinematic-landing__wolf {
     top: 43%;
-    width: 154vw;
-    opacity: .27;
-    filter: saturate(.68) contrast(1.4) brightness(.84) drop-shadow(0 0 24px rgb(0 229 255 / 20%));
-    mask-image: radial-gradient(ellipse 45% 53% at 50% 50%, #000 44%, rgb(0 0 0 / 78%) 65%, transparent 84%);
+    width: 142vw;
+    opacity: .74;
+    filter: saturate(.86) contrast(1.22) brightness(1.18) drop-shadow(0 0 22px rgb(255 23 68 / 24%));
   }
 }
 `;
@@ -373,12 +376,7 @@ export function CinematicLanding() {
       <div className="cinematic-landing__grain" aria-hidden="true" />
       <div className="cinematic-landing__beam" aria-hidden="true" />
       <div className="cinematic-landing__scan" aria-hidden="true" />
-      <img
-        className="cinematic-landing__wolf"
-        src="/fenrir-cyber-guardian-hero.svg"
-        alt=""
-        aria-hidden="true"
-      />
+      <FenrirSilhouette className="cinematic-landing__wolf" />
       {particles.map((particle) => <span className="cinematic-landing__particle" key={particle} aria-hidden="true" />)}
       <div className="cinematic-landing__wolf" aria-hidden="true">
         <svg viewBox="0 0 640 520">
@@ -423,9 +421,11 @@ export function CinematicLanding() {
         </p>
         <div className="cinematic-landing__actions">
           <a className="cinematic-landing__enter" href="/login">Enter</a>
-          <a className="cinematic-landing__docs" href={knowledgeBaseUrl} target="_blank" rel="noreferrer">
-            Wiki <i>↗</i>
-          </a>
+          {knowledgeBaseUrl ? (
+            <a className="cinematic-landing__docs" href={knowledgeBaseUrl} target="_blank" rel="noreferrer">
+              Fenrir Docs <i>↗</i>
+            </a>
+          ) : null}
         </div>
         <div className="cinematic-landing__rail" aria-hidden="true">
           {protocolRail.map((lane) => <span key={lane}>{lane}</span>)}

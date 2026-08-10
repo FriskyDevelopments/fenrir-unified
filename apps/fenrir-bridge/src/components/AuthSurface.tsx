@@ -47,9 +47,11 @@ export function AuthSurface({ theme, locale, onLocale, railLabel, logoUrl, backg
 
   const topbarActions = (
     <div className="gate-topbar-actions">
-      <a className="gate-btn-ghost gate-kb-link" href={knowledgeBaseUrl} target="_blank" rel="noreferrer" data-testid="kb-link">
-        {knowledgeBaseLabel}
-      </a>
+      {knowledgeBaseUrl ? (
+        <a className="gate-btn-ghost gate-kb-link" href={knowledgeBaseUrl} target="_blank" rel="noreferrer" data-testid="kb-link">
+          {knowledgeBaseLabel}
+        </a>
+      ) : null}
       <select className="language-select" value={locale} onChange={(event) => onLocale(event.target.value as Locale)} aria-label="Language">
         {locales.map((item) => (
           <option value={item} key={item}>{languageNames[item]}</option>

@@ -1,9 +1,5 @@
-/**
- * La base de conocimiento de MyFenrir es la Wiki "Guardian Protocol"
- * (public/wiki, también servida en prod en myfenrir.com/wiki).
- * VITE_KNOWLEDGE_BASE_URL permite apuntar a otro destino si hiciera falta.
- * (Astelar es un producto aparte — no es la KB de MyFenrir.)
- */
-export const knowledgeBaseUrl: string = import.meta.env.VITE_KNOWLEDGE_BASE_URL || "/wiki";
+/** A verified MyFenrir documentation URL must be supplied explicitly. */
+export const knowledgeBaseUrl: string | null =
+  import.meta.env.VITE_MYFENRIR_DOCS_URL?.trim() || null;
 
 export const knowledgeBaseLabel = "Wiki";
