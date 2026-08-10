@@ -1,14 +1,5 @@
-/**
- * Astelar — the Fenrir knowledge base. It lives as an ISOLATED nested repo
- * (apps/fenrir-bridge/astelar, gitignored here) and is linked from the page,
- * not bundled. The URL is environment-driven:
- *   - VITE_ASTELAR_KB_URL, set at build time, wins (use it in production
- *     once Astelar is deployed, e.g. its Cloudflare Pages URL).
- *   - Dev fallback: the local Astro dev server (astelar: `npm run dev`, :4321).
- *   - Prod fallback: the public, read-only Astelar Pages documentation.
- */
-export const knowledgeBaseUrl: string =
-  import.meta.env.VITE_ASTELAR_KB_URL ||
-  (import.meta.env.DEV ? "http://localhost:4321" : "https://astelar.pages.dev/");
+/** A verified MyFenrir documentation URL must be supplied explicitly. */
+export const knowledgeBaseUrl: string | null =
+  import.meta.env.VITE_MYFENRIR_DOCS_URL?.trim() || null;
 
 export const knowledgeBaseLabel = "Knowledge Base";
