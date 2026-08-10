@@ -3,6 +3,7 @@ import { dbNotConfiguredResponse, type BillingEnv } from "../../_lib/billing-env
 import { resolveBillingForOrg } from "../../_lib/billing-db";
 import { effectiveBillingPlanFromRow, limitsForPlan, type BillingPlanKey } from "../../_lib/plan-catalog";
 import { noStoreJson } from "../../_lib/responses";
+import { syncPendingStarsForFriskyUser } from "../../_lib/stars-billing";
 
 export async function onRequestGet(context: { request: Request; env: BillingEnv }) {
   const session = await readSession(context.request, context.env);
@@ -14,6 +15,7 @@ export async function onRequestGet(context: { request: Request; env: BillingEnv 
     return dbNotConfiguredResponse();
   }
 
+  await syncPendingStarsForFriskyUser(context.env.DB, context.env, session.frisky_user_id);
   const { customer, subscription } = await resolveBillingForOrg(context.env, session.frisky_org_id);
   const plan: BillingPlanKey = effectiveBillingPlanFromRow(subscription);
 

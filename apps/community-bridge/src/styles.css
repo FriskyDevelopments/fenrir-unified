@@ -160,3 +160,19 @@
     font-family: var(--font-mono);
   }
 }
+#community-boot-fallback {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  color: #e5edf7;
+  text-align: center;
+  background: #070b12;
+}
+
+#community-boot-fallback span { color: #94a3b8; }
+#community-boot-fallback a { color: #5eead4; text-decoration: underline; }
+html[data-community-hydrated="true"] #community-boot-fallback { display: none; }

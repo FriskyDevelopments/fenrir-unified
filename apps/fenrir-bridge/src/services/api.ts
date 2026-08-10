@@ -24,7 +24,6 @@ const telegramBotUsername = () =>
     .replace(/^@/, "")
     .trim();
 
-const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? "").trim().replace(/\/$/, "");
 
 export type PaidPlan = Exclude<Plan, "free">;
 
@@ -175,16 +174,6 @@ function devAuthSession(): AuthSession & { ok: true } {
       plan: store.org.plan
     }
   };
-}
-
-function safeCurrentAuthReturnPath() {
-  const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-  if (!path.startsWith("/") || path.startsWith("//")) return "/main";
-  const pathname = window.location.pathname || "/";
-  if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) {
-    return "/main";
-  }
-  return path;
 }
 
 function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: string): T {
@@ -392,7 +381,6 @@ export const authService = {
         return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
       }
     }
-
     try {
       const result = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
       if (!result.authenticated) {
@@ -407,17 +395,7 @@ export const authService = {
     }
   },
   async login(provider: "google" | "microsoft" | "apple") {
-    // Supabase Auth is the restored login broker (the original working flow):
-    // signInWithOAuth against project yqevglppbhuoxxfsfnih, which holds the
-    // provider apps that accept its callback. Only if the bundle was built
-    // without Supabase config do we fall back to the direct per-provider stack.
-    // The banned broker is deliberately NOT in this path (1621d6a regression).
-    if (isSupabaseAuthConfigured()) {
-      await signInWithSupabase(provider);
-      return;
-    }
-    const returnTo = safeCurrentAuthReturnPath();
-    window.location.assign(`${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
+    await signInWithSupabase(provider);
   },
   async telegramLogin(payload: TelegramLoginPayload) {
     return apiRequest<{ ok: true; authenticated: true; user: AuthSession["user"]; org: AuthSession["org"] }>("/api/auth/telegram-session", {
@@ -431,8 +409,13 @@ export const authService = {
     } catch {
       // Optional cleanup only.
     }
-    await signOutSupabase();
+    // The Fenrir cookie is authoritative for protected routes, so revoke it
+    // even when Supabase storage cleanup is slow or offline.
     await apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }).catch(() => null);
+    await Promise.race([
+      signOutSupabase().catch(() => undefined),
+      new Promise<void>((resolve) => window.setTimeout(resolve, 3_000))
+    ]);
   }
 };
 

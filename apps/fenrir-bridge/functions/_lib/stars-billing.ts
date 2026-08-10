@@ -78,16 +78,16 @@ export async function syncPendingStarsForFriskyUser(db: D1Database, env: Billing
     .prepare(`SELECT telegram_user_id FROM telegram_identity_links WHERE frisky_user_id = ? LIMIT 1`)
     .bind(friskyUserId)
     .first<{ telegram_user_id: string }>();
-  if (!link) return { applied: false as const };
-
   const entitlement = await db
     .prepare(
       `SELECT telegram_user_id, status, stars_amount, payload, telegram_payment_charge_id
        FROM telegram_stars_entitlements
-       WHERE telegram_user_id = ? AND status = 'active'
+       WHERE status = 'active'
+         AND (frisky_user_id = ? OR telegram_user_id = ?)
+       ORDER BY updated_at DESC
        LIMIT 1`
     )
-    .bind(link.telegram_user_id)
+    .bind(friskyUserId, link?.telegram_user_id ?? "")
     .first<{
       telegram_user_id: string;
       status: string;
