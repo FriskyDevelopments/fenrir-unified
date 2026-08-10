@@ -115,6 +115,11 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <div id="community-boot-fallback" role="status">
+          <strong>Community Bridge is loading…</strong>
+          <span>If this takes more than a few seconds, reload the application.</span>
+          <a href={typeof location === "undefined" ? "/" : location.href}>Reload</a>
+        </div>
         {children}
         <Scripts />
       </body>
@@ -124,6 +129,12 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useEffect(() => {
+    document.documentElement.dataset.communityHydrated = "true";
+    return () => {
+      delete document.documentElement.dataset.communityHydrated;
+    };
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

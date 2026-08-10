@@ -10,12 +10,12 @@ export async function onRequestPost(context: any) {
 
   try {
     const payload = await createSessionFromSupabaseToken(body.accessToken, context.env);
-    const session = await signSession(payload, context.env);
+    const token = await signSession(payload, context.env);
     return noStoreJson(
       { ok: true },
       {
         headers: {
-          "Set-Cookie": sessionSetCookie(session)
+          "Set-Cookie": sessionSetCookie(token)
         }
       }
     );

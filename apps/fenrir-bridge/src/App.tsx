@@ -1090,6 +1090,8 @@ export function App() {
   const [readinessError, setReadinessError] = useState(false);
   const [activationVisible, setActivationVisible] = useState(true);
   const [fenrirRole, setFenrirRole] = useState<FenrirRole | null>(null);
+  const [authInitError, setAuthInitError] = useState<string | null>(null);
+  const [authAttempt, setAuthAttempt] = useState(0);
 
   function triggerCelebration(title: string, detail: string, tone: Celebration["tone"]) {
     const id = Date.now();
@@ -1132,10 +1134,16 @@ export function App() {
   }
 
   async function refreshAuth() {
-    const result = await authService.me();
-    setAuth(result.data);
-    if (result.data.authenticated && (isAuthCallbackPath(window.location.pathname) || window.location.hash.includes("access_token="))) {
-      window.history.replaceState({}, "", managedDashboardPath);
+    setAuthInitError(null);
+    try {
+      const result = await withTimeout(authService.me(), 12_000, "auth_initialization_timeout");
+      setAuth(result.data);
+      if (result.data.authenticated && (isAuthCallbackPath(window.location.pathname) || window.location.hash.includes("access_token="))) {
+        window.history.replaceState({}, "", managedDashboardPath);
+      }
+    } catch (error) {
+      setAuth(null);
+      setAuthInitError(error instanceof Error ? error.message : "auth_initialization_failed");
     }
   }
 
@@ -1148,7 +1156,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authAttempt]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1278,7 +1286,20 @@ export function App() {
   }
 
   if (!auth) {
-    return <div className="boot">{c.boot}</div>;
+    if (authInitError) {
+      return (
+        <main className="boot boot-error" role="alert">
+          <b>Fenrir could not finish secure sign-in.</b>
+          <span>Your session was not opened. Check your connection, then retry or return to sign in.</span>
+          <div>
+            <button type="button" onClick={() => setAuthAttempt((attempt) => attempt + 1)}>Retry</button>
+            <a href="/login">Return to sign in</a>
+          </div>
+          <small>{authInitError}</small>
+        </main>
+      );
+    }
+    return <div className="boot" aria-live="polite">{c.boot}</div>;
   }
 
   if (!auth.authenticated) {
@@ -2102,6 +2123,22 @@ export function App() {
       )}
     </div>
   );
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, code: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(code)), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
 }
 
 function GoRoutePage({

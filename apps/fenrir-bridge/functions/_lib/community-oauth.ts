@@ -51,11 +51,7 @@ export function communityOAuthCallbackPath(provider: OAuthProvider) {
 
 const COMMUNITY_OAUTH_PROVIDERS: OAuthProvider[] = ["google", "microsoft", "apple"];
 
-/**
- * Which providers actually have credentials bound in this environment. Lets the gate
- * hide buttons that would dead-end on `provider_not_configured`, and lets the brand
- * endpoints report what a community can actually offer.
- */
+/** Existing routes expose only providers whose bindings are actually present. */
 export function availableCommunityAuthProviders(env: CommunityOAuthEnv): string[] {
   return [
     "magic_link",
