@@ -1680,7 +1680,7 @@ export function App() {
           <b>{state.user.email}</b>
           <small>{state.org.id}</small>
           <div className="legal-mini-links">
-            <a href={knowledgeBaseUrl} target="_blank" rel="noreferrer">{knowledgeBaseLabel}</a>
+            {knowledgeBaseUrl ? <a href={knowledgeBaseUrl} target="_blank" rel="noreferrer">{knowledgeBaseLabel}</a> : null}
             <a href="/legal">{c.legal}</a>
             <a href="/terms">{c.terms}</a>
           </div>
