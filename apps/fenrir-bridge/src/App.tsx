@@ -3328,9 +3328,13 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
     setPendingProvider(provider);
     try {
       await friskyClientAuthEngine.signInWithProvider(provider);
-    } catch {
+    } catch (error) {
       setPendingProvider(null);
-      setAuthNote(c.authProviderError);
+      setAuthNote(
+        error instanceof Error && error.message === "preview_auth_not_configured"
+          ? "Sign-in is disabled on this review build because its OAuth callback is not allowlisted. Production sign-in was not opened or changed."
+          : c.authProviderError
+      );
     }
   }
 
