@@ -46,12 +46,9 @@ function DashboardPage() {
       navigate({ to: "/login", search: { next: undefined } });
       return;
     }
-    if (!roleLoading && !telegramId) {
-      navigate({ to: "/activate" });
-    }
-  }, [loading, roleLoading, session, telegramId, navigate]);
+  }, [loading, session, navigate]);
 
-  if (loading || roleLoading || !session || !telegramId) {
+  if (loading || roleLoading || !session) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -105,20 +102,32 @@ function DashboardPage() {
           <div className="mx-auto mb-4 inline-flex rounded-full bg-primary/10 p-3">
             <Sparkles className="h-6 w-6 text-primary" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Your MyFenrir Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Gate Overview</h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Your account is linked. Your clips and stats will appear here.
+            Manage your Gates first. Telegram can be connected when you are ready to activate one.
           </p>
 
-          <TelegramIdentityCard
-            className="mx-auto mt-6 max-w-sm text-left"
-            identity={
-              demo
-                ? { ...DEMO_TELEGRAM_PROFILE, id: telegramId }
-                : { id: telegramId }
-            }
-            note={demo ? "Simulated Telegram identity (demo mode)." : undefined}
-          />
+          {telegramId ? (
+            <TelegramIdentityCard
+              className="mx-auto mt-6 max-w-sm text-left"
+              identity={
+                demo
+                  ? { ...DEMO_TELEGRAM_PROFILE, id: telegramId }
+                  : { id: telegramId }
+              }
+              note={demo ? "Simulated Telegram identity (demo mode)." : undefined}
+            />
+          ) : (
+            <div className="mx-auto mt-6 max-w-sm rounded-xl border border-border/60 bg-background/50 p-4 text-left">
+              <p className="text-sm font-medium">Telegram is not connected yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                You can create and manage Gates now. Connect Telegram only when you are ready to activate a Gate.
+              </p>
+              <Button asChild variant="outline" size="sm" className="mt-4">
+                <Link to="/activate">Connect Telegram</Link>
+              </Button>
+            </div>
+          )}
         </div>
       </main>
     </div>
