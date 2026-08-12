@@ -30,6 +30,7 @@ import { CinematicLanding } from "./components/CinematicLanding";
 import { GlowCard } from "./components/GlowCard";
 import { TelegramLoginWidget } from "./components/TelegramLoginWidget";
 import { brandThemes, themeClassName, themeCssVars } from "./theme/brandThemes";
+import { NotFoundRoute } from "./routes/NotFoundRoute";
 
 const defaultServiceOrg = (import.meta.env.VITE_DEFAULT_SERVICE_ORG ?? "Frisky Dev Workspace").trim();
 const defaultServiceSubdomain = (import.meta.env.VITE_DEFAULT_SERVICE_SUBDOMAIN ?? "vip.myfenrir.com").trim();
@@ -1030,6 +1031,16 @@ function dashboardPathFor(page: PageKey) {
   return page === "command" ? managedDashboardPath : `/${page}`;
 }
 
+function isKnownDashboardPath(path: string) {
+  const routeKey = path.replace(/^\/+|\/+$/g, "");
+  return Boolean(
+    dashboardPageAliases[routeKey] ||
+    path.startsWith("/admin") ||
+    path.startsWith("/portal") ||
+    isAuthCallbackPath(path)
+  );
+}
+
 function paidPlanFromProductLabel(label: string): PaidPlan | null {
   const p = label.trim().toLowerCase();
   if (p === "starter") return "starter";
@@ -1275,6 +1286,10 @@ export function App() {
 
   if (path === "/") {
     return <CinematicLanding />;
+  }
+
+  if (!isKnownDashboardPath(path)) {
+    return <NotFoundRoute />;
   }
 
   if (!auth) {
