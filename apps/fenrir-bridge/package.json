@@ -34,6 +34,7 @@
     "@simplewebauthn/server": "^13.3.0",
     "@supabase/supabase-js": "^2.105.3",
     "@vitejs/plugin-react": "^5.2.0",
+    "altcha": "^2.2.4",
     "posthog-js": "^1.414.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
