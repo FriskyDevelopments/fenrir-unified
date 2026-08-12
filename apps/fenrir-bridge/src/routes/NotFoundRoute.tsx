@@ -36,21 +36,21 @@ export function NotFoundRoute() {
 
         <div className="fenrir-not-found__copy">
           <p className="fenrir-not-found__code">Error 404 · Gate unavailable</p>
-          <h1>This gate does not exist.</h1>
+          <h1>Verification failed.</h1>
           <p>
-            Fenrir could not resolve this protected route. Your session and
-            community access remain secure.
+            Fenrir could not verify this route because the requested gate does
+            not exist. Your identity remains secure.
           </p>
         </div>
 
         <nav className="fenrir-not-found__actions" aria-label="Continue through MyFenrir">
-          <a href="/">Return to MyFenrir</a>
+          <a href="/">Try again</a>
           <a href="/main">Open command center</a>
         </nav>
 
         <div className="fenrir-not-found__trust">
           <span><i /> Guardian online</span>
-          <span>Secured · End-to-end encrypted</span>
+          <span>No tracking · No image puzzles</span>
         </div>
 
         <code className="fenrir-not-found__path">{requestedPath}</code>
