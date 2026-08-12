@@ -24,45 +24,37 @@ export function NotFoundRoute() {
 
   return (
     <main className="fenrir-not-found">
-      <div className="fenrir-not-found__grain" aria-hidden="true" />
-      <div className="fenrir-not-found__scan" aria-hidden="true" />
-
-      <header className="fenrir-not-found__header">
-        <a href="/" aria-label="MyFenrir home">
-          <img src="/fenrir-cut-wordmark.svg" alt="Fenrir" />
+      <div className="fenrir-not-found__aurora" aria-hidden="true" />
+      <section className="fenrir-not-found__gate">
+        <a className="fenrir-not-found__brand" href="/" aria-label="MyFenrir home">
+          <img src="/fenrir-cut-wordmark.svg" alt="MyFenrir" />
         </a>
-        <span><i /> Guardian online</span>
-        <span>Protocol / 404</span>
-      </header>
 
-      <section className="fenrir-not-found__stage">
-        <div className="fenrir-not-found__guardian" aria-hidden="true">
-          <span className="fenrir-not-found__ring fenrir-not-found__ring--outer" />
-          <span className="fenrir-not-found__ring fenrir-not-found__ring--inner" />
-          <img src="/fenrir-cyber-guardian-hero.svg" alt="" />
+        <div className="fenrir-not-found__mascot" aria-hidden="true">
+          <img src="/fenrir-splash-icon.svg" alt="" />
         </div>
-
-        <p className="fenrir-not-found__number" aria-hidden="true">404</p>
 
         <div className="fenrir-not-found__copy">
-          <p className="fenrir-not-found__kicker">Perimeter reached / Destination absent</p>
-          <h1>Route<br /><em>denied.</em></h1>
-          <p className="fenrir-not-found__body">
-            Fenrir found no protected destination at this address. Your identity
-            remains secure; only the route is missing.
+          <p className="fenrir-not-found__code">Error 404 · Gate unavailable</p>
+          <h1>This gate does not exist.</h1>
+          <p>
+            Fenrir could not resolve this protected route. Your session and
+            community access remain secure.
           </p>
-          <nav className="fenrir-not-found__actions" aria-label="Continue through MyFenrir">
-            <a href="/">Return to MyFenrir <span aria-hidden="true">&#8599;</span></a>
-            <a href="/main">Open command center</a>
-          </nav>
         </div>
-      </section>
 
-      <footer className="fenrir-not-found__footer">
-        <span>Requested path</span>
-        <code>{requestedPath}</code>
-        <span>Identity intact / Access closed</span>
-      </footer>
+        <nav className="fenrir-not-found__actions" aria-label="Continue through MyFenrir">
+          <a href="/">Return to MyFenrir</a>
+          <a href="/main">Open command center</a>
+        </nav>
+
+        <div className="fenrir-not-found__trust">
+          <span><i /> Guardian online</span>
+          <span>Secured · End-to-end encrypted</span>
+        </div>
+
+        <code className="fenrir-not-found__path">{requestedPath}</code>
+      </section>
     </main>
   );
 }
