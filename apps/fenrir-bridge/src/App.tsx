@@ -189,7 +189,7 @@ const uiCopy: Record<Locale, {
     loginRequired: "login required",
     telegramConnected: (username, id) => `${username ? `@${username}` : id} is connected to this Frisky ID.`,
     telegramSessionFoundNoLink: "Frisky session found. Telegram ID is not linked yet, so Fenrir cannot verify Telegram Stars or access status for this account.",
-    telegramSignInFirst: "Sign in with the unified Frisky login first so Fenrir can check whether this Telegram ID has active access.",
+    telegramSignInFirst: "Sign in to MyFenrir, then link Telegram so Fenrir can verify your active access.",
     linkTelegramId: "Link Telegram ID",
     telegramVerifyWhenNeeded: "Telegram is only verified when a Telegram action needs it.",
     telegramReaddButton: "Re-add me",
@@ -325,7 +325,7 @@ const uiCopy: Record<Locale, {
     loginRequired: "requiere inicio de sesion",
     telegramConnected: (username, id) => `${username ? `@${username}` : id} esta conectado a esta ID de Frisky.`,
     telegramSessionFoundNoLink: "Sesion Frisky encontrada. El ID de Telegram aun no esta vinculado, asi que Fenrir no puede verificar Telegram Stars ni estado de acceso.",
-    telegramSignInFirst: "Inicia sesion con el login unificado de Frisky para que Fenrir pueda verificar si este Telegram ID tiene acceso activo.",
+    telegramSignInFirst: "Inicia sesión en MyFenrir y después vincula Telegram para verificar tu acceso activo.",
     linkTelegramId: "Vincular Telegram ID",
     telegramVerifyWhenNeeded: "Telegram solo se verifica cuando una accion de Telegram lo necesita.",
     telegramReaddButton: "Reingresar",
@@ -461,7 +461,7 @@ const uiCopy: Record<Locale, {
     loginRequired: "connexion requise",
     telegramConnected: (username, id) => `${username ? `@${username}` : id} est connecté à cet ID Frisky.`,
     telegramSessionFoundNoLink: "Session Frisky trouvee. L'ID Telegram n'est pas encore lie, donc Fenrir ne peut pas verifier Telegram Stars ni l'etat d'acces.",
-    telegramSignInFirst: "Connectez-vous avec le login Frisky unifie pour que Fenrir verifie l'acces actif de cet ID Telegram.",
+    telegramSignInFirst: "Connectez-vous à MyFenrir, puis associez Telegram pour vérifier votre accès actif.",
     linkTelegramId: "Lier Telegram ID",
     telegramVerifyWhenNeeded: "Telegram est verifie seulement quand une action Telegram en a besoin.",
     telegramReaddButton: "Me reinviter",
@@ -597,7 +597,7 @@ const uiCopy: Record<Locale, {
     loginRequired: "anmeldung erforderlich",
     telegramConnected: (username, id) => `${username ? `@${username}` : id} ist mit dieser Frisky ID verknuepft.`,
     telegramSessionFoundNoLink: "Frisky-Session gefunden. Telegram ID ist noch nicht verknuepft, daher kann Fenrir Telegram Stars oder Zugangsstatus fuer diesen Account nicht pruefen.",
-    telegramSignInFirst: "Bitte zuerst mit dem einheitlichen Frisky Login anmelden, damit Fenrir pruefen kann, ob diese Telegram ID aktiven Zugriff hat.",
+    telegramSignInFirst: "Melde dich bei MyFenrir an und verknüpfe danach Telegram, damit Fenrir deinen aktiven Zugriff prüfen kann.",
     linkTelegramId: "Telegram ID verknuepfen",
     telegramVerifyWhenNeeded: "Telegram wird nur geprueft, wenn eine Telegram-Aktion es braucht.",
     telegramReaddButton: "Neu einladen",
@@ -2031,7 +2031,57 @@ export function App() {
 
           {show("locks", "telegram") && <section className="panel">
             <PanelTitle title={c.telegramGroups} subtitle={c.telegramGroupsSub} />
-            <div className="check telegram-status-check">
+            <div className="telegram-access-widget" data-authenticated={auth?.authenticated ? "true" : "false"}>
+              <div className="telegram-access-widget__header">
+                <div className="telegram-access-widget__mark" aria-hidden="true">✦</div>
+                <div>
+                  <span className="label">MYFENRIR · TELEGRAM ACCESS</span>
+                  <h3>{ui.telegramStatusCheck}</h3>
+                  <p>{ui.telegramSignInFirst}</p>
+                </div>
+                <span className={telegramIdentity?.linked ? "status good" : auth?.authenticated ? "status amber" : "status neutral"}>
+                  {telegramIdentity?.linked ? ui.linked : auth?.authenticated ? "ready to link" : ui.loginRequired}
+                </span>
+              </div>
+
+              <div className="telegram-access-widget__steps">
+                <section className={auth?.authenticated ? "complete" : "active"}>
+                  <span className="telegram-access-widget__step">01</span>
+                  <div>
+                    <b>Sign in to MyFenrir</b>
+                    <small>Use your MyFenrir identity. Authentication is handled by Supabase.</small>
+                  </div>
+                  {auth?.authenticated
+                    ? <span className="telegram-access-widget__done" aria-label="Signed in">✓</span>
+                    : <a className="button-link" href="/login">Sign in</a>}
+                </section>
+                <section className={telegramIdentity?.linked ? "complete" : auth?.authenticated ? "active" : "locked"}>
+                  <span className="telegram-access-widget__step">02</span>
+                  <div>
+                    <b>Link Telegram</b>
+                    <small>Open the private bot link and confirm this Telegram account.</small>
+                  </div>
+                  {telegramIdentity?.linked
+                    ? <span className="telegram-access-widget__done" aria-label="Telegram linked">✓</span>
+                    : <button type="button" disabled={!auth?.authenticated} onClick={() => void linkTelegramIdentity()}>{ui.linkTelegramId}</button>}
+                </section>
+              </div>
+
+              <div className="telegram-access-widget__result" aria-live="polite">
+                <span className={telegramIdentity?.linked ? "status-dot good" : "status-dot"} aria-hidden="true" />
+                <div>
+                  <b>{telegramIdentity?.linked ? "Access check available" : "Waiting for a linked Telegram account"}</b>
+                  <small>
+                    {telegramIdentity?.linked
+                      ? ui.telegramConnected(telegramIdentity.telegramUsername ?? "", telegramIdentity.telegramUserId ?? "Telegram", auth?.authenticated ?? false)
+                      : telegramIdentity
+                        ? ui.telegramSessionFoundNoLink
+                        : ui.telegramVerifyWhenNeeded}
+                  </small>
+                </div>
+              </div>
+            </div>
+            <div className="check telegram-status-check telegram-status-check--compact">
               <b>{ui.telegramStatusCheck}</b>
               <span className={telegramIdentity?.linked ? "status good" : "status amber"}>
                 {telegramIdentity?.linked ? ui.linked : ui.loginRequired}
@@ -2045,7 +2095,6 @@ export function App() {
             </small>
             <small>{ui.telegramVerifyWhenNeeded}</small>
               <div className="row-actions">
-                {!telegramIdentity?.linked ? <button type="button" onClick={() => void linkTelegramIdentity()}>{ui.linkTelegramId}</button> : null}
                 {telegramIdentity?.linked ? <button type="button" onClick={() => void requestTelegramReadd()}>{ui.telegramReaddButton}</button> : null}
                 <a className="button-link ghost" href={friskySignalDevRequestUrl} target="_blank" rel="noreferrer">{ui.devRequestViaSignal}</a>
               </div>
