@@ -1,7 +1,8 @@
 import "altcha";
 import { useEffect, useRef, useState } from "react";
 
-const CHALLENGE_URL = "https://dediny.tailab8146.ts.net/v1/challenge";
+const CHALLENGE_URL = "/api/altcha/challenge";
+const VERIFY_URL = "/api/altcha/verify";
 
 export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => void }) {
   const widgetRef = useRef<HTMLElement>(null);
@@ -25,6 +26,7 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
       <altcha-widget
         ref={widgetRef}
         challengeurl={CHALLENGE_URL}
+        verifyurl={VERIFY_URL}
         name="altcha"
         auto="off"
         workers={2}
