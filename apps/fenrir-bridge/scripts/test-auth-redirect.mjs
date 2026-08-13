@@ -8,7 +8,11 @@ import { join } from "node:path";
 const root = new URL("..", import.meta.url).pathname;
 const apiSource = readFileSync(join(root, "src/services/api.ts"), "utf8");
 const supabaseAuthSource = readFileSync(join(root, "src/services/supabaseAuth.ts"), "utf8");
+const appSource = readFileSync(join(root, "src/App.tsx"), "utf8");
+const routingSource = readFileSync(join(root, "src/app/routing.ts"), "utf8");
 const callbackPathMatcher = supabaseAuthSource.match(/function isAuthCallbackPath[\s\S]*?\n}/)?.[0] ?? "";
+const appCallbackPathMatcher = appSource.match(/function isAuthCallbackPath[\s\S]*?\n}/)?.[0] ?? "";
+const routingCallbackPathMatcher = routingSource.match(/export function isAuthCallbackPath[\s\S]*?\n}/)?.[0] ?? "";
 
 function workosMatches() {
   try {
@@ -31,8 +35,10 @@ const checks = [
     pass: offenders === ""
   },
   {
-    name: "plain /login is not treated as an OAuth callback",
-    pass: !callbackPathMatcher.includes('normalizedPath === "/login"')
+    name: "plain /login is not treated as an OAuth callback in any client route",
+    pass: !callbackPathMatcher.includes('normalizedPath === "/login"') &&
+      !appCallbackPathMatcher.includes('normalizedPath === "/login"') &&
+      !routingCallbackPathMatcher.includes('normalizedPath === "/login"')
   }
 ];
 
