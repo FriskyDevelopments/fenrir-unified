@@ -1,4 +1,5 @@
 import type { BillingEnv } from "./billing-env";
+import { clearCookieHeader, cookieHeader, readCookie } from "./auth";
 
 type VerificationMode = "slider" | "puzzle";
 type Risk = "low" | "medium" | "high";
@@ -10,11 +11,13 @@ type VerificationToken = {
   sequence?: string[];
   risk?: Risk;
   tolerance?: number;
+  grant?: true;
 };
 
 const encoder = new TextEncoder();
 const tokenLifetimeSeconds = 5 * 60;
 const runes = ["ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚱ", "ᚲ"];
+const verificationCookie = "fenrir_human_verification";
 
 export function riskLevel(request: Request): Risk {
   const score = (request as Request & { cf?: { botManagement?: { score?: number } } }).cf?.botManagement?.score;
@@ -41,8 +44,8 @@ function constantTimeEqual(left: string, right: string) {
 }
 
 async function signingKey(env: BillingEnv) {
-  const secret = env.ALTCHA_HMAC_SECRET?.trim() || env.SESSION_SECRET?.trim();
-  if (!secret) throw new Error("missing_env:ALTCHA_HMAC_SECRET_or_SESSION_SECRET");
+  const secret = env.HUMAN_VERIFICATION_SECRET?.trim() || env.ALTCHA_HMAC_SECRET?.trim() || env.SESSION_SECRET?.trim();
+  if (!secret) throw new Error("missing_env:HUMAN_VERIFICATION_SECRET_or_SESSION_SECRET");
   return crypto.subtle.importKey("raw", encoder.encode(`myfenrir-verification-v1:${secret}`), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
 }
 
@@ -56,13 +59,13 @@ async function createToken(payload: VerificationToken, env: BillingEnv) {
   return `${encoded}.${await sign(encoded, env)}`;
 }
 
-async function readToken(token: unknown, mode: VerificationMode, env: BillingEnv): Promise<VerificationToken | null> {
+async function readToken(token: unknown, mode: VerificationMode, env: BillingEnv, nowSeconds = Math.floor(Date.now() / 1000)): Promise<VerificationToken | null> {
   if (typeof token !== "string") return null;
   const [encoded, signature] = token.split(".");
   if (!encoded || !signature || !constantTimeEqual(signature, await sign(encoded, env))) return null;
   try {
     const payload = JSON.parse(fromBase64Url(encoded)) as VerificationToken;
-    return payload.mode === mode && Number.isFinite(payload.exp) && payload.exp >= Math.floor(Date.now() / 1000) ? payload : null;
+    return payload.mode === mode && Number.isFinite(payload.exp) && payload.exp >= nowSeconds ? payload : null;
   } catch {
     return null;
   }
@@ -87,6 +90,19 @@ export async function verifyFallbackChallenge(input: { mode: VerificationMode; t
   return Array.isArray(input.answer) && Array.isArray(payload.sequence) && input.answer.length === payload.sequence.length && input.answer.every((value, index) => value === payload.sequence![index]);
 }
 
-export async function createVerificationGrant(env: BillingEnv) {
-  return createToken({ mode: "slider", exp: Math.floor(Date.now() / 1000) + tokenLifetimeSeconds }, env);
+export async function createVerificationGrant(env: BillingEnv, nowSeconds = Math.floor(Date.now() / 1000)) {
+  return createToken({ mode: "slider", grant: true, exp: nowSeconds + tokenLifetimeSeconds }, env);
+}
+
+export function verificationSetCookie(grant: string, domain?: string) {
+  return cookieHeader(verificationCookie, grant, tokenLifetimeSeconds, domain);
+}
+
+export function verificationClearCookie(domain?: string) {
+  return clearCookieHeader(verificationCookie, domain);
+}
+
+export async function hasHumanVerification(request: Request, env: BillingEnv, nowSeconds = Math.floor(Date.now() / 1000)) {
+  const payload = await readToken(readCookie(request, verificationCookie), "slider", env, nowSeconds);
+  return payload?.grant === true;
 }

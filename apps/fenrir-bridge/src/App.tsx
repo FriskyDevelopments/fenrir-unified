@@ -3323,7 +3323,7 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
             </div>
 
             <div className="lovable-auth-actions">
-              <AltchaGate onVerified={onHumanVerified} />
+              <AltchaGate onVerified={onHumanVerified} accentColor={brandThemes.fenrir.primary} />
               {(["apple", "google", "microsoft"] as AuthProvider[]).map((provider) => (
                 <AuthProviderButton
                   key={provider}

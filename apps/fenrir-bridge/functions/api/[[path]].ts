@@ -2,7 +2,8 @@ import { noStoreJson } from "../_lib/responses";
 import { onRequestGet as altchaChallenge } from "./altcha/challenge";
 import { onRequestPost as altchaVerify } from "./altcha/verify";
 import { createAltchaChallenge, verifyAltchaPayload } from "../_lib/altcha";
-import { createFallbackChallenge, createVerificationGrant, riskLevel, verifyFallbackChallenge } from "../_lib/verification";
+import { cookieDomain } from "../_lib/billing-env";
+import { createFallbackChallenge, createVerificationGrant, riskLevel, verificationSetCookie, verifyFallbackChallenge } from "../_lib/verification";
 
 export async function onRequest(context: any) {
   const url = new URL(context.request.url);
@@ -34,7 +35,11 @@ export async function onRequest(context: any) {
         ? typeof body?.payload === "string" && await verifyAltchaPayload(body.payload, context.env)
         : (mode === "slider" || mode === "puzzle") && await verifyFallbackChallenge({ mode, token: body?.token, value: body?.value, answer: body?.answer }, context.env);
       if (!verified) return noStoreJson({ verified: false, error: "verification_failed" }, { status: 400 });
-      return noStoreJson({ verified: true, grant: await createVerificationGrant(context.env) });
+      const grant = await createVerificationGrant(context.env);
+      return noStoreJson(
+        { verified: true },
+        { headers: { "Set-Cookie": verificationSetCookie(grant, cookieDomain(context.request, context.env)) } }
+      );
     } catch (error) {
       console.error("verification check failed", error);
       return noStoreJson({ verified: false, error: "verification_unavailable" }, { status: 503 });

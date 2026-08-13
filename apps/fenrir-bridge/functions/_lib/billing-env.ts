@@ -39,7 +39,9 @@ export type BillingEnv = AuthEnv & {
   PUBLIC_AUTH_URL?: string;
   /** Comma-separated list of allowed redirect URIs for authentication. */
   ALLOWED_REDIRECT_URIS?: string;
-  /** Optional dedicated ALTCHA secret. SESSION_SECRET is used with domain separation when absent. */
+  /** Preferred dedicated secret for every human-verification method. */
+  HUMAN_VERIFICATION_SECRET?: string;
+  /** Legacy dedicated ALTCHA secret. SESSION_SECRET is used when both dedicated secrets are absent. */
   ALTCHA_HMAC_SECRET?: string;
 };
 
@@ -111,6 +113,10 @@ export function authOrigin(request: Request, env: BillingEnv) {
 }
 
 export function cookieDomain(request: Request, env: BillingEnv) {
+  const requestHostname = new URL(request.url).hostname;
+  if (requestHostname === "localhost" || requestHostname.endsWith(".pages.dev") || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(requestHostname)) {
+    return undefined;
+  }
   const site = siteOrigin(request, env);
   try {
     const url = new URL(site);

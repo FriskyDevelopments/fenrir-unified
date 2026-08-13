@@ -10,24 +10,17 @@ function encodePayload(value: unknown) {
   return Buffer.from(JSON.stringify(value)).toString("base64");
 }
 
-async function solve(challenge: Awaited<ReturnType<typeof createAltchaChallenge>>) {
-  for (let number = 0; number <= challenge.maxnumber; number += 1) {
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${challenge.salt}${number}`));
-    const hex = Buffer.from(digest).toString("hex");
-    if (hex === challenge.challenge) return encodePayload({ ...challenge, number });
-  }
-  throw new Error("test challenge was not solvable");
-}
-
 test("ALTCHA challenge round-trips through server verification", async () => {
-  const challenge = await createAltchaChallenge(env, now);
-  const payload = await solve(challenge);
+  const number = 42;
+  const challenge = await createAltchaChallenge(env, now, () => number);
+  const payload = encodePayload({ ...challenge, number });
   assert.equal(await verifyAltchaPayload(payload, env, now + 1_000), true);
 });
 
 test("ALTCHA rejects tampering, the wrong secret, and expired proofs", async () => {
-  const challenge = await createAltchaChallenge(env, now);
-  const payload = await solve(challenge);
+  const number = 42;
+  const challenge = await createAltchaChallenge(env, now, () => number);
+  const payload = encodePayload({ ...challenge, number });
   const parsed = JSON.parse(Buffer.from(payload, "base64").toString("utf8"));
 
   assert.equal(await verifyAltchaPayload(encodePayload({ ...parsed, number: parsed.number + 1 }), env, now), false);

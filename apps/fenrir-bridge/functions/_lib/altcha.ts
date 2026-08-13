@@ -33,8 +33,8 @@ async function sha256(value: string) {
 }
 
 async function signingKey(env: BillingEnv) {
-  const baseSecret = env.ALTCHA_HMAC_SECRET?.trim() || env.SESSION_SECRET?.trim();
-  if (!baseSecret) throw new Error("missing_env:ALTCHA_HMAC_SECRET_or_SESSION_SECRET");
+  const baseSecret = env.HUMAN_VERIFICATION_SECRET?.trim() || env.ALTCHA_HMAC_SECRET?.trim() || env.SESSION_SECRET?.trim();
+  if (!baseSecret) throw new Error("missing_env:HUMAN_VERIFICATION_SECRET_or_SESSION_SECRET");
   return crypto.subtle.importKey(
     "raw",
     encoder.encode(`myfenrir-altcha-v1:${baseSecret}`),
@@ -48,10 +48,10 @@ async function signChallenge(challenge: string, env: BillingEnv) {
   return toHex(await crypto.subtle.sign("HMAC", await signingKey(env), encoder.encode(challenge)));
 }
 
-export async function createAltchaChallenge(env: BillingEnv, now = Date.now()): Promise<AltchaChallenge> {
+export async function createAltchaChallenge(env: BillingEnv, now = Date.now(), randomNumber?: () => number): Promise<AltchaChallenge> {
   const random = new Uint32Array(1);
-  crypto.getRandomValues(random);
-  const number = random[0]! % (maxNumber + 1);
+  if (!randomNumber) crypto.getRandomValues(random);
+  const number = randomNumber ? Math.abs(Math.trunc(randomNumber())) % (maxNumber + 1) : random[0]! % (maxNumber + 1);
   const nonce = crypto.randomUUID().replaceAll("-", "");
   const expires = Math.floor(now / 1000) + lifetimeSeconds;
   const salt = `${nonce}?expires=${expires}&`;

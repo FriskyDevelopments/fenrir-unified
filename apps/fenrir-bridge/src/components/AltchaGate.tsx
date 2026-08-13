@@ -6,9 +6,9 @@ type Mode = "altcha" | "slider" | "puzzle";
 type Challenge = { token: string; risk: string; target?: number; sequence?: string[]; choices?: string[] };
 
 const copy = {
-  title: "Face verification",
-  intro: "Confirm the living signal. No tracking, no image recognition.",
-  checking: "Preparing the face-signal check…",
+  title: "Privacy-safe verification",
+  intro: "Confirm the human signal. No tracking, no image recognition.",
+  checking: "Completing the automatic privacy-safe check…",
   slider: "Signal Slider",
   sliderInstruction: "Move the wolf to the luminous lock.",
   puzzle: "Rune sequence",
@@ -18,14 +18,9 @@ const copy = {
   failed: "That signal did not match. Try the next method.",
 };
 
-/**
- * The primary challenge is the in-product Face Verification experience.
- * ALTCHA is deliberately last-resort only: it must never be the first thing
- * a member sees on the MyFenrir login surface.
- */
-export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => void }) {
+export function AltchaGate({ onVerified, accentColor = "#c2a469" }: { onVerified: (verified: boolean) => void; accentColor?: string }) {
   const widgetRef = useRef<HTMLElement | null>(null);
-  const [mode, setMode] = useState<Mode>("puzzle");
+  const [mode, setMode] = useState<Mode>("altcha");
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [slider, setSlider] = useState(0);
   const [answer, setAnswer] = useState<string[]>([]);
@@ -38,8 +33,8 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode: current, ...payload }),
     });
-    const body = await response.json().catch(() => null) as { grant?: string } | null;
-    if (!response.ok || !body?.grant) throw new Error("verification_failed");
+    const body = await response.json().catch(() => null) as { verified?: boolean } | null;
+    if (!response.ok || body?.verified !== true) throw new Error("verification_failed");
     setVerified(true);
     setNote(copy.verified);
     onVerified(true);
@@ -57,11 +52,9 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
       setChallenge(await response.json() as Challenge);
     } catch {
       setNote(copy.failed);
+      if (next === "slider") window.setTimeout(() => void loadChallenge("puzzle"), 600);
     }
   }
-
-  // Start with the repository's custom Face Verification challenge, not ALTCHA.
-  useEffect(() => { void loadChallenge("puzzle"); }, []);
 
   useEffect(() => {
     if (mode !== "altcha" || !widgetRef.current) return;
@@ -73,7 +66,8 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
     };
     widget.addEventListener("statechange", state);
     widget.addEventListener("verified", state);
-    return () => { widget.removeEventListener("statechange", state); widget.removeEventListener("verified", state); };
+    const timer = window.setTimeout(() => void loadChallenge("slider"), 8000);
+    return () => { window.clearTimeout(timer); widget.removeEventListener("statechange", state); widget.removeEventListener("verified", state); };
   }, [mode]);
 
   async function submitSlider() {
@@ -92,7 +86,7 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
     }
   }
 
-  const style = { "--hv": "#00e5ff" } as CSSProperties;
+  const style = { "--hv": accentColor } as CSSProperties;
   return <section className={`human-verification human-verification--fenrir ${verified ? "is-verified" : ""}`} style={style} aria-label={copy.title}>
     <header>
       <img src="/fenrir-splash-icon.svg?v=20260813-face-verification" alt="" />
@@ -116,7 +110,7 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
       <div className="verification-switches"><button type="button" onClick={() => void loadChallenge("puzzle")}>{copy.puzzle}</button><button type="button" onClick={() => { setMode("altcha"); setNote("Automatic verification is available if needed."); }}>{copy.altcha}</button></div>
     </div> : null}
 
-    {!verified && mode === "altcha" ? <div className="altcha-shell"><altcha-widget ref={widgetRef as never} challengeurl="/api/verification/challenge?mode=altcha" hidefooter hidelogo {...({ configuration: '{"hideFooter":true,"hideLogo":true}' } as Record<string, string>)} /></div> : null}
+    {!verified && mode === "altcha" ? <div className="altcha-shell"><altcha-widget ref={widgetRef as never} challengeurl="/api/verification/challenge?mode=altcha" auto="onload" hidefooter hidelogo {...({ configuration: '{"hideFooter":true,"hideLogo":true,"auto":"onload"}' } as Record<string, string>)} /></div> : null}
     {verified ? <div className="verification-success"><span>✓</span>{copy.verified}</div> : null}
   </section>;
 }
