@@ -2182,16 +2182,27 @@ export function App() {
 }
 
 function QualityMvpHome({ auth }: { auth: AuthSession }) {
-  const communityUrl = "https://quality.communities.myfenrir.com/";
+  const communityOrigin = "https://quality.communities.myfenrir.com";
   return (
     <main className="boot" style={{ minHeight: "calc(100vh - 44px)", padding: "48px 24px", textAlign: "center" }}>
       <section style={{ maxWidth: 620 }}>
         <p style={{ letterSpacing: ".14em", fontSize: 12, opacity: 0.72 }}>MYFENRIR · QUALITY</p>
         <h1 style={{ margin: "12px 0" }}>Your Fenrir session is open.</h1>
         <p style={{ margin: "0 0 28px", opacity: 0.8 }}>
-          Signed in as {auth.user?.email ?? "your MyFenrir identity"}. Community Bridge will use this same Quality session.
+          Signed in as {auth.user?.email ?? "your MyFenrir identity"}. Continue the setup in Community Bridge using this same session.
         </p>
-        <a className="button" href={communityUrl}>Open Community Bridge</a>
+        <ol style={{ display: "grid", gap: 12, margin: "0 0 26px", padding: 0, listStyle: "none", textAlign: "left" }}>
+          <li><b>1. Create your gate.</b> Pick its address, look, and community standards.</li>
+          <li><b>2. Link Telegram.</b> Open the bot link from Community Bridge and redeem the one-time code.</li>
+          <li><b>3. Publish.</b> Return to your gate, confirm its public URL, and share it with your community.</li>
+        </ol>
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 12 }}>
+          <a className="button" href={`${communityOrigin}/gate?onboarding=1`}>Start setup: create a gate</a>
+          <a className="button" href={`${communityOrigin}/dashboard`}>Open Community dashboard</a>
+        </div>
+        <p style={{ marginTop: 18, fontSize: 13, opacity: 0.62 }}>
+          Already have a gate? Use the dashboard. Need Telegram linking? The dashboard takes you to activation first.
+        </p>
         <p style={{ marginTop: 18, fontSize: 13, opacity: 0.62 }}>Quality only · no production data or routes changed.</p>
       </section>
     </main>
