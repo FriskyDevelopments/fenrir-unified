@@ -18,6 +18,14 @@ const copy = {
   failed: "That signal did not match. Try the next method.",
 };
 
+function FenrirVerificationBrand() {
+  return <div className="altcha-brand" aria-label="Fenrir verification by Frisky Developments">
+    <img className="altcha-brand__mark" src="/fenrir-splash-icon.svg?v=20260813-verification-brand" alt="" />
+    <img className="altcha-brand__wordmark" src="/fenrir-cut-wordmark.svg?v=20260813-verification-brand" alt="Fenrir" />
+    <span>Frisky verification</span>
+  </div>;
+}
+
 export function AltchaGate({ onVerified, accentColor = "#c2a469" }: { onVerified: (verified: boolean) => void; accentColor?: string }) {
   const widgetRef = useRef<HTMLElement | null>(null);
   const [mode, setMode] = useState<Mode>("altcha");
@@ -103,6 +111,7 @@ export function AltchaGate({ onVerified, accentColor = "#c2a469" }: { onVerified
     </div> : null}
 
     {!verified && mode === "slider" && challenge?.target != null ? <div className="wolf-slider">
+      <FenrirVerificationBrand />
       <b className="signal-slider__name">{copy.slider}</b>
       <p className="verification-method">{copy.sliderInstruction}</p>
       <div className="wolf-slider__track"><i style={{ left: `${challenge.target}%` }} /><span style={{ width: `${slider}%` }} /></div>
@@ -110,7 +119,10 @@ export function AltchaGate({ onVerified, accentColor = "#c2a469" }: { onVerified
       <div className="verification-switches"><button type="button" onClick={() => void loadChallenge("puzzle")}>{copy.puzzle}</button><button type="button" onClick={() => { setMode("altcha"); setNote("Automatic verification is available if needed."); }}>{copy.altcha}</button></div>
     </div> : null}
 
-    {!verified && mode === "altcha" ? <div className="altcha-shell"><altcha-widget ref={widgetRef as never} challengeurl="/api/verification/challenge?mode=altcha" auto="onload" hidefooter hidelogo {...({ configuration: '{"hideFooter":true,"hideLogo":true,"auto":"onload"}' } as Record<string, string>)} /></div> : null}
+    {!verified && mode === "altcha" ? <div className="altcha-shell">
+      <FenrirVerificationBrand />
+      <altcha-widget ref={widgetRef as never} challengeurl="/api/verification/challenge?mode=altcha" auto="onload" hidefooter hidelogo {...({ configuration: '{"hideFooter":true,"hideLogo":true,"auto":"onload"}' } as Record<string, string>)} />
+    </div> : null}
     {verified ? <div className="verification-success"><span>✓</span>{copy.verified}</div> : null}
   </section>;
 }
