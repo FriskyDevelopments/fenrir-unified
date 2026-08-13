@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { Copy, Locale } from "../i18n";
 import { webauthnService } from "../services/api";
 import { friskyClientAuthEngine, type AuthProvider } from "../services/authGateway";
@@ -8,10 +8,13 @@ import { GlowCard } from "../components/GlowCard";
 import { brandThemes } from "../theme/brandThemes";
 import { managedDashboardPath, twoFactorHelpLinks } from "../app/shared";
 import { BrandSignature } from "./routeCommon";
+import { AltchaGate } from "../components/AltchaGate";
 
 export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
   const theme = brandThemes.fenrir;
   const [passkeyNote, setPasskeyNote] = useState<string | null>(() => authErrorMessage());
+  const [humanVerified, setHumanVerified] = useState(false);
+  const onHumanVerified = useCallback((verified: boolean) => setHumanVerified(verified), []);
 
   async function signInWithPasskey() {
     setPasskeyNote(null);
@@ -47,13 +50,14 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
           <h2 className="auth-enter-title" data-text={c.authTitle}>
             <span>{c.authTitle}</span>
           </h2>
+          <AltchaGate onVerified={onHumanVerified} />
           <div className="auth-actions">
-            <AuthProviderButton provider="apple" label={c.continueApple} onClick={() => void signInWithProvider("apple")} />
-            <AuthProviderButton provider="google" label={c.continueGoogle} onClick={() => void signInWithProvider("google")} />
-            <AuthProviderButton provider="microsoft" label={c.continueMicrosoft} onClick={() => void signInWithProvider("microsoft")} />
+            <AuthProviderButton provider="apple" label={c.continueApple} disabled={!humanVerified} onClick={() => void signInWithProvider("apple")} />
+            <AuthProviderButton provider="google" label={c.continueGoogle} disabled={!humanVerified} onClick={() => void signInWithProvider("google")} />
+            <AuthProviderButton provider="microsoft" label={c.continueMicrosoft} disabled={!humanVerified} onClick={() => void signInWithProvider("microsoft")} />
           </div>
           <div className="auth-passkey-row">
-            <button type="button" className="secondary" onClick={() => void signInWithPasskey()}>
+            <button type="button" className="secondary" disabled={!humanVerified} onClick={() => void signInWithPasskey()}>
               {c.passkeySignIn}
             </button>
             {passkeyNote ? <small className="muted">{passkeyNote}</small> : null}
@@ -127,4 +131,3 @@ function authErrorMessage() {
   }
   return "Sign-in could not finish. Try another provider or refresh the page.";
 }
-

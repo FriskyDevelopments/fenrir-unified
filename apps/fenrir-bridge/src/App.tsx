@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { copy, detectLocale, languageNames, locales, type Copy, type Locale } from "./i18n";
 import { aiOpsService, appService, authService, billingService, bridgeService, commerceService, domainService, liveRoomService, readinessService, telegramIdentityService, telegramService, webauthnService, type AuthSession, type BillingStatusPayload, type PaidPlan, type ReadinessPayload, type TelegramIdentityLinkPayload } from "./services/api";
 import { friskyClientAuthEngine, type AuthProvider } from "./services/authGateway";
@@ -23,6 +23,7 @@ import {
 import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan } from "./services/types";
 import { AuthProviderButton } from "./components/AuthProviderButton";
 import { AuthSurface } from "./components/AuthSurface";
+import { AltchaGate } from "./components/AltchaGate";
 import { communityBridgeDashboardUrl } from "./services/communityBridge";
 import { CommunityBridgeHandoffPanel } from "./routes/communityGate";
 import { knowledgeBaseLabel, knowledgeBaseUrl } from "./services/knowledgeBase";
@@ -3287,6 +3288,8 @@ function communityBrandAdminErrorMessage(error: unknown) {
 function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
   const [authNote, setAuthNote] = useState<string | null>(() => authErrorMessage());
   const [pendingProvider, setPendingProvider] = useState<AuthProvider | null>(null);
+  const [humanVerified, setHumanVerified] = useState(false);
+  const onHumanVerified = useCallback((verified: boolean) => setHumanVerified(verified), []);
 
   async function signInWithProvider(provider: AuthProvider) {
     setAuthNote(null);
@@ -3312,20 +3315,21 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
             <div className="lovable-auth-card-line" aria-hidden="true" />
             <div className="lovable-auth-brand">
               <div className="lovable-auth-mark-shell">
-                <img src="/fenrir-splash-icon.svg" alt="MyFenrir logo" />
+                <img src="/fenrir-splash-icon.svg?v=20260813-login" alt="MyFenrir logo" />
               </div>
-              <img className="lovable-auth-wordmark" src="/fenrir-cut-wordmark.svg" alt="MyFenrir wordmark logo" />
+              <img className="lovable-auth-wordmark" src="/fenrir-cut-wordmark.svg?v=20260813-login" alt="MyFenrir wordmark logo" />
               <h1>Welcome back</h1>
               <p>Sign in to continue to MyFenrir</p>
             </div>
 
             <div className="lovable-auth-actions">
+              <AltchaGate onVerified={onHumanVerified} />
               {(["apple", "google", "microsoft"] as AuthProvider[]).map((provider) => (
                 <AuthProviderButton
                   key={provider}
                   provider={provider}
                   label={`Continue with ${provider === "apple" ? "Apple" : provider === "google" ? "Google" : "Microsoft"}`}
-                  disabled={pendingProvider !== null}
+                  disabled={pendingProvider !== null || !humanVerified}
                   onClick={() => void signInWithProvider(provider)}
                 />
               ))}
@@ -3348,7 +3352,7 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
         <div className="lovable-auth-secured">
           <p>Secured · End-to-end encrypted</p>
           <a href="https://myfenrir.com" aria-label="Powered by MyFenrir">
-            <img src="/fenrir-splash-icon.svg" alt="" />
+            <img src="/fenrir-splash-icon.svg?v=20260813-login" alt="" />
             <span>Powered by MyFenrir</span>
           </a>
         </div>
