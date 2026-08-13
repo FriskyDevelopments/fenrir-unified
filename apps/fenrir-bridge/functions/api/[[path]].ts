@@ -2,7 +2,7 @@ import { noStoreJson } from "../_lib/responses";
 import { onRequestGet as altchaChallenge } from "./altcha/challenge";
 import { onRequestPost as altchaVerify } from "./altcha/verify";
 import { createAltchaChallenge, verifyAltchaPayload } from "../_lib/altcha";
-import { createFallbackChallenge, createVerificationGrant, verifyFallbackChallenge } from "../_lib/verification";
+import { createFallbackChallenge, createVerificationGrant, riskLevel, verifyFallbackChallenge } from "../_lib/verification";
 
 export async function onRequest(context: any) {
   const url = new URL(context.request.url);
@@ -19,7 +19,7 @@ export async function onRequest(context: any) {
     const mode = url.searchParams.get("mode");
     try {
       if (mode === "altcha") return noStoreJson(await createAltchaChallenge(context.env));
-      if (mode === "slider" || mode === "puzzle") return noStoreJson(await createFallbackChallenge(mode, context.env));
+      if (mode === "slider" || mode === "puzzle") return noStoreJson(await createFallbackChallenge(mode, context.env, riskLevel(context.request)));
       return noStoreJson({ error: "verification_mode_invalid" }, { status: 400 });
     } catch (error) {
       console.error("verification challenge failed", error);

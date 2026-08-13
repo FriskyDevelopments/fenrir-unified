@@ -1,17 +1,27 @@
 import type { BillingEnv } from "./billing-env";
 
 type VerificationMode = "slider" | "puzzle";
+type Risk = "low" | "medium" | "high";
 
 type VerificationToken = {
   mode: VerificationMode;
   exp: number;
   target?: number;
   sequence?: string[];
+  risk?: Risk;
+  tolerance?: number;
 };
 
 const encoder = new TextEncoder();
 const tokenLifetimeSeconds = 5 * 60;
 const runes = ["ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚱ", "ᚲ"];
+
+export function riskLevel(request: Request): Risk {
+  const score = (request as Request & { cf?: { botManagement?: { score?: number } } }).cf?.botManagement?.score;
+  if (typeof score === "number" && score < 20) return "high";
+  if (typeof score === "number" && score < 50) return "medium";
+  return request.headers.get("user-agent") ? "low" : "medium";
+}
 
 function base64Url(value: string) {
   const binary = String.fromCharCode(...encoder.encode(value));
@@ -58,20 +68,22 @@ async function readToken(token: unknown, mode: VerificationMode, env: BillingEnv
   }
 }
 
-export async function createFallbackChallenge(mode: VerificationMode, env: BillingEnv) {
+export async function createFallbackChallenge(mode: VerificationMode, env: BillingEnv, risk: Risk) {
   const exp = Math.floor(Date.now() / 1000) + tokenLifetimeSeconds;
   if (mode === "slider") {
     const target = 28 + Math.floor(Math.random() * 45);
-    return { token: await createToken({ mode, exp, target }, env), target, risk: "adaptive" };
+    const tolerance = risk === "high" ? 2 : risk === "medium" ? 4 : 7;
+    return { token: await createToken({ mode, exp, target, risk, tolerance }, env), target, risk };
   }
-  const sequence = Array.from({ length: 4 }, () => runes[Math.floor(Math.random() * runes.length)]!);
-  return { token: await createToken({ mode, exp, sequence }, env), sequence, choices: runes, risk: "adaptive" };
+  const length = risk === "high" ? 3 : risk === "medium" ? 2 : 1;
+  const sequence = Array.from({ length }, () => runes[Math.floor(Math.random() * runes.length)]!);
+  return { token: await createToken({ mode, exp, sequence, risk }, env), sequence, choices: runes, risk };
 }
 
 export async function verifyFallbackChallenge(input: { mode: VerificationMode; token?: unknown; value?: unknown; answer?: unknown }, env: BillingEnv) {
   const payload = await readToken(input.token, input.mode, env);
   if (!payload) return false;
-  if (input.mode === "slider") return typeof input.value === "number" && Number.isInteger(input.value) && input.value === payload.target;
+  if (input.mode === "slider") return typeof input.value === "number" && Number.isInteger(input.value) && typeof payload.target === "number" && Math.abs(input.value - payload.target) <= (payload.tolerance ?? 4);
   return Array.isArray(input.answer) && Array.isArray(payload.sequence) && input.answer.length === payload.sequence.length && input.answer.every((value, index) => value === payload.sequence![index]);
 }
 
