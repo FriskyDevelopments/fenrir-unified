@@ -111,7 +111,7 @@ export const BRANDS: BrandConfig[] = [
     tagline: "Secure access and public gates for your Telegram community",
     // communities.* es la superficie separada del Community Bridge: sin este
     // host caía en el brand por defecto y tomaba el logo del tenant heredado.
-    hosts: ["myfenrir.com", "www.myfenrir.com", "communities.myfenrir.com", "clipsflow-auth-hub.lovable.app"],
+    hosts: ["myfenrir.com", "www.myfenrir.com", "communities.myfenrir.com"],
     logo: { markUrl: MYFENRIR_MARK_URL, wordmarkUrl: MYFENRIR_WORDMARK_URL, alt: "MyFenrir logo" },
     theme: {
       "--primary": "oklch(0.637 0.208 25.3)",
@@ -123,7 +123,11 @@ export const BRANDS: BrandConfig[] = [
     redirect: { afterLogin: "/dashboard", oauthReturnPath: "/" },
     gatePreset: "fenrir-dark",
     terminalCommand: "fenrir --login",
-    links: { site: "https://myfenrir.com", terms: "/terms", privacy: "/privacy" },
+    links: {
+      site: "https://myfenrir.com",
+      terms: "https://www.myfenrir.com/terms",
+      privacy: "https://www.myfenrir.com/privacy",
+    },
   },
   {
     id: "lore",
@@ -144,7 +148,10 @@ export const BRANDS: BrandConfig[] = [
     redirect: { afterLogin: "/dashboard", oauthReturnPath: "/" },
     gatePreset: "lore-neon",
     terminalCommand: "lore --enter",
-    links: { terms: "/terms", privacy: "/privacy" },
+    links: {
+      terms: "https://www.myfenrir.com/terms",
+      privacy: "https://www.myfenrir.com/privacy",
+    },
   },
   {
     id: "clipsflow",
@@ -165,7 +172,10 @@ export const BRANDS: BrandConfig[] = [
     redirect: { afterLogin: "/dashboard", oauthReturnPath: "/" },
     gatePreset: "minimal",
     terminalCommand: "clipsflow --login",
-    links: { terms: "/terms", privacy: "/privacy" },
+    links: {
+      terms: "https://www.myfenrir.com/terms",
+      privacy: "https://www.myfenrir.com/privacy",
+    },
   },
 ];
 

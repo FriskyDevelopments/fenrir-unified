@@ -161,9 +161,10 @@ export function GatePreview({
           </p>
         </div>
 
-        <div
+        <a
+          href={`/login?brand=${encodeURIComponent(preset.brandId)}`}
           className={cn(
-            "flex w-full items-center justify-center rounded-xl font-medium text-white",
+            "flex w-full items-center justify-center rounded-xl font-medium text-white transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80",
             compact ? "h-9 text-xs" : "h-11 text-sm",
           )}
           style={{
@@ -172,7 +173,7 @@ export function GatePreview({
           }}
         >
           Continue with single sign-on
-        </div>
+        </a>
 
         <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-white/40">
           Secured · End-to-end encrypted

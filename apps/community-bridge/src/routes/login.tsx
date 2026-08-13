@@ -2,35 +2,36 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { Button } from "@/components/ui/button";
-import { lovable } from "@/integrations/lovable";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { formatAuthError } from "@/lib/auth-errors";
 import { useBrand } from "@/config/brand-context";
 import {
-  brandOAuthRedirectUrl,
   validateBrandRedirects,
   type RedirectIssue,
 } from "@/lib/redirect-validation";
 import { BRANDS, brandLoginCopy, getBrand, type ProviderId } from "@/config/brands";
 import { isDemoMode } from "@/config/demo-mode";
 import { logDemoEvent } from "@/config/demo-log";
+import { getSiteUrl } from "@/config/site-url";
 
 
 /** Build-time brand: head() is static, so it uses the deployment's brand. */
 const HEAD_BRAND = getBrand(import.meta.env['VITE_BRAND_ID']);
-const SITE = "https://clipsflow-auth-hub.lovable.app";
 
 export const Route = createFileRoute("/login")({
   ssr: false,
-  validateSearch: (s: { next?: unknown; brand?: unknown }): {
+  validateSearch: (s: { next?: unknown; brand?: unknown; sso?: unknown }): {
     next?: string;
     brand?: string;
+    sso?: string;
   } => ({
     next: typeof s.next === "string" ? s.next : undefined,
     brand:
       typeof s.brand === "string" && BRANDS.some((b) => b.id === s.brand)
         ? s.brand
         : undefined,
+    sso: typeof s.sso === "string" ? s.sso : undefined,
   }),
 
 
@@ -47,10 +48,10 @@ export const Route = createFileRoute("/login")({
         content: `Single sign-on access to the ${HEAD_BRAND.name} portal.`,
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: `${SITE}/login` },
+      { property: "og:url", content: `${getSiteUrl()}/login` },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [{ rel: "canonical", href: `${SITE}/login` }],
+    links: [{ rel: "canonical", href: `${getSiteUrl()}/login` }],
   }),
   component: LoginPage,
 });
@@ -107,7 +108,7 @@ function LoginPage() {
   const { session, loading } = useAuth();
   const navigate = useNavigate();
   const brand = useBrand();
-  const search = Route.useSearch() as { next?: string };
+  const search = Route.useSearch() as { next?: string; sso?: string };
   const next = safeNext(search.next);
   const [pending, setPending] = useState<ProviderId | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -115,6 +116,17 @@ function LoginPage() {
   // This route is client-only (ssr: false), so demo mode can be read up front —
   // resolving it late would let the signed-in redirect fire before we know.
   const [demo] = useState(() => isDemoMode());
+
+  useEffect(() => {
+    const alreadyAttempted = document.cookie
+      .split("; ")
+      .some((cookie) => cookie.startsWith("fenrir_community_sso_attempted="));
+    if (demo || loading || session || search.sso === "0" || alreadyAttempted) return;
+    const destination = new URL(next ?? "/gate?onboarding=1", window.location.origin).toString();
+    const exchange = new URL("https://quality.myfenrir.com/api/auth/community-sso");
+    exchange.searchParams.set("next", destination);
+    window.location.replace(exchange.toString());
+  }, [demo, loading, session, search.sso, next]);
 
 
 
@@ -159,19 +171,22 @@ function LoginPage() {
       return;
     }
 
-    const result = await lovable.auth.signInWithOAuth(provider, {
-      redirect_uri: next
-        ? new URL(next, window.location.origin).toString()
-        : brandOAuthRedirectUrl(brand, window.location.origin),
+    const callback = new URL("/login", window.location.origin);
+    callback.searchParams.set("sso", "0");
+    if (next) callback.searchParams.set("next", next);
+
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: provider === "microsoft" ? "azure" : provider,
+      options: {
+        redirectTo: callback.toString(),
+        scopes: provider === "microsoft" ? "email profile" : undefined,
+      },
     });
-    if (result.error) {
+    if (oauthError) {
       setPending(null);
-      setError(formatAuthError(result.error.message ?? String(result.error)));
+      setError(formatAuthError(oauthError.message));
       return;
     }
-    if (result.redirected) return;
-    if (next) window.location.replace(next);
-    else navigate({ to: brand.redirect.afterLogin });
   }
 
 

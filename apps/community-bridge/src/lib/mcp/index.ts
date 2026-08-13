@@ -6,7 +6,7 @@ import listPortalUsersTool from "./tools/list-portal-users";
 const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "project-ref-unset";
 
 export default defineMcp({
-  name: "clipsflow-access-control",
+  name: "myfenrir-access-control",
   title: "MyFenrir Access Control",
   version: "0.1.0",
   instructions:

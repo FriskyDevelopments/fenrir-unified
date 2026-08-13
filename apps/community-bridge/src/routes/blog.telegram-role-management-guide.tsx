@@ -3,8 +3,9 @@ import { BrandBadge, BrandWordmark } from "@/components/brand/brand-logo";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, KeyRound, ListChecks, ShieldCheck, Users } from "lucide-react";
+import { getSiteUrl } from "@/config/site-url";
 
-const URL = "https://clipsflow-auth-hub.lovable.app/blog/telegram-role-management-guide";
+const URL = `${getSiteUrl()}/blog/telegram-role-management-guide`;
 const TITLE = "Telegram Bot Role Management Guide";
 const DESCRIPTION =
   "Link Telegram IDs to real accounts, model roles server-side, and automate group access without leaking permissions. A practical role management guide.";
@@ -48,12 +49,12 @@ export const Route = createFileRoute("/blog/telegram-role-management-guide")({
           author: {
             "@type": "Organization",
             name: "MyFenrir",
-            url: "https://clipsflow-auth-hub.lovable.app/",
+            url: `${getSiteUrl()}/`,
           },
           publisher: {
             "@type": "Organization",
             name: "MyFenrir",
-            url: "https://clipsflow-auth-hub.lovable.app/",
+            url: `${getSiteUrl()}/`,
           },
         }),
       },
@@ -68,7 +69,7 @@ export const Route = createFileRoute("/blog/telegram-role-management-guide")({
               "@type": "ListItem",
               position: 1,
               name: "MyFenrir",
-              item: "https://clipsflow-auth-hub.lovable.app/",
+              item: `${getSiteUrl()}/`,
             },
             { "@type": "ListItem", position: 2, name: TITLE, item: URL },
           ],

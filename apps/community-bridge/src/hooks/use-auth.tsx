@@ -77,18 +77,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     setRoleLoading(true);
-    const { data, error } = await supabase
-      .from("user_roles")
-      .select("role, telegram_id")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!error && data) {
-      setRole((data.role as AppRole) ?? "user");
-      setTelegramId(data.telegram_id ? Number(data.telegram_id) : null);
-    } else {
-      setRole("user");
-      setTelegramId(null);
-    }
+    const [roleRes, linkRes] = await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
+      supabase
+        .from("account_links")
+        .select("telegram_id, status")
+        .eq("provider", "telegram")
+        .eq("status", "linked")
+        .maybeSingle(),
+    ]);
+    setRole((roleRes.data?.role as AppRole) ?? "user");
+    const telegram = linkRes.data?.telegram_id;
+    setTelegramId(telegram ? Number(telegram) : null);
     setRoleLoading(false);
   }, []);
 

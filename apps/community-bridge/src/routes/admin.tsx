@@ -1,3 +1,4 @@
+import { getSiteUrl } from "@/config/site-url";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -45,11 +46,11 @@ export const Route = createFileRoute("/admin")({
         content: "Manage MyFenrir portal members, roles and Telegram links.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://clipsflow-auth-hub.lovable.app/admin" },
+      { property: "og:url", content: `${getSiteUrl()}/admin` },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: "https://clipsflow-auth-hub.lovable.app/admin" }],
+    links: [{ rel: "canonical", href: `${getSiteUrl()}/admin` }],
   }),
   component: AdminPage,
 });

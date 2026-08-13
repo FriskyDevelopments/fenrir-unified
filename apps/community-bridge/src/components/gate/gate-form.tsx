@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, ChevronDown, ExternalLink } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { isDemoMode } from "@/config/demo-mode";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -69,7 +69,7 @@ const SLUG_MESSAGE: Record<SlugStatus, string> = {
   idle: "3–40 lowercase letters, numbers or dashes",
   invalid: "Use 3–40 lowercase letters, numbers or dashes.",
   checking: "Checking availability…",
-  available: "This address is available.",
+  available: "Address available — publish this gate to make it live.",
   taken: "That gate address is already taken — pick another one.",
 };
 
@@ -160,7 +160,7 @@ export function GateForm({ config, onChange, slugStatus }: GateFormProps) {
                 )}
               >
                 {slugStatus === "available" && gateUrl
-                  ? `${gateUrl} is available.`
+                  ? `${gateUrl} is available. Publish to make it live.`
                   : SLUG_MESSAGE[slugStatus]}
               </p>
             </div>
@@ -241,16 +241,7 @@ export function GateForm({ config, onChange, slugStatus }: GateFormProps) {
           <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-muted-foreground">
             Live preview
           </p>
-          {gateUrl ? (
-            <a
-              href={`/g/${config.slug}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              Open gate <ExternalLink className="h-3 w-3" />
-            </a>
-          ) : null}
+          <span className="text-[11px] text-muted-foreground">Draft · updates instantly</span>
         </div>
         <GatePreview config={config} compact className="border border-border" />
       </div>

@@ -9,6 +9,7 @@ import { GatePreview } from "@/components/gate/gate-preview";
 import { GateAnalyticsPanel } from "@/components/gate/gate-analytics-panel";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/config/brand-context";
+import { getSiteUrl } from "@/config/site-url";
 import { listMyGates, type GateRecord } from "@/lib/gate.functions";
 import { getMyGateViewStats, type GateViewStats } from "@/lib/gate-analytics.functions";
 import { getPreset } from "@/lib/gate-presets";
@@ -27,11 +28,11 @@ export const Route = createFileRoute("/gates/")({
       { property: "og:title", content: "My Gates — MyFenrir" },
       { property: "og:description", content: "Manage your public MyFenrir sign-in gates." },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://clipsflow-auth-hub.lovable.app/gates" },
+      { property: "og:url", content: `${getSiteUrl()}/gates` },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: "https://clipsflow-auth-hub.lovable.app/gates" }],
+    links: [{ rel: "canonical", href: `${getSiteUrl()}/gates` }],
   }),
   component: MyGatesPage,
 });

@@ -20,6 +20,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ModerationRouteImport } from './routes/moderation'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as BlogTelegramRoleManagementGuideRouteImport } from './routes/blog.telegram-role-management-guide'
@@ -84,6 +85,11 @@ const ModerationRoute = ModerationRouteImport.update({
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UpgradeRoute = UpgradeRouteImport.update({
+  id: '/upgrade',
+  path: '/upgrade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char91DotmcpChar93ListToolsRoute =
@@ -153,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/moderation': typeof ModerationRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/upgrade': typeof UpgradeRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/blog/telegram-role-management-guide': typeof BlogTelegramRoleManagementGuideRoute
@@ -176,6 +183,7 @@ export interface FileRoutesByTo {
   '/mcp': typeof McpRoute
   '/moderation': typeof ModerationRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/upgrade': typeof UpgradeRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/blog/telegram-role-management-guide': typeof BlogTelegramRoleManagementGuideRoute
@@ -200,6 +208,7 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/moderation': typeof ModerationRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/upgrade': typeof UpgradeRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/blog/telegram-role-management-guide': typeof BlogTelegramRoleManagementGuideRoute
@@ -225,6 +234,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/moderation'
     | '/sitemap.xml'
+    | '/upgrade'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/blog/telegram-role-management-guide'
@@ -248,6 +258,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/moderation'
     | '/sitemap.xml'
+    | '/upgrade'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/blog/telegram-role-management-guide'
@@ -271,6 +282,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/moderation'
     | '/sitemap.xml'
+    | '/upgrade'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/blog/telegram-role-management-guide'
@@ -295,6 +307,7 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   ModerationRoute: typeof ModerationRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  UpgradeRoute: typeof UpgradeRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   BlogTelegramRoleManagementGuideRoute: typeof BlogTelegramRoleManagementGuideRoute
@@ -386,6 +399,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/upgrade': {
+      id: '/upgrade'
+      path: '/upgrade'
+      fullPath: '/upgrade'
+      preLoaderRoute: typeof UpgradeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.mcp/list-tools': {
       id: '/.mcp/list-tools'
       path: '/.mcp/list-tools'
@@ -471,6 +491,7 @@ const rootRouteChildren: RootRouteChildren = {
   McpRoute: McpRoute,
   ModerationRoute: ModerationRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  UpgradeRoute: UpgradeRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,

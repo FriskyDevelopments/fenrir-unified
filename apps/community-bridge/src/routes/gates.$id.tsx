@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { GateForm, SLUG_PATTERN, useSlugAvailability } from "@/components/gate/gate-form";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/config/brand-context";
+import { getSiteUrl } from "@/config/site-url";
 import { deleteGate, getMyGate, updateGate } from "@/lib/gate.functions";
 import type { GateConfig } from "@/lib/gate-presets";
 
@@ -25,11 +26,11 @@ export const Route = createFileRoute("/gates/$id")({
       { property: "og:title", content: "Edit Gate — MyFenrir" },
       { property: "og:description", content: "Update your public MyFenrir sign-in gate." },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: `https://clipsflow-auth-hub.lovable.app/gates/${params.id}` },
+      { property: "og:url", content: `${getSiteUrl()}/gates/${params.id}` },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: `https://clipsflow-auth-hub.lovable.app/gates/${params.id}` }],
+    links: [{ rel: "canonical", href: `${getSiteUrl()}/gates/${params.id}` }],
   }),
   component: EditGatePage,
 });

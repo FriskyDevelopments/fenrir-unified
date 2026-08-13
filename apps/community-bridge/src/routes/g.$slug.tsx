@@ -1,3 +1,4 @@
+import { getSiteUrl } from "@/config/site-url";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { GatePreview } from "@/components/gate/gate-preview";
 import { GateShare } from "@/components/gate/gate-share";
@@ -27,10 +28,10 @@ export const Route = createFileRoute("/g/$slug")({
         content: loaderData?.subheadline ?? "Secure single sign-on gate.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: `https://clipsflow-auth-hub.lovable.app/g/${params.slug}` },
+      { property: "og:url", content: `${getSiteUrl()}/g/${params.slug}` },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [{ rel: "canonical", href: `https://clipsflow-auth-hub.lovable.app/g/${params.slug}` }],
+    links: [{ rel: "canonical", href: `${getSiteUrl()}/g/${params.slug}` }],
   }),
   errorComponent: () => <GateFallback message="This gate could not be loaded." />,
   notFoundComponent: () => <GateFallback message="No gate exists at this address." />,

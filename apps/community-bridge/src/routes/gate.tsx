@@ -1,17 +1,23 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Check, Loader2, Wand2 } from "lucide-react";
+import { ArrowLeft, Bot, Check, ExternalLink, Loader2, ShieldCheck, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GateForm, SLUG_PATTERN, slugify, useSlugAvailability } from "@/components/gate/gate-form";
 import { CommunityStandardsStep, hasAcceptedStandards } from "@/components/gate/community-standards-step";
+import { OnboardingMotionGuide } from "@/components/gate/onboarding-motion-guide";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/config/brand-context";
+import { getSiteUrl } from "@/config/site-url";
 import { createGate } from "@/lib/gate.functions";
 import { DEFAULT_GATE, type GateConfig } from "@/lib/gate-presets";
 import { isDemoMode } from "@/config/demo-mode";
+
+const TELEGRAM_BOT_USERNAME =
+  (import.meta.env["VITE_TELEGRAM_BOT_USERNAME"] as string | undefined) ?? "Myfenrir_bot";
+const TELEGRAM_BOT_URL = `https://t.me/${TELEGRAM_BOT_USERNAME}`;
 
 export const Route = createFileRoute("/gate")({
   ssr: false,
@@ -29,11 +35,11 @@ export const Route = createFileRoute("/gate")({
         content: "Preset-first public gate builder for the MyFenrir portal.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://clipsflow-auth-hub.lovable.app/gate" },
+      { property: "og:url", content: `${getSiteUrl()}/gate` },
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
-      { rel: "canonical", href: "https://clipsflow-auth-hub.lovable.app/gate" },
+      { rel: "canonical", href: `${getSiteUrl()}/gate` },
     ],
   }),
   component: NewGatePage,
@@ -60,7 +66,10 @@ function NewGatePage() {
   useEffect(() => {
     if (loading) return;
     if (!session) {
-      navigate({ to: "/login", search: { next: undefined } });
+      navigate({
+        to: "/login",
+        search: { next: `${window.location.pathname}${window.location.search}` },
+      });
       return;
     }
     setConfig((c) => {
@@ -119,7 +128,7 @@ function NewGatePage() {
   if (createdGate) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background px-5">
-        <Card className="w-full max-w-lg p-8">
+        <Card className="w-full max-w-2xl p-8">
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/15 text-primary">
             <Check className="h-5 w-5" />
           </div>
@@ -131,16 +140,54 @@ function NewGatePage() {
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Account email</p>
             <p className="mt-1 text-sm text-foreground">{user?.email ?? "Email from your sign-in provider"}</p>
           </div>
+          <div className="mt-6 rounded-xl border border-border bg-card/60 p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                <Bot className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-foreground">Set up Fenrir in your Telegram group</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Connect the gate to the group it will protect, then test the complete member journey.
+                </p>
+              </div>
+            </div>
+            <ol className="mt-5 space-y-4 text-sm text-foreground">
+              <li className="flex gap-3"><span className="font-semibold text-primary">1.</span><span>Open <strong>@{TELEGRAM_BOT_USERNAME}</strong> in a private chat and send <code className="rounded bg-background px-1.5 py-0.5 font-mono text-xs">/link</code>. Fenrir will enable the MyFenrir Mini App button and guide you through secure account linking.</span></li>
+              <li className="flex gap-3"><span className="font-semibold text-primary">2.</span><span>Add Fenrir to the Telegram group connected to this gate.</span></li>
+              <li className="flex gap-3"><span className="font-semibold text-primary">3.</span><span>Promote Fenrir to administrator and enable <strong>Invite Users</strong> so it can manage gate access.</span></li>
+              <li className="flex gap-3"><span className="font-semibold text-primary">4.</span><span>Return to MyFenrir, check the bot permissions, then open the live gate and test it with a member account.</span></li>
+            </ol>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Button asChild variant="fenrir">
+                <a href={`${TELEGRAM_BOT_URL}?start=link`} target="_blank" rel="noreferrer">
+                  Open Fenrir bot <ExternalLink className="ml-2 h-4 w-4" />
+                </a>
+              </Button>
+              <Button asChild variant="outline">
+                <a href={`${TELEGRAM_BOT_URL}?startgroup=gate_${createdGate.slug}`} target="_blank" rel="noreferrer">
+                  Add bot to group <ExternalLink className="ml-2 h-4 w-4" />
+                </a>
+              </Button>
+              <Button asChild variant="outline"><a href="https://myfenrir.com/main">Link Telegram account</a></Button>
+              <Button asChild variant="ghost"><Link to="/dashboard"><ShieldCheck className="mr-2 h-4 w-4" />Check permissions</Link></Button>
+            </div>
+          </div>
           <div className="mt-6 rounded-xl border border-primary/30 bg-primary/10 p-5">
             <h2 className="text-base font-semibold text-foreground">Ready to upgrade?</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Unlock branded domains, advanced access rules, analytics, and team controls for this gate.
             </p>
             <Button asChild variant="fenrir" className="mt-4">
-              <Link to="/dashboard">See upgrade options</Link>
+              <Link to="/upgrade">See upgrade options</Link>
             </Button>
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
+            <Button asChild variant="fenrir">
+              <a href={`/g/${createdGate.slug}`} target="_blank" rel="noreferrer">
+                View live gate <ExternalLink className="ml-2 h-4 w-4" />
+              </a>
+            </Button>
             <Button asChild variant="outline"><Link to="/gates/$id" params={{ id: createdGate.id }}>Edit gate</Link></Button>
             <Button asChild variant="ghost"><Link to="/gates">View all gates</Link></Button>
           </div>
@@ -178,6 +225,8 @@ function NewGatePage() {
             Publish gate
           </Button>
         </div>
+
+        <OnboardingMotionGuide />
 
         <GateForm config={config} onChange={setConfig} slugStatus={slugStatus} />
       </main>
