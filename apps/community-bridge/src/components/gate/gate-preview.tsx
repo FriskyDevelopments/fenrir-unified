@@ -8,6 +8,18 @@ import {
   type MascotKey,
 } from "@/lib/gate-presets";
 
+function singleSignOnHref(slug?: string, brandId?: string) {
+  if (typeof window === "undefined") return "/login";
+  // A visitor enters through one Gate. Authentication must return to that
+  // exact Gate — never the owner's management list, which is a different
+  // product surface and made the public flow feel like a dead end.
+  const destination = new URL(slug ? `/g/${encodeURIComponent(slug)}?sso=complete` : "/", window.location.origin);
+  const handoff = new URL("https://quality.myfenrir.com/api/auth/community-sso");
+  handoff.searchParams.set("next", destination.toString());
+  if (brandId) handoff.searchParams.set("brand", brandId);
+  return handoff.toString();
+}
+
 const MASCOT_ICONS = {
   ghost: Ghost,
   wolf: PawPrint,
@@ -162,7 +174,7 @@ export function GatePreview({
         </div>
 
         <a
-          href={`/login?brand=${encodeURIComponent(preset.brandId)}`}
+          href={singleSignOnHref(config.slug, preset.brandId)}
           className={cn(
             "flex w-full items-center justify-center rounded-xl font-medium text-white transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80",
             compact ? "h-9 text-xs" : "h-11 text-sm",
