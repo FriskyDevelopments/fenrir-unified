@@ -62,7 +62,7 @@ function DashboardPage() {
         window.location.replace("/gate?onboarding=1");
         return () => { active = false; };
       }
-      void fetchGates({ data: { brand_id: brand.id } })
+      void fetchGates()
         .then((gates) => {
           if (!active) return;
           window.location.replace(gates.length > 0 ? "/gates" : "/gate?onboarding=1");
@@ -73,7 +73,7 @@ function DashboardPage() {
         });
       return () => { active = false; };
     }
-  }, [loading, roleLoading, session, telegramId, navigate, fetchGates, brand.id]);
+  }, [loading, roleLoading, session, telegramId, navigate, fetchGates]);
 
   if (loading || roleLoading || !session || !telegramId) {
     return (

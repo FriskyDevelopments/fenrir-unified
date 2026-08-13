@@ -79,16 +79,24 @@ function toRecord(row: GateRow): GateRecord {
   } as GateRecord;
 }
 
-/** Every gate owned by the signed-in user *within the current brand*. */
+/**
+ * Every gate owned by the signed-in user.
+ *
+ * The owner dashboard is deliberately not narrowed by the visual brand that
+ * happened to load at the current hostname. A single owner can create gates
+ * for several brands; filtering here made those gates look deleted whenever
+ * they returned through another branded entry point. The ownership predicate
+ * remains mandatory, so this never crosses account boundaries.
+ */
 export const listMyGates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ brand_id: tenantField }).parse(data))
-  .handler(async ({ context, data }) => {
+  .inputValidator(() => undefined)
+  .handler(async ({ context }) => {
     const sql = neonSql();
     const rows = (await sql`
       select id, updated_at, brand_id, community_id, slug, preset, headline, subheadline, logo_url, mascot_url, background_url
       from cb_gate_configs
-      where user_id = ${context.userId} and brand_id = ${data.brand_id}
+      where user_id = ${context.userId}
       order by created_at asc
     `) as GateRow[];
     return rows.map(toRecord);

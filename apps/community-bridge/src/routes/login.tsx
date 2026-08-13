@@ -122,7 +122,10 @@ function LoginPage() {
       .split("; ")
       .some((cookie) => cookie.startsWith("fenrir_community_sso_attempted="));
     if (demo || loading || session || search.sso === "0" || alreadyAttempted) return;
-    const destination = new URL(next ?? "/gate?onboarding=1", window.location.origin).toString();
+    // A visitor without an explicit destination may own Gates already. Let
+    // /dashboard perform the authenticated lookup instead of forcing everyone
+    // into the new-Gate wizard.
+    const destination = new URL(next ?? "/dashboard", window.location.origin).toString();
     const exchange = new URL("https://quality.myfenrir.com/api/auth/community-sso");
     exchange.searchParams.set("next", destination);
     window.location.replace(exchange.toString());

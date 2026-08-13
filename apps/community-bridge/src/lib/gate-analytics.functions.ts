@@ -113,23 +113,13 @@ export const recordGateView = createServerFn({ method: "POST" })
 /** Per-gate view stats for every gate the signed-in user owns. */
 export const getMyGateViewStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
-    z
-      .object({
-        brand_id: z
-          .string()
-          .trim()
-          .toLowerCase()
-          .regex(/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/, "Invalid brand"),
-      })
-      .parse(data),
-  )
-  .handler(async ({ context, data }) => {
+  .inputValidator(() => undefined)
+  .handler(async ({ context }) => {
     const sql = neonSql();
 
     const gates = (await sql`
       select id from cb_gate_configs
-      where user_id = ${context.userId} and brand_id = ${data.brand_id}
+      where user_id = ${context.userId}
     `) as Array<{ id: string }>;
     const ids = gates.map((g) => g.id);
     if (ids.length === 0) return [] as GateViewStats[];

@@ -64,8 +64,13 @@ function PublicGatePage() {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 px-5 pb-8">
         <Link
           to="/login"
-          /* White-label handoff: the gate's preset carries its tenant to /login. */
-          search={{ next: undefined, brand: preset.brandId }}
+          /*
+           * Preserve where the visitor came from without returning to the same
+           * public sign-in screen after auth. The protected destination is the
+           * owner's Gates surface; the gate slug remains available for the
+           * follow-on admission flow.
+           */
+          search={{ next: `/gates?from_gate=${encodeURIComponent(params.slug)}`, brand: preset.brandId }}
           className="pointer-events-auto rounded-full border border-white/15 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.22em] text-white/70 transition hover:text-white"
 
           style={{ background: `color-mix(in oklab, ${preset.accent} 12%, transparent)` }}
@@ -77,4 +82,3 @@ function PublicGatePage() {
     </div>
   );
 }
-

@@ -60,20 +60,20 @@ function MyGatesPage() {
       return;
     }
     let active = true;
-    fetchGates({ data: { brand_id: brand.id } })
+    fetchGates()
       .then((rows) => active && setGates(rows))
       .catch((error: unknown) => {
         if (!active) return;
         toast.error(error instanceof Error ? error.message : "Could not load your gates");
         setGates([]);
       });
-    fetchStats({ data: { brand_id: brand.id } })
+    fetchStats()
       .then((rows) => active && setStats(rows))
       .catch(() => active && setStats([]));
     return () => {
       active = false;
     };
-  }, [loading, session, fetchGates, fetchStats, navigate, brand.id]);
+  }, [loading, session, fetchGates, fetchStats, navigate]);
 
 
   if (loading || !gates) {
