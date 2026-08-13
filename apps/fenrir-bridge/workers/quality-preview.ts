@@ -20,6 +20,29 @@ function readCookie(request: Request) {
   return raw.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1) ?? "";
 }
 
+function hasSupabaseBrowserSession(request: Request) {
+  // The Supabase client deliberately stores its session in the shared
+  // `.myfenrir.com` cookie so Community Bridge can read it too.  Do not use
+  // the Fenrir server-session alone as proof that the browser can enter
+  // Community: that was the source of the login loop.
+  return /(?:^|;\s*)sb-yqevglppbhuoxxfsfnih-auth-token(?:\.\d+)?=/.test(request.headers.get("cookie") ?? "");
+}
+
+function safeCommunityDestination(request: Request) {
+  const url = new URL(request.url);
+  const requested = url.searchParams.get("next");
+  if (!requested) return "https://quality.communities.myfenrir.com/dashboard";
+  try {
+    const destination = new URL(requested);
+    if (destination.protocol !== "https:" || destination.hostname !== "quality.communities.myfenrir.com") {
+      throw new Error("unsafe community destination");
+    }
+    return destination.toString();
+  } catch {
+    return "https://quality.communities.myfenrir.com/dashboard";
+  }
+}
+
 function base64Url(bytes: Uint8Array) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -80,6 +103,24 @@ async function createSession(request: Request, env: Env) {
 export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
+    if (url.pathname === "/api/auth/community-sso" && request.method === "GET") {
+      const destination = safeCommunityDestination(request);
+      const current = await session(request, env).catch(() => null);
+
+      // A valid Fenrir server session plus the shared Supabase browser
+      // session is the only state that can enter Community directly.
+      if (current && hasSupabaseBrowserSession(request)) {
+        return Response.redirect(destination, 302);
+      }
+
+      // Establish the browser Supabase session first.  The login client keeps
+      // this `next` value through the provider callback and posts the access
+      // token back to `/api/auth/supabase-session`, which creates the signed
+      // Fenrir session before returning to Community.
+      const login = new URL("/login", url.origin);
+      login.searchParams.set("next", destination);
+      return Response.redirect(login.toString(), 302);
+    }
     if (url.pathname === "/api/auth/supabase-session" && request.method === "POST") return createSession(request, env);
     if (url.pathname === "/api/auth/me" && request.method === "GET") {
       const current = await session(request, env).catch(() => null);

@@ -76,7 +76,40 @@ function isSafeRedirectPath(path: string | null) {
   return !isAuthCallbackPath(pathname);
 }
 
+function isAllowedPostAuthDestination(destination: string | null) {
+  if (isSafeRedirectPath(destination)) return true;
+  if (!destination) return false;
+  try {
+    const url = new URL(destination);
+    return url.protocol === "https:" && url.hostname === "quality.communities.myfenrir.com";
+  } catch {
+    return false;
+  }
+}
+
+function isExternalCommunityDestination(destination: string) {
+  try {
+    const url = new URL(destination);
+    return url.protocol === "https:" && url.hostname === "quality.communities.myfenrir.com";
+  } catch {
+    return false;
+  }
+}
+
 function currentPostAuthDestination() {
+  // Community SSO gives the Fenrir login a same-origin `next` URL. Keep it
+  // through the OAuth round trip instead of silently falling back to /main.
+  const requested = new URLSearchParams(window.location.search).get("next");
+  if (requested) {
+    try {
+      const destination = new URL(requested);
+      if (destination.protocol === "https:" && destination.hostname === "quality.communities.myfenrir.com") {
+        return destination.toString();
+      }
+    } catch {
+      // Ignore malformed destinations and keep the normal safe fallback.
+    }
+  }
   const destination = window.location.pathname;
   return destination === "/" || !isSafeRedirectPath(destination) ? fallbackPostAuthDestination() : destination;
 }
@@ -93,7 +126,7 @@ function consumePostAuthDestination() {
   try {
     const destination = window.localStorage.getItem(postAuthDestinationKey);
     window.localStorage.removeItem(postAuthDestinationKey);
-    return isSafeRedirectPath(destination) ? destination as string : fallbackPostAuthDestination();
+    return isAllowedPostAuthDestination(destination) ? destination as string : fallbackPostAuthDestination();
   } catch {
     return fallbackPostAuthDestination();
   }
@@ -229,6 +262,13 @@ function hasSupabaseCallbackParams(params: URLSearchParams) {
 
 function clearCallbackParameters(hasCallbackParams = false) {
   const destinationPath = callbackDestinationPath(window.location.pathname, hasCallbackParams);
+  // `history.replaceState` cannot cross origins. Community is intentionally a
+  // different Quality host, so this must be a navigation once the Supabase and
+  // Fenrir sessions are both established.
+  if (isExternalCommunityDestination(destinationPath)) {
+    window.location.replace(destinationPath);
+    return;
+  }
   const nextParams = new URLSearchParams(window.location.search);
   for (const key of callbackParameterKeys) {
     nextParams.delete(key);
@@ -240,7 +280,10 @@ function clearCallbackParameters(hasCallbackParams = false) {
 
 function setAuthCallbackError(code: string) {
   const params = parseSupabaseCallbackParams();
-  const destinationPath = callbackDestinationPath(window.location.pathname, params.hasCallbackParams);
+  const requestedDestination = callbackDestinationPath(window.location.pathname, params.hasCallbackParams);
+  // Keep the failure visible on MyFenrir. A failed OAuth exchange must never
+  // send the user to Community as if its session were valid.
+  const destinationPath = isExternalCommunityDestination(requestedDestination) ? "/login" : requestedDestination;
   const nextParams = new URLSearchParams(window.location.search);
   nextParams.set("auth_error", code);
   const nextSearch = nextParams.toString();
