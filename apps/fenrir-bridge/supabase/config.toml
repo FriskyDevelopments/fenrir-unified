@@ -1,0 +1,6 @@
+# Supabase CLI config for the CANONICAL MyFenrir project.
+# This pins the CLI to yqev (FriskyDEV) — the project BOTH fenrir-bridge and
+# community-bridge actually run against. It replaces the stale `jgkt...` target
+# that community-bridge/supabase/config.toml still points at (the reason the
+# orphan telegram_link_codes migrations were never applied to the live project).
+project_id = "yqevglppbhuoxxfsfnih"

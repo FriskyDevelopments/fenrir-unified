@@ -1,4 +1,4 @@
-import { FENRIR_MAIL_FROM } from "../../../_lib/transactional-email";
+import { sendMyFenrirEmail } from "../../../_lib/myfenrir-emails";
 import {
   communityAuthConfigured,
   communityAuthNotConfigured,
@@ -54,24 +54,37 @@ export async function onRequestPost(context: any) {
   const origin = siteOrigin(context.request, context.env);
   const devReturnLink = context.env.FENRIR_COMMUNITY_AUTH_DEV_RETURN_LINK === "true";
   const magicLink = `${origin}/api/community-auth/magic-link/consume?token=${encodeURIComponent(token)}`;
-  if (!context.env.EMAIL) {
-    return noStoreJson({ ok: false, error: "email_service_not_configured", linkId: link?.id, expiresAt: link?.expires_at }, { status: 503 });
-  }
-  try {
-    await context.env.EMAIL.send({
-      to: email,
-      from: FENRIR_MAIL_FROM,
-      subject: "Tu acceso a MyFenrir",
-      html: `<p>Hola,</p><p>Usa este enlace para entrar a la comunidad:</p><p><a href="${magicLink}">Entrar a MyFenrir</a></p><p>Este enlace caduca en 15 minutos.</p>`,
-      text: `Entra a MyFenrir: ${magicLink} (caduca en 15 minutos).`
-    });
-  } catch (error) {
-    console.error("Cloudflare Email Service send failed", error);
-    return noStoreJson({ ok: false, error: "email_delivery_failed", linkId: link?.id, expiresAt: link?.expires_at }, { status: 502 });
+  // Branded delivery via the dedicated myfenrir-emails Worker when configured
+  // (MYFENRIR_EMAILS_URL/_TOKEN); otherwise this gracefully falls back to the
+  // Pages EMAIL binding with a compact on-brand shell. Same response contract
+  // and error codes as before, so existing callers/tests keep working.
+  const emailResult = await sendMyFenrirEmail(context.env, {
+    template: "acceso",
+    to: email,
+    subject: "Tu acceso a MyFenrir",
+    data: {
+      url: magicLink,
+      minutos: 15,
+      comunidad: (brand as any)?.displayName ?? (brand as any)?.name ?? undefined,
+      email
+    }
+  });
+  if (!emailResult.ok) {
+    const notConfigured = emailResult.error === "email_not_configured";
+    if (!notConfigured) console.error("MyFenrir email send failed", emailResult.error);
+    return noStoreJson(
+      {
+        ok: false,
+        error: notConfigured ? "email_service_not_configured" : "email_delivery_failed",
+        linkId: link?.id,
+        expiresAt: link?.expires_at
+      },
+      { status: notConfigured ? 503 : 502 }
+    );
   }
   return noStoreJson({
     ok: true,
-    delivery: "cloudflare_email_service",
+    delivery: emailResult.via === "worker" ? "myfenrir_emails_worker" : "cloudflare_email_service",
     brandConfigured,
     linkId: link?.id,
     expiresAt: link?.expires_at,

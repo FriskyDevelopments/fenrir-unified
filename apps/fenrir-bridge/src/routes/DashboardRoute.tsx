@@ -31,7 +31,6 @@ import {
   domainSearchCandidates,
   domainTagPresets,
   findCommissionLink,
-  friskySignalDevRequestUrl,
   legalRoutes,
   liveRoomProviders,
   lookupDomainDns,
@@ -1028,7 +1027,6 @@ export function DashboardRoute() {
               <div className="row-actions">
                 {!telegramIdentity?.linked ? <button type="button" onClick={() => void linkTelegramIdentity()}>{ui.linkTelegramId}</button> : null}
                 {telegramIdentity?.linked ? <button type="button" onClick={() => void requestTelegramReadd()}>{ui.telegramReaddButton}</button> : null}
-                <a className="button-link ghost" href={friskySignalDevRequestUrl} target="_blank" rel="noreferrer">{ui.devRequestViaSignal}</a>
               </div>
             </div>
             <div className="form-column">
@@ -1052,9 +1050,6 @@ export function DashboardRoute() {
               <button onClick={() => runAiOps("jules")}>{c.julesTicket}</button>
               <button className="secondary" onClick={() => runAiOps("gemini")}>{c.geminiDnsGuide}</button>
               <button className="ghost" onClick={() => runAiOps("cursor")}>{c.cursorHandoff}</button>
-            <a className="button-link ghost" href={friskySignalDevRequestUrl} target="_blank" rel="noreferrer">
-              {ui.devRequestViaSignal}
-            </a>
             </div>
             <p className="muted">{c.opsStackBody}</p>
           </section>}

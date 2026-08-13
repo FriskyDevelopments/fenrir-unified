@@ -26,6 +26,25 @@ export type AuditAction =
   | "gemini_dns_explained"
   | "cursor_handoff_exported";
 
+export type TrialStatus = "pending_card" | "active" | "converted" | "expired" | "canceled";
+
+export type TrialPublic = {
+  id: string;
+  code: string;
+  status: TrialStatus;
+  cardOnFile: boolean;
+  plan: Plan | null;
+  startedAt: string | null;
+  endsAt: string | null;
+  daysRemaining: number | null;
+};
+
+export type TrialStatusPayload = {
+  ok: true;
+  hasTrial: boolean;
+  trial: TrialPublic | null;
+};
+
 export type FriskyUser = {
   id: string;
   email: string;

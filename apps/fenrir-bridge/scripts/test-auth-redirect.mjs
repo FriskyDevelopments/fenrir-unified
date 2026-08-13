@@ -8,6 +8,7 @@ import { join } from "node:path";
 const root = new URL("..", import.meta.url).pathname;
 const apiSource = readFileSync(join(root, "src/services/api.ts"), "utf8");
 const supabaseAuthSource = readFileSync(join(root, "src/services/supabaseAuth.ts"), "utf8");
+const callbackPathMatcher = supabaseAuthSource.match(/function isAuthCallbackPath[\s\S]*?\n}/)?.[0] ?? "";
 
 function workosMatches() {
   try {
@@ -28,6 +29,10 @@ const checks = [
   {
     name: `no WorkOS reference exists anywhere in the app (banned)${offenders ? ` — found in: ${offenders.replaceAll("\n", ", ")}` : ""}`,
     pass: offenders === ""
+  },
+  {
+    name: "plain /login is not treated as an OAuth callback",
+    pass: !callbackPathMatcher.includes('normalizedPath === "/login"')
   }
 ];
 

@@ -53,6 +53,7 @@ export const copy = {
 	    legalTermsBody: [
 	      "Fenrir Bridge by Frisky provides administrative software for creating stable public access links that route to private operational destinations, including Telegram groups, live rooms, payment links, documents, booking links, and support links.",
 	      "By using the service, you confirm that you are authorized to administer the domains, groups, links, and destinations you connect. You are responsible for the accuracy, legality, permissions, and safety of any target link you configure.",
+	      "You are responsible for every image and other piece of content you upload or publish through Fenrir. By uploading content, you confirm that you own it or have all rights and permissions required to use it, and that it complies with applicable law and these Terms.",
 	      "Fenrir may suspend access to links, workspaces, or accounts that create security risk, abuse, fraud, spam, impersonation, payment disputes, or legal exposure."
 	    ],
 	    legalPrivacyBody: [
@@ -330,6 +331,7 @@ export const copy = {
 	    legalTermsBody: [
 	      "Fenrir Bridge by Frisky ofrece software administrativo para crear links publicos estables que enrutan hacia destinos privados de operacion, incluyendo grupos de Telegram, live rooms, links de pago, documentos, links de booking y links de soporte.",
 	      "Al usar el servicio, confirmas que tienes autorizacion para administrar los dominios, grupos, links y destinos que conectas. Tu eres responsable de la exactitud, legalidad, permisos y seguridad de cualquier link destino que configures.",
+	      "Eres responsable de cada imagen y demas contenido que subas o publiques mediante Fenrir. Al subir contenido, confirmas que es tuyo o que tienes todos los derechos y permisos necesarios para usarlo, y que cumple con la ley aplicable y estos Terminos.",
 	      "Fenrir puede suspender el acceso a links, workspaces o cuentas que generen riesgo de seguridad, abuso, fraude, spam, suplantacion, disputas de pago o exposicion legal."
 	    ],
 	    legalPrivacyBody: [
@@ -607,6 +609,7 @@ export const copy = {
 	    legalTermsBody: [
 	      "Fenrir Bridge by Frisky fournit un logiciel d'administration pour creer des liens publics stables qui redirigent vers des destinations operationnelles privees, y compris des groupes Telegram, live rooms, liens de paiement, documents, liens de reservation et liens de support.",
 	      "En utilisant le service, vous confirmez etre autorise a administrer les domaines, groupes, liens et destinations que vous connectez. Vous etes responsable de l'exactitude, de la legalite, des permissions et de la securite de tout lien destination configure.",
+	      "Vous etes responsable de chaque image et autre contenu que vous televersez ou publiez via Fenrir. En televersant du contenu, vous confirmez en etre proprietaire ou disposer de tous les droits et autorisations necessaires, et qu'il respecte la loi applicable et les presentes Conditions.",
 	      "Fenrir peut suspendre l'acces aux liens, workspaces ou comptes qui creent un risque de securite, abus, fraude, spam, usurpation, litige de paiement ou exposition legale."
 	    ],
 	    legalPrivacyBody: [
@@ -884,6 +887,7 @@ export const copy = {
 	    legalTermsBody: [
 	      "Fenrir Bridge by Frisky stellt Admin-Software bereit, um stabile oeffentliche Zugangslinks zu erstellen, die auf private operative Ziele verweisen, darunter Telegram-Gruppen, Live Rooms, Zahlungslinks, Dokumente, Buchungslinks und Support-Links.",
 	      "Durch die Nutzung des Dienstes bestaetigen Sie, dass Sie berechtigt sind, die verbundenen Domains, Gruppen, Links und Ziele zu verwalten. Sie sind fuer Richtigkeit, Rechtmaessigkeit, Berechtigungen und Sicherheit jedes konfigurierten Ziel-Links verantwortlich.",
+	      "Sie sind fuer jedes Bild und jeden anderen Inhalt verantwortlich, den Sie ueber Fenrir hochladen oder veroeffentlichen. Mit dem Hochladen bestaetigen Sie, dass Ihnen der Inhalt gehoert oder Sie alle erforderlichen Rechte und Genehmigungen besitzen und dass er dem geltenden Recht und diesen Bedingungen entspricht.",
 	      "Fenrir kann den Zugriff auf Links, Workspaces oder Konten sperren, wenn Sicherheitsrisiken, Missbrauch, Betrug, Spam, Identitaetstaeuschung, Zahlungsstreitigkeiten oder rechtliche Risiken entstehen."
 	    ],
 	    legalPrivacyBody: [

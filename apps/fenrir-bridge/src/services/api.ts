@@ -10,7 +10,7 @@ import {
 import { copy } from "../i18n";
 import { addBridge, addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
 import { completeSupabaseSession, hasSupabaseCallbackInLocation, isSupabaseAuthConfigured, signInWithSupabase, signOutSupabase } from "./supabaseAuth";
-import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck } from "./types";
+import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck, TrialPublic, TrialStatusPayload } from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
 export const defaultBillingCheckoutErrorMessage = copy.en.checkoutErrorGeneric;
@@ -615,6 +615,36 @@ export const billingService = {
   }
 };
 
+export const trialService = {
+  async status(): Promise<TrialStatusPayload> {
+    return apiRequest<TrialStatusPayload>("/api/trial/status");
+  },
+  async redeem(code: string): Promise<{ ok: true; requiresCard: boolean; next?: string; trial: TrialPublic | null }> {
+    return apiRequest<{ ok: true; requiresCard: boolean; next?: string; trial: TrialPublic | null }>("/api/trial/redeem", {
+      method: "POST",
+      body: JSON.stringify({ code })
+    });
+  },
+  async createSetupIntent(code?: string): Promise<{ ok: true; clientSecret: string; setupIntentId: string; customerId: string; trialId: string }> {
+    return apiRequest<{ ok: true; clientSecret: string; setupIntentId: string; customerId: string; trialId: string }>("/api/trial/setup-intent", {
+      method: "POST",
+      body: JSON.stringify(code ? { code } : {})
+    });
+  },
+  async verify(code?: string): Promise<{ ok: true; alreadyActive?: boolean; trial?: TrialPublic }> {
+    return apiRequest<{ ok: true; alreadyActive?: boolean; trial?: TrialPublic }>("/api/trial/verify", {
+      method: "POST",
+      body: JSON.stringify(code ? { code } : {})
+    });
+  },
+  async convert(plan: "starter" | "pro" | "operator"): Promise<{ ok: true; plan: string; subscriptionStatus: string; stripeSubscriptionId: string }> {
+    return apiRequest<{ ok: true; plan: string; subscriptionStatus: string; stripeSubscriptionId: string }>("/api/trial/convert", {
+      method: "POST",
+      body: JSON.stringify({ plan })
+    });
+  }
+};
+
 export const telegramIdentityService = {
   async status(): Promise<TelegramIdentityLinkPayload> {
     return apiRequest<TelegramIdentityLinkPayload>("/api/telegram/link");
@@ -627,5 +657,40 @@ export const telegramIdentityService = {
       method: "POST",
       body: JSON.stringify(input)
     });
+  }
+};
+
+export type MediaKind = "avatar" | "cover" | "upload";
+
+export type MediaUploadResult = {
+  ok: true;
+  /** Object key inside the R2 bucket, e.g. `frisky_usr_.../avatar-1699999999999.png`. */
+  key: string;
+  /** Same-origin read path served by the Pages Function, e.g. `/api/media/r2/<key>`. */
+  url: string;
+};
+
+/**
+ * Uploads member media (avatars / covers / uploads) to the MyFenrir R2 bucket
+ * via the authenticated /api/media/upload Pages Function. Uses multipart
+ * FormData and does NOT set Content-Type, so the browser can add the multipart
+ * boundary. The fenrir_session cookie rides along via `credentials: "include"`.
+ */
+export const mediaService = {
+  async upload(file: File, kind: MediaKind = "upload"): Promise<MediaUploadResult> {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("kind", kind);
+
+    const response = await fetch("/api/media/upload", {
+      method: "POST",
+      credentials: "include",
+      body: form
+    });
+    const body = (await response.json().catch(() => null)) as (MediaUploadResult & { error?: string }) | null;
+    if (!response.ok || !body?.ok) {
+      throw new Error(body?.error ?? `media_upload_failed_${response.status}`);
+    }
+    return body;
   }
 };

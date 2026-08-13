@@ -196,7 +196,7 @@ const uiCopy: Record<Locale, {
     telegramReaddNeedChat: "Enter the Telegram group ID first.",
     telegramReaddReady: "Recovery invite ready. Fenrir opened a one-use Telegram link.",
     telegramReaddUnavailable: "Recovery invite could not be created. Check bot admin invite permissions.",
-    devRequestViaSignal: "Dev request via Frisky Signal",
+    devRequestViaSignal: "Support",
     devRequestViaSignalShort: "Frisky Signal",
     setupRoute: "Setup route",
     openingLaunchRoute: "Opening launch route",
@@ -726,7 +726,6 @@ const uiCopy: Record<Locale, {
 const confettiPieces = Array.from({ length: 28 }, (_, index) => index);
 const pageKeys = ["command", "links", "domains", "dns", "locks", "rooms", "telegram", "revocations", "audit", "faq", "billing", "brands"] as const;
 const legalRoutes = new Set(["/legal", "/terms", "/privacy", "/acceptable-use"]);
-const friskySignalDevRequestUrl = "https://t.me/friskysignal";
 const liveRoomProviders: Array<{ id: LiveRoomProvider; name: string; icon: string; brand: string; hint: string; placeholder: string }> = [
   {
     id: "zoom",
@@ -2026,7 +2025,6 @@ export function App() {
               <div className="row-actions">
                 {!telegramIdentity?.linked ? <button type="button" onClick={() => void linkTelegramIdentity()}>{ui.linkTelegramId}</button> : null}
                 {telegramIdentity?.linked ? <button type="button" onClick={() => void requestTelegramReadd()}>{ui.telegramReaddButton}</button> : null}
-                <a className="button-link ghost" href={friskySignalDevRequestUrl} target="_blank" rel="noreferrer">{ui.devRequestViaSignal}</a>
               </div>
             </div>
             <div className="form-column">
@@ -2050,9 +2048,6 @@ export function App() {
               <button onClick={() => runAiOps("jules")}>{c.julesTicket}</button>
               <button className="secondary" onClick={() => runAiOps("gemini")}>{c.geminiDnsGuide}</button>
               <button className="ghost" onClick={() => runAiOps("cursor")}>{c.cursorHandoff}</button>
-            <a className="button-link ghost" href={friskySignalDevRequestUrl} target="_blank" rel="noreferrer">
-              {ui.devRequestViaSignal}
-            </a>
             </div>
             <p className="muted">{c.opsStackBody}</p>
           </section>}

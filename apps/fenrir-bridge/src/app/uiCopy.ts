@@ -164,7 +164,7 @@ export const uiCopy: Record<Locale, {
     telegramReaddNeedChat: "Enter the Telegram group ID first.",
     telegramReaddReady: "Recovery invite ready. Fenrir opened a one-use Telegram link.",
     telegramReaddUnavailable: "Recovery invite could not be created. Check bot admin invite permissions.",
-    devRequestViaSignal: "Dev request via Frisky Signal",
+    devRequestViaSignal: "Support",
     devRequestViaSignalShort: "Frisky Signal",
     setupRoute: "Setup route",
     openingLaunchRoute: "Opening launch route",

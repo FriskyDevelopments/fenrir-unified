@@ -1161,6 +1161,66 @@ code {
   background: rgba(255,255,255,.04);
 }
 
+.bot-os-media {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.bot-os-media video {
+  display: block;
+  width: 100%;
+  background: #020407;
+}
+
+.bot-os-media-hero {
+  height: 100%;
+  min-height: 320px;
+  border: 1px solid rgba(138,245,222,.22);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.bot-os-media-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bot-os-media-grid figure {
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px;
+  background: rgba(4,12,14,.78);
+}
+
+.bot-os-media-grid video {
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.bot-os-media-grid figcaption {
+  padding: 7px 9px;
+  color: #8af5de;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  .bot-os-media {
+    grid-template-columns: 1fr;
+  }
+
+  .bot-os-media-hero {
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+  }
+}
+
 .bot-module-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

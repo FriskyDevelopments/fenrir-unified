@@ -20,6 +20,10 @@ const botToken = (env, channel) => {
 
 const normalizeText = (value) => (value || "").trim();
 const BRIDGE_TARGET = "bridge.myfenrir.com";
+// Account linking is owned by Fenrir Bridge. Community Bridge's /activate
+// screen previously asked for a six-character code that this bot never minted.
+const MYFENRIR_APP_URL = "https://www.myfenrir.com/main";
+const BOT_OS_WELCOME_VIDEO_URL = "https://www.myfenrir.com/bot-os/media/fenrir-welcome.mp4";
 
 const FENRIR_BOT_BRIEF = [
   "You are Fenrir Bot by Frisky.",
@@ -162,6 +166,32 @@ async function consumeTelegramLinkCode(env, code, message) {
   return { ok: true, friskyUserId: pending.frisky_user_id, friskyOrgId: pending.frisky_org_id };
 }
 
+async function notifyLinkConfirm(env, payload) {
+  const url = (env.FENRIR_LINK_CONFIRM_URL || "").trim();
+  const secret = (env.TELEGRAM_LINK_CONFIRM_SECRET || "").trim();
+  if (!url || !secret) return;
+  const body = JSON.stringify(payload);
+  const signature = await hmacHex(secret, body);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-fenrir-link-signature": signature },
+    body
+  });
+  if (!response.ok) throw new Error(`confirm_${response.status}`);
+}
+
+async function hmacHex(secret, data) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+  return [...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 function linkCodeFromStart(text) {
   const match = text.match(/^\/start\s+link_([a-z0-9_-]{8,64})$/i);
   return match?.[1] || "";
@@ -248,6 +278,49 @@ function menuIntent(text) {
   return /^\/(start|menu|help)\b/i.test(text) || /\b(menu|commands|modulos|módulos|ayuda|help)\b/i.test(text);
 }
 
+function commandForThisBot(text, command, env) {
+  const match = text.match(new RegExp(`^/${command}(?:@([A-Za-z0-9_]+))?(?:\\s|$)`, "i"));
+  if (!match) return false;
+  const target = normalizeText(match[1]).toLowerCase();
+  return !target || target === botUsername(env).toLowerCase();
+}
+
+async function sendTelegramLinkStart(env, channel, message) {
+  if (message.chat?.type && message.chat.type !== "private") {
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: message.chat.id,
+      text: "For security, send /link to me in a private chat."
+    });
+    return;
+  }
+
+  const menuButton = {
+    type: "web_app",
+    text: "Open MyFenrir",
+    web_app: { url: MYFENRIR_APP_URL }
+  };
+  try {
+    await telegramApi(env, channel, "setChatMenuButton", { menu_button: menuButton });
+  } catch (error) {
+    console.error("telegram_menu_button_failed", String(error));
+  }
+  await telegramApi(env, channel, "sendMessage", {
+    chat_id: message.chat.id,
+    text: [
+      "MyFenrir account linking",
+      "",
+      "1. Open MyFenrir and sign in.",
+      "2. In your dashboard, tap Link Telegram ID.",
+      "3. Telegram opens automatically to confirm — there is no code to copy.",
+      "",
+      "The Open MyFenrir Mini App button is now enabled in this chat."
+    ].join("\n"),
+    reply_markup: {
+      inline_keyboard: [[{ text: "Open MyFenrir", url: MYFENRIR_APP_URL }]]
+    }
+  });
+}
+
 function spanishIntent(text) {
   return /\b(si|sí|como|cómo|cuanto|precio|pagar|comprar|dominio|grupo|configurar|estado|activo|pagado|quiero|tengo)\b/i.test(text);
 }
@@ -295,9 +368,11 @@ function modularMenuText(text, entitlement) {
 }
 
 async function sendBotMenu(env, channel, message, entitlement) {
-  await telegramApi(env, channel, "sendMessage", {
+  const payload = {
     chat_id: message.chat.id,
-    text: modularMenuText(message.text || "", entitlement),
+    caption: modularMenuText(message.text || "", entitlement),
+    video: BOT_OS_WELCOME_VIDEO_URL,
+    supports_streaming: true,
     reply_markup: {
       inline_keyboard: [
         [
@@ -310,7 +385,17 @@ async function sendBotMenu(env, channel, message, entitlement) {
         ]
       ]
     }
-  });
+  };
+  try {
+    await telegramApi(env, channel, "sendVideo", payload);
+  } catch (error) {
+    console.error("bot_os_welcome_video_failed", String(error));
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: payload.chat_id,
+      text: payload.caption,
+      reply_markup: payload.reply_markup
+    });
+  }
 }
 
 function fallbackMind(text, entitlement) {
@@ -512,20 +597,33 @@ async function handleTelegramWebhook(request, env, url) {
 
   const entitlement = await getEntitlement(env, message.from?.id || message.chat.id);
 
-  if (menuIntent(text)) {
-    await sendBotMenu(env, channel, message, entitlement);
+  if (commandForThisBot(text, "link", env)) {
+    await sendTelegramLinkStart(env, channel, message);
     return json({ ok: true });
   }
 
   const linkCode = linkCodeFromStart(text);
   if (linkCode) {
     const result = await consumeTelegramLinkCode(env, linkCode, message);
+    if (result.ok) {
+      await notifyLinkConfirm(env, {
+        code: linkCode,
+        telegramId: String(message.from?.id || message.chat.id),
+        telegramUsername: message.from?.username || null,
+        telegramFirstName: message.from?.first_name || null
+      }).catch((error) => console.error("link_confirm_failed", String(error)));
+    }
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
       text: result.ok
         ? "Telegram identity linked to your Frisky ID. Fenrir can now connect this Telegram account to your workspace."
         : "This Fenrir link code is expired or invalid. Open MyFenrir and generate a fresh Telegram link."
     });
+    return json({ ok: true });
+  }
+
+  if (menuIntent(text)) {
+    await sendBotMenu(env, channel, message, entitlement);
     return json({ ok: true });
   }
 
@@ -578,6 +676,36 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/telegram/bot-health" && request.method === "GET") {
+      try {
+        const me = await telegramApi(env, "prod", "getMe", {});
+        const webhook = await telegramApi(env, "prod", "getWebhookInfo", {});
+        // Keep Telegram's global/default menu aligned with the canonical
+        // account-linking surface. This is idempotent and repairs BotFather or
+        // dashboard drift whenever the health monitor runs.
+        await telegramApi(env, "prod", "setChatMenuButton", {
+          menu_button: {
+            type: "web_app",
+            text: "Open MyFenrir",
+            web_app: { url: MYFENRIR_APP_URL }
+          }
+        });
+        const menu = await telegramApi(env, "prod", "getChatMenuButton", {});
+        const registered = normalizeText(webhook.result?.url);
+        const registeredUrl = registered ? new URL(registered) : null;
+        return json({
+          ok: true,
+          username: me.result?.username || null,
+          webhook: registeredUrl ? `${registeredUrl.origin}${registeredUrl.pathname}` : null,
+          pending: webhook.result?.pending_update_count ?? 0,
+          lastError: webhook.result?.last_error_message || null,
+          menuButton: menu.result || null
+        });
+      } catch {
+        return json({ ok: false, error: "telegram_bot_auth_failed" }, { status: 503 });
+      }
+    }
+
     if (url.pathname === "/api/telegram/webhook" && request.method === "POST") {
       // KILL SWITCH: BOT_SILENCE=1 → accept every update with 200 and send nothing
       // (halts a runaway spam loop instantly). Then ALWAYS 200: any thrown error
@@ -626,7 +754,7 @@ export default {
 
     // Telegram Mini App links must open the app shell, not the worker health response.
     if (url.pathname === "/" && request.method === "GET") {
-      return Response.redirect("https://www.myfenrir.com/gate/app", 302);
+      return Response.redirect(MYFENRIR_APP_URL, 302);
     }
 
     return json({ ok: true, service: "fenrir-stars-payments" });
