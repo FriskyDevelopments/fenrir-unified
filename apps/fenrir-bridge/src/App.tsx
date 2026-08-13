@@ -1154,7 +1154,11 @@ export function App() {
     const params = new URLSearchParams(window.location.search);
     const staleAuthError = params.get("auth_error");
     if (!staleAuthError) return;
-    if (staleAuthError.startsWith("missing_env:") || staleAuthError === "direct_oauth_disabled") {
+    if (
+      staleAuthError.startsWith("missing_env:") ||
+      staleAuthError === "direct_oauth_disabled" ||
+      staleAuthError === "supabase_session_failed:human_verification_required"
+    ) {
       params.delete("auth_error");
       const nextSearch = params.toString();
       window.history.replaceState({}, "", `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`);
@@ -3289,7 +3293,14 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
   const [authNote, setAuthNote] = useState<string | null>(() => authErrorMessage());
   const [pendingProvider, setPendingProvider] = useState<AuthProvider | null>(null);
   const [humanVerified, setHumanVerified] = useState(false);
-  const onHumanVerified = useCallback((verified: boolean) => setHumanVerified(verified), []);
+  const onHumanVerified = useCallback((verified: boolean) => {
+    setHumanVerified(verified);
+    if (!verified) return;
+    setAuthNote(null);
+    void authService.me().then((result) => {
+      if (result.data.authenticated) window.location.assign(managedDashboardPath);
+    });
+  }, []);
 
   async function signInWithProvider(provider: AuthProvider) {
     setAuthNote(null);
@@ -3418,6 +3429,7 @@ function authErrorMessage() {
     return `Could not read the Frisky login session after login. ${detail ? `(${detail})` : "Please retry from the sign-in screen."}`;
   }
   if (errorCode === "supabase_session_failed") {
+    if (detail === "human_verification_required") return null;
     return `Could not open a Fenrir admin session.${detail ? ` (${detail})` : ""}`;
   }
   if (errorCode === "missing_code") {

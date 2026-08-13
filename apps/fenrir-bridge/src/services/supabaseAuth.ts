@@ -18,6 +18,7 @@ const authRedirectOrigin = (import.meta.env.VITE_AUTH_REDIRECT_ORIGIN ?? "https:
 const authRedirectPath = (import.meta.env.VITE_AUTH_REDIRECT_PATH ?? "/auth/callback").trim();
 const fenrirManagedUrl = (import.meta.env.VITE_FENRIR_MANAGED_URL ?? "/main").trim();
 const postAuthDestinationKey = "fenrir_post_auth_destination";
+const humanVerificationRequired = "human_verification_required";
 
 function sanitizeRedirectPath(path: string) {
   if (!path) return "/auth/callback";
@@ -156,7 +157,18 @@ export async function completeSupabaseSession() {
     body: JSON.stringify({ accessToken })
   });
   if (!response.ok) {
-    setAuthCallbackError(`supabase_session_failed:${encodeURIComponent(await readResponseError(response))}`);
+    const responseError = await readResponseError(response);
+    if (response.status === 403 && responseError === humanVerificationRequired) {
+      // The provider callback is already safely stored in the Supabase client.
+      // Do not turn the expected pre-login gate into a user-facing auth error:
+      // clear callback material, show HumanVerification, then retry after it succeeds.
+      if (params.hasCallbackParams || isAuthCallbackPath(window.location.pathname)) {
+        clearCallbackParameters(params.hasCallbackParams);
+      }
+      clearDeferredVerificationError();
+      return false;
+    }
+    setAuthCallbackError(`supabase_session_failed:${encodeURIComponent(responseError)}`);
     return false;
   }
   if (params.hasCallbackParams || isAuthCallbackPath(window.location.pathname)) {
@@ -244,6 +256,15 @@ function setAuthCallbackError(code: string) {
     return;
   }
   window.history.replaceState({}, "", `${destinationPath}${nextSearch ? `?${nextSearch}` : ""}`);
+}
+
+function clearDeferredVerificationError() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("auth_error") !== `supabase_session_failed:${humanVerificationRequired}`) return;
+  params.delete("auth_error");
+  params.delete("auth_error_detail");
+  const nextSearch = params.toString();
+  window.history.replaceState({}, "", `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`);
 }
 
 const callbackParameterKeys = ["code", "error", "error_description", "state", "scope", "access_token", "id_token", "refresh_token", "token_type", "expires_in"];
