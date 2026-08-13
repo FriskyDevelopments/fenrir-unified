@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GateForm, SLUG_PATTERN, slugify, useSlugAvailability } from "@/components/gate/gate-form";
 import { CommunityStandardsStep, hasAcceptedStandards } from "@/components/gate/community-standards-step";
+import { CommunityArrival } from "@/components/gate/community-arrival";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/config/brand-context";
 import { createGate } from "@/lib/gate.functions";
@@ -54,6 +55,10 @@ function NewGatePage() {
     if (typeof window === "undefined") return false;
     const guided = new URLSearchParams(window.location.search).get("onboarding") === "1";
     return guided || !hasAcceptedStandards();
+  });
+  const [showArrival, setShowArrival] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("onboarding") === "1" && !hasAcceptedStandards();
   });
   const slugStatus = useSlugAvailability(config.slug);
 
@@ -109,6 +114,13 @@ function NewGatePage() {
   // Las normas van ANTES del builder: quien abre una puerta debe saber qué se
   // hace cumplir del otro lado antes de tener una puerta que administrar.
   if (showStandards) {
+    if (showArrival) {
+      return (
+        <div className="min-h-dvh bg-background">
+          <CommunityArrival onEnter={() => setShowArrival(false)} />
+        </div>
+      );
+    }
     return (
       <div className="min-h-dvh bg-background">
         <CommunityStandardsStep onAccept={() => setShowStandards(false)} />
