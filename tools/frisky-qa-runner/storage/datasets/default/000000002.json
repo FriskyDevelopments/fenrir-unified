@@ -1,0 +1,29 @@
+{
+	"type": "leg",
+	"viewport": "mobile",
+	"steps": [
+		{
+			"step": "landing",
+			"status": 200,
+			"finalUrl": "https://quality.myfenrir.com/",
+			"title": "Fenrir Bridge by Frisky",
+			"hasSilhouette": false,
+			"hasRoot": true,
+			"wrongDocsRoute": false
+		},
+		{
+			"step": "me_anon",
+			"status": 200,
+			"authenticated": false
+		},
+		{
+			"step": "authenticated_legs",
+			"verdict": "blocked",
+			"reason": "QA_SUPABASE_ACCESS_TOKEN secret not set"
+		}
+	],
+	"console": [],
+	"failed": [],
+	"badStatus": [],
+	"verdict": "partial-unauthenticated"
+}

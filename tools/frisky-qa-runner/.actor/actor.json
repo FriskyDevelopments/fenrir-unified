@@ -1,0 +1,17 @@
+{
+  "actorSpecification": 1,
+  "name": "frisky-qa-runner",
+  "title": "Frisky QA Runner — MyFenrir Quality E2E",
+  "description": "Playwright E2E for the MyFenrir Quality → Community Bridge Quality auth flow. Quality-only URLs. Credentials come exclusively from Apify Secrets (never input/code/logs).",
+  "version": "0.1",
+  "buildTag": "latest",
+  "input": "./INPUT_SCHEMA.json",
+  "dockerfile": "../Dockerfile",
+  "storages": {
+    "dataset": {
+      "actorSpecification": 1,
+      "title": "QA run artifacts",
+      "views": {}
+    }
+  }
+}

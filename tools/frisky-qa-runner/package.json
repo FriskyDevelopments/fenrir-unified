@@ -1,0 +1,16 @@
+{
+  "name": "frisky-qa-runner",
+  "version": "0.1.0",
+  "description": "Playwright E2E QA actor for MyFenrir Quality auth flow (Apify).",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node main.js",
+    "start:local": "node main.js"
+  },
+  "dependencies": {
+    "apify": "^3.2.6",
+    "playwright": "^1.47.0"
+  }
+}

@@ -1,0 +1,65 @@
+name = "myfenrir-emails"
+main = "src/index.ts"
+compatibility_date = "2026-06-25"
+compatibility_flags = ["nodejs_compat"]
+account_id = "e2a7eccb24c4836847fd14d08c499bd0"
+workers_dev = true
+
+# ---------------------------------------------------------------------------
+# Cloudflare Email Service — NATIVE outbound send binding (DEFAULT provider).
+# Gives env.EMAIL.send({ to, from, subject, html, text, attachments }).
+# No API keys/secrets for this path. Requires:
+#   - Workers Paid plan on the account
+#   - myfenrir.com onboarded in Email Service (Email Sending) — see DEPLOY.md
+# This binding is Workers-only. It CANNOT live in the fenrir-bridge *Pages*
+# project (wrangler rejects `send_email` for Pages), which is why this Worker
+# is the real home for outbound mail; Pages Functions call it over HTTP.
+# `remote = true` lets `wrangler dev` reach the real service via remote bindings.
+# ---------------------------------------------------------------------------
+[[send_email]]
+name = "EMAIL"
+remote = true
+
+# ---------------------------------------------------------------------------
+# Non-secret configuration. Secrets go via `wrangler secret put` (see DEPLOY.md):
+#   SEND_AUTH_TOKEN     -> bearer token that authorizes POST /send
+#   RESEND_API_KEY      -> only for the resend fallback
+#   MAILERSEND_API_KEY  -> only for the mailersend fallback
+# ---------------------------------------------------------------------------
+[vars]
+# Transport selector: "cloudflare" (default) | "resend" | "mailersend".
+# Per-request override allowed via body.provider.
+EMAIL_PROVIDER = "cloudflare"
+# Ordered fallback chain used automatically when the primary rail fails with an
+# infra error (no binding / no key / domain not configured / 5xx).
+EMAIL_FALLBACK = ""
+# Default envelope sender when a brand config doesn't specify one. Root domain
+# noreply@myfenrir.com is the identity that authenticates (SPF + DKIM). Do NOT
+# use mail.myfenrir.com (DMARC p=reject, no SPF/DKIM -> hard-rejected).
+DEFAULT_FROM_EMAIL = "noreply@mail.myfenrir.com"
+DEFAULT_FROM_NAME = "MyFenrir"
+DEFAULT_REPLY_TO = "hola@myfenrir.com"
+# Comma-separated brand ids allowed on /send (empty = allow all registered).
+ALLOWED_BRANDS = ""
+# Require the Authorization bearer on /send.
+REQUIRE_AUTH = "1"
+
+# Production route (optional): serve at emails.myfenrir.com once the DNS record
+# for that hostname exists in the myfenrir.com zone.
+[env.production]
+name = "myfenrir-emails"
+workers_dev = true
+route = { pattern = "emails.myfenrir.com/*", zone_name = "myfenrir.com" }
+
+[env.production.vars]
+EMAIL_PROVIDER = "cloudflare"
+EMAIL_FALLBACK = ""
+DEFAULT_FROM_EMAIL = "noreply@mail.myfenrir.com"
+DEFAULT_FROM_NAME = "MyFenrir"
+DEFAULT_REPLY_TO = "hola@myfenrir.com"
+ALLOWED_BRANDS = ""
+REQUIRE_AUTH = "1"
+
+[[env.production.send_email]]
+name = "EMAIL"
+remote = true
