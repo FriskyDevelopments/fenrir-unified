@@ -3320,9 +3320,9 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
             <div className="lovable-auth-card-line" aria-hidden="true" />
             <div className="lovable-auth-brand">
               <div className="lovable-auth-mark-shell">
-                <img src="/fenrir-splash-icon.svg" alt="MyFenrir logo" />
+                <img src="/fenrir-splash-icon.svg?v=20260813-login" alt="MyFenrir logo" />
               </div>
-              <img className="lovable-auth-wordmark" src="/fenrir-cut-wordmark.svg" alt="MyFenrir wordmark logo" />
+              <img className="lovable-auth-wordmark" src="/fenrir-cut-wordmark.svg?v=20260813-login" alt="MyFenrir wordmark logo" />
               <h1>Welcome back</h1>
               <p>Sign in to continue to MyFenrir</p>
             </div>
@@ -3357,7 +3357,7 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
         <div className="lovable-auth-secured">
           <p>Secured · End-to-end encrypted</p>
           <a href="https://myfenrir.com" aria-label="Powered by MyFenrir">
-            <img src="/fenrir-splash-icon.svg" alt="" />
+            <img src="/fenrir-splash-icon.svg?v=20260813-login" alt="" />
             <span>Powered by MyFenrir</span>
           </a>
         </div>
