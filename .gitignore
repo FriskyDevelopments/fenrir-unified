@@ -29,3 +29,6 @@ apps/fenrir-bridge/astelar/
 # Local checkout of the separately versioned Gatekeeper Worker. This path may
 # be a symlink, but must never encode a developer-specific absolute path in Git.
 apps/fenrir-gatekeeper-worker
+
+# Supabase CLI local state (cache, auth, temp) — never versioned.
+**/supabase/.temp/
