@@ -1310,6 +1310,13 @@ export function App() {
   }
 
   if (!state) {
+    // Quality has a deliberately small API surface. Do not leave a signed-in
+    // person on an indefinite boot screen just because the operational
+    // dashboard endpoints are intentionally absent there. The Quality MVP is
+    // the authenticated entry point and the real Community Bridge handoff.
+    if (host === "quality.myfenrir.com" && auth.authenticated && auth.user) {
+      return <QualityMvpHome auth={auth} />;
+    }
     return <div className="boot">{c.boot}</div>;
   }
 
@@ -2171,6 +2178,23 @@ export function App() {
         />
       )}
     </div>
+  );
+}
+
+function QualityMvpHome({ auth }: { auth: AuthSession }) {
+  const communityUrl = "https://quality.communities.myfenrir.com/";
+  return (
+    <main className="boot" style={{ minHeight: "calc(100vh - 44px)", padding: "48px 24px", textAlign: "center" }}>
+      <section style={{ maxWidth: 620 }}>
+        <p style={{ letterSpacing: ".14em", fontSize: 12, opacity: 0.72 }}>MYFENRIR · QUALITY</p>
+        <h1 style={{ margin: "12px 0" }}>Your Fenrir session is open.</h1>
+        <p style={{ margin: "0 0 28px", opacity: 0.8 }}>
+          Signed in as {auth.user?.email ?? "your MyFenrir identity"}. Community Bridge will use this same Quality session.
+        </p>
+        <a className="button" href={communityUrl}>Open Community Bridge</a>
+        <p style={{ marginTop: 18, fontSize: 13, opacity: 0.62 }}>Quality only · no production data or routes changed.</p>
+      </section>
+    </main>
   );
 }
 
