@@ -1092,6 +1092,7 @@ export function App() {
   const [fenrirRole, setFenrirRole] = useState<FenrirRole | null>(null);
   const [authInitError, setAuthInitError] = useState<string | null>(null);
   const [authAttempt, setAuthAttempt] = useState(0);
+  const [stateLoadError, setStateLoadError] = useState<string | null>(null);
 
   function triggerCelebration(title: string, detail: string, tone: Celebration["tone"]) {
     const id = Date.now();
@@ -1123,13 +1124,15 @@ export function App() {
     try {
       const result = await appService.load();
       setState(result.data);
+      setStateLoadError(null);
       setSelectedDomain((current) => current || result.data.domains[0]?.id || "");
       if (auth?.authenticated) {
         await refreshBilling();
         await refreshTelegramIdentity();
       }
-    } catch {
+    } catch (error) {
       setState(null);
+      setStateLoadError(error instanceof Error ? error.message : "command_center_unavailable");
     }
   }
 
@@ -1310,12 +1313,18 @@ export function App() {
   }
 
   if (!state) {
-    // Quality has a deliberately small API surface. Do not leave a signed-in
-    // person on an indefinite boot screen just because the operational
-    // dashboard endpoints are intentionally absent there. The Quality MVP is
-    // the authenticated entry point and the real Community Bridge handoff.
-    if (host === "quality.myfenrir.com" && auth.authenticated && auth.user) {
-      return <QualityMvpHome auth={auth} />;
+    if (stateLoadError) {
+      return (
+        <main className="boot boot-error" role="alert">
+          <b>MyFenrir could not load your command center.</b>
+          <span>Your identity is still active. This is a Quality data-route failure, not a new sign-in request.</span>
+          <div>
+            <button type="button" onClick={() => void refresh()}>Retry dashboard</button>
+            <a href="https://quality.communities.myfenrir.com/gates">Open Community Gates</a>
+          </div>
+          <small>{stateLoadError}</small>
+        </main>
+      );
     }
     return <div className="boot">{c.boot}</div>;
   }
@@ -2178,25 +2187,6 @@ export function App() {
         />
       )}
     </div>
-  );
-}
-
-function QualityMvpHome({ auth }: { auth: AuthSession }) {
-  const communityOrigin = "https://quality.communities.myfenrir.com";
-  return (
-    <main className="boot" style={{ minHeight: "calc(100vh - 44px)", padding: "48px 24px", textAlign: "center" }}>
-      <section style={{ maxWidth: 620 }}>
-        <p style={{ letterSpacing: ".14em", fontSize: 12, opacity: 0.72 }}>MYFENRIR · QUALITY</p>
-        <h1 style={{ margin: "12px 0" }}>Your Fenrir session is open.</h1>
-        <p style={{ margin: "0 0 28px", opacity: 0.8 }}>
-          Signed in as {auth.user?.email ?? "your MyFenrir identity"}. Your Community Bridge session is ready.
-        </p>
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 12 }}>
-          <a className="button" href={`${communityOrigin}/`}>Enter Community Bridge</a>
-        </div>
-        <p style={{ marginTop: 18, fontSize: 13, opacity: 0.62 }}>Quality only · no production data or routes changed.</p>
-      </section>
-    </main>
   );
 }
 
