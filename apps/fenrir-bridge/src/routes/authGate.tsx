@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { Copy, Locale } from "../i18n";
-import { webauthnService } from "../services/api";
+import { authService, webauthnService } from "../services/api";
 import { friskyClientAuthEngine, type AuthProvider } from "../services/authGateway";
 import { AuthProviderButton } from "../components/AuthProviderButton";
 import { AuthSurface } from "../components/AuthSurface";
@@ -14,7 +14,14 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
   const theme = brandThemes.fenrir;
   const [passkeyNote, setPasskeyNote] = useState<string | null>(() => authErrorMessage());
   const [humanVerified, setHumanVerified] = useState(false);
-  const onHumanVerified = useCallback((verified: boolean) => setHumanVerified(verified), []);
+  const onHumanVerified = useCallback((verified: boolean) => {
+    setHumanVerified(verified);
+    if (!verified) return;
+    setPasskeyNote(null);
+    void authService.me().then((result) => {
+      if (result.data.authenticated) window.location.assign(managedDashboardPath);
+    });
+  }, []);
 
   async function signInWithPasskey() {
     setPasskeyNote(null);
@@ -124,6 +131,7 @@ function authErrorMessage() {
     return `Could not read the Frisky login session after login. ${detail ? `(${detail})` : "Please retry from the sign-in screen."}`;
   }
   if (errorCode === "supabase_session_failed") {
+    if (detail === "human_verification_required") return null;
     return `Could not open a Fenrir admin session.${detail ? ` (${detail})` : ""}`;
   }
   if (errorCode === "missing_code") {

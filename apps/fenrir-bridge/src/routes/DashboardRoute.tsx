@@ -201,7 +201,11 @@ export function DashboardRoute() {
     const params = new URLSearchParams(window.location.search);
     const staleAuthError = params.get("auth_error");
     if (!staleAuthError) return;
-    if (staleAuthError.startsWith("missing_env:") || staleAuthError === "direct_oauth_disabled") {
+    if (
+      staleAuthError.startsWith("missing_env:") ||
+      staleAuthError === "direct_oauth_disabled" ||
+      staleAuthError === "supabase_session_failed:human_verification_required"
+    ) {
       params.delete("auth_error");
       const nextSearch = params.toString();
       window.history.replaceState({}, "", `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`);
