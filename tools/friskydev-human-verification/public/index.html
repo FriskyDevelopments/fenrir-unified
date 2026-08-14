@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Human verification</title>
     <link rel="stylesheet" href="/styles.css" />
-    <script async defer type="module" src="/vendor/altcha/main/altcha.i18n.js?v=friskydev-logo-1"></script>
+    <script defer type="module" src="/vendor/altcha/main/altcha.i18n.js?v=lore-mark-2"></script>
     <script defer type="module" src="/app.js"></script>
   </head>
   <body>
@@ -29,14 +29,18 @@
 
       <form id="verification-form" action="/api/verify" method="post">
         <input id="fallback-grant" type="hidden" name="fallbackGrant" value="">
-        <altcha-widget
-          challenge="/api/altcha/challenge"
-          name="altcha"
-          type="checkbox"
-          display="standard"
-          auto="off"
-          configuration='{"hideFooter":true,"hideLogo":false}'
-        ></altcha-widget>
+        <div class="altcha-shell">
+          <altcha-widget
+            challengeurl="/api/altcha/challenge"
+            name="altcha"
+            type="checkbox"
+            display="standard"
+            auto="onload"
+            hidefooter
+            hidelogo
+          ></altcha-widget>
+          <span class="lore-altcha-mark" aria-label="LORE verification">L</span>
+        </div>
         <div id="fallback-verified" class="fallback-verified" hidden><span aria-hidden="true">✓</span><strong>Verified by alternative challenge</strong></div>
         <button class="primary" type="submit" data-i18n="continue">Continue</button>
       </form>
