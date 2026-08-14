@@ -5,7 +5,6 @@ const glyphs = ["moon", "paw", "spark", "eye", "bolt", "diamond", "flame", "orbi
 const allowedAudiences = new Set([
   "https://friskydev-human-verification.zainxantoine.workers.dev",
   "https://quality.communities.myfenrir.com",
-  "https://lore.myfenrir.com",
 ]);
 
 const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), {

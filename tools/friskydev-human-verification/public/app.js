@@ -170,7 +170,7 @@ languageButtons.forEach((button) => button.addEventListener('click', async () =>
   if (!puzzleForm.hidden) await loadPuzzle();
 }));
 applyLanguage(currentLanguage);
-widget.setAttribute('challengeurl', verificationEndpoint('/api/altcha/challenge'));
+widget.setAttribute('challenge', verificationEndpoint('/api/altcha/challenge'));
 
 themeButtons.forEach((button) => button.addEventListener('click', () => {
   document.documentElement.dataset.theme = button.dataset.theme;
@@ -250,7 +250,7 @@ let signalFallbackTimer = window.setTimeout(() => {
     setStatus(t('failed'));
     showSlider.click();
   }
-}, 8000);
+}, 5000);
 
 widget.addEventListener('statechange', (event) => {
   if (event.detail?.state === 'verified') window.clearTimeout(signalFallbackTimer);
