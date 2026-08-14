@@ -1,12 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireCommunitySession } from "@/lib/authentik.functions";
 import { isUniqueViolation, neonSql } from "@/lib/neon.server";
 import type { GateConfig } from "@/lib/gate-presets";
 
 // Datos en Neon (cb_gate_configs); la sesión/identidad sigue siendo Supabase.
 const GATE_COLUMNS =
-  "slug, preset, headline, subheadline, logo_url, mascot_url, background_url";
+  "slug, preset, headline, subheadline, logo_url, mascot_url, background_url, rules_text, disclaimer_text, policy_version";
 const GATE_RECORD_COLUMNS = `id, updated_at, brand_id, community_id, ${GATE_COLUMNS}`;
 
 export interface GateRecord extends GateConfig {
@@ -56,12 +56,26 @@ const configSchema = tenantSchema.extend({
   logo_url: urlField,
   mascot_url: urlField,
   background_url: urlField,
+  rules_text: z.string().trim().max(6000),
+  disclaimer_text: z.string().trim().max(1600),
+  policy_version: z.number().int().min(1).max(999).default(1),
 });
 
 const SLUG_TAKEN = "That gate address is already taken — pick another one.";
 const WRONG_TENANT = "That gate belongs to a different brand.";
 
 type GateRow = Record<string, unknown>;
+
+/**
+ * Quality began with visual-only gates. Keep the schema upgrade additive and
+ * idempotent so existing owner records remain live while Rules/Disclaimer
+ * become first-class Gate data.
+ */
+async function ensureGatePolicyColumns(sql: ReturnType<typeof neonSql>) {
+  await sql`alter table cb_gate_configs add column if not exists rules_text text not null default ''`;
+  await sql`alter table cb_gate_configs add column if not exists disclaimer_text text not null default ''`;
+  await sql`alter table cb_gate_configs add column if not exists policy_version integer not null default 1`;
+}
 
 function toRecord(row: GateRow): GateRecord {
   return {
@@ -76,6 +90,9 @@ function toRecord(row: GateRow): GateRecord {
     logo_url: (row["logo_url"] as string | null) ?? null,
     mascot_url: (row["mascot_url"] as string | null) ?? null,
     background_url: (row["background_url"] as string | null) ?? null,
+    rules_text: String(row["rules_text"] ?? ""),
+    disclaimer_text: String(row["disclaimer_text"] ?? ""),
+    policy_version: Number(row["policy_version"] ?? 1),
   } as GateRecord;
 }
 
@@ -89,12 +106,13 @@ function toRecord(row: GateRow): GateRecord {
  * remains mandatory, so this never crosses account boundaries.
  */
 export const listMyGates = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireCommunitySession])
   .inputValidator(() => undefined)
   .handler(async ({ context }) => {
     const sql = neonSql();
+    await ensureGatePolicyColumns(sql);
     const rows = (await sql`
-      select id, updated_at, brand_id, community_id, slug, preset, headline, subheadline, logo_url, mascot_url, background_url
+      select id, updated_at, brand_id, community_id, slug, preset, headline, subheadline, logo_url, mascot_url, background_url, rules_text, disclaimer_text, policy_version
       from cb_gate_configs
       where user_id = ${context.userId}
       order by created_at asc
@@ -104,14 +122,15 @@ export const listMyGates = createServerFn({ method: "GET" })
 
 /** One gate owned by the signed-in user in this brand (null otherwise). */
 export const getMyGate = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireCommunitySession])
   .inputValidator((data) =>
     z.object({ id: z.string().uuid(), brand_id: tenantField }).parse(data),
   )
   .handler(async ({ context, data }) => {
     const sql = neonSql();
+    await ensureGatePolicyColumns(sql);
     const rows = (await sql`
-      select id, updated_at, brand_id, community_id, slug, preset, headline, subheadline, logo_url, mascot_url, background_url
+      select id, updated_at, brand_id, community_id, slug, preset, headline, subheadline, logo_url, mascot_url, background_url, rules_text, disclaimer_text, policy_version
       from cb_gate_configs
       where id = ${data.id} and user_id = ${context.userId} and brand_id = ${data.brand_id}
       limit 1
@@ -125,12 +144,13 @@ export const getMyGate = createServerFn({ method: "GET" })
  * tenant-scoped — it only ever returns a boolean.
  */
 export const checkSlugAvailable = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireCommunitySession])
   .inputValidator((data) =>
     z.object({ slug: slugField, excludeId: z.string().uuid().optional() }).parse(data),
   )
   .handler(async ({ data }) => {
     const sql = neonSql();
+    await ensureGatePolicyColumns(sql);
     const rows = (await (data.excludeId
       ? sql`select id from cb_gate_configs where slug = ${data.slug} and id <> ${data.excludeId} limit 1`
       : sql`select id from cb_gate_configs where slug = ${data.slug} limit 1`)) as GateRow[];
@@ -138,15 +158,16 @@ export const checkSlugAvailable = createServerFn({ method: "GET" })
   });
 
 export const createGate = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireCommunitySession])
   .inputValidator((data) => configSchema.parse(data))
   .handler(async ({ context, data }) => {
     const sql = neonSql();
+    await ensureGatePolicyColumns(sql);
     try {
       const rows = (await sql`
-        insert into cb_gate_configs (user_id, brand_id, community_id, slug, preset, headline, subheadline, logo_url, mascot_url, background_url)
-        values (${context.userId}, ${data.brand_id}, ${data.community_id ?? data.brand_id}, ${data.slug}, ${data.preset}, ${data.headline}, ${data.subheadline}, ${data.logo_url}, ${data.mascot_url}, ${data.background_url})
-        returning id, updated_at, brand_id, community_id, slug, preset, headline, subheadline, logo_url, mascot_url, background_url
+        insert into cb_gate_configs (user_id, brand_id, community_id, slug, preset, headline, subheadline, logo_url, mascot_url, background_url, rules_text, disclaimer_text, policy_version)
+        values (${context.userId}, ${data.brand_id}, ${data.community_id ?? data.brand_id}, ${data.slug}, ${data.preset}, ${data.headline}, ${data.subheadline}, ${data.logo_url}, ${data.mascot_url}, ${data.background_url}, ${data.rules_text}, ${data.disclaimer_text}, ${data.policy_version})
+        returning id, updated_at, brand_id, community_id, slug, preset, headline, subheadline, logo_url, mascot_url, background_url, rules_text, disclaimer_text, policy_version
       `) as GateRow[];
       return toRecord(rows[0]!);
     } catch (error) {
@@ -155,19 +176,21 @@ export const createGate = createServerFn({ method: "POST" })
   });
 
 export const updateGate = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireCommunitySession])
   .inputValidator((data) => configSchema.extend({ id: z.string().uuid() }).parse(data))
   .handler(async ({ context, data }) => {
     const sql = neonSql();
+    await ensureGatePolicyColumns(sql);
     try {
       const rows = (await sql`
         update cb_gate_configs
         set slug = ${data.slug}, preset = ${data.preset}, headline = ${data.headline},
             subheadline = ${data.subheadline}, logo_url = ${data.logo_url},
             mascot_url = ${data.mascot_url}, background_url = ${data.background_url},
+            rules_text = ${data.rules_text}, disclaimer_text = ${data.disclaimer_text}, policy_version = ${data.policy_version},
             community_id = ${data.community_id ?? data.brand_id}, updated_at = now()
         where id = ${data.id} and user_id = ${context.userId} and brand_id = ${data.brand_id}
-        returning id, updated_at, brand_id, community_id, slug, preset, headline, subheadline, logo_url, mascot_url, background_url
+        returning id, updated_at, brand_id, community_id, slug, preset, headline, subheadline, logo_url, mascot_url, background_url, rules_text, disclaimer_text, policy_version
       `) as GateRow[];
       if (!rows[0]) throw new Error(WRONG_TENANT);
       return toRecord(rows[0]);
@@ -177,12 +200,13 @@ export const updateGate = createServerFn({ method: "POST" })
   });
 
 export const deleteGate = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireCommunitySession])
   .inputValidator((data) =>
     z.object({ id: z.string().uuid(), brand_id: tenantField }).parse(data),
   )
   .handler(async ({ context, data }) => {
     const sql = neonSql();
+    await ensureGatePolicyColumns(sql);
     const rows = (await sql`
       delete from cb_gate_configs
       where id = ${data.id} and user_id = ${context.userId} and brand_id = ${data.brand_id}
@@ -197,8 +221,9 @@ export const getPublicGate = createServerFn({ method: "GET" })
   .inputValidator((data) => z.object({ slug: z.string().trim().max(60) }).parse(data))
   .handler(async ({ data }) => {
     const sql = neonSql();
+    await ensureGatePolicyColumns(sql);
     const rows = (await sql`
-      select slug, preset, headline, subheadline, logo_url, mascot_url, background_url
+      select id, brand_id, slug, preset, headline, subheadline, logo_url, mascot_url, background_url, rules_text, disclaimer_text, policy_version
       from cb_gate_configs
       where slug = ${data.slug.toLowerCase()}
       limit 1
@@ -206,6 +231,8 @@ export const getPublicGate = createServerFn({ method: "GET" })
     const row = rows[0];
     if (!row) return null;
     return {
+      id: String(row["id"]),
+      brand_id: String(row["brand_id"]),
       slug: String(row["slug"]),
       preset: String(row["preset"]),
       headline: String(row["headline"]),
@@ -213,5 +240,8 @@ export const getPublicGate = createServerFn({ method: "GET" })
       logo_url: (row["logo_url"] as string | null) ?? null,
       mascot_url: (row["mascot_url"] as string | null) ?? null,
       background_url: (row["background_url"] as string | null) ?? null,
+      rules_text: String(row["rules_text"] ?? ""),
+      disclaimer_text: String(row["disclaimer_text"] ?? ""),
+      policy_version: Number(row["policy_version"] ?? 1),
     } as GateConfig;
   });

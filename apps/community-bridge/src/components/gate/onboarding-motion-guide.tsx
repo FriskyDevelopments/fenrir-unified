@@ -12,7 +12,7 @@ const steps = [
   },
   {
     title: "Link Telegram",
-    body: "After publishing, MyFenrir gives you a one-time bot handoff to link your Telegram ID and add the bot to your group.",
+    body: "Add Fenrir to the group, then promote it. Fenrir confirms the exact Telegram community name in the group before this Gate is ready to share.",
     icon: Bot,
   },
   {
@@ -78,7 +78,7 @@ export function OnboardingMotionGuide() {
         {active === steps.length - 1 ? <Check className="ml-auto h-4 w-4 shrink-0 text-primary" aria-label="Final setup step" /> : null}
       </motion.div>
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
-        <p className="text-xs text-muted-foreground">{active === 0 ? "Start by choosing the gate people will recognize." : active === 1 ? "Telegram is linked only after your gate exists." : "Run the member journey before sharing it."}</p>
+        <p className="text-xs text-muted-foreground">{active === 0 ? "Start by choosing the gate people will recognize." : active === 1 ? "Telegram confirms the real group name after the owner promotes Fenrir." : "Run the member journey before sharing it."}</p>
         {active < steps.length - 1 ? <button type="button" onClick={() => setActive((step) => step + 1)} className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80">Next <ArrowRight className="h-3.5 w-3.5" /></button> : <Link to="/upgrade" className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80">Upgrade options <ArrowRight className="h-3.5 w-3.5" /></Link>}
       </div>
     </section>

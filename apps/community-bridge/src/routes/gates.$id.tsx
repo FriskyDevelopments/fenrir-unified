@@ -7,10 +7,12 @@ import { isDemoMode } from "@/config/demo-mode";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GateForm, SLUG_PATTERN, useSlugAvailability } from "@/components/gate/gate-form";
+import { GateInviteControls } from "@/components/gate/gate-invite-controls";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/config/brand-context";
 import { getSiteUrl } from "@/config/site-url";
 import { deleteGate, getMyGate, updateGate } from "@/lib/gate.functions";
+import { isCommunitySessionError } from "@/lib/authentik.functions";
 import type { GateConfig } from "@/lib/gate-presets";
 
 export const Route = createFileRoute("/gates/$id")({
@@ -37,7 +39,7 @@ export const Route = createFileRoute("/gates/$id")({
 
 function EditGatePage() {
   const { id } = Route.useParams();
-  const { session, loading } = useAuth();
+  const { authenticated, loading } = useAuth();
   const brand = useBrand();
   const navigate = useNavigate();
   const fetchGate = useServerFn(getMyGate);
@@ -52,8 +54,8 @@ function EditGatePage() {
 
   useEffect(() => {
     if (loading) return;
-    if (!session) {
-      navigate({ to: "/login", search: { next: undefined } });
+    if (!authenticated) {
+      navigate({ to: "/login", search: { next: `/gates/${id}` } });
       return;
     }
     // Demo mode has no real bearer token; skip the protected fetch.
@@ -80,13 +82,17 @@ function EditGatePage() {
       })
       .catch((error: unknown) => {
         if (!active) return;
+        if (isCommunitySessionError(error)) {
+          void navigate({ to: "/login", search: { next: `/gates/${id}` } });
+          return;
+        }
         toast.error(error instanceof Error ? error.message : "Could not load gate");
         setMissing(true);
       });
     return () => {
       active = false;
     };
-  }, [loading, session, id, fetchGate, navigate, brand.id]);
+  }, [loading, authenticated, id, fetchGate, navigate, brand.id]);
 
   const onSave = async () => {
     if (!config) return;
@@ -107,6 +113,10 @@ function EditGatePage() {
       setConfig(rest);
       toast.success("Gate updated");
     } catch (error) {
+      if (isCommunitySessionError(error)) {
+        void navigate({ to: "/login", search: { next: `/gates/${id}` } });
+        return;
+      }
       toast.error(error instanceof Error ? error.message : "Could not update gate");
     } finally {
       setSaving(false);
@@ -120,6 +130,10 @@ function EditGatePage() {
       toast.success("Gate deleted");
       navigate({ to: "/gates" });
     } catch (error) {
+      if (isCommunitySessionError(error)) {
+        void navigate({ to: "/login", search: { next: `/gates/${id}` } });
+        return;
+      }
       toast.error(error instanceof Error ? error.message : "Could not delete gate");
     } finally {
       setDeleting(false);
@@ -188,6 +202,7 @@ function EditGatePage() {
           onChange={(next) => setConfig(next)}
           slugStatus={slugStatus}
         />
+        <GateInviteControls gateId={id} />
       </main>
     </div>
   );

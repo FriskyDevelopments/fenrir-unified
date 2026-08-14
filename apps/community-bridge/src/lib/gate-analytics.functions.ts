@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie, setCookie } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireCommunitySession } from "@/lib/authentik.functions";
 import { neonSql } from "@/lib/neon.server";
 
 // Vistas de gates en Neon (cb_gate_views); la sesión sigue siendo Supabase.
@@ -112,7 +112,7 @@ export const recordGateView = createServerFn({ method: "POST" })
 
 /** Per-gate view stats for every gate the signed-in user owns. */
 export const getMyGateViewStats = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireCommunitySession])
   .inputValidator(() => undefined)
   .handler(async ({ context }) => {
     const sql = neonSql();

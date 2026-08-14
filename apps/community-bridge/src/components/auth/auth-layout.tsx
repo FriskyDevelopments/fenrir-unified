@@ -7,6 +7,7 @@ import { BrandSyncStatus } from "@/components/brand/brand-sync-status";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/config/brand-context";
 import { getPreset } from "@/lib/gate-presets";
+import { motion, MotionConfig } from "motion/react";
 
 
 export function AuthLayout({
@@ -30,19 +31,24 @@ export function AuthLayout({
     new URLSearchParams(window.location.search).has("brand");
 
   return (
+    <MotionConfig reducedMotion="user">
     <div
       className="relative isolate flex min-h-dvh flex-col items-center justify-center overflow-hidden px-6 py-14"
       style={{ background: preset.atmosphere }}
     >
       {/* Gate-matched atmosphere: accent glow + faint grid, never a flat fill */}
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div
+        <motion.div
           className="absolute -top-[10%] left-1/2 h-[55%] w-[70%] -translate-x-1/2 rounded-full blur-[140px]"
           style={{ background: `color-mix(in oklab, ${preset.accent} 16%, transparent)` }}
+          animate={{ x: ["-50%", "-44%", "-52%"], y: [0, 24, 0], scale: [1, 1.08, 1] }}
+          transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
         />
-        <div
+        <motion.div
           className="absolute -bottom-[15%] right-[-10%] h-[50%] w-[55%] rounded-full blur-[140px]"
           style={{ background: `color-mix(in oklab, ${preset.accent} 10%, transparent)` }}
+          animate={{ x: [0, -32, 0], y: [0, -18, 0], scale: [1, 1.12, 1] }}
+          transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }}
         />
         <div
           aria-hidden="true"
@@ -64,7 +70,12 @@ export function AuthLayout({
           {isStaff || previewing ? <BrandSyncStatus /> : null}
         </div>
         {/* Terminal */}
-        <div className="group relative">
+        <motion.div
+          className="group relative"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+        >
           <div
             aria-hidden="true"
             className="absolute -inset-px rounded-2xl opacity-40 blur-md transition duration-700 group-hover:opacity-70"
@@ -73,10 +84,15 @@ export function AuthLayout({
           <div className="relative">
             <TerminalTyper />
           </div>
-        </div>
+        </motion.div>
 
         {/* Auth card */}
-        <div className="relative">
+        <motion.div
+          className="relative"
+          initial={{ opacity: 0, y: 20, scale: 0.985 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.55, delay: 0.08, ease: "easeOut" }}
+        >
           <div
             aria-hidden="true"
             className="absolute -inset-8 rounded-[2.25rem] opacity-30 blur-3xl"
@@ -114,7 +130,7 @@ export function AuthLayout({
               {children}
             </div>
           </Card>
-        </div>
+        </motion.div>
 
         {footer ? (
           <div className="text-center text-xs text-muted-foreground">{footer}</div>
@@ -130,5 +146,6 @@ export function AuthLayout({
         </div>
       </div>
     </div>
+    </MotionConfig>
   );
 }

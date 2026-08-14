@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GateForm, SLUG_PATTERN, slugify, useSlugAvailability } from "@/components/gate/gate-form";
-import { CommunityStandardsStep, hasAcceptedStandards } from "@/components/gate/community-standards-step";
+import { CommunityStandardsStep } from "@/components/gate/community-standards-step";
 import { OnboardingMotionGuide } from "@/components/gate/onboarding-motion-guide";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/config/brand-context";
@@ -14,9 +14,11 @@ import { getSiteUrl } from "@/config/site-url";
 import { createGate } from "@/lib/gate.functions";
 import { DEFAULT_GATE, type GateConfig } from "@/lib/gate-presets";
 import { isDemoMode } from "@/config/demo-mode";
+import { acceptHostStandards, getHostStandardsAcceptance } from "@/lib/gate-onboarding.functions";
+import { needsHostStandardsAcceptance } from "@/lib/gate-onboarding";
 
 const TELEGRAM_BOT_USERNAME =
-  (import.meta.env["VITE_TELEGRAM_BOT_USERNAME"] as string | undefined) ?? "Myfenrir_bot";
+  (import.meta.env["VITE_TELEGRAM_BOT_USERNAME"] as string | undefined) ?? "MyfenrirprotocolDEVbot";
 const TELEGRAM_BOT_URL = `https://t.me/${TELEGRAM_BOT_USERNAME}`;
 
 export const Route = createFileRoute("/gate")({
@@ -46,26 +48,23 @@ export const Route = createFileRoute("/gate")({
 });
 
 function NewGatePage() {
-  const { session, loading, user } = useAuth();
+  const { authenticated, loading, user, community } = useAuth();
   const navigate = useNavigate();
   const persist = useServerFn(createGate);
+  const fetchStandardsAcceptance = useServerFn(getHostStandardsAcceptance);
+  const persistStandardsAcceptance = useServerFn(acceptHostStandards);
   const brand = useBrand();
 
   const [config, setConfig] = useState<GateConfig>({ slug: "", ...DEFAULT_GATE });
   const [saving, setSaving] = useState(false);
   const [createdGate, setCreatedGate] = useState<{ id: string; slug: string } | null>(null);
-  // Se muestran una vez por navegador, y siempre en el primer arranque guiado
-  // (?onboarding=1 desde el dashboard de MyFenrir).
-  const [showStandards, setShowStandards] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const guided = new URLSearchParams(window.location.search).get("onboarding") === "1";
-    return guided || !hasAcceptedStandards();
-  });
+  const [showStandards, setShowStandards] = useState<boolean | null>(null);
+  const [acceptingStandards, setAcceptingStandards] = useState(false);
   const slugStatus = useSlugAvailability(config.slug);
 
   useEffect(() => {
     if (loading) return;
-    if (!session) {
+    if (!authenticated) {
       navigate({
         to: "/login",
         search: { next: `${window.location.pathname}${window.location.search}` },
@@ -74,10 +73,45 @@ function NewGatePage() {
     }
     setConfig((c) => {
       if (c.slug) return c;
-      const fallback = slugify((user?.email ?? "my-gate").split("@")[0] ?? "my-gate");
+      const fallback = slugify((user?.email ?? community?.email ?? "my-gate").split("@")[0] ?? "my-gate");
       return { ...c, slug: fallback.length >= 3 ? fallback : "my-gate" };
     });
-  }, [loading, session, user?.email, navigate]);
+  }, [loading, authenticated, user?.email, community?.email, navigate]);
+
+  useEffect(() => {
+    if (loading || !authenticated) return;
+    if (isDemoMode()) {
+      setShowStandards(true);
+      return;
+    }
+    let active = true;
+    void fetchStandardsAcceptance()
+      .then(({ acceptedVersion }) => {
+        if (active) setShowStandards(needsHostStandardsAcceptance(acceptedVersion));
+      })
+      .catch((error) => {
+        if (!active) return;
+        toast.error(error instanceof Error ? error.message : "Could not check standards acceptance");
+        setShowStandards(true);
+      });
+    return () => { active = false; };
+  }, [loading, authenticated, fetchStandardsAcceptance]);
+
+  const onAcceptStandards = async () => {
+    if (isDemoMode()) {
+      setShowStandards(false);
+      return;
+    }
+    setAcceptingStandards(true);
+    try {
+      const result = await persistStandardsAcceptance();
+      setShowStandards(needsHostStandardsAcceptance(result.acceptedVersion));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not record acceptance");
+    } finally {
+      setAcceptingStandards(false);
+    }
+  };
 
   const onSave = async () => {
     if (!SLUG_PATTERN.test(config.slug)) {
@@ -107,7 +141,7 @@ function NewGatePage() {
     }
   };
 
-  if (loading || !session) {
+  if (loading || !authenticated || showStandards === null) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -120,7 +154,7 @@ function NewGatePage() {
   if (showStandards) {
     return (
       <div className="min-h-dvh bg-background">
-        <CommunityStandardsStep onAccept={() => setShowStandards(false)} />
+        <CommunityStandardsStep onAccept={() => void onAcceptStandards()} accepting={acceptingStandards} />
       </div>
     );
   }
@@ -132,9 +166,9 @@ function NewGatePage() {
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/15 text-primary">
             <Check className="h-5 w-5" />
           </div>
-          <h1 className="mt-5 text-2xl font-semibold tracking-tight">Your gate is live</h1>
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight">Gate created — finish Telegram setup</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            We created <span className="font-medium text-foreground">/{createdGate.slug}</span> for your community.
+            <span className="font-medium text-foreground">/{createdGate.slug}</span> is not marked live until Fenrir is linked to its Telegram group and has the permissions you approve.
           </p>
           <div className="mt-6 rounded-xl border border-border bg-card/60 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Account email</p>
@@ -148,20 +182,20 @@ function NewGatePage() {
               <div>
                 <h2 className="text-base font-semibold text-foreground">Set up Fenrir in your Telegram group</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Connect the gate to the group it will protect, then test the complete member journey.
+                  Connect this Gate to the group it will protect. Telegram requires the group owner to promote the bot; Fenrir cannot grant itself any permission.
                 </p>
               </div>
             </div>
             <ol className="mt-5 space-y-4 text-sm text-foreground">
-              <li className="flex gap-3"><span className="font-semibold text-primary">1.</span><span>Open <strong>@{TELEGRAM_BOT_USERNAME}</strong> in a private chat and send <code className="rounded bg-background px-1.5 py-0.5 font-mono text-xs">/link</code>. Fenrir will enable the MyFenrir Mini App button and guide you through secure account linking.</span></li>
-              <li className="flex gap-3"><span className="font-semibold text-primary">2.</span><span>Add Fenrir to the Telegram group connected to this gate.</span></li>
-              <li className="flex gap-3"><span className="font-semibold text-primary">3.</span><span>Promote Fenrir to administrator and enable <strong>Invite Users</strong> so it can manage gate access.</span></li>
-              <li className="flex gap-3"><span className="font-semibold text-primary">4.</span><span>Return to MyFenrir, check the bot permissions, then open the live gate and test it with a member account.</span></li>
+              <li className="flex gap-3"><span className="font-semibold text-primary">1.</span><span>Open <strong>@{TELEGRAM_BOT_USERNAME}</strong>. Its native Mini App links your Telegram identity to this Gate.</span></li>
+              <li className="flex gap-3"><span className="font-semibold text-primary">2.</span><span>Add Fenrir to the Telegram group connected to <strong>/{createdGate.slug}</strong>.</span></li>
+              <li className="flex gap-3"><span className="font-semibold text-primary">3.</span><span>As the group owner, promote Fenrir to administrator. Enable only the permissions this Gate needs — at minimum <strong>Invite Users</strong>; add moderation permissions only when you enable those rules.</span></li>
+              <li className="flex gap-3"><span className="font-semibold text-primary">4.</span><span>Open the Mini App again and test the member journey. Only then is the Gate ready to share.</span></li>
             </ol>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button asChild variant="fenrir">
-                <a href={`${TELEGRAM_BOT_URL}?start=link`} target="_blank" rel="noreferrer">
-                  Open Fenrir bot <ExternalLink className="ml-2 h-4 w-4" />
+                <a href={`${TELEGRAM_BOT_URL}?start=gate_${createdGate.slug}`} target="_blank" rel="noreferrer">
+                  Open Gate Mini App <ExternalLink className="ml-2 h-4 w-4" />
                 </a>
               </Button>
               <Button asChild variant="outline">
@@ -169,8 +203,7 @@ function NewGatePage() {
                   Add bot to group <ExternalLink className="ml-2 h-4 w-4" />
                 </a>
               </Button>
-              <Button asChild variant="outline"><a href="https://myfenrir.com/main">Link Telegram account</a></Button>
-              <Button asChild variant="ghost"><Link to="/dashboard"><ShieldCheck className="mr-2 h-4 w-4" />Check permissions</Link></Button>
+              <Button asChild variant="ghost"><Link to="/gates"><ShieldCheck className="mr-2 h-4 w-4" />Return to My Gates</Link></Button>
             </div>
           </div>
           <div className="mt-6 rounded-xl border border-primary/30 bg-primary/10 p-5">

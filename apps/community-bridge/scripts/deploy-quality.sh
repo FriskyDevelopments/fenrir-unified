@@ -23,7 +23,7 @@ cd "$APP_DIR"
 
 WORKER_NAME="community-bridge-quality"
 SITE_URL="https://quality.communities.myfenrir.com"
-TELEGRAM_DEV_BOT_USERNAME="${VITE_TELEGRAM_BOT_USERNAME:-MyfenrirprotocolDEVbot}"
+TELEGRAM_DEV_BOT_USERNAME="${VITE_TELEGRAM_BOT_USERNAME:-Myfenrirdevbot}"
 ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-e2a7eccb24c4836847fd14d08c499bd0}"
 
 echo "==> Building $WORKER_NAME for $SITE_URL with DEV bot @$TELEGRAM_DEV_BOT_USERNAME"

@@ -92,7 +92,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", type: "image/png", href: "/favicon.png" },
+      // `/favicon.png` is the inherited ClipsFlow asset.  Community Bridge
+      // must use the shipped Fenrir mark on every Quality and production host.
+      { rel: "icon", type: "image/svg+xml", href: "/fenrir-mark.svg?v=20260814" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

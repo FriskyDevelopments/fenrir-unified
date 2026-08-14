@@ -16,9 +16,17 @@ create table if not exists cb_gate_configs (
   logo_url text,
   mascot_url text,
   background_url text,
+  rules_text text not null default '',
+  disclaimer_text text not null default '',
+  policy_version integer not null default 1,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Existing Quality databases are upgraded safely by the application as well;
+-- these remain here for fresh installs and operator-run schema updates.
+alter table cb_gate_configs add column if not exists rules_text text not null default '';
+alter table cb_gate_configs add column if not exists disclaimer_text text not null default '';
+alter table cb_gate_configs add column if not exists policy_version integer not null default 1;
 create index if not exists cb_gate_configs_owner_idx on cb_gate_configs (user_id, brand_id);
 
 create table if not exists cb_gate_views (
@@ -30,6 +38,18 @@ create table if not exists cb_gate_views (
   unique (gate_id, visitor_key)
 );
 create index if not exists cb_gate_views_gate_time_idx on cb_gate_views (gate_id, viewed_at);
+
+-- Rotatable, revocable access links. The token is the only public identifier;
+-- rotating a Gate revokes the previous token before a replacement is issued.
+create table if not exists cb_gate_invites (
+  token text primary key,
+  gate_id uuid not null references cb_gate_configs(id) on delete cascade,
+  status text not null check (status in ('active', 'revoked')) default 'active',
+  created_at timestamptz not null default now(),
+  revoked_at timestamptz
+);
+create unique index if not exists cb_gate_invites_one_active_per_gate
+  on cb_gate_invites (gate_id) where status = 'active';
 
 create table if not exists cb_brand_tenants (
   id uuid primary key default gen_random_uuid(),
@@ -125,3 +145,32 @@ create table if not exists cb_blocked_terms (
   created_at timestamptz not null default now()
 );
 create index if not exists cb_blocked_terms_kind_idx on cb_blocked_terms (match_kind);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Identidad de comunidad: mapeo persistente Authentik `sub` → `user_id`.
+-- Community Bridge es UNA organización de comunidad. La identidad OIDC nueva
+-- (Authentik) se traduce a la clave de propiedad ya existente (`user_id`), que
+-- es la MISMA que viven en cb_gate_configs.user_id, public.user_roles.user_id
+-- y public.account_links.supabase_user_id. No se fabrica una sesión de Supabase
+-- para ocultar esta migración: el vínculo queda explícito y persistente aquí.
+create table if not exists cb_identity_map (
+  authentik_sub text primary key,
+  user_id uuid not null,
+  email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists cb_identity_map_user_idx on cb_identity_map (user_id);
+create index if not exists cb_identity_map_email_idx on cb_identity_map (lower(email));
+
+-- Evidencia de migración: un dueño existente conserva sus Gates tras el primer
+-- login Authentik. Su `sub` queda mapeado al MISMO `user_id` que ya tenían sus
+-- Gates (reconciliado por email contra la identidad Supabase), de modo que:
+--
+--   select m.authentik_sub, m.user_id, count(g.id) as gates
+--   from cb_identity_map m
+--   left join cb_gate_configs g on g.user_id = m.user_id
+--   group by m.authentik_sub, m.user_id;
+--
+-- La fila de un dueño existente debe mostrar el mismo número de Gates que antes
+-- de la migración (nunca 0 para quien ya tenía Gates).

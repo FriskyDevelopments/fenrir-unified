@@ -5,14 +5,12 @@ import { getCommunityStandards, type StandardsRule } from "@/config/community-st
 
 /**
  * Primer paso del onboarding: las normas que el operador acepta antes de
- * construir su gate. Se muestra una vez (queda registrado en localStorage) y
+ * construir su gate. La ruta persiste la aceptación por cuenta y versión; y
  * en el idioma del navegador — en · es · fr · de.
  *
  * Va ANTES del builder a propósito: quien abre una puerta debe saber qué se
  * hace cumplir del otro lado antes de tener una puerta que administrar.
  */
-
-const ACK_KEY = "myfenrir-community-standards-accepted";
 
 const TONE: Record<StandardsRule["tone"], { icon: typeof ShieldCheck; className: string }> = {
   allow: { icon: ShieldCheck, className: "text-emerald-400 border-emerald-400/30 bg-emerald-400/5" },
@@ -20,26 +18,11 @@ const TONE: Record<StandardsRule["tone"], { icon: typeof ShieldCheck; className:
   duty: { icon: Scale, className: "text-amber-400 border-amber-400/30 bg-amber-400/5" },
 };
 
-/** ¿Ya aceptó estas normas en este navegador? */
-export function hasAcceptedStandards(): boolean {
-  try {
-    return window.localStorage.getItem(ACK_KEY) === "1";
-  } catch {
-    // Sin storage preferimos volver a mostrarlas: es el lado seguro.
-    return false;
-  }
-}
-
-export function CommunityStandardsStep({ onAccept }: { onAccept: () => void }) {
+export function CommunityStandardsStep({ onAccept, accepting = false }: { onAccept: () => void; accepting?: boolean }) {
   const copy = useMemo(() => getCommunityStandards(), []);
   const [checked, setChecked] = useState(false);
 
   function accept() {
-    try {
-      window.localStorage.setItem(ACK_KEY, "1");
-    } catch {
-      // Si no se puede guardar, seguimos igual: no bloqueamos por eso.
-    }
     onAccept();
   }
 
@@ -81,7 +64,7 @@ export function CommunityStandardsStep({ onAccept }: { onAccept: () => void }) {
 
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{copy.legalNote}</p>
 
-      <Button className="mt-6 w-full" disabled={!checked} onClick={accept}>
+      <Button className="mt-6 w-full" disabled={!checked || accepting} loading={accepting} onClick={accept}>
         <Check className="mr-2 h-4 w-4" />
         {copy.continueLabel}
       </Button>

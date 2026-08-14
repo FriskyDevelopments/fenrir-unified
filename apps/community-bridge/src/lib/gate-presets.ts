@@ -7,6 +7,15 @@
 
 export const DEFAULT_LOGO_URL = "/fenrir-cut-wordmark.svg";
 
+/**
+ * A public Gate must never appear policy-free. Hosts can replace both values
+ * in the builder; these are a neutral baseline for existing and new Gates.
+ */
+export const DEFAULT_GATE_RULES =
+  "Zero tolerance: no sexual content involving minors or animals, with no exceptions or workarounds. Respect people and the host's boundaries. No harassment, spam, impersonation, unlawful content, or sharing private material without consent. Follow the host's instructions and Telegram's terms.";
+export const DEFAULT_GATE_DISCLAIMER =
+  "This is a private community entrance for members and invited guests. By continuing, you agree to this Gate's rules. Access may be declined or revoked by the host.";
+
 export type MascotKey = "ghost" | "wolf" | "shield" | "flame" | "sparkle" | "wave" | "crown";
 
 export interface GatePreset {
@@ -153,12 +162,24 @@ export function getPreset(id: string | null | undefined): GatePreset {
 
 export interface GateConfig {
   slug: string;
+  /**
+   * The owning Community tenant. This is deliberately carried by a public Gate
+   * so the visitor enters the same branded Community organization after the
+   * verification step; it must never be inferred from a visual preset.
+   */
+  brand_id?: string;
   preset: string;
   headline: string;
   subheadline: string;
   logo_url: string | null;
   mascot_url: string | null;
   background_url: string | null;
+  /** Host-owned rules presented at this particular Gate. */
+  rules_text: string;
+  /** Short access notice presented before a visitor begins SSO. */
+  disclaimer_text: string;
+  /** Increment whenever the host materially changes the access policy. */
+  policy_version: number;
 }
 
 export const DEFAULT_GATE: Omit<GateConfig, "slug"> = {
@@ -168,6 +189,9 @@ export const DEFAULT_GATE: Omit<GateConfig, "slug"> = {
   logo_url: null,
   mascot_url: null,
   background_url: null,
+  rules_text: DEFAULT_GATE_RULES,
+  disclaimer_text: DEFAULT_GATE_DISCLAIMER,
+  policy_version: 1,
 };
 
 /** Accepts only public https URLs (or the bundled root-relative defaults). */

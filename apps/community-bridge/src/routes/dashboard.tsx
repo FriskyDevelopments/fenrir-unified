@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowUpRight, Crown, Loader2, LogOut, Shield, Sparkles, Waypoints } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Crown, Loader2, LogOut, RefreshCw, Shield, Sparkles, Waypoints } from "lucide-react";
 import { motion } from "motion/react";
 import { TelegramIdentityCard } from "@/components/telegram/telegram-identity-card";
 import { DEMO_TELEGRAM_PROFILE, isDemoMode } from "@/config/demo-mode";
 import { useBrand } from "@/config/brand-context";
 import { listMyGates } from "@/lib/gate.functions";
+import { isCommunitySessionError } from "@/lib/authentik.functions";
 
 export const Route = createFileRoute("/dashboard")({
   ssr: false,
@@ -37,11 +38,16 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function DashboardPage() {
-  const { session, loading, roleLoading, telegramId, isStaff, signOut } = useAuth();
+  const { session, loading, roleLoading, telegramId, isStaff, signOut, authenticated, community } = useAuth();
   const navigate = useNavigate();
   const brand = useBrand();
   const fetchGates = useServerFn(listMyGates);
   const [demo, setDemo] = useState(false);
+  // A failed Gate lookup must never be indistinguishable from "zero Gates":
+  // that would silently funnel a returning owner into the new-Gate creator.
+  // Track the failure explicitly so the render path can offer a retry.
+  const [lookupError, setLookupError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     setDemo(isDemoMode());
@@ -49,8 +55,8 @@ function DashboardPage() {
 
   useEffect(() => {
     if (loading) return;
-    if (!session) {
-      navigate({ to: "/login", search: { next: undefined } });
+    if (!authenticated) {
+      navigate({ to: "/login", search: { next: "/dashboard" } });
       return;
     }
     if (!roleLoading && !telegramId) {
@@ -62,20 +68,67 @@ function DashboardPage() {
         window.location.replace("/gate?onboarding=1");
         return () => { active = false; };
       }
+      setLookupError(false);
       void fetchGates()
         .then((gates) => {
           if (!active) return;
+          // Onboarding (?onboarding=1) is only ever reached after a SUCCESSFUL
+          // server-side lookup that confirms zero Gates. An owner with Gates
+          // lands on /gates, never the creator.
           window.location.replace(gates.length > 0 ? "/gates" : "/gate?onboarding=1");
         })
-        .catch(() => {
-          // Do not funnel a returning user into a new gate if the gate lookup
-          // is temporarily unavailable. Leave the dashboard visible instead.
+        .catch((error: unknown) => {
+          if (isCommunitySessionError(error)) {
+            void navigate({ to: "/login", search: { next: "/dashboard" } });
+            return;
+          }
+          // Lookup failed/unavailable. Do NOT default to the new-Gate creator
+          // and do NOT spin forever — surface a visible error + retry.
+          if (active) setLookupError(true);
         });
       return () => { active = false; };
     }
-  }, [loading, roleLoading, session, telegramId, navigate, fetchGates]);
+  }, [loading, roleLoading, authenticated, telegramId, navigate, fetchGates, retryNonce]);
 
-  if (loading || roleLoading || !session || !telegramId) {
+  // Visible failure state for an unavailable Gate lookup: retry the Neon read
+  // or fall back to sign-in. Never the creator, never an infinite spinner.
+  if (!loading && !roleLoading && authenticated && !telegramId && lookupError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-6">
+        <div
+          role="alert"
+          className="w-full max-w-md rounded-2xl border border-destructive/40 bg-destructive/10 p-6 text-center"
+        >
+          <AlertTriangle className="mx-auto mb-3 h-7 w-7 text-destructive" />
+          <h1 className="text-lg font-semibold text-foreground">We couldn't load your Gates</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Your Gate directory is temporarily unavailable. Retry in a moment — we won't start a new
+            Gate for you.
+          </p>
+          <div className="mt-5 flex flex-col gap-2">
+            <Button
+              variant="fenrir"
+              onClick={() => {
+                setLookupError(false);
+                setRetryNonce((n) => n + 1);
+              }}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => signOut().then(() => navigate({ to: "/login", search: { next: undefined } }))}
+            >
+              Back to sign in
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading || roleLoading || !authenticated || !telegramId) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -91,7 +144,7 @@ function DashboardPage() {
           <Link to="/" className="group flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-xl border border-primary/35 bg-primary/10 text-primary transition-transform duration-300 group-hover:rotate-6"><Waypoints className="h-4 w-4" /></span><span className="text-sm font-semibold tracking-[0.08em] text-foreground">FENRIR <span className="font-normal text-primary">COMMUNITY BRIDGE</span></span></Link>
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-muted-foreground sm:inline">
-              {session.user.email}
+              {session?.user.email ?? community?.email}
             </span>
             <Button asChild variant="outline" size="sm">
               <Link to="/gates">My gates</Link>

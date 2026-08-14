@@ -5,6 +5,7 @@ import { isDemoMode } from "@/config/demo-mode";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Collapsible,
   CollapsibleContent,
@@ -15,6 +16,7 @@ import { checkSlugAvailable } from "@/lib/gate.functions";
 import { GateMediaField } from "@/components/gate/gate-media-field";
 import { GATE_PRESETS, type GateConfig } from "@/lib/gate-presets";
 import { cn } from "@/lib/utils";
+import { POLICY_TEMPLATES } from "@/lib/gate-onboarding";
 
 export const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
 
@@ -95,6 +97,9 @@ export function GateForm({ config, onChange, slugStatus }: GateFormProps) {
   const set = <K extends keyof GateConfig>(key: K, value: GateConfig[K]) =>
     onChange({ ...config, [key]: value });
 
+  const applyPolicyTemplate = (template: (typeof POLICY_TEMPLATES)[number]) =>
+    onChange({ ...config, rules_text: template.rules, disclaimer_text: template.disclaimer });
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-6">
@@ -133,6 +138,37 @@ export function GateForm({ config, onChange, slugStatus }: GateFormProps) {
                 </button>
               );
             })}
+          </div>
+        </Card>
+
+        <Card className="p-5 sm:p-6">
+          <h2 className="text-sm font-semibold tracking-tight">3. Rules &amp; access notice</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            These belong to this Gate. Members see them before sign-in and event emails inherit this voice.
+          </p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {POLICY_TEMPLATES.map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                onClick={() => applyPolicyTemplate(template)}
+                className="rounded-xl border border-border bg-muted/30 p-3 text-left transition hover:border-primary/50 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span className="block text-xs font-semibold text-foreground">{template.label}</span>
+                <span className="mt-1 block text-[11px] leading-snug text-muted-foreground">{template.description}</span>
+                <span className="mt-2 block text-[10px] font-medium uppercase tracking-[0.14em] text-primary">Use template</span>
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="gate-rules">Community rules</Label>
+              <Textarea id="gate-rules" value={config.rules_text} onChange={(e) => set("rules_text", e.target.value)} maxLength={6000} placeholder="What members agree to in this community." className="min-h-32" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="gate-disclaimer">Access notice</Label>
+              <Textarea id="gate-disclaimer" value={config.disclaimer_text} onChange={(e) => set("disclaimer_text", e.target.value)} maxLength={1600} placeholder="A short, human explanation shown before sign-in." className="min-h-24" />
+            </div>
           </div>
         </Card>
 

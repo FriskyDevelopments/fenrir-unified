@@ -21,16 +21,25 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ModerationRouteImport } from './routes/moderation'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as UpgradeRouteImport } from './routes/upgrade'
+import { Route as VerifyRouteImport } from './routes/verify'
+import { Route as ZzGateHarnessRouteImport } from './routes/zz-gate-harness'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as AuthNeonCallbackRouteImport } from './routes/auth.neon-callback'
+import { Route as AuthNeonStartRouteImport } from './routes/auth.neon-start'
+import { Route as AuthSocialRouteImport } from './routes/auth.social'
+import { Route as AuthStartRouteImport } from './routes/auth.start'
 import { Route as BlogTelegramRoleManagementGuideRouteImport } from './routes/blog.telegram-role-management-guide'
 import { Route as BrandAssetSplatRouteImport } from './routes/brand-asset.$'
 import { Route as GSlugRouteImport } from './routes/g.$slug'
 import { Route as GateMediaSplatRouteImport } from './routes/gate-media.$'
 import { Route as GatesIndexRouteImport } from './routes/gates.index'
 import { Route as GatesIdRouteImport } from './routes/gates.$id'
+import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as ApiStripeWebhookRouteImport } from './routes/api.stripe.webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -92,6 +101,16 @@ const UpgradeRoute = UpgradeRouteImport.update({
   path: '/upgrade',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerifyRoute = VerifyRouteImport.update({
+  id: '/verify',
+  path: '/verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ZzGateHarnessRoute = ZzGateHarnessRouteImport.update({
+  id: '/zz-gate-harness',
+  path: '/zz-gate-harness',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const Char91DotmcpChar93ListToolsRoute =
   Char91DotmcpChar93ListToolsRouteImport.update({
     id: '/.mcp/list-tools',
@@ -104,6 +123,31 @@ const Char91DotwellKnownChar93OauthProtectedResourceRoute =
     path: '/.well-known/oauth-protected-resource',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthNeonCallbackRoute = AuthNeonCallbackRouteImport.update({
+  id: '/auth/neon-callback',
+  path: '/auth/neon-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthNeonStartRoute = AuthNeonStartRouteImport.update({
+  id: '/auth/neon-start',
+  path: '/auth/neon-start',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthSocialRoute = AuthSocialRouteImport.update({
+  id: '/auth/social',
+  path: '/auth/social',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthStartRoute = AuthStartRouteImport.update({
+  id: '/auth/start',
+  path: '/auth/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BlogTelegramRoleManagementGuideRoute =
   BlogTelegramRoleManagementGuideRouteImport.update({
     id: '/blog/telegram-role-management-guide',
@@ -135,6 +179,11 @@ const GatesIdRoute = GatesIdRouteImport.update({
   path: '/gates/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   id: '/.lovable/oauth/consent',
   path: '/.lovable/oauth/consent',
@@ -146,6 +195,11 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
+  id: '/api/stripe/webhook',
+  path: '/api/stripe/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -160,16 +214,25 @@ export interface FileRoutesByFullPath {
   '/moderation': typeof ModerationRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/upgrade': typeof UpgradeRoute
+  '/verify': typeof VerifyRoute
+  '/zz-gate-harness': typeof ZzGateHarnessRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/neon-callback': typeof AuthNeonCallbackRoute
+  '/auth/neon-start': typeof AuthNeonStartRoute
+  '/auth/social': typeof AuthSocialRoute
+  '/auth/start': typeof AuthStartRoute
   '/blog/telegram-role-management-guide': typeof BlogTelegramRoleManagementGuideRoute
   '/brand-asset/$': typeof BrandAssetSplatRoute
   '/g/$slug': typeof GSlugRoute
   '/gate-media/$': typeof GateMediaSplatRoute
   '/gates/$id': typeof GatesIdRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/gates/': typeof GatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/stripe/webhook': typeof ApiStripeWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -184,16 +247,25 @@ export interface FileRoutesByTo {
   '/moderation': typeof ModerationRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/upgrade': typeof UpgradeRoute
+  '/verify': typeof VerifyRoute
+  '/zz-gate-harness': typeof ZzGateHarnessRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/neon-callback': typeof AuthNeonCallbackRoute
+  '/auth/neon-start': typeof AuthNeonStartRoute
+  '/auth/social': typeof AuthSocialRoute
+  '/auth/start': typeof AuthStartRoute
   '/blog/telegram-role-management-guide': typeof BlogTelegramRoleManagementGuideRoute
   '/brand-asset/$': typeof BrandAssetSplatRoute
   '/g/$slug': typeof GSlugRoute
   '/gate-media/$': typeof GateMediaSplatRoute
   '/gates/$id': typeof GatesIdRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/gates': typeof GatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/stripe/webhook': typeof ApiStripeWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -209,16 +281,25 @@ export interface FileRoutesById {
   '/moderation': typeof ModerationRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/upgrade': typeof UpgradeRoute
+  '/verify': typeof VerifyRoute
+  '/zz-gate-harness': typeof ZzGateHarnessRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/neon-callback': typeof AuthNeonCallbackRoute
+  '/auth/neon-start': typeof AuthNeonStartRoute
+  '/auth/social': typeof AuthSocialRoute
+  '/auth/start': typeof AuthStartRoute
   '/blog/telegram-role-management-guide': typeof BlogTelegramRoleManagementGuideRoute
   '/brand-asset/$': typeof BrandAssetSplatRoute
   '/g/$slug': typeof GSlugRoute
   '/gate-media/$': typeof GateMediaSplatRoute
   '/gates/$id': typeof GatesIdRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/gates/': typeof GatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/stripe/webhook': typeof ApiStripeWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -235,16 +316,25 @@ export interface FileRouteTypes {
     | '/moderation'
     | '/sitemap.xml'
     | '/upgrade'
+    | '/verify'
+    | '/zz-gate-harness'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/auth/callback'
+    | '/auth/neon-callback'
+    | '/auth/neon-start'
+    | '/auth/social'
+    | '/auth/start'
     | '/blog/telegram-role-management-guide'
     | '/brand-asset/$'
     | '/g/$slug'
     | '/gate-media/$'
     | '/gates/$id'
+    | '/invite/$token'
     | '/gates/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/stripe/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -259,16 +349,25 @@ export interface FileRouteTypes {
     | '/moderation'
     | '/sitemap.xml'
     | '/upgrade'
+    | '/verify'
+    | '/zz-gate-harness'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/auth/callback'
+    | '/auth/neon-callback'
+    | '/auth/neon-start'
+    | '/auth/social'
+    | '/auth/start'
     | '/blog/telegram-role-management-guide'
     | '/brand-asset/$'
     | '/g/$slug'
     | '/gate-media/$'
     | '/gates/$id'
+    | '/invite/$token'
     | '/gates'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/stripe/webhook'
   id:
     | '__root__'
     | '/'
@@ -283,16 +382,25 @@ export interface FileRouteTypes {
     | '/moderation'
     | '/sitemap.xml'
     | '/upgrade'
+    | '/verify'
+    | '/zz-gate-harness'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/auth/callback'
+    | '/auth/neon-callback'
+    | '/auth/neon-start'
+    | '/auth/social'
+    | '/auth/start'
     | '/blog/telegram-role-management-guide'
     | '/brand-asset/$'
     | '/g/$slug'
     | '/gate-media/$'
     | '/gates/$id'
+    | '/invite/$token'
     | '/gates/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/stripe/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -308,16 +416,25 @@ export interface RootRouteChildren {
   ModerationRoute: typeof ModerationRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   UpgradeRoute: typeof UpgradeRoute
+  VerifyRoute: typeof VerifyRoute
+  ZzGateHarnessRoute: typeof ZzGateHarnessRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
+  AuthNeonCallbackRoute: typeof AuthNeonCallbackRoute
+  AuthNeonStartRoute: typeof AuthNeonStartRoute
+  AuthSocialRoute: typeof AuthSocialRoute
+  AuthStartRoute: typeof AuthStartRoute
   BlogTelegramRoleManagementGuideRoute: typeof BlogTelegramRoleManagementGuideRoute
   BrandAssetSplatRoute: typeof BrandAssetSplatRoute
   GSlugRoute: typeof GSlugRoute
   GateMediaSplatRoute: typeof GateMediaSplatRoute
   GatesIdRoute: typeof GatesIdRoute
+  InviteTokenRoute: typeof InviteTokenRoute
   GatesIndexRoute: typeof GatesIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -406,6 +523,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UpgradeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verify': {
+      id: '/verify'
+      path: '/verify'
+      fullPath: '/verify'
+      preLoaderRoute: typeof VerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/zz-gate-harness': {
+      id: '/zz-gate-harness'
+      path: '/zz-gate-harness'
+      fullPath: '/zz-gate-harness'
+      preLoaderRoute: typeof ZzGateHarnessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.mcp/list-tools': {
       id: '/.mcp/list-tools'
       path: '/.mcp/list-tools'
@@ -418,6 +549,41 @@ declare module '@tanstack/react-router' {
       path: '/.well-known/oauth-protected-resource'
       fullPath: '/.well-known/oauth-protected-resource'
       preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/neon-callback': {
+      id: '/auth/neon-callback'
+      path: '/auth/neon-callback'
+      fullPath: '/auth/neon-callback'
+      preLoaderRoute: typeof AuthNeonCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/neon-start': {
+      id: '/auth/neon-start'
+      path: '/auth/neon-start'
+      fullPath: '/auth/neon-start'
+      preLoaderRoute: typeof AuthNeonStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/social': {
+      id: '/auth/social'
+      path: '/auth/social'
+      fullPath: '/auth/social'
+      preLoaderRoute: typeof AuthSocialRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/start': {
+      id: '/auth/start'
+      path: '/auth/start'
+      fullPath: '/auth/start'
+      preLoaderRoute: typeof AuthStartRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/blog/telegram-role-management-guide': {
@@ -462,6 +628,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GatesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.lovable/oauth/consent': {
       id: '/.lovable/oauth/consent'
       path: '/.lovable/oauth/consent'
@@ -474,6 +647,13 @@ declare module '@tanstack/react-router' {
       path: '/.mcp/invoke-tool/$tool'
       fullPath: '/.mcp/invoke-tool/$tool'
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/stripe/webhook': {
+      id: '/api/stripe/webhook'
+      path: '/api/stripe/webhook'
+      fullPath: '/api/stripe/webhook'
+      preLoaderRoute: typeof ApiStripeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -492,17 +672,26 @@ const rootRouteChildren: RootRouteChildren = {
   ModerationRoute: ModerationRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   UpgradeRoute: UpgradeRoute,
+  VerifyRoute: VerifyRoute,
+  ZzGateHarnessRoute: ZzGateHarnessRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
+  AuthNeonCallbackRoute: AuthNeonCallbackRoute,
+  AuthNeonStartRoute: AuthNeonStartRoute,
+  AuthSocialRoute: AuthSocialRoute,
+  AuthStartRoute: AuthStartRoute,
   BlogTelegramRoleManagementGuideRoute: BlogTelegramRoleManagementGuideRoute,
   BrandAssetSplatRoute: BrandAssetSplatRoute,
   GSlugRoute: GSlugRoute,
   GateMediaSplatRoute: GateMediaSplatRoute,
   GatesIdRoute: GatesIdRoute,
+  InviteTokenRoute: InviteTokenRoute,
   GatesIndexRoute: GatesIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiStripeWebhookRoute: ApiStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

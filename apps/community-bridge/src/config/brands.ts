@@ -111,7 +111,7 @@ export const BRANDS: BrandConfig[] = [
     tagline: "Secure access and public gates for your Telegram community",
     // communities.* es la superficie separada del Community Bridge: sin este
     // host caía en el brand por defecto y tomaba el logo del tenant heredado.
-    hosts: ["myfenrir.com", "www.myfenrir.com", "communities.myfenrir.com"],
+    hosts: ["myfenrir.com", "www.myfenrir.com", "communities.myfenrir.com", "quality.communities.myfenrir.com"],
     logo: { markUrl: MYFENRIR_MARK_URL, wordmarkUrl: MYFENRIR_WORDMARK_URL, alt: "MyFenrir logo" },
     theme: {
       "--primary": "oklch(0.637 0.208 25.3)",

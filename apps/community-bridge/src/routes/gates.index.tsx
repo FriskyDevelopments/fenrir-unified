@@ -12,6 +12,7 @@ import { useBrand } from "@/config/brand-context";
 import { getSiteUrl } from "@/config/site-url";
 import { listMyGates, type GateRecord } from "@/lib/gate.functions";
 import { getMyGateViewStats, type GateViewStats } from "@/lib/gate-analytics.functions";
+import { isCommunitySessionError } from "@/lib/authentik.functions";
 import { getPreset } from "@/lib/gate-presets";
 import { isDemoMode } from "@/config/demo-mode";
 
@@ -38,7 +39,7 @@ export const Route = createFileRoute("/gates/")({
 });
 
 function MyGatesPage() {
-  const { session, loading } = useAuth();
+  const { authenticated, loading } = useAuth();
   const navigate = useNavigate();
   const fetchGates = useServerFn(listMyGates);
   const fetchStats = useServerFn(getMyGateViewStats);
@@ -48,8 +49,8 @@ function MyGatesPage() {
 
   useEffect(() => {
     if (loading) return;
-    if (!session) {
-      navigate({ to: "/login", search: { next: undefined } });
+    if (!authenticated) {
+      navigate({ to: "/login", search: { next: "/gates" } });
       return;
     }
     // Demo mode has a mock session with no bearer token — protected server
@@ -64,6 +65,10 @@ function MyGatesPage() {
       .then((rows) => active && setGates(rows))
       .catch((error: unknown) => {
         if (!active) return;
+        if (isCommunitySessionError(error)) {
+          void navigate({ to: "/login", search: { next: "/gates" } });
+          return;
+        }
         toast.error(error instanceof Error ? error.message : "Could not load your gates");
         setGates([]);
       });
@@ -73,7 +78,7 @@ function MyGatesPage() {
     return () => {
       active = false;
     };
-  }, [loading, session, fetchGates, fetchStats, navigate]);
+  }, [loading, authenticated, fetchGates, fetchStats, navigate]);
 
 
   if (loading || !gates) {

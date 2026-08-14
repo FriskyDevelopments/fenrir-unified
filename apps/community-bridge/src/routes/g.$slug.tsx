@@ -1,12 +1,14 @@
 import { getSiteUrl } from "@/config/site-url";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { GatePreview } from "@/components/gate/gate-preview";
-import { GateShare } from "@/components/gate/gate-share";
 import { useTrackGateView } from "@/hooks/use-track-gate-view";
 
-
 import { getPublicGate } from "@/lib/gate.functions";
-import { getPreset } from "@/lib/gate-presets";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useAuth } from "@/hooks/use-auth";
+import { acceptGateRules, getGateMemberAcceptance } from "@/lib/gate-member-acceptance.functions";
+import type { GateMemberAcceptanceState } from "@/components/gate/gate-preview";
 
 export const Route = createFileRoute("/g/$slug")({
   loader: async ({ params }) => {
@@ -53,30 +55,39 @@ function GateFallback({ message }: { message: string }) {
 function PublicGatePage() {
   const config = Route.useLoaderData();
   const params = Route.useParams();
-  const preset = getPreset(config.preset);
+  const { community, loading } = useAuth();
+  const getAcceptance = useServerFn(getGateMemberAcceptance);
+  const persistAcceptance = useServerFn(acceptGateRules);
+  const [acceptance, setAcceptance] = useState<Omit<GateMemberAcceptanceState, "authenticated" | "onAccept"> | null>(null);
 
   useTrackGateView(params.slug, config.preset);
 
+  useEffect(() => {
+    if (loading || !community) return;
+    let active = true;
+    void getAcceptance({ data: { gateId: config.id } })
+      .then((result) => {
+        if (active) setAcceptance({ ...result, accepting: false, error: null });
+      })
+      .catch((error) => {
+        if (active) setAcceptance({ accepted: false, rulesUpdated: false, changedRuleKeys: ["arrival", "respect", "privacy", "participation", "ready"], accepting: false, error: error instanceof Error ? error.message : "Could not load rule acceptance" });
+      });
+    return () => { active = false; };
+  }, [loading, community, config.id, getAcceptance]);
 
-  return (
-    <div className="relative">
-      <GatePreview config={config} />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 px-5 pb-8">
-        <a
-          href={(() => {
-            const destination = new URL(`/g/${encodeURIComponent(params.slug)}?sso=complete`, window.location.origin);
-            const handoff = new URL("https://quality.myfenrir.com/api/auth/community-sso");
-            handoff.searchParams.set("next", destination.toString());
-            handoff.searchParams.set("brand", preset.brandId);
-            return handoff.toString();
-          })()}
-          className="pointer-events-auto rounded-full border border-white/15 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.22em] text-white/70 transition hover:text-white"
-          style={{ background: `color-mix(in oklab, ${preset.accent} 12%, transparent)` }}
-        >
-          Sign in
-        </a>
-        <GateShare slug={params.slug} accent={preset.accent} />
-      </div>
-    </div>
-  );
+  const accept = async () => {
+    if (!acceptance) return;
+    setAcceptance({ ...acceptance, accepting: true, error: null });
+    try {
+      await persistAcceptance({ data: { gateId: config.id } });
+      setAcceptance({ accepted: true, rulesUpdated: false, changedRuleKeys: [], accepting: false, error: null });
+    } catch (error) {
+      setAcceptance({ ...acceptance, accepting: false, error: error instanceof Error ? error.message : "Could not record acceptance" });
+    }
+  };
+
+  const memberAcceptance = community && acceptance
+    ? { authenticated: true as const, ...acceptance, onAccept: () => void accept() }
+    : undefined;
+  return <GatePreview config={config} memberAcceptance={memberAcceptance} />;
 }

@@ -1,7 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, ArrowUpRight, Check, Crown, Globe2, LockKeyhole, Sparkles, UsersRound } from "lucide-react";
 import { motion } from "motion/react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { createFounderCheckout } from "@/lib/stripe-checkout.functions";
 
 const capabilities = [
   { icon: Globe2, title: "A home that is yours", body: "Bring a community domain and make every gate feel like part of the same world." },
@@ -12,6 +15,28 @@ const capabilities = [
 export const Route = createFileRoute("/upgrade")({ ssr: false, component: UpgradePage });
 
 function UpgradePage() {
+  const startCheckout = useServerFn(createFounderCheckout);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  async function openFounderCheckout() {
+    if (checkoutBusy) return;
+    setCheckoutBusy(true);
+    setCheckoutError(null);
+    try {
+      const result = await startCheckout();
+      window.location.assign(result.url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setCheckoutError(
+        message.includes("Unauthorized")
+          ? "Sign in to Community before starting Founder Checkout."
+          : message.replace(/^founder_checkout_(?:unavailable|failed):\s*/, "") || "Founder Checkout is unavailable.",
+      );
+      setCheckoutBusy(false);
+    }
+  }
+
   return (
     <main className="min-h-dvh overflow-hidden bg-background px-5 py-8 sm:px-8 sm:py-12">
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
@@ -27,13 +52,22 @@ function UpgradePage() {
             <h1 className="mt-6 max-w-3xl text-5xl font-semibold leading-[0.95] tracking-[-0.055em] sm:text-6xl lg:text-7xl">Grow the world around your Gates.</h1>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">You already have entrances. Pack turns them into a coherent community system—branded, protected, and ready to evolve with your people.</p>
           </motion.div>
-          <motion.aside initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.12, duration: 0.48 }} className="relative overflow-hidden rounded-3xl border border-primary/35 bg-card/70 p-6 shadow-[0_28px_100px_-50px_hsl(var(--primary))] backdrop-blur">
+          <motion.aside initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.12, duration: 0.48 }} className="relative overflow-hidden rounded-3xl border border-primary/55 bg-card/85 p-6 shadow-[0_28px_100px_-40px_hsl(var(--primary))] backdrop-blur">
             <div aria-hidden="true" className="absolute -right-8 -top-8 h-32 w-32 rounded-full border border-primary/30" />
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Pack membership</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Make your Gates a Pack.</h2>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">A personal upgrade path for your existing community—not a new Gate and not a fake checkout.</p>
-            <a className="group relative mt-6 flex w-full items-center justify-center overflow-hidden rounded-xl border border-primary/40 bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.25),0_14px_32px_-16px_hsl(var(--primary))] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.32),0_20px_40px_-16px_hsl(var(--primary))] active:translate-y-0" href="mailto:community@myfenrir.com?subject=Community%20Bridge%20Pack%20upgrade&body=I%20want%20to%20upgrade%20my%20existing%20Community%20Bridge%20gates%20to%20Pack."><span aria-hidden="true" className="absolute inset-x-0 -top-8 h-12 -translate-x-full rotate-12 bg-primary-foreground/20 blur-md transition-transform duration-700 group-hover:translate-x-full" /><span className="relative">Request Pack upgrade <ArrowUpRight className="ml-2 inline h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></span></a>
-            <p className="mt-3 text-center text-xs text-muted-foreground">Quality does not process payment.</p>
+            <div className="relative inline-flex items-center gap-2 rounded-full border border-amber-300/45 bg-amber-300/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-amber-200"><Crown className="h-3.5 w-3.5" /> Founder Deal</div>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight">Lock in Pack at founder price.</h2>
+            <div className="mt-5 flex items-end gap-3">
+              <p className="text-5xl font-semibold tracking-[-0.06em] text-foreground">US$14.99</p>
+              <p className="pb-1.5 text-sm text-muted-foreground">/ month</p>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+              <span className="rounded-full bg-primary/12 px-2.5 py-1 font-semibold text-primary">Save US$5 every month</span>
+              <span className="text-muted-foreground"><span className="line-through">US$19.99</span> standard price</span>
+            </div>
+            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">Join as a Founder and keep <strong className="text-foreground">US$14.99/month for as long as you keep your membership.</strong> Invitation trials are separate and issued personally.</p>
+            <button type="button" onClick={() => void openFounderCheckout()} disabled={checkoutBusy} className="group relative mt-6 flex w-full items-center justify-center overflow-hidden rounded-xl border border-primary/40 bg-primary px-4 py-3.5 text-sm font-semibold text-primary-foreground shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.25),0_14px_32px_-16px_hsl(var(--primary))] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.32),0_20px_40px_-16px_hsl(var(--primary))] active:translate-y-0 disabled:cursor-wait disabled:opacity-70"><span aria-hidden="true" className="absolute inset-x-0 -top-8 h-12 -translate-x-full rotate-12 bg-primary-foreground/20 blur-md transition-transform duration-700 group-hover:translate-x-full" /><span className="relative">{checkoutBusy ? "Opening Stripe…" : "Lock in US$14.99"} <ArrowUpRight className="ml-2 inline h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></span></button>
+          <p className="mt-3 text-center text-xs text-muted-foreground">Stripe test checkout · Price stays locked while subscribed · invitation trials only</p>
+          {checkoutError ? <p className="mt-3 text-center text-sm text-destructive" role="alert">{checkoutError}</p> : null}
           </motion.aside>
         </section>
 
@@ -51,7 +85,7 @@ function UpgradePage() {
           </motion.div>
         </section>
 
-        <motion.section initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="mb-6 flex flex-col justify-between gap-5 rounded-3xl border border-primary/25 bg-primary/10 p-7 sm:flex-row sm:items-center sm:p-9"><div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Ready when you are</p><h2 className="mt-2 text-2xl font-semibold tracking-tight">Your existing Gates are already the starting point.</h2></div><Button asChild variant="fenrir"><a href="mailto:community@myfenrir.com?subject=Community%20Bridge%20Pack%20upgrade&body=I%20want%20to%20upgrade%20my%20existing%20Community%20Bridge%20gates%20to%20Pack."><Sparkles className="mr-2 h-4 w-4" /> Start Pack conversation</a></Button></motion.section>
+        <motion.section initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="mb-6 flex flex-col justify-between gap-5 rounded-3xl border border-primary/25 bg-primary/10 p-7 sm:flex-row sm:items-center sm:p-9"><div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Founder Go-Live</p><h2 className="mt-2 text-2xl font-semibold tracking-tight">Your existing Gates are already the starting point.</h2></div><Button type="button" variant="fenrir" disabled={checkoutBusy} onClick={() => void openFounderCheckout()}><Sparkles className="mr-2 h-4 w-4" /> {checkoutBusy ? "Opening Stripe…" : "Continue to Founder Checkout"}</Button></motion.section>
       </div>
     </main>
   );

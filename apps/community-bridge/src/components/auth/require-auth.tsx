@@ -12,14 +12,14 @@ function FullPageSpinner() {
 }
 
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { session, loading } = useAuth();
+  const { authenticated, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && !session) navigate({ to: "/login", search: { next: undefined } });
-  }, [loading, session, navigate]);
+    if (!loading && !authenticated) navigate({ to: "/login", search: { next: undefined } });
+  }, [loading, authenticated, navigate]);
 
-  if (loading || !session) return <FullPageSpinner />;
+  if (loading || !authenticated) return <FullPageSpinner />;
   return <>{children}</>;
 }
 
@@ -29,14 +29,14 @@ interface RequireRoleProps {
 }
 
 export function RequireRole({ children, roles }: RequireRoleProps) {
-  const { session, loading, role, roleLoading } = useAuth();
+  const { authenticated, loading, role, roleLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && !session) navigate({ to: "/login", search: { next: undefined } });
-  }, [loading, session, navigate]);
+    if (!loading && !authenticated) navigate({ to: "/login", search: { next: undefined } });
+  }, [loading, authenticated, navigate]);
 
-  if (loading || roleLoading || !session) return <FullPageSpinner />;
+  if (loading || roleLoading || !authenticated) return <FullPageSpinner />;
 
   if (!role || !roles.includes(role)) {
     return (

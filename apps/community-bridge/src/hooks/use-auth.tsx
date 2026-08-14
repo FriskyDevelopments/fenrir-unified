@@ -17,6 +17,9 @@ import {
   isDemoTelegramLinked,
 } from "@/config/demo-mode";
 import { logDemoEvent } from "@/config/demo-log";
+import { getCommunitySession, signOutCommunity } from "@/lib/authentik.functions";
+import type { CommunityIdentity } from "@/lib/authentik.server";
+import { useServerFn } from "@tanstack/react-start";
 
 
 
@@ -27,6 +30,8 @@ export type AppRole = "owner" | "admin" | "user";
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
+  community: CommunityIdentity | null;
+  authenticated: boolean;
   loading: boolean;
   configured: boolean;
   role: AppRole | null;
@@ -49,7 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roleLoading, setRoleLoading] = useState(false);
   const [demo, setDemo] = useState(false);
   const [demoLinked, setDemoLinked] = useState(false);
+  const [community, setCommunity] = useState<CommunityIdentity | null>(null);
+  const [communityLoading, setCommunityLoading] = useState(true);
   const currentUserId = useRef<string | null>(null);
+
+  const fetchCommunity = useServerFn(getCommunitySession);
+  const clearCommunity = useServerFn(signOutCommunity);
 
   // Demo mode is client-only: resolved after hydration to avoid SSR mismatch.
   useEffect(() => {
@@ -67,7 +77,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-
+  // The Community (Authentik) session lives in a first-party HttpOnly cookie.
+  // Resolve it once so Community-authenticated members are treated as signed
+  // in without any Supabase session being fabricated.
+  useEffect(() => {
+    let active = true;
+    void fetchCommunity()
+      .then(({ session: cs }) => {
+        if (active) {
+          setCommunity(cs);
+          setCommunityLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setCommunity(null);
+          setCommunityLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [fetchCommunity]);
 
   const loadRole = useCallback(async (userId: string | null) => {
     if (!userId) {
@@ -122,12 +153,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (demo) logDemoEvent("auth", "Mock sign-out", "session cleared in this browser");
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      /* no Supabase session */
+    }
+    try {
+      await clearCommunity();
+    } catch {
+      /* no Community session */
+    }
     setSession(null);
+    setCommunity(null);
     setRole(null);
     setTelegramId(null);
     currentUserId.current = null;
-  }, [demo]);
+  }, [demo, clearCommunity]);
 
   const refresh = useCallback(async () => {
     const { data } = await supabase.auth.getSession();
@@ -151,7 +192,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session: demo ? DEMO_SESSION : session,
       user: demo ? DEMO_SESSION.user : session?.user ?? null,
-      loading: demo ? false : loading,
+      community,
+      // Community Bridge is its own organization. A legacy Supabase browser
+      // session must never unlock Community routes: their server functions are
+      // scoped to the signed cb_session cookie issued after Community OIDC.
+      authenticated: demo || Boolean(community),
+      loading: demo ? false : loading || communityLoading,
       configured: supabaseConfigured,
       role: demo ? "owner" : role,
       telegramId: demo ? (demoLinked ? DEMO_TELEGRAM_ID : null) : telegramId,
@@ -166,6 +212,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       demo,
       demoLinked,
       session,
+      community,
+      communityLoading,
       loading,
       role,
       telegramId,
