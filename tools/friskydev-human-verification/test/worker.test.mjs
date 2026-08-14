@@ -5,6 +5,7 @@ import worker from "../src/worker.js";
 const env = { VERIFICATION_SECRET: "test-only-secret-with-sufficient-entropy" };
 const origin = "https://friskydev-human-verification.zainxantoine.workers.dev";
 const audience = "https://quality.communities.myfenrir.com";
+const authentikAudience = "https://authentik.friskydev.com";
 const context = "a".repeat(32);
 
 function decodeBody(token) {
@@ -42,4 +43,13 @@ test("issues a grant bound to the Quality origin and per-attempt context", async
 
   assert.equal((await consume(context)).status, 200);
   assert.equal((await consume("b".repeat(32))).status, 400);
+});
+
+test("accepts the canonical FriskyDEV Authentik gateway as an audience", async () => {
+  const query = new URLSearchParams({ audience: authentikAudience, context });
+  const response = await worker.fetch(new Request(`${origin}/api/slider?${query}`), env);
+  assert.equal(response.status, 200);
+  const challenge = await response.json();
+  assert.equal(challenge.risk, "medium");
+  assert.equal(decodeBody(challenge.token).audience, authentikAudience);
 });
