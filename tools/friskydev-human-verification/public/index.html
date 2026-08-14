@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Human verification</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script async defer type="module" src="/vendor/altcha/main/altcha.i18n.js?v=friskydev-logo-1"></script>
+    <script defer type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <main class="card" aria-labelledby="title">
+      <nav class="languages" aria-label="Language">
+        <button type="button" data-language="en">EN</button>
+        <button type="button" data-language="es">ES</button>
+        <button type="button" data-language="fr">FR</button>
+        <button type="button" data-language="pt">PT</button>
+      </nav>
+      <nav class="themes" aria-label="Color theme">
+        <button type="button" data-theme="acid" aria-label="Acid green"></button>
+        <button type="button" data-theme="cyan" aria-label="Electric cyan"></button>
+        <button type="button" data-theme="violet" aria-label="Ultraviolet"></button>
+        <button type="button" data-theme="coral" aria-label="Solar coral"></button>
+      </nav>
+      <div class="mark" role="img" aria-label="FriskyDev wolf logo"></div>
+      <p class="eyebrow">FRISKYDEV · SECURE CHECK</p>
+      <h1 id="title">Let’s make sure you’re human</h1>
+      <p id="intro" class="intro">Private verification with no tracking. Complete the automatic challenge or use the puzzle instead.</p>
+
+      <form id="verification-form" action="/api/verify" method="post">
+        <input id="fallback-grant" type="hidden" name="fallbackGrant" value="">
+        <altcha-widget
+          challenge="/api/altcha/challenge"
+          name="altcha"
+          type="checkbox"
+          display="standard"
+          auto="off"
+          configuration='{"hideFooter":true,"hideLogo":false}'
+        ></altcha-widget>
+        <div id="fallback-verified" class="fallback-verified" hidden><span aria-hidden="true">✓</span><strong>Verified by alternative challenge</strong></div>
+        <button class="primary" type="submit" data-i18n="continue">Continue</button>
+      </form>
+
+      <button id="show-slider" class="link" type="button">Use Signal Slider</button>
+
+      <form id="puzzle-form" class="puzzle" hidden>
+        <div class="signal-head">
+          <span class="signal-pulse" aria-hidden="true"></span>
+          <div>
+            <p class="puzzle-label">WOLF SIGNAL LOCK</p>
+            <h2 id="puzzle-prompt">Loading signal…</h2>
+          </div>
+          <span id="risk-tag" class="channel-tag">RISK / LOW</span>
+        </div>
+        <p id="puzzle-instruction" class="puzzle-instruction"></p>
+        <div id="signal-sequence" class="signal-sequence" aria-label="Signal sequence"></div>
+        <div class="signal-rule" aria-hidden="true"><span></span></div>
+        <fieldset>
+          <legend id="puzzle-legend">Select the matching pair</legend>
+          <div id="rune-options" class="rune-options"></div>
+        </fieldset>
+        <button class="unlock" type="submit" disabled><span id="unlock-label">Unlock signal</span><b aria-hidden="true">↗</b></button>
+      </form>
+      <button id="show-puzzle" class="link alt-method" type="button" hidden>Use rune puzzle instead</button>
+
+      <form id="slider-form" class="slider-challenge" hidden>
+        <div class="slider-copy">
+          <p class="puzzle-label">SIGNAL SLIDER · FRISKYDEV</p>
+          <h2 id="slider-title">Lock onto the signal</h2>
+          <p id="slider-instruction">Drag the wolf into the glowing target.</p>
+        </div>
+        <div class="adaptive-level">
+          <span id="slider-risk">RISK / LOW</span>
+          <div class="level-bars" aria-hidden="true"><i></i><i></i><i></i></div>
+        </div>
+        <div class="slider-readout" aria-live="polite"><span>SIGNAL LOCK</span><strong id="slider-strength">00%</strong></div>
+        <div id="slider-track" class="slider-track">
+          <span class="slider-beam" aria-hidden="true"></span>
+          <span class="slider-target" aria-hidden="true"></span>
+          <span class="slider-sparks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="slider-wolf" aria-hidden="true"></span>
+          <input id="signal-slider" type="range" min="0" max="100" value="0" aria-label="Signal position">
+        </div>
+        <button class="slider-submit" type="submit">Verify position <b aria-hidden="true">↗</b></button>
+      </form>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <p id="privacy" class="privacy">No cookies · No fingerprinting · No image recognition</p>
+    </main>
+  </body>
+</html>
