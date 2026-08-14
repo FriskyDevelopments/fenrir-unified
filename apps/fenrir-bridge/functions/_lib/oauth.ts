@@ -245,7 +245,7 @@ export function clearCommunityTransactionCookie(domain?: string) {
 export function safeCommunityReturnPath(value: string | null | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
   const pathname = value.split(/[?#]/, 1)[0] || "/";
-  if (!pathname.startsWith("/community/")) return "/";
+  if (!pathname.startsWith("/community/") && pathname !== "/api/community-auth/quality-handoff") return "/";
   return value;
 }
 

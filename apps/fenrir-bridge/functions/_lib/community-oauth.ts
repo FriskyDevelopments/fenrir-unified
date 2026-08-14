@@ -216,8 +216,11 @@ export async function finalizeCommunityOAuthSignIn(options: {
   });
 
   const origin = siteOrigin(options.request, options.env);
-  const location = safeCommunityReturnPath(options.returnTo).startsWith("/community/")
-    ? `${origin.replace(/\/$/, "")}${safeCommunityReturnPath(options.returnTo)}`
+  const returnPath = safeCommunityReturnPath(options.returnTo);
+  const supportedReturn = returnPath.startsWith("/community/")
+    || returnPath.startsWith("/api/community-auth/quality-handoff?");
+  const location = supportedReturn
+    ? `${origin.replace(/\/$/, "")}${returnPath}`
     : `${origin.replace(/\/$/, "")}/community/${options.slug}`;
 
   return {
