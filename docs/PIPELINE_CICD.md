@@ -105,3 +105,32 @@ Never run prod deploys without explicit approval.
 ## Evidence
 
 _(Filled from the real Quality deploy — see "Quality deploy evidence" at the bottom, appended after the run.)_
+
+## Quality deploy evidence (real, not just "build passed")
+
+Run 2026-08-14 (UTC ~23:07) on Francisco's Mac via **wrangler OAuth** (account
+`e2a7eccb24c4836847fd14d08c499bd0`, `CLOUDFLARE_API_TOKEN` stripped from env) —
+the same build→deploy→verify chain the CI Quality jobs run.
+
+**community-bridge → `community-bridge-quality` (Worker)** — via `scripts/deploy-quality.sh`
+- New deployment created `2026-08-14T23:07:12Z` (confirmed newest via `wrangler deployments list`).
+- Worker URL: `https://community-bridge-quality.hrgrrtks2p.workers.dev`
+- Live surface `https://quality.communities.myfenrir.com/` → **HTTP 200**
+- `rel="canonical" href="https://quality.communities.myfenrir.com/"` and
+  `og:url = https://quality.communities.myfenrir.com/` — correctly the Quality
+  origin, **not** localhost (the exact regression the script guards against).
+- Built with the DEV Telegram bot (env had `VITE_TELEGRAM_BOT_USERNAME=Myfenrirdevbot`),
+  never the prod bot.
+
+**fenrir-bridge → Pages preview `--branch quality`**
+- `vite build` → `dist`, then `wrangler pages deploy dist --project-name fenrir-bridge --branch quality`.
+- Deployment: `https://0ec4595a.fenrir-bridge.pages.dev`
+- Branch alias: `https://quality.fenrir-bridge.pages.dev` → `/healthz` **HTTP 200** (body `ok`).
+
+**Prod control (untouched):** `https://www.myfenrir.com/healthz` → **HTTP 200**.
+No `--branch main` deploy was run; the production alias never moved.
+
+> Note: the CI-triggered path (push to `quality` → GitLab runner deploys with the
+> Protected `CLOUDFLARE_API_TOKEN`) additionally requires `quality` to be a
+> Protected branch (see "The token-scope decision"). That is a one-time GitLab
+> settings change for Francisco; the deploy mechanics themselves are proven above.
