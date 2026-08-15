@@ -6,6 +6,10 @@ const env = { VERIFICATION_SECRET: "test-only-secret-with-sufficient-entropy" };
 const origin = "https://friskydev-human-verification.zainxantoine.workers.dev";
 const audience = "https://quality.communities.myfenrir.com";
 const authentikAudience = "https://authentik.friskydev.com";
+const loreAudiences = [
+  "https://lore.myfenrir.com",
+  "https://codex-lore-mvp.lore-the-pack.pages.dev",
+];
 const context = "a".repeat(32);
 
 function decodeBody(token) {
@@ -45,11 +49,21 @@ test("issues a grant bound to the Quality origin and per-attempt context", async
   assert.equal((await consume("b".repeat(32))).status, 400);
 });
 
-test("accepts the canonical FriskyDEV Authentik gateway as an audience", async () => {
+test("accepts Authentik only as a consuming audience", async () => {
   const query = new URLSearchParams({ audience: authentikAudience, context });
   const response = await worker.fetch(new Request(`${origin}/api/slider?${query}`), env);
   assert.equal(response.status, 200);
   const challenge = await response.json();
   assert.equal(challenge.risk, "medium");
   assert.equal(decodeBody(challenge.token).audience, authentikAudience);
+});
+
+test("accepts LORE production and isolated preview as consuming audiences", async () => {
+  for (const loreAudience of loreAudiences) {
+    const query = new URLSearchParams({ audience: loreAudience, context });
+    const response = await worker.fetch(new Request(`${origin}/api/puzzle?${query}`), env);
+    assert.equal(response.status, 200);
+    const challenge = await response.json();
+    assert.equal(decodeBody(challenge.token).audience, loreAudience);
+  }
 });

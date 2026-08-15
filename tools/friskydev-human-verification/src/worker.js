@@ -5,6 +5,8 @@ const glyphs = ["moon", "paw", "spark", "eye", "bolt", "diamond", "flame", "orbi
 const allowedAudiences = new Set([
   "https://friskydev-human-verification.zainxantoine.workers.dev",
   "https://quality.communities.myfenrir.com",
+  "https://lore.myfenrir.com",
+  "https://codex-lore-mvp.lore-the-pack.pages.dev",
   "https://authentik.friskydev.com",
   "https://authentik.tailab8146.ts.net:9443",
 ]);

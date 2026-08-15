@@ -14,8 +14,9 @@ application origin and a per-attempt context. Applications must validate the
 grant server-to-server through `POST /api/grant/verify`; a browser query flag is
 never authentication or verification proof.
 
-Community Bridge Quality is the first consumer. Production origins are not
-allowlisted by this change.
+Community Bridge Quality and LORE are explicit consumers. LORE uses this
+canonical worker directly; Authentik remains an identity-provider audience and
+must never be presented as the CAPTCHA or challenge host.
 
 Run the protocol tests with:
 
