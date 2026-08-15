@@ -21,6 +21,7 @@ const copy = {
 /** ALTCHA is the primary check; the custom methods remain explicit fallbacks. */
 export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => void }) {
   const widgetRef = useRef<HTMLElement | null>(null);
+  const verifiedRef = useRef(false);
   const [mode, setMode] = useState<Mode>("altcha");
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [slider, setSlider] = useState(0);
@@ -36,6 +37,7 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
     });
     const body = await response.json().catch(() => null) as { grant?: string } | null;
     if (!response.ok || !body?.grant) throw new Error("verification_failed");
+    verifiedRef.current = true;
     setVerified(true);
     setNote(copy.verified);
     onVerified(true);
@@ -60,9 +62,10 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
     if (mode !== "altcha" || !widgetRef.current) return;
     const widget = widgetRef.current;
     const state = (event: Event) => {
+      if (verifiedRef.current) return;
       const detail = (event as CustomEvent<{ state?: string; payload?: string }>).detail;
-      if (detail?.payload) void submit("altcha", { payload: detail.payload }).catch(() => setNote("Automatic verification failed. Retry or choose a fallback."));
-      else if (detail?.state === "error") setNote("Automatic verification is unavailable. Choose a fallback below.");
+      if (detail?.payload) void submit("altcha", { payload: detail.payload }).catch(() => { if (!verifiedRef.current) setNote("Automatic verification failed. Retry or choose a fallback."); });
+      else if (detail?.state === "error") { if (!verifiedRef.current) setNote("Automatic verification is unavailable. Choose a fallback below."); }
     };
     widget.addEventListener("statechange", state);
     widget.addEventListener("verified", state);
