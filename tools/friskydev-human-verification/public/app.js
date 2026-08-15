@@ -27,12 +27,22 @@ const sliderStrength = document.querySelector('#slider-strength');
 const sliderRisk = document.querySelector('#slider-risk');
 const fallbackGrant = document.querySelector('#fallback-grant');
 const fallbackVerified = document.querySelector('#fallback-verified');
+const brandKicker = document.querySelector('#brand-kicker');
+const puzzleKicker = document.querySelector('#puzzle-kicker');
+const sliderKicker = document.querySelector('#slider-kicker');
+const verificationMark = document.querySelector('#verification-mark');
 let puzzleToken = '';
 let selectedRune = '';
 let sliderToken = '';
 let sliderTarget = 50;
 const verificationParams = new URLSearchParams(location.search);
 const verificationAudience = verificationParams.get('audience') || location.origin;
+const loreAudiences = new Set([
+  'https://lore.myfenrir.com',
+  'https://codex-lore-mvp.lore-the-pack.pages.dev',
+]);
+const isLore = loreAudiences.has(verificationAudience);
+document.documentElement.dataset.experience = isLore ? 'lore' : 'friskydev';
 const verificationContext = verificationParams.get('context') || crypto.randomUUID().replaceAll('-', '');
 const verificationQuery = new URLSearchParams({ audience: verificationAudience, context: verificationContext });
 const verificationEndpoint = (path) => `${path}?${verificationQuery.toString()}`;
@@ -45,6 +55,13 @@ const copy = {
   pt: { title: 'Vamos confirmar que você é humano', intro: 'Verificação privada sem rastreamento. Conclua o desafio automático ou use o puzzle alternativo.', continue: 'Continuar', fallback: 'Com problemas? Use o puzzle', puzzleTitle: 'Combine o sinal', puzzleInstruction: 'Toque no sinal idêntico. A ordem importa.', legend: 'Selecione o sinal correto', unlock: 'Desbloquear sinal', privacy: 'Sem cookies · Sem impressão digital · Sem reconhecimento de imagens', checking: 'Verificando…', checkingAnswer: 'Verificando sua resposta…', verified: 'Verificado. Você pode continuar.', failed: 'A verificação automática falhou. Use o puzzle abaixo.', failedPuzzle: 'A verificação automática falhou. Conclua o puzzle alternativo.', unavailable: 'Não foi possível carregar o puzzle. Tente novamente mais tarde.', mismatch: 'O sinal não corresponde. Aqui está um novo puzzle.', then: 'depois', risk: { low: 'BAIXO', medium: 'MÉDIO', high: 'ALTO' }, glyph: { moon: 'lua', paw: 'pata', spark: 'faísca', eye: 'olho', bolt: 'raio', diamond: 'diamante', flame: 'chama', orbit: 'órbita', wolf: 'lobo', star: 'estrela' } },
 };
 
+const loreCopy = {
+  en: { kicker: 'LORE · SIGNAL CHECK', title: 'Prove the signal is yours', intro: 'Before your Aura enters THE PACK, complete a private human check. No tracking, no image recognition.', continue: 'Verify my signal', verified: 'Signal confirmed. Return to LORE.', privacy: 'Private by design · No tracking · No image recognition', puzzleKicker: 'LORE SIGNAL LOCK', sliderKicker: 'SIGNAL SLIDER · LORE' },
+  es: { kicker: 'LORE · CONTROL DE SEÑAL', title: 'Demuestra que la señal es tuya', intro: 'Antes de que tu Aura entre a THE PACK, completa una verificación humana privada. Sin seguimiento ni reconocimiento de imágenes.', continue: 'Verificar mi señal', verified: 'Señal confirmada. Vuelve a LORE.', privacy: 'Privado por diseño · Sin seguimiento · Sin reconocimiento de imágenes', puzzleKicker: 'BLOQUEO DE SEÑAL LORE', sliderKicker: 'SIGNAL SLIDER · LORE' },
+  fr: { kicker: 'LORE · CONTRÔLE DU SIGNAL', title: 'Prouvez que le signal est le vôtre', intro: 'Avant que votre Aura rejoigne THE PACK, effectuez une vérification humaine privée. Sans suivi ni reconnaissance d’image.', continue: 'Vérifier mon signal', verified: 'Signal confirmé. Retournez à LORE.', privacy: 'Privé dès la conception · Sans suivi · Sans reconnaissance d’image', puzzleKicker: 'VERROU DU SIGNAL LORE', sliderKicker: 'SIGNAL SLIDER · LORE' },
+  pt: { kicker: 'LORE · VERIFICAÇÃO DE SINAL', title: 'Prove que o sinal é seu', intro: 'Antes que sua Aura entre no THE PACK, conclua uma verificação humana privada. Sem rastreamento nem reconhecimento de imagens.', continue: 'Verificar meu sinal', verified: 'Sinal confirmado. Volte ao LORE.', privacy: 'Privado por design · Sem rastreamento · Sem reconhecimento de imagens', puzzleKicker: 'BLOQUEIO DE SINAL LORE', sliderKicker: 'SIGNAL SLIDER · LORE' },
+};
+
 const sliderCopy = {
   en: { method: 'Use Signal Slider', puzzle: 'Use rune puzzle instead', title: 'Lock onto the signal', instruction: 'Drag the wolf into the glowing target.', verify: 'Verify position', aria: 'Signal position' },
   es: { method: 'Usar Signal Slider', puzzle: 'Usar puzzle de runas', title: 'Sintoniza la señal', instruction: 'Arrastra el lobo hasta el objetivo brillante.', verify: 'Verificar posición', aria: 'Posición de la señal' },
@@ -53,7 +70,7 @@ const sliderCopy = {
 };
 
 const glyphs = { moon: '◒', paw: '◆', spark: '✦', eye: '◉', bolt: 'ϟ', diamond: '◇', flame: '♨', orbit: '⊛', star: '★' };
-const t = (key) => copy[currentLanguage][key];
+const t = (key) => (isLore ? loreCopy[currentLanguage][key] : undefined) ?? copy[currentLanguage][key];
 const glyphName = (name) => copy[currentLanguage].glyph[name] ?? name;
 const glyph = (name) => glyphs[name] ?? '•';
 const glyphMarkup = (name) => name === 'wolf' ? '<img class="glyph-wolf" src="/assets/friskydev-wolf-transparent.png" alt="">' : glyph(name);
@@ -95,6 +112,9 @@ function applyLanguage(language) {
   legend.textContent = t('legend');
   unlockLabel.textContent = t('unlock');
   privacy.textContent = t('privacy');
+  brandKicker.textContent = isLore ? loreCopy[language].kicker : 'FRISKYDEV · SECURE CHECK';
+  puzzleKicker.textContent = isLore ? loreCopy[language].puzzleKicker : 'WOLF SIGNAL LOCK';
+  sliderKicker.textContent = isLore ? loreCopy[language].sliderKicker : 'SIGNAL SLIDER · FRISKYDEV';
   showSlider.textContent = sliderCopy[language].method;
   sliderTitle.textContent = sliderCopy[language].title;
   sliderInstruction.textContent = sliderCopy[language].instruction;
@@ -176,8 +196,9 @@ themeButtons.forEach((button) => button.addEventListener('click', () => {
   document.documentElement.dataset.theme = button.dataset.theme;
   themeButtons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
 }));
-document.documentElement.dataset.theme = 'acid';
-themeButtons[0]?.setAttribute('aria-pressed', 'true');
+document.documentElement.dataset.theme = isLore ? 'violet' : 'acid';
+themeButtons[isLore ? 2 : 0]?.setAttribute('aria-pressed', 'true');
+if (isLore) verificationMark.setAttribute('aria-label', 'LORE human-signal mark');
 
 if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
   card.addEventListener('pointermove', (event) => {

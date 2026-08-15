@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "../src/worker.js";
+import { readFileSync } from "node:fs";
 
 const env = { VERIFICATION_SECRET: "test-only-secret-with-sufficient-entropy" };
 const origin = "https://friskydev-human-verification.zainxantoine.workers.dev";
@@ -66,4 +67,11 @@ test("accepts LORE production and isolated preview as consuming audiences", asyn
     const challenge = await response.json();
     assert.equal(decodeBody(challenge.token).audience, loreAudience);
   }
+});
+
+test("ships an audience-specific LORE presentation without making Authentik canonical", () => {
+  const app = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
+  assert.match(app, /LORE · SIGNAL CHECK/);
+  assert.match(app, /Prove the signal is yours/);
+  assert.doesNotMatch(app, /loreAudiences[\s\S]*authentik\.friskydev\.com/);
 });

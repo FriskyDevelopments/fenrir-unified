@@ -2,6 +2,12 @@
 :root[data-theme=cyan] { --accent: #40eaff; --accent-rgb: 64,234,255; --accent-filter: invert(81%) sepia(88%) saturate(1428%) hue-rotate(148deg) brightness(105%); }
 :root[data-theme=violet] { --accent: #a98bff; --accent-rgb: 169,139,255; --accent-filter: invert(68%) sepia(75%) saturate(2516%) hue-rotate(217deg) brightness(104%); }
 :root[data-theme=coral] { --accent: #ff715b; --accent-rgb: 255,113,91; --accent-filter: invert(61%) sepia(91%) saturate(2746%) hue-rotate(328deg) brightness(103%); }
+:root[data-experience=lore] { --lore-pink: #ff2e6e; }
+:root[data-experience=lore] body { background: #07030f; }
+:root[data-experience=lore] body::before { background: conic-gradient(from 215deg at 48% 44%, #07030f, #210b38 18%, #090414 35%, rgba(var(--accent-rgb),.18) 49%, #10051f 62%, rgba(255,46,110,.16) 79%, #07030f); }
+:root[data-experience=lore] .card { border-color: rgba(169,139,255,.46); background: linear-gradient(145deg,rgba(24,10,39,.97),rgba(8,4,16,.97)); }
+:root[data-experience=lore] .card::after { content: 'LORE / HUMAN SIGNAL'; color: rgba(var(--accent-rgb),.55); }
+:root[data-experience=lore] .eyebrow { text-shadow: 0 0 18px rgba(var(--accent-rgb),.35); }
 * { box-sizing: border-box; }
 body { min-height: 100vh; margin: 0; display: grid; place-items: center; overflow-x: hidden; padding: 56px 24px; background: #090b10; color: #f7f8fb; isolation: isolate; }
 body::before { content: ''; position: fixed; z-index: -2; inset: -30%; background: conic-gradient(from 210deg at 48% 44%, #0a0d13, #1b2435 16%, #0b1018 34%, rgba(var(--accent-rgb),.13) 48%, #0a0c11 59%, #192133 78%, #0a0d13); filter: blur(70px); opacity: .9; }
