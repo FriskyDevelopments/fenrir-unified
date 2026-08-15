@@ -32,6 +32,27 @@ describe("Community Neon handoff edge", () => {
     expect(response.headers.get("set-cookie")).toContain("HttpOnly");
   });
 
+  it("proxies OAuth starts through the pinned canonical Neon deployment", async () => {
+    const upstreamFetch = vi.fn(async () => new Response(null, {
+      status: 302,
+      headers: {
+        Location: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+        "Set-Cookie": "fenrir_oauth_state=opaque; Path=/api/community-auth; HttpOnly; Secure; SameSite=Lax",
+      },
+    }));
+    vi.stubGlobal("fetch", upstreamFetch);
+    const response = await worker.fetch(new Request(
+      "https://myfenrir.com/api/community-auth/oauth/microsoft?slug=fenrir&return_to=%2Fcommunity%2Ffenrir",
+    ), env);
+    expect(upstreamFetch).toHaveBeenCalledOnce();
+    expect((upstreamFetch.mock.calls[0]![0] as Request).url).toBe(
+      "https://276df7c1.fenrir-bridge.pages.dev/api/community-auth/oauth/microsoft?slug=fenrir&return_to=%2Fcommunity%2Ffenrir",
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toContain("login.microsoftonline.com");
+    expect(response.headers.get("set-cookie")).toContain("fenrir_oauth_state=");
+  });
+
   it("rejects a handoff when the canonical Neon session is not authenticated", async () => {
     const now = Math.floor(Date.now() / 1000);
     const marker = await testables.signedJson({

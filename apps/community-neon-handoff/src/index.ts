@@ -111,6 +111,12 @@ async function proxyCallback(request: Request, env: Env): Promise<Response> {
   return new Response(upstream.body, { status: upstream.status, statusText: upstream.statusText, headers });
 }
 
+async function proxyCanonical(request: Request, env: Env): Promise<Response> {
+  const incoming = new URL(request.url);
+  const upstreamUrl = new URL(incoming.pathname + incoming.search, env.CANONICAL_NEON_ORIGIN);
+  return fetch(new Request(upstreamUrl, request));
+}
+
 async function qualityHandoff(request: Request, env: Env): Promise<Response> {
   const marker = await verifiedJson<Marker>(cookie(request, MARKER_COOKIE), `quality-marker-v1:${env.QUALITY_HANDOFF_SECRET}`);
   const now = Math.floor(Date.now() / 1000);
@@ -145,6 +151,7 @@ export default {
     if (path === "/api/community-auth/quality-start" && request.method === "GET") return qualityStart(request, env);
     if (path === "/api/community-auth/quality-handoff" && request.method === "GET") return qualityHandoff(request, env);
     if (path.startsWith("/api/community-auth/oauth/callback/")) return proxyCallback(request, env);
+    if (path.startsWith("/api/community-auth/oauth/")) return proxyCanonical(request, env);
     return new Response("Not found", { status: 404 });
   },
 };
