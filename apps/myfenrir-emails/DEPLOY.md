@@ -10,11 +10,12 @@ to **`hola@myfenrir.com`**.
 | Piece | Status |
 |-------|--------|
 | Worker `myfenrir-emails` code (providers, templates, brand) | ✅ in `apps/myfenrir-emails` |
-| Pages client `functions/_lib/myfenrir-emails.ts` + magic-link wired | ✅ (uncommitted, additive) |
+| Pages client `functions/_lib/myfenrir-emails.ts` + magic-link wired | ✅ deployed in `fenrir-bridge` |
 | `env.EMAIL` binding (Cloudflare Email Service) on the Worker | ✅ declared in `wrangler.toml` (`[[send_email]]`) |
 | `mail.myfenrir.com` SPF + DKIM (`cf-bounce`) | ✅ confirmed with Wrangler |
 | `mail.myfenrir.com` onboarded in **Email Service → Email Sending** | ✅ enabled 2026-08-08 |
-| Secret `SEND_AUTH_TOKEN` (Worker + Pages token) | ⛔ set on deploy (`wrangler secret put`) |
+| Secret `SEND_AUTH_TOKEN` (Worker + Pages token) | ✅ set and synchronized (values remain encrypted) |
+| Custom Domain `emails.myfenrir.com` | ✅ Worker Custom Domain; DNS and TLS managed by Cloudflare |
 | Secret `RESEND_API_KEY` (fallback) | 🔑 `op://FriskyDev-Infra/Email/password` |
 | Secret `MAILERSEND_API_KEY` (fallback) | ⛔ **op:// path TBD** — leave unset until provided |
 | Resend domain `myfenrir.com` | ⛔ not verified in Resend (only `hostcasa.app` is) |
@@ -42,7 +43,7 @@ Then, on the **fenrir-bridge Pages** project, so Pages Functions reach this Work
 
 ```bash
 # var (non-secret): the deployed Worker URL
-#   MYFENRIR_EMAILS_URL = https://myfenrir-emails.<subdomain>.workers.dev
+#   MYFENRIR_EMAILS_URL = https://emails.myfenrir.com
 # secret: must equal the Worker's SEND_AUTH_TOKEN
 wrangler pages secret put MYFENRIR_EMAILS_TOKEN --project-name fenrir-bridge
 ```
@@ -69,18 +70,18 @@ cd apps/myfenrir-emails
 npm install
 npm run typecheck
 wrangler deploy            # workers.dev preview URL (top-level env, workers_dev=true)
-# -> https://myfenrir-emails.<subdomain>.workers.dev
+# -> https://myfenrir-emails.hrgrrtks2p.workers.dev
 
 # smoke test the render path (no secret needed for previews):
-curl -s https://myfenrir-emails.<subdomain>.workers.dev/health | jq
-open  https://myfenrir-emails.<subdomain>.workers.dev/preview/acceso?brand=myfenrir
+curl -s https://emails.myfenrir.com/health | jq
+open  https://emails.myfenrir.com/preview/acceso?brand=myfenrir
 ```
 
 Send a real email through the Worker once secrets are set:
 
 ```bash
 source .dev.vars   # for SEND_AUTH_TOKEN locally, or use the deployed secret
-curl -s -X POST https://myfenrir-emails.<subdomain>.workers.dev/send \
+curl -s -X POST https://emails.myfenrir.com/send \
   -H "Authorization: Bearer $SEND_AUTH_TOKEN" -H "Content-Type: application/json" \
   -d '{"template":"verificacion-codigo","to":"babaji.alvarez@gmail.com",
        "brand":"myfenrir","data":{"nombre":"Francisco","codigo":"F7K2Q9","minutos":15}}'
@@ -88,11 +89,22 @@ curl -s -X POST https://myfenrir-emails.<subdomain>.workers.dev/send \
 # if not onboarded yet, it auto-falls back to resend (from hostcasa.app).
 ```
 
-Promote to the branded hostname only when ready:
+Deploy the production Worker and its managed Custom Domain:
 
 ```bash
-wrangler deploy --env production    # route emails.myfenrir.com/* (needs the DNS record)
+wrangler deploy --env production    # emails.myfenrir.com (Custom Domain)
 ```
+
+## Verified production baseline — 2026-08-14
+
+- `GET /health`: HTTP 200, Cloudflare provider, live `EMAIL` binding, 8 templates.
+- `GET /` and `/preview/bienvenida`: HTTP 200 over the branded Custom Domain.
+- Unauthenticated `POST /send`: HTTP 401.
+- Authenticated `bienvenida` send: accepted by Cloudflare Email Service and
+  observed in an independent QA inbox with authenticated
+  `noreply@mail.myfenrir.com`, matching subject, HTML, plain text, and CTA.
+- Responsive browser QA: 1440 px desktop and 390 px mobile; no horizontal
+  overflow in the studio or email card.
 
 ## Step 3 (optional) — Resend from @myfenrir.com
 

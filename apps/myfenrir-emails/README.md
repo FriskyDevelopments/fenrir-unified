@@ -71,6 +71,8 @@ by default; a hosted PNG can be opted in via `brand.logoUrl`).
 
 `GET /health` reports provider, fallback chain, binding status, templates, brands.
 `GET /preview/<template>?brand=myfenrir` renders a template with sample data.
+`GET /` serves the responsive **MyFenrir Signal Email Studio**, a production
+catalog for visually inspecting every live template on desktop and mobile.
 
 ## Develop
 
@@ -78,8 +80,10 @@ by default; a hosted PNG can be opted in via `brand.logoUrl`).
 npm install
 cp .dev.vars.example .dev.vars      # fill SEND_AUTH_TOKEN (+ RESEND_API_KEY to test fallback)
 npm run previews                    # eyeball previews/index.html
+npm test                            # Worker API, auth and dispatch contract
 npm run typecheck
 npm run dev                         # wrangler dev (remote EMAIL binding)
 ```
 
-Deploy + DNS onboarding: see **DEPLOY.md**. Event wiring: see **WIRING.md**.
+Production: **https://emails.myfenrir.com**. Deploy + DNS evidence: see
+**DEPLOY.md**. Event wiring: see **WIRING.md**.

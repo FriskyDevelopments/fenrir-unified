@@ -155,23 +155,40 @@ async function handleSend(body: any, env: Env): Promise<Response> {
 
 function indexPage(env: Env): string {
   const brands = Object.keys(BRANDS);
-  const rows = Object.values(TEMPLATES)
+  const cards = Object.values(TEMPLATES)
     .map((t) => {
       const links = brands
-        .map((b) => `<a href="/preview/${t.id}?brand=${b}" style="color:#00E5FF;margin-right:12px;text-decoration:none;">${b}</a>`)
+        .map((b) => `<a class="preview" href="/preview/${t.id}?brand=${b}">Explorar correo <span>↗</span></a>`)
         .join("");
-      return `<tr><td style="padding:10px 14px;color:#ECEEFF;font-weight:600;">${t.label}<br><code style="color:#8B7CFF;font-size:12px;">${t.id}</code></td><td style="padding:10px 14px;">${links}</td></tr>`;
+      return `<article class="template-card">
+        <div class="card-orbit"></div>
+        <div class="card-top"><span class="signal"></span><code>${t.id}</code><span class="rail">EDGE READY</span></div>
+        <h2>${t.label}</h2>
+        <p>Responsive HTML + texto plano. Renderizado en el edge con la identidad protectora de MyFenrir.</p>
+        ${links}
+      </article>`;
     })
     .join("");
-  return `<!doctype html><meta charset="utf-8"><title>MyFenrir Emails</title>
-  <body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:760px;margin:0 auto;padding:40px 20px;background:#05060B;color:#ECEEFF;">
-  <div style="font-size:11px;font-weight:800;letter-spacing:3px;color:#4FD7E0;">MYFENRIR // THE PACK</div>
-  <h1 style="letter-spacing:-.5px;margin:6px 0 0;">FENRIR<span style="color:#00E5FF;">.</span> · Email service</h1>
-  <p style="color:#AEB5D0;">Provider: <b style="color:#00E5FF;">${env.EMAIL_PROVIDER || "cloudflare"}</b>
-    · Fallback: <b>${env.EMAIL_FALLBACK || "none"}</b>
-    · EMAIL binding: <b>${env.EMAIL ? "on" : "off"}</b></p>
-  <table style="border-collapse:collapse;width:100%;border:1px solid rgba(150,166,224,.16);border-radius:12px;overflow:hidden;margin-top:16px;">
-  <tr style="background:#0B0E1A;"><th align="left" style="padding:12px 14px;color:#AEB5D0;">Plantilla</th><th align="left" style="padding:12px 14px;color:#AEB5D0;">Previews por marca</th></tr>
-  ${rows}</table>
-  <p style="color:#858BA8;margin-top:24px;font-size:13px;">POST <code>/send</code> · GET <code>/health</code></p></body>`;
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#05060b"><title>MyFenrir Signal — Email Studio</title>
+  <style>
+  :root{color-scheme:dark;--void:#05060b;--panel:#0b0e1a;--text:#eceeff;--muted:#929ab8;--cyan:#00e5ff;--violet:#8b7cff;--gold:#f1b75c}
+  *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--void);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow-x:hidden}
+  body:before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at 12% 4%,rgba(139,124,255,.18),transparent 32%),radial-gradient(circle at 88% 12%,rgba(0,229,255,.13),transparent 28%),linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:auto,auto,72px 72px,72px 72px;mask-image:linear-gradient(to bottom,#000 0%,transparent 72%)}
+  .shell{width:min(1180px,calc(100% - 40px));margin:auto;position:relative}.nav{height:88px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(150,166,224,.13)}
+  .brand{font-weight:900;font-size:19px;letter-spacing:-.04em}.brand i{font-style:normal;color:var(--cyan)}.eyebrow,.rail,code{font:700 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.16em;text-transform:uppercase}.eyebrow{color:#73eef7}.nav-status{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:12px}.pulse,.signal{display:inline-block;border-radius:50%;background:var(--cyan);box-shadow:0 0 0 5px rgba(0,229,255,.1),0 0 24px rgba(0,229,255,.75)}.pulse{width:7px;height:7px}
+  .hero{padding:106px 0 84px;display:grid;grid-template-columns:1.35fr .65fr;gap:70px;align-items:end}.hero h1{font-size:clamp(54px,8.7vw,118px);line-height:.84;letter-spacing:-.075em;margin:22px 0 32px;max-width:850px}.hero h1 span{display:block;color:transparent;-webkit-text-stroke:1px rgba(236,238,255,.42)}.lede{font-size:clamp(17px,2vw,22px);line-height:1.55;color:#b7bdd4;max-width:680px}.hero-panel{border-left:1px solid rgba(150,166,224,.18);padding-left:28px}.metric{padding:18px 0;border-bottom:1px solid rgba(150,166,224,.12)}.metric b{font-size:32px;letter-spacing:-.05em;display:block}.metric span{color:var(--muted);font-size:12px}.cyan{color:var(--cyan)}
+  .marquee{border-block:1px solid rgba(150,166,224,.13);overflow:hidden;white-space:nowrap}.marquee div{padding:15px 0;color:#707999;font:700 10px ui-monospace,monospace;letter-spacing:.22em;word-spacing:2em;animation:drift 28s linear infinite}@keyframes drift{to{transform:translateX(-45%)}}
+  .section-head{display:flex;justify-content:space-between;align-items:end;padding:84px 0 28px}.section-head h2{font-size:clamp(34px,5vw,60px);letter-spacing:-.06em;margin:8px 0 0}.section-head p{max-width:390px;color:var(--muted);line-height:1.6}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;padding-bottom:100px}.template-card{position:relative;overflow:hidden;min-height:300px;padding:30px;border:1px solid rgba(150,166,224,.14);border-radius:24px;background:linear-gradient(145deg,rgba(18,23,52,.76),rgba(8,10,18,.92));transition:.35s ease}.template-card:hover{transform:translateY(-5px);border-color:rgba(0,229,255,.35);box-shadow:0 28px 70px rgba(0,0,0,.35)}.card-orbit{position:absolute;width:210px;height:210px;border:1px solid rgba(139,124,255,.14);border-radius:50%;right:-90px;top:-110px;box-shadow:0 0 80px rgba(139,124,255,.08)}.card-top{display:flex;align-items:center;gap:12px}.signal{width:5px;height:5px}.card-top code{color:#9ca5c5}.rail{margin-left:auto;color:#64708f}.template-card h2{font-size:31px;letter-spacing:-.04em;margin:58px 0 12px}.template-card p{color:#969fbc;line-height:1.65;max-width:440px}.preview{display:inline-flex;align-items:center;gap:12px;margin-top:22px;color:var(--text);text-decoration:none;font-size:13px;font-weight:750}.preview span{color:var(--cyan);transition:.25s}.preview:hover span{transform:translate(4px,-2px)}
+  footer{padding:32px 0 48px;border-top:1px solid rgba(150,166,224,.13);display:flex;justify-content:space-between;color:#68718f;font-size:11px}.api{font-family:ui-monospace,monospace;color:#8c95b1}
+  @media(max-width:760px){.shell{width:calc(100% - 40px)}.hero{grid-template-columns:minmax(0,1fr);padding:72px 0 56px;gap:40px}.hero>div{min-width:0}.hero h1{font-size:clamp(44px,13vw,52px);line-height:.9;max-width:100%;overflow-wrap:normal}.lede{font-size:17px;max-width:100%;overflow-wrap:anywhere}.hero-panel{border-left:0;border-top:1px solid rgba(150,166,224,.18);padding:18px 0 0}.grid{grid-template-columns:minmax(0,1fr)}.section-head{display:block}.section-head h2{font-size:42px}.template-card{min-height:270px;padding:24px}.template-card h2{font-size:28px}.nav-status span:last-child{display:none}footer{display:block;line-height:2}}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  </style></head><body><main class="shell">
+  <nav class="nav"><div class="brand">FENRIR<i>.</i></div><div class="nav-status"><span class="pulse"></span><span>SIGNAL ONLINE · CLOUDFLARE EDGE</span></div></nav>
+  <section class="hero"><div><div class="eyebrow">MYFENRIR // THE PACK // EMAIL SYSTEM</div><h1>Messages with <span>instinct.</span></h1><p class="lede">Un sistema transaccional que convierte cada acceso, vínculo y bienvenida en una señal inequívocamente MyFenrir.</p></div>
+  <aside class="hero-panel"><div class="metric"><b>${TEMPLATE_IDS.length}</b><span>señales transaccionales</span></div><div class="metric"><b class="cyan">${env.EMAIL ? "LIVE" : "READY"}</b><span>Cloudflare Email binding</span></div><div class="metric"><b>2×</b><span>HTML responsivo + texto plano</span></div></aside></section>
+  </main><div class="marquee"><div>IDENTITY VERIFIED · PASSWORDLESS ACCESS · TELEGRAM LINKED · PACK ACTIVATED · EDGE DELIVERED · IDENTITY VERIFIED · PASSWORDLESS ACCESS · TELEGRAM LINKED · PACK ACTIVATED · EDGE DELIVERED ·</div></div>
+  <main class="shell"><section class="section-head"><div><div class="eyebrow">SIGNAL LIBRARY / 01—08</div><h2>Cada momento,<br>una señal propia.</h2></div><p>Previews reales generados por el mismo renderer que alimenta producción. Sin screenshots falsos, sin plantillas genéricas.</p></section><section class="grid">${cards}</section>
+  <footer><span>© ${new Date().getFullYear()} MYFENRIR · FENRIR PROTOCOL</span><span class="api">GET /health · POST /send · EDGE NATIVE</span></footer></main></body></html>`;
 }

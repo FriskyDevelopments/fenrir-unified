@@ -49,7 +49,7 @@ REQUIRE_AUTH = "1"
 [env.production]
 name = "myfenrir-emails"
 workers_dev = true
-route = { pattern = "emails.myfenrir.com/*", zone_name = "myfenrir.com" }
+route = { pattern = "emails.myfenrir.com", custom_domain = true }
 
 [env.production.vars]
 EMAIL_PROVIDER = "cloudflare"
