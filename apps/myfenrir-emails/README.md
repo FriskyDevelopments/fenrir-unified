@@ -72,7 +72,10 @@ by default; a hosted PNG can be opted in via `brand.logoUrl`).
 `GET /health` reports provider, fallback chain, binding status, templates, brands.
 `GET /preview/<template>?brand=myfenrir` renders a template with sample data.
 `GET /` serves the responsive **MyFenrir Signal Email Studio**, a production
-catalog for visually inspecting every live template on desktop and mobile.
+catalog for visually inspecting every live template on desktop and mobile. Its
+UI Verse-inspired **Signal Prism** pattern adds an orbital sigil, reactive
+spotlight, holographic card depth and pointer tilt; motion is disabled on mobile
+and under `prefers-reduced-motion` while email markup remains client-safe.
 
 ## Develop
 
