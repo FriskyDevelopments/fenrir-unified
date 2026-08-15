@@ -16,6 +16,7 @@ import { noStoreJson } from "../../../_lib/responses";
 type MagicLinkRequest = {
   email?: unknown;
   slug?: unknown;
+  locale?: unknown;
 };
 
 export async function onRequestPost(context: any) {
@@ -61,7 +62,7 @@ export async function onRequestPost(context: any) {
   const emailResult = await sendMyFenrirEmail(context.env, {
     template: "acceso",
     to: email,
-    subject: "Tu acceso a MyFenrir",
+    locale: typeof body?.locale === "string" ? body.locale as "en" | "es" | "fr" | "de" : "en",
     data: {
       url: magicLink,
       minutos: 15,

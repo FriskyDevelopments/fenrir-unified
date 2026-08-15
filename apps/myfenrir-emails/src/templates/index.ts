@@ -8,13 +8,15 @@ import * as notificacion from "./notificacion";
 import * as activacionIdentidad from "./activacion-identidad";
 import * as invitacionLore from "./invitacion-lore";
 import * as continuarLore from "./continuar-lore";
+import type { Locale } from "../locale";
+import { renderLocalized } from "./localized";
 
 export type { RenderedEmail } from "./types";
 
 export interface TemplateModule {
   id: string;
   label: string;
-  render: (brand: Brand, data: any) => RenderedEmail;
+  render: (brand: Brand, data: any, locale?: Locale) => RenderedEmail;
   sample: any;
 }
 
@@ -33,5 +35,7 @@ export const TEMPLATES: Record<string, TemplateModule> = {
 export const TEMPLATE_IDS = Object.keys(TEMPLATES);
 
 export function getTemplate(id: string): TemplateModule | undefined {
-  return TEMPLATES[id];
+  const template = TEMPLATES[id];
+  if (!template) return undefined;
+  return { ...template, render: (brand, data, locale = "en") => locale === "es" ? template.render(brand, data, "es") : renderLocalized(id, brand, data, locale) };
 }

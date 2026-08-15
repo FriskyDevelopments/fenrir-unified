@@ -37,6 +37,14 @@ export type MyFenrirTemplateId =
   | "continuar-lore";
 
 export const FENRIR_MAIL_FROM = { email: "noreply@mail.myfenrir.com", name: "MyFenrir" } as const;
+export type MyFenrirEmailLocale = "en" | "es" | "fr" | "de";
+
+export function emailLocaleFromTelegram(languageCode?: string | null): MyFenrirEmailLocale {
+  const base = String(languageCode ?? "").trim().toLowerCase().replace("_", "-").split("-")[0];
+  return (["en", "es", "fr", "de"] as const).includes(base as MyFenrirEmailLocale)
+    ? base as MyFenrirEmailLocale
+    : "en";
+}
 
 export interface SendTemplateInput {
   template: MyFenrirTemplateId;
@@ -44,6 +52,8 @@ export interface SendTemplateInput {
   data?: Record<string, unknown>;
   subject?: string;
   brand?: string | Record<string, unknown>;
+  locale?: MyFenrirEmailLocale;
+  telegramLanguageCode?: string;
 }
 
 export interface SendTemplateResult {
@@ -72,6 +82,7 @@ export async function sendMyFenrirEmail(env: MyFenrirEmailEnv, input: SendTempla
           data: input.data ?? {},
           subject: input.subject,
           brand: input.brand ?? "myfenrir",
+          locale: input.locale ?? emailLocaleFromTelegram(input.telegramLanguageCode),
         }),
       });
       const body: any = await res.json().catch(() => ({}));

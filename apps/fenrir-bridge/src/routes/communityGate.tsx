@@ -689,7 +689,7 @@ export function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmedEmail, slug })
+        body: JSON.stringify({ email: trimmedEmail, slug, locale })
       });
       const body = await response.json().catch(() => null) as { message?: string; devLink?: string; error?: string; detail?: string | { message?: string } } | null;
       if (!response.ok) throw new Error(readableCommunityError(body?.detail, body?.error));

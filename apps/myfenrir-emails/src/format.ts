@@ -12,7 +12,7 @@ export function esc(v: unknown): string {
 }
 
 // Human date in Spanish (es-MX) with time. Accepts ISO string or Date.
-export function fecha(input?: string | Date, withTime = false): string {
+export function fecha(input?: string | Date, withTime = false, locale = "es"): string {
   if (!input) return "";
   const d = typeof input === "string" ? new Date(input) : input;
   if (isNaN(d.getTime())) return esc(String(input));
@@ -21,7 +21,8 @@ export function fecha(input?: string | Date, withTime = false): string {
     opts.hour = "2-digit";
     opts.minute = "2-digit";
   }
-  return d.toLocaleDateString("es-MX", opts);
+  const tags: Record<string, string> = { en: "en-US", es: "es-MX", fr: "fr-FR", de: "de-DE" };
+  return d.toLocaleDateString(tags[locale] ?? tags.en, opts);
 }
 
 // Minutes-from-now helper for "expires in X" copy. Accepts an ISO expiry.

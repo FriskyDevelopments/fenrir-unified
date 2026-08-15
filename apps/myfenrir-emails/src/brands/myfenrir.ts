@@ -17,7 +17,8 @@ export const myfenrir: Brand = {
   wordmark: "FENRIR",
   wordmarkDot: true,
   tagline: "THE PACK",
-  logoWidth: 72,
+  logoUrl: "https://www.myfenrir.com/fenrir-splash-icon-512.png",
+  logoWidth: 84,
   colors: {
     ink: "#05060B",
     inkAlt: "#0B0E1A",

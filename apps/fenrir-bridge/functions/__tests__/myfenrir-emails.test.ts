@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { sendMyFenrirEmail } from "../_lib/myfenrir-emails";
+import { emailLocaleFromTelegram, sendMyFenrirEmail } from "../_lib/myfenrir-emails";
+
+it("maps Telegram language codes to supported email locales", () => {
+  expect(emailLocaleFromTelegram("es-MX")).toBe("es");
+  expect(emailLocaleFromTelegram("fr")).toBe("fr");
+  expect(emailLocaleFromTelegram("de-DE")).toBe("de");
+  expect(emailLocaleFromTelegram("pt-BR")).toBe("en");
+});
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -31,6 +38,7 @@ describe("sendMyFenrirEmail", () => {
       template: "acceso",
       to: "qa@example.com",
       brand: "myfenrir",
+      locale: "en",
     });
   });
 

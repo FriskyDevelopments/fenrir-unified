@@ -1,6 +1,7 @@
 import type { Brand } from "./brands/types";
 import { DEFAULT_FONT_STACK } from "./brands/types";
 import { esc } from "./format";
+import type { Locale } from "./locale";
 
 export interface LayoutOptions {
   brand: Brand;
@@ -8,6 +9,7 @@ export interface LayoutOptions {
   heroBadge: string; // small label in the hero, e.g. "Verificación"
   body: string; // inner HTML (composed from components)
   accentKey?: "accent" | "purple" | "gold" | "danger"; // hero accent (default cyan)
+  locale?: Locale;
 }
 
 // Hero header: deep-void band with an amethyst→cyan glow, the FENRIR wordmark,
@@ -38,38 +40,45 @@ function hero(brand: Brand, heroBadge: string, accent: string): string {
   </td></tr>`;
 }
 
-function footer(brand: Brand): string {
+function footer(brand: Brand, locale: Locale): string {
   const { ink, muted, faint, accent } = brand.colors;
+  const localized = {
+    en: { legal: "Fenrir Protocol · MyFenrir — The digital pack", note: "If you did not request this email, you can safely ignore it; nobody can access your account without this message. We will never ask for your password by email.", signoff: "Sent by MyFenrir · myfenrir.com", open: "Open MyFenrir" },
+    es: { legal: brand.footer.legal ?? "", note: brand.footer.note ?? "", signoff: brand.footer.signoff ?? "", open: "Abrir MyFenrir" },
+    fr: { legal: "Fenrir Protocol · MyFenrir — La meute numérique", note: "Si vous n’avez pas demandé cet e-mail, vous pouvez l’ignorer en toute sécurité. Nous ne vous demanderons jamais votre mot de passe par e-mail.", signoff: "Envoyé par MyFenrir · myfenrir.com", open: "Ouvrir MyFenrir" },
+    de: { legal: "Fenrir Protocol · MyFenrir — Das digitale Rudel", note: "Falls du diese E-Mail nicht angefordert hast, kannst du sie sicher ignorieren. Wir werden dich niemals per E-Mail nach deinem Passwort fragen.", signoff: "Gesendet von MyFenrir · myfenrir.com", open: "MyFenrir öffnen" },
+  }[locale];
   const links = (brand.footer.links ?? [])
     .map(
       (l) =>
-        `<a href="${esc(l.url)}" target="_blank" style="color:${muted};text-decoration:none;font-weight:600;">${esc(l.label)}</a>`,
+        `<a href="${esc(l.url)}" target="_blank" style="color:${muted};text-decoration:none;font-weight:600;">${esc(l.url.includes("/main") ? localized.open : l.label)}</a>`,
     )
     .join(`<span style="color:${faint};">&nbsp;&middot;&nbsp;</span>`);
   return `
   <tr><td style="padding:26px 40px 40px 40px;background:${ink};">
     <div style="height:1px;background:rgba(150,166,224,.14);line-height:1px;">&nbsp;</div>
     ${links ? `<div style="margin-top:18px;font-size:13px;">${links}</div>` : ""}
-    <div style="margin-top:14px;font-size:12px;line-height:1.6;color:${faint};">${esc(brand.footer.legal ?? "")}</div>
+    <div style="margin-top:14px;font-size:12px;line-height:1.6;color:${faint};">${esc(localized.legal)}</div>
     ${brand.footer.address ? `<div style="margin-top:4px;font-size:11px;color:${faint};">${esc(brand.footer.address)}</div>` : ""}
     ${
-      brand.footer.note
-        ? `<div style="margin-top:16px;font-size:11px;line-height:1.7;color:${faint};">${esc(brand.footer.note)}</div>`
+      localized.note
+        ? `<div style="margin-top:16px;font-size:11px;line-height:1.7;color:${faint};">${esc(localized.note)}</div>`
         : ""
     }
     <div style="margin-top:16px;font-size:11px;color:${faint};">
-      ${esc(brand.footer.signoff ?? "")}
+      ${esc(localized.signoff)}
     </div>
   </td></tr>`;
 }
 
 export function layout(opts: LayoutOptions): string {
   const { brand, preheader, heroBadge, body } = opts;
+  const locale = opts.locale ?? "es";
   const font = brand.fontStack ?? DEFAULT_FONT_STACK;
   const accent = brand.colors[opts.accentKey ?? "accent"];
   const { ink, surface, border, body: bodyText } = brand.colors;
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${locale}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -109,7 +118,7 @@ export function layout(opts: LayoutOptions): string {
         <tr><td>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
             style="border-radius:0 0 22px 22px;overflow:hidden;">
-            ${footer(brand)}
+            ${footer(brand, locale)}
           </table>
         </td></tr>
         <tr><td align="center" style="padding:18px 12px;">
