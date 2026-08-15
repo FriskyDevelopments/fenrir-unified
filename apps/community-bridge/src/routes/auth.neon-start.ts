@@ -14,9 +14,8 @@ function startNeonSocial(request: Request): Response {
   if (!PROVIDERS.has(provider)) return Response.redirect("/login?error=unsupported_provider", 302);
   const destinationPath = qualityDestinationPath(url.searchParams.get("destination"));
   const destination = new URL(destinationPath, QUALITY_COMMUNITY_ORIGIN).toString();
-  const handoffPath = `/api/community-auth/quality-handoff?${new URLSearchParams({ destination })}`;
-  const oauth = new URL(`/api/community-auth/oauth/${provider}`, NEON_COMMUNITY_ORIGIN);
-  oauth.searchParams.set("slug", "fenrir");
-  oauth.searchParams.set("return_to", handoffPath);
-  return new Response(null, { status: 302, headers: { Location: oauth.toString(), "Cache-Control": "no-store" } });
+  const start = new URL("/api/community-auth/quality-start", NEON_COMMUNITY_ORIGIN);
+  start.searchParams.set("provider", provider);
+  start.searchParams.set("destination", destination);
+  return new Response(null, { status: 302, headers: { Location: start.toString(), "Cache-Control": "no-store" } });
 }

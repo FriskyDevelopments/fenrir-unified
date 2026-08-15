@@ -1,0 +1,17 @@
+name = "myfenrir-community-neon-handoff"
+main = "src/index.ts"
+compatibility_date = "2026-08-14"
+workers_dev = true
+
+routes = [
+  { pattern = "myfenrir.com/api/community-auth/quality-start*", zone_name = "myfenrir.com" },
+  { pattern = "myfenrir.com/api/community-auth/quality-handoff*", zone_name = "myfenrir.com" },
+  { pattern = "myfenrir.com/api/community-auth/oauth/callback/*", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/api/community-auth/quality-start*", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/api/community-auth/quality-handoff*", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/api/community-auth/oauth/callback/*", zone_name = "myfenrir.com" }
+]
+
+[vars]
+CANONICAL_NEON_ORIGIN = "https://276df7c1.fenrir-bridge.pages.dev"
+QUALITY_ORIGIN = "https://quality.communities.myfenrir.com"

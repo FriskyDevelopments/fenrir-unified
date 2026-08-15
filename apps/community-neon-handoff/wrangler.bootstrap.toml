@@ -1,0 +1,8 @@
+name = "myfenrir-community-neon-handoff"
+main = "src/index.ts"
+compatibility_date = "2026-08-14"
+workers_dev = true
+
+[vars]
+CANONICAL_NEON_ORIGIN = "https://276df7c1.fenrir-bridge.pages.dev"
+QUALITY_ORIGIN = "https://quality.communities.myfenrir.com"
