@@ -7,6 +7,12 @@ type SupabaseEnv = BillingEnv & {
   SUPABASE_ADMIN_EMAILS?: string;
 };
 
+// These public browser credentials are already embedded in the frontend.
+// Preview Pages Functions must use the same project when preview variables are
+// absent, otherwise OAuth succeeds but the Fenrir session exchange cannot run.
+export const defaultSupabaseUrl = "https://yqevglppbhuoxxfsfnih.supabase.co";
+export const defaultSupabaseAnonKey = "sb_publishable_t8xng5GIhOmAtT4Nsf7Zgg_TO36FTTE";
+
 type SupabaseUserResponse = {
   id?: string;
   email?: string;
@@ -20,12 +26,12 @@ type SupabaseUserResponse = {
 };
 
 export async function createSessionFromSupabaseToken(accessToken: string, env: SupabaseEnv) {
-  const supabaseUrl = requireEnv(env.SUPABASE_URL, "SUPABASE_URL").replace(/\/$/, "");
+  const supabaseUrl = (env.SUPABASE_URL?.trim() || defaultSupabaseUrl).replace(/\/$/, "");
   if (supabaseUrl.includes("example.supabase.co") || supabaseUrl.includes("<your-project-ref>")) {
     console.error(`Supabase URL misconfigured in edge function: ${supabaseUrl}`);
     throw new Error("supabase_url_misconfigured");
   }
-  const anonKey = requireEnv(env.SUPABASE_ANON_KEY, "SUPABASE_ANON_KEY");
+  const anonKey = env.SUPABASE_ANON_KEY?.trim() || defaultSupabaseAnonKey;
   const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
     headers: {
       apikey: anonKey,
@@ -72,9 +78,4 @@ function sessionProvider(provider?: string) {
   if (provider === "azure") return "microsoft";
   if (provider === "apple") return "apple";
   return "google";
-}
-
-function requireEnv(value: string | undefined, name: string) {
-  if (!value?.trim()) throw new Error(`missing_env:${name}`);
-  return value.trim();
 }
