@@ -71,7 +71,8 @@ test("accepts the browser's multipart ALTCHA submission", async () => {
   }
   assert.notEqual(number, -1, "expected to solve the issued proof-of-work");
 
-  const payload = Buffer.from(JSON.stringify({ ...challenge, number })).toString("base64url");
+  const { maxnumber: _omittedByOfficialWidget, ...widgetChallenge } = challenge;
+  const payload = Buffer.from(JSON.stringify({ ...widgetChallenge, number, took: 1 })).toString("base64url");
   const form = new FormData();
   form.set("altcha", payload);
   form.set("fallbackGrant", "");
