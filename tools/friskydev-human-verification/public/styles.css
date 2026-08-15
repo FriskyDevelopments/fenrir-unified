@@ -133,4 +133,16 @@ button { cursor: pointer; }
 .status.success { color: var(--accent); }
 .privacy { margin: 22px 0 0; color: #777f90; font-size: 12px; text-align: center; }
 @media (max-width: 520px) { .card { padding: 28px 22px; } }
+html[data-embed=miniapp] body { min-height:0; padding:0; place-items:start center; background:#090b10; }
+html[data-embed=miniapp] .card { width:100%; padding:18px; border-radius:14px; transform:none; box-shadow:none; }
+html[data-embed=miniapp] .languages { margin:-4px -4px 6px 0; }
+html[data-embed=miniapp] .themes { top:49px; right:18px; }
+html[data-embed=miniapp] .mark { width:42px; height:42px; }
+html[data-embed=miniapp] .eyebrow { margin:10px 0 5px; font-size:9px; }
+html[data-embed=miniapp] h1 { font-size:25px; }
+html[data-embed=miniapp] .intro { margin:8px 0 12px; font-size:12px; line-height:1.35; }
+html[data-embed=miniapp] .link { margin-top:10px; }
+html[data-embed=miniapp] .puzzle, html[data-embed=miniapp] .slider-challenge { margin-top:10px; padding:14px; }
+html[data-embed=miniapp] .status { min-height:18px; margin-top:9px; font-size:11px; }
+html[data-embed=miniapp] .privacy { margin-top:9px; font-size:10px; }
 @media (prefers-reduced-motion: no-preference) { .card { animation: arrive .5s ease-out both; } @keyframes arrive { from { opacity: 0; transform: translateY(12px); } } }

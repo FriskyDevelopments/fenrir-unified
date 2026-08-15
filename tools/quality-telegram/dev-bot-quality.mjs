@@ -16,6 +16,40 @@ const json = (body, status = 200) =>
 
 const QUALITY_BOT_ORIGIN = 'https://myfenrir-dev-bot-quality.hrgrrtks2p.workers.dev';
 const MYFENRIR_QUALITY_ORIGIN = 'https://quality.myfenrir.com';
+const MYFENRIR_APP_URL = 'https://www.myfenrir.com/main';
+
+// Approved no-audio celebration clip, autoplayed as a GIF via sendAnimation on a
+// successful Telegram-identity link. Reuses the public approved bot-os clip.
+const LINK_SUCCESS_ANIM_URL = 'https://www.myfenrir.com/bot-os/media/fenrir-access.mp4';
+const LINK_SUCCESS_CAPTION = [
+  '🐺 *Linked in.* Your Telegram is now bound to your Frisky ID.',
+  '',
+  'Fenrir can connect this account to your workspace — you\'re clear to run the pack.',
+  '',
+  'Next: open MyFenrir to finish setup.',
+].join('\n');
+
+async function sendLinkedAnimation(token, chatId) {
+  const reply_markup = { inline_keyboard: [[{ text: 'Open MyFenrir →', url: MYFENRIR_APP_URL }]] };
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendAnimation`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      animation: LINK_SUCCESS_ANIM_URL,
+      caption: LINK_SUCCESS_CAPTION,
+      parse_mode: 'Markdown',
+      reply_markup,
+    }),
+  }).catch(() => null);
+  if (!res || !res.ok) {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, parse_mode: 'Markdown', text: LINK_SUCCESS_CAPTION, reply_markup }),
+    }).catch(() => {});
+  }
+}
 
 // Public, secret-free handoff for the Frisky Bot OS community curator. This
 // describes the Quality runtime; credentials and entitlement truth remain in
@@ -74,6 +108,12 @@ export default {
     const msg = update?.message;
     if (msg?.text) {
       const text = String(msg.text).trim();
+      // DEV-only render harness: preview the link-success animation without a
+      // valid link code. Not present in the prod worker.
+      if (text === '/preview_linked' || text === '/preview') {
+        await sendLinkedAnimation(token, msg.chat.id);
+        return json({ ok: true });
+      }
       const linkCode = text.match(/^\/start\s+link_([A-Z0-9]{20})$/i)?.[1]?.toUpperCase();
       if (linkCode) {
         const linkSecret = env.TELEGRAM_LINK_CONFIRM_SECRET?.trim();
@@ -89,16 +129,18 @@ export default {
             }).catch(() => null)
           : null;
         const linked = Boolean(result?.ok);
-        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: msg.chat.id,
-            text: linked
-              ? '🐺 Your Telegram ID is linked to MyFenrir Quality. Return to the widget and refresh once.'
-              : 'That MyFenrir link has expired or was already used. Generate a new one from the Telegram ID widget.',
-          }),
-        }).catch(() => {});
+        if (linked) {
+          await sendLinkedAnimation(token, msg.chat.id);
+        } else {
+          await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: msg.chat.id,
+              text: 'That MyFenrir link has expired or was already used. Generate a new one from the Telegram ID widget.',
+            }),
+          }).catch(() => {});
+        }
         return json({ ok: true });
       }
       if (text.startsWith('/start')) {

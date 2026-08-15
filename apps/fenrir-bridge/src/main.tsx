@@ -1,8 +1,12 @@
-import { StrictMode } from "react";
+import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { installHoneybadgerBrowserReporter } from "./services/honeybadger";
 import "./styles/global.css";
+
+const WowMvpRoute = lazy(() =>
+  import("./routes/WowMvpRoute").then((module) => ({ default: module.WowMvpRoute }))
+);
 
 installHoneybadgerBrowserReporter();
 // Analítica de producto + session replay + flags. Se carga de forma diferida
@@ -29,8 +33,12 @@ if (typeof window !== "undefined") {
 // broken edge response has been cached under a previous asset URL.
 document.documentElement.dataset.fenrirRelease = "supabase-auth-2026-08-07b";
 
+const isWowMvpRoute = window.location.pathname === "/wow" || window.location.pathname === "/visual-lab";
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    {isWowMvpRoute ? (
+      <Suspense fallback={<div className="boot">Awakening Fenrir…</div>}><WowMvpRoute /></Suspense>
+    ) : <App />}
   </StrictMode>
 );

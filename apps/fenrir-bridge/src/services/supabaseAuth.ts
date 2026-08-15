@@ -76,6 +76,8 @@ function isSafeRedirectPath(path: string | null) {
 }
 
 function currentPostAuthDestination() {
+  const requested = new URLSearchParams(window.location.search).get("next");
+  if (isSafeRedirectPath(requested)) return requested as string;
   const destination = window.location.pathname;
   return destination === "/" || !isSafeRedirectPath(destination) ? fallbackPostAuthDestination() : destination;
 }

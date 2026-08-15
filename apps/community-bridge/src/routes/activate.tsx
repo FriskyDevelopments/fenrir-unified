@@ -40,8 +40,12 @@ import {
 
 const BOT_USERNAME =
   (import.meta.env["VITE_TELEGRAM_BOT_USERNAME"] as string | undefined) ?? "Myfenrir_bot";
-const BOT_URL = `https://t.me/${BOT_USERNAME}?start=link`;
-const MYFENRIR_LINK_URL = "https://www.myfenrir.com/main";
+const BOT_URL = `https://t.me/${BOT_USERNAME}`;
+// Top-level navigation is intentional: the MyFenrir session cookie is scoped to
+// www.myfenrir.com, where this endpoint mints the single-use Telegram deep link
+// and immediately redirects to the bot. A cross-origin fetch from Community
+// Bridge would not reliably carry that session.
+const MYFENRIR_LINK_URL = "https://www.myfenrir.com/api/telegram/link/start";
 const CODE_LENGTH = 6;
 
 const FAILURE_COPY: Record<DemoRedeemFailure, string> = {
@@ -248,7 +252,7 @@ function ActivatePage() {
     return (
       <AuthLayout
         title={copy.headline}
-        subtitle="Link securely from your MyFenrir dashboard. No code is required."
+        subtitle="Continue securely to Telegram. No code is required."
         footer={
           <button
             onClick={() => {
@@ -268,16 +272,16 @@ function ActivatePage() {
             <div className="text-sm">
               <p className="font-medium text-foreground">Secure Telegram linking</p>
               <ol className="mt-2 space-y-1.5 text-muted-foreground">
-                <li>1. Open your MyFenrir dashboard.</li>
-                <li>2. Tap <strong>Link Telegram ID</strong>.</li>
-                <li>3. Telegram opens automatically to confirm.</li>
+                <li>1. Continue through your signed-in MyFenrir session.</li>
+                <li>2. Telegram opens with a private, single-use link.</li>
+                <li>3. Confirm with the bot to finish.</li>
               </ol>
             </div>
           </div>
         </Card>
         <Button asChild variant="fenrir" size="lg" className="mt-5 w-full">
           <a href={MYFENRIR_LINK_URL}>
-            Continue to MyFenrir
+            Continue securely
             <ArrowRight />
           </a>
         </Button>

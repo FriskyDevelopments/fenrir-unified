@@ -5,6 +5,7 @@ const glyphs = ["moon", "paw", "spark", "eye", "bolt", "diamond", "flame", "orbi
 const allowedAudiences = new Set([
   "https://friskydev-human-verification.zainxantoine.workers.dev",
   "https://quality.communities.myfenrir.com",
+  "https://www.myfenrir.com",
   "https://authentik.friskydev.com",
   "https://authentik.tailab8146.ts.net:9443",
 ]);
@@ -108,8 +109,8 @@ async function verifyAltcha(value, secret) {
     const expires = Number(saltParams.get("expires"));
     const binding = { audience: saltParams.get("audience") || "", context: saltParams.get("context") || "" };
     if (!allowedAudiences.has(binding.audience) || !/^[A-Za-z0-9_-]{32,128}$/.test(binding.context)) return null;
-    if (parsed.algorithm !== "SHA-256" || parsed.maxnumber !== 120000 || !Number.isInteger(parsed.number)) return null;
-    if (parsed.number < 0 || parsed.number > parsed.maxnumber || expires * 1000 < Date.now()) return null;
+    if (parsed.algorithm !== "SHA-256" || !Number.isInteger(parsed.number)) return null;
+    if (parsed.number < 0 || parsed.number > 120000 || expires * 1000 < Date.now()) return null;
     if (!equal(parsed.challenge, await sha256(`${parsed.salt}${parsed.number}`))) return null;
     return equal(parsed.signature, await hmac(parsed.challenge, secret, "friskydev-altcha-v1")) ? binding : null;
   } catch { return null; }

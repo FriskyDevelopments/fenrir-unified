@@ -304,3 +304,15 @@ export async function getAccountLinkByFriskyUser(env: BillingEnv, friskyUserId: 
   const rows = (await r?.json().catch(() => null)) as AccountLinkRow[] | null;
   return rows?.[0] ?? null;
 }
+
+export async function getAccountLinkByTelegramUser(env: BillingEnv, telegramId: string | number): Promise<AccountLinkRow | null> {
+  if (!accountLinksConfigured(env)) return null;
+  const normalized = toTelegramBigInt(telegramId);
+  if (normalized === null) return null;
+  const r = await fetch(
+    `${restBase(env)}/account_links?telegram_id=eq.${normalized}&provider=eq.telegram&status=eq.linked&select=*&limit=1`,
+    { headers: serviceHeaders(env) }
+  ).catch(() => null);
+  const rows = (await r?.json().catch(() => null)) as AccountLinkRow[] | null;
+  return rows?.[0] ?? null;
+}

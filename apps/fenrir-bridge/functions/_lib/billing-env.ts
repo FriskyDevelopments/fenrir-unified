@@ -1,7 +1,10 @@
 import type { AuthEnv } from "./auth";
 
 export type BillingEnv = AuthEnv & {
-  EMAIL?: { send(message: { to: string; from: { email: string; name?: string }; subject: string; html: string; text: string }): Promise<unknown> };
+  EMAIL?: {
+    send?: (message: { to: string; from: { email: string; name?: string }; subject: string; html: string; text: string }) => Promise<unknown>;
+    fetch?: (request: Request) => Promise<Response>;
+  };
   DB?: D1Database;
   /** R2 bucket for MyFenrir member media (avatars/covers/uploads); bound as MEDIA in wrangler.jsonc. */
   MEDIA?: R2Bucket;

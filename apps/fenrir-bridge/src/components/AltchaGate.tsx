@@ -6,26 +6,22 @@ type Mode = "altcha" | "slider" | "puzzle";
 type Challenge = { token: string; risk: string; target?: number; sequence?: string[]; choices?: string[] };
 
 const copy = {
-  title: "Face verification",
-  intro: "Confirm the living signal. No tracking, no image recognition.",
-  checking: "Preparing the face-signal check…",
+  title: "MyFenrir verification",
+  intro: "Complete a brief security check.",
+  checking: "Preparing secure verification…",
   slider: "Signal Slider",
-  sliderInstruction: "Move the wolf to the luminous lock.",
+  sliderInstruction: "Move the marker to the indicated position.",
   puzzle: "Rune sequence",
   puzzleInstruction: "Repeat the signal in the same order.",
   altcha: "Use automatic verification",
-  verified: "Signal verified. Continue to MyFenrir.",
-  failed: "That signal did not match. Try the next method.",
+  verified: "Verified. You may continue.",
+  failed: "Verification did not match. Try another method.",
 };
 
-/**
- * The primary challenge is the in-product Face Verification experience.
- * ALTCHA is deliberately last-resort only: it must never be the first thing
- * a member sees on the MyFenrir login surface.
- */
+/** ALTCHA is the primary check; the custom methods remain explicit fallbacks. */
 export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => void }) {
   const widgetRef = useRef<HTMLElement | null>(null);
-  const [mode, setMode] = useState<Mode>("puzzle");
+  const [mode, setMode] = useState<Mode>("altcha");
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [slider, setSlider] = useState(0);
   const [answer, setAnswer] = useState<string[]>([]);
@@ -60,16 +56,13 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
     }
   }
 
-  // Start with the repository's custom Face Verification challenge, not ALTCHA.
-  useEffect(() => { void loadChallenge("puzzle"); }, []);
-
   useEffect(() => {
     if (mode !== "altcha" || !widgetRef.current) return;
     const widget = widgetRef.current;
     const state = (event: Event) => {
       const detail = (event as CustomEvent<{ state?: string; payload?: string }>).detail;
-      if (detail?.payload) void submit("altcha", { payload: detail.payload }).catch(() => { setNote(copy.failed); void loadChallenge("slider"); });
-      else if (detail?.state === "error") { setNote(copy.failed); void loadChallenge("slider"); }
+      if (detail?.payload) void submit("altcha", { payload: detail.payload }).catch(() => setNote("Automatic verification failed. Retry or choose a fallback."));
+      else if (detail?.state === "error") setNote("Automatic verification is unavailable. Choose a fallback below.");
     };
     widget.addEventListener("statechange", state);
     widget.addEventListener("verified", state);
@@ -92,7 +85,7 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
     }
   }
 
-  const style = { "--hv": "#00e5ff" } as CSSProperties;
+  const style = { "--hv": "#22c7a8" } as CSSProperties;
   return <section className={`human-verification human-verification--fenrir ${verified ? "is-verified" : ""}`} style={style} aria-label={copy.title}>
     <header>
       <img src="/fenrir-splash-icon.svg?v=20260813-face-verification" alt="" />
@@ -101,7 +94,7 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
     </header>
 
     {!verified && mode === "puzzle" && challenge?.sequence ? <div className="rune-puzzle">
-      <p className="verification-method">FACE SIGNAL · ORDER MATTERS</p>
+      <p className="verification-method">SECURITY SEQUENCE · ORDER MATTERS</p>
       <div className="rune-sequence">{challenge.sequence.map((rune, i) => <span key={`${rune}-${i}`}>{rune}</span>)}</div>
       <div className="rune-answer">{challenge.sequence.map((_, i) => <span key={i}>{answer[i] || "·"}</span>)}</div>
       <div className="rune-choices">{challenge.choices?.map((rune) => <button type="button" key={rune} onClick={() => void chooseRune(rune)}>{rune}</button>)}</div>
@@ -116,7 +109,10 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
       <div className="verification-switches"><button type="button" onClick={() => void loadChallenge("puzzle")}>{copy.puzzle}</button><button type="button" onClick={() => { setMode("altcha"); setNote("Automatic verification is available if needed."); }}>{copy.altcha}</button></div>
     </div> : null}
 
-    {!verified && mode === "altcha" ? <div className="altcha-shell"><altcha-widget ref={widgetRef as never} challengeurl="/api/verification/challenge?mode=altcha" hidefooter hidelogo {...({ configuration: '{"hideFooter":true,"hideLogo":true}' } as Record<string, string>)} /></div> : null}
+    {!verified && mode === "altcha" ? <div className="altcha-shell">
+      <altcha-widget ref={widgetRef as never} challengeurl="/api/verification/challenge?mode=altcha" hidefooter hidelogo {...({ configuration: '{"hideFooter":true,"hideLogo":true}' } as Record<string, string>)} />
+      <div className="verification-switches verification-switches--altcha"><button type="button" onClick={() => void loadChallenge("puzzle")}>{copy.puzzle}</button><button type="button" onClick={() => void loadChallenge("slider")}>{copy.slider}</button></div>
+    </div> : null}
     {verified ? <div className="verification-success"><span>✓</span>{copy.verified}</div> : null}
   </section>;
 }

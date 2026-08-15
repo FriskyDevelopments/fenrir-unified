@@ -3,11 +3,11 @@
   "compatibility_date": "2026-05-17",
   "compatibility_flags": ["nodejs_compat"],
   "pages_build_output_dir": "dist",
-  // "send_email" is a Workers-only config key — wrangler rejects it for Pages
-  // projects (checked against 4.95 and 4.110) and it blocks `pages deploy`.
-  // functions/_lib/transactional-email.ts already guards on `env.EMAIL` being
-  // absent, so billing emails no-op until the EMAIL binding gets a real home
-  // (Pages dashboard binding or a dedicated Worker).
+  // Pages cannot own send_email directly. EMAIL is a private service binding
+  // to the dedicated Worker declared in wrangler.fenrir-email.toml.
+  "services": [
+    { "binding": "EMAIL", "service": "fenrir-transactional-email" }
+  ],
   "vars": {
     "PUBLIC_SITE_URL": "https://www.myfenrir.com",
     "ALLOWED_REDIRECT_URIS": "https://myfenrir.com,https://www.myfenrir.com,http://localhost:5173"

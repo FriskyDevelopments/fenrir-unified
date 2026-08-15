@@ -1,4 +1,5 @@
 import { Crown, Flame, Ghost, PawPrint, ShieldCheck, Sparkles, Waves } from "lucide-react";
+import { GateAccessMotion } from "@/components/gate/gate-access-motion";
 import { cn } from "@/lib/utils";
 import {
   getPreset,
@@ -8,16 +9,12 @@ import {
   type MascotKey,
 } from "@/lib/gate-presets";
 
-function singleSignOnHref(slug?: string, brandId?: string) {
-  if (typeof window === "undefined") return "/login";
-  // A visitor enters through one Gate. Authentication must return to that
-  // exact Gate — never the owner's management list, which is a different
-  // product surface and made the public flow feel like a dead end.
-  const destination = new URL(slug ? `/g/${encodeURIComponent(slug)}?sso=complete` : "/", window.location.origin);
-  const handoff = new URL("https://quality.myfenrir.com/api/auth/community-sso");
-  handoff.searchParams.set("next", destination.toString());
-  if (brandId) handoff.searchParams.set("brand", brandId);
-  return handoff.toString();
+function gateLoginHref(slug?: string, brandId?: string) {
+  const params = new URLSearchParams({
+    next: slug ? `/g/${encodeURIComponent(slug)}` : "/",
+  });
+  if (brandId) params.set("brand", brandId);
+  return `/login?${params.toString()}`;
 }
 
 const MASCOT_ICONS = {
@@ -49,10 +46,14 @@ export function GatePreview({
   config,
   className,
   compact = false,
+  actionHref,
+  actionLabel,
 }: {
   config: Omit<GateConfig, "slug"> & { slug?: string };
   className?: string;
   compact?: boolean;
+  actionHref?: string;
+  actionLabel?: string;
 }) {
   const preset = getPreset(config.preset);
   const logo =
@@ -60,9 +61,7 @@ export function GatePreview({
   const mascotUrl =
     config.mascot_url && isUsableMediaUrl(config.mascot_url) ? config.mascot_url : null;
   const background =
-    config.background_url && isUsableMediaUrl(config.background_url)
-      ? config.background_url
-      : null;
+    config.background_url && isUsableMediaUrl(config.background_url) ? config.background_url : null;
 
   return (
     <div
@@ -154,13 +153,9 @@ export function GatePreview({
 
         <div className="space-y-2">
           {compact ? (
-            <p className="font-semibold tracking-tight text-white text-xl">
-              {config.headline}
-            </p>
+            <p className="font-semibold tracking-tight text-white text-xl">{config.headline}</p>
           ) : (
-            <h1 className="font-semibold tracking-tight text-white text-3xl">
-              {config.headline}
-            </h1>
+            <h1 className="font-semibold tracking-tight text-white text-3xl">{config.headline}</h1>
           )}
 
           <p
@@ -173,19 +168,24 @@ export function GatePreview({
           </p>
         </div>
 
-        <a
-          href={singleSignOnHref(config.slug, preset.brandId)}
-          className={cn(
-            "flex w-full items-center justify-center rounded-xl font-medium text-white transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80",
-            compact ? "h-9 text-xs" : "h-11 text-sm",
-          )}
-          style={{
-            background: `color-mix(in oklab, ${preset.accent} 85%, black)`,
-            boxShadow: `0 0 40px -10px ${preset.accent}`,
-          }}
-        >
-          Continue with single sign-on
-        </a>
+        <GateAccessMotion accent={preset.accent} compact={compact} />
+
+        {!compact ? (
+          <a
+            href={actionHref ?? gateLoginHref(config.slug, preset.brandId)}
+            className="flex h-11 w-full items-center justify-center rounded-xl font-medium text-white transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+            style={{
+              background: `color-mix(in oklab, ${preset.accent} 85%, black)`,
+              boxShadow: `0 0 40px -10px ${preset.accent}`,
+            }}
+          >
+            {actionLabel ?? "Continue securely"}
+          </a>
+        ) : (
+          <span className="rounded-full border border-white/15 bg-black/20 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-white/48">
+            Visual preview
+          </span>
+        )}
 
         <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-white/40">
           Secured · End-to-end encrypted

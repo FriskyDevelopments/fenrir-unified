@@ -1,1 +1,50 @@
-.human-verification{--hv:#00e5ff;margin:1rem 0;padding:14px;border:1px solid color-mix(in srgb,var(--hv) 35%,transparent);border-radius:18px;background:linear-gradient(135deg,rgb(4 12 20/.94),rgb(9 8 24/.92));box-shadow:inset 0 1px rgb(255 255 255/.06),0 16px 50px rgb(0 0 0/.25);overflow:hidden}.human-verification header{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;margin-bottom:12px}.human-verification header img{width:30px;height:30px;object-fit:contain;filter:grayscale(1) brightness(2) drop-shadow(0 0 8px var(--hv))}.human-verification header div{display:grid;text-align:left}.human-verification header b{font-size:.76rem;letter-spacing:.13em;text-transform:uppercase}.human-verification header small{font-size:.68rem;color:rgb(224 242 255/.65)}.human-verification header>span{font-size:.58rem;text-transform:uppercase;letter-spacing:.12em;color:var(--hv)}.verification-method{margin:0 0 10px;color:rgb(220 240 252/.62);font-size:.67rem;letter-spacing:.08em;text-transform:uppercase}.altcha-shell{padding-left:42px;position:relative}.altcha-shell:before{content:"";position:absolute;left:4px;top:50%;width:28px;height:28px;translate:0 -50%;background:url('/fenrir-splash-icon.svg') center/contain no-repeat;filter:grayscale(1) brightness(1.8)}altcha-widget{display:block;--altcha-color-border:color-mix(in srgb,var(--hv) 32%,#1f2937);--altcha-color-base:#0b111b;--altcha-color-text:#e5f7ff;--altcha-color-border-focus:var(--hv)}.wolf-slider{padding:4px 2px}.wolf-slider__track{height:12px;position:relative;border-radius:10px;background:#121b2a;box-shadow:inset 0 0 0 1px rgb(255 255 255/.08)}.wolf-slider__track i{position:absolute;top:-6px;width:3px;height:24px;background:var(--hv);box-shadow:0 0 14px var(--hv)}.wolf-slider__track span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#7b2fff,var(--hv));box-shadow:0 0 18px color-mix(in srgb,var(--hv) 55%,transparent)}.wolf-slider input{width:100%;accent-color:var(--hv)}.verification-switches{display:flex;justify-content:space-between;gap:8px;margin-top:12px}.verification-switches button{border:0;background:none;color:rgb(220 240 252/.7);font-size:.68rem;text-decoration:underline;cursor:pointer}.rune-sequence,.rune-answer,.rune-choices{display:flex;justify-content:center;gap:8px;margin:9px 0}.rune-sequence span,.rune-answer span,.rune-choices button{display:grid;place-items:center;width:40px;height:40px;border:1px solid color-mix(in srgb,var(--hv) 38%,transparent);border-radius:10px;background:rgb(255 255 255/.04);color:#effcff;font-size:1.15rem}.rune-sequence span{box-shadow:0 0 18px color-mix(in srgb,var(--hv) 22%,transparent)}.rune-choices button{cursor:pointer}.verification-success{display:flex;gap:8px;align-items:center;justify-content:center;color:#96ffe1;font-size:.78rem}.verification-success span{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:#19c98b;color:#03120e}.signal-slider__name{display:block;margin:0 0 10px;color:var(--hv);font-size:.65rem;letter-spacing:.16em;text-transform:uppercase}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.human-verification {
+  --hv: #22c7a8;
+  --hv-coral: #ff334e;
+  --hv-gold: #f1b75c;
+  position: relative;
+  width: min(100%, 360px);
+  margin: 8px auto;
+  padding: 10px 11px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / .1);
+  border-radius: 9px;
+  background: linear-gradient(145deg, rgb(8 11 12 / .97), rgb(13 17 18 / .96));
+  box-shadow: inset 0 1px rgb(255 255 255 / .035), 0 10px 28px rgb(0 0 0 / .2);
+  color: #edf8f5;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+.human-verification::before { position: absolute; inset: 0 auto 0 0; width: 2px; background: var(--hv-coral); opacity: .62; content: ""; }
+.human-verification header { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-bottom: 7px; }
+.human-verification header img { width: 21px; height: 21px; object-fit: contain; opacity: .88; filter: grayscale(.18); }
+.human-verification header div { display: grid; min-width: 0; text-align: left; }
+.human-verification header b { font-size: .64rem; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; }
+.human-verification header small { overflow: hidden; color: rgb(225 240 236 / .62); font-size: .59rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.human-verification header > span { padding: 3px 5px; border: 1px solid rgb(255 255 255 / .1); border-radius: 4px; color: rgb(225 235 232 / .52); font-size: .48rem; letter-spacing: .1em; text-transform: uppercase; }
+.verification-method { margin: 0; color: rgb(221 239 234 / .58); font-size: .56rem; letter-spacing: .09em; text-transform: uppercase; }
+.rune-puzzle { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; align-items: center; }
+.rune-puzzle > .verification-method, .rune-puzzle > .rune-choices, .rune-puzzle > .verification-switches { grid-column: 1 / -1; }
+.rune-sequence, .rune-answer, .rune-choices { display: flex; justify-content: center; gap: 5px; margin: 0; }
+.rune-sequence span, .rune-answer span, .rune-choices button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid rgb(34 199 168 / .3); border-radius: 7px 2px 7px 2px; background: rgb(255 255 255 / .035); color: #effaf7; font: inherit; font-size: .88rem; }
+.rune-sequence span { border-color: rgb(255 255 255 / .16); color: #e8efed; box-shadow: none; }
+.rune-answer span { color: var(--hv); }
+.rune-choices button { cursor: pointer; transition: border-color 140ms ease, background 140ms ease, transform 140ms ease; }
+.rune-choices button:hover { border-color: var(--hv); background: rgb(34 199 168 / .1); transform: translateY(-1px); }
+.verification-switches { display: flex; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.verification-switches button { min-height: 29px; padding: 4px 6px; border: 1px solid transparent; border-radius: 6px 2px 6px 2px; background: transparent; color: rgb(220 239 234 / .68); font: inherit; font-size: .56rem; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
+.verification-switches button:hover { border-color: rgb(255 255 255 / .13); color: #f2f7f5; background: rgb(255 255 255 / .035); }
+.verification-switches--altcha { margin-top: 5px; }
+.rune-choices button:focus-visible, .verification-switches button:focus-visible, .wolf-slider input:focus-visible { outline: 2px solid var(--hv-gold); outline-offset: 2px; }
+.altcha-shell { position: relative; width: min(100%, 320px); margin: auto; padding: 0; }
+altcha-widget { display: block; width: 100%; --altcha-color-border: rgb(255 255 255 / .13); --altcha-color-base: #0b0f10; --altcha-color-text: #e6ecea; --altcha-color-border-focus: var(--hv-coral); }
+.wolf-slider { display: grid; gap: 5px; padding: 2px; }
+.wolf-slider__track { position: relative; height: 10px; border-radius: 2px; background: #151d1c; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08); }
+.wolf-slider__track i { position: absolute; top: -4px; width: 2px; height: 18px; background: rgb(239 245 243 / .72); }
+.wolf-slider__track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, rgb(255 51 78 / .72), var(--hv)); box-shadow: none; }
+.wolf-slider input { width: 100%; margin: 0; accent-color: var(--hv); }
+.signal-slider__name { display: block; margin: 0; color: rgb(230 240 237 / .78); font-size: .58rem; letter-spacing: .13em; text-transform: uppercase; }
+.verification-success { display: flex; gap: 8px; align-items: center; justify-content: center; padding: 5px; color: #a8eadc; font-size: .68rem; }
+.verification-success span { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid rgb(34 199 168 / .35); border-radius: 50%; background: rgb(34 199 168 / .08); color: var(--hv); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 420px) { .human-verification { padding: 9px; } .rune-sequence span, .rune-answer span, .rune-choices button { width: 30px; height: 30px; } .verification-switches { gap: 4px; } .verification-switches button { font-size: .53rem; } }
+@media (prefers-reduced-motion: reduce) { .rune-choices button { transition: none; } }

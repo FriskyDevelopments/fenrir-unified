@@ -136,7 +136,7 @@ function shell(opts: { badge: string; title: string; intro: string; extraHtml?: 
     </td></tr>
     <tr><td style="padding:24px 40px 36px;background:#05060B;border-radius:0 0 22px 22px;">
       <div style="height:1px;background:rgba(150,166,224,.14);"></div>
-      <div style="margin-top:16px;font:12px Arial;color:#858BA8;">Fenrir Protocol · <a href="https://myfenrir.com/wiki" style="color:#00E5FF;text-decoration:none;">Fenrir Wiki →</a></div>
+      <div style="margin-top:16px;font:12px Arial;color:#858BA8;">Fenrir Protocol · <a href="https://myfenrir-docs.pages.dev/" style="color:#00E5FF;text-decoration:none;">MyFenrir Wiki →</a></div>
       <div style="margin-top:8px;font:11px Arial;color:#858BA8;">Enviado por MyFenrir · myfenrir.com</div>
     </td></tr>
   </table></td></tr></table></body></html>`;

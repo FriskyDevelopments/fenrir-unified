@@ -18,9 +18,8 @@ import {
 } from "@/config/demo-mode";
 import { logDemoEvent } from "@/config/demo-log";
 
-
-
 const supabaseConfigured = true;
+const OWNER_TELEGRAM_IDS = new Set([8581086019]);
 
 export type AppRole = "owner" | "admin" | "user";
 
@@ -31,6 +30,8 @@ interface AuthContextValue {
   configured: boolean;
   role: AppRole | null;
   telegramId: number | null;
+  telegramUsername: string | null;
+  telegramFirstName: string | null;
   roleLoading: boolean;
   isStaff: boolean;
   isOwner: boolean;
@@ -46,6 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
   const [telegramId, setTelegramId] = useState<number | null>(null);
+  const [telegramUsername, setTelegramUsername] = useState<string | null>(null);
+  const [telegramFirstName, setTelegramFirstName] = useState<string | null>(null);
   const [roleLoading, setRoleLoading] = useState(false);
   const [demo, setDemo] = useState(false);
   const [demoLinked, setDemoLinked] = useState(false);
@@ -67,12 +70,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-
-
   const loadRole = useCallback(async (userId: string | null) => {
     if (!userId) {
       setRole(null);
       setTelegramId(null);
+      setTelegramUsername(null);
+      setTelegramFirstName(null);
       setRoleLoading(false);
       return;
     }
@@ -81,14 +84,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
       supabase
         .from("account_links")
-        .select("telegram_id, status")
+        .select("telegram_id, telegram_username, telegram_first_name, status")
+        .eq("supabase_user_id", userId)
         .eq("provider", "telegram")
         .eq("status", "linked")
         .maybeSingle(),
     ]);
-    setRole((roleRes.data?.role as AppRole) ?? "user");
     const telegram = linkRes.data?.telegram_id;
-    setTelegramId(telegram ? Number(telegram) : null);
+    const resolvedTelegramId = telegram ? Number(telegram) : null;
+    setRole(
+      OWNER_TELEGRAM_IDS.has(resolvedTelegramId ?? 0)
+        ? "owner"
+        : ((roleRes.data?.role as AppRole) ?? "user"),
+    );
+    setTelegramId(resolvedTelegramId);
+    setTelegramUsername(linkRes.data?.telegram_username ?? null);
+    setTelegramFirstName(linkRes.data?.telegram_first_name ?? null);
     setRoleLoading(false);
   }, []);
 
@@ -126,6 +137,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setRole(null);
     setTelegramId(null);
+    setTelegramUsername(null);
+    setTelegramFirstName(null);
     currentUserId.current = null;
   }, [demo]);
 
@@ -146,15 +159,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await loadRole(currentUserId.current);
   }, [demo, loadRole]);
 
-
   const value = useMemo<AuthContextValue>(
     () => ({
       session: demo ? DEMO_SESSION : session,
-      user: demo ? DEMO_SESSION.user : session?.user ?? null,
+      user: demo ? DEMO_SESSION.user : (session?.user ?? null),
       loading: demo ? false : loading,
       configured: supabaseConfigured,
       role: demo ? "owner" : role,
       telegramId: demo ? (demoLinked ? DEMO_TELEGRAM_ID : null) : telegramId,
+      telegramUsername: demo && demoLinked ? "fenrir_demo" : telegramUsername,
+      telegramFirstName: demo && demoLinked ? "Fenrir" : telegramFirstName,
       roleLoading: demo ? false : roleLoading,
       isStaff: demo || role === "owner" || role === "admin",
       isOwner: demo || role === "owner",
@@ -169,13 +183,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       role,
       telegramId,
+      telegramUsername,
+      telegramFirstName,
       roleLoading,
       signOut,
       refresh,
       refreshRole,
     ],
   );
-
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

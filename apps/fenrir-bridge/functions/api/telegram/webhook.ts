@@ -1,6 +1,6 @@
 import { dbNotConfiguredResponse, missingEnvResponse, siteOrigin, type BillingEnv } from "../../_lib/billing-env";
 import { consumeTelegramAccountLinkCode } from "../../_lib/telegram-identity";
-import { consumeLinkCode } from "../../_lib/account-links";
+import { consumeLinkCode, getAccountLinkByTelegramUser } from "../../_lib/account-links";
 import { applyStarsEntitlementForTelegramUser } from "../../_lib/stars-billing";
 import {
   createStarsOrder,
@@ -125,6 +125,33 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
     return;
   }
 
+  if (/^\/start\s+link$/i.test(text)) {
+    const telegramId = String(message.from?.id ?? message.chat.id);
+    const account = await getAccountLinkByTelegramUser(env, telegramId);
+    const name = escapeMd(message.from?.first_name?.trim() || "there");
+    await telegramApi(env, "sendMessage", {
+      chat_id: message.chat.id,
+      parse_mode: "Markdown",
+      text: account
+        ? [
+            `🐺 *Welcome, ${name}*`,
+            "",
+            "✅ *Account linked with Frisky Dev*",
+            `MyFenrir account · ${escapeMd(maskEmail(account.email))}`,
+            "",
+            "Your identity is confirmed. Next, add Fenrir to the protected group and map it before the Gate can go live."
+          ].join("\n")
+        : [
+            `🐺 *Welcome, ${name}*`,
+            "",
+            "Your Telegram account is not linked to MyFenrir yet.",
+            "Open MyFenrir and generate the secure one-time Telegram link."
+          ].join("\n"),
+      reply_markup: { inline_keyboard: startActionButtons(env, origin) }
+    }, channel);
+    return;
+  }
+
   if (textLower.startsWith("/help") || textLower.startsWith("/commands")) {
     await telegramApi(env, "sendMessage", {
       chat_id: message.chat.id,
@@ -222,6 +249,13 @@ async function handleLinkCommand(env: BillingEnv, message: TelegramMessage, chan
 
 function escapeMd(s: string) {
   return s.replace(/([_*`\[])/g, "\\$1");
+}
+
+function maskEmail(email: string | null) {
+  if (!email || !email.includes("@")) return "verified identity";
+  const [local, domain] = email.split("@", 2);
+  const visible = (local || "").slice(0, 2);
+  return `${visible}${"•".repeat(Math.max(3, Math.min(6, (local || "").length - visible.length)))}@${domain}`;
 }
 
 function linkCodeFromStart(text: string) {

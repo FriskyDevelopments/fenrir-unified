@@ -5,11 +5,7 @@ import { isDemoMode } from "@/config/demo-mode";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { GatePreview } from "@/components/gate/gate-preview";
 import { checkSlugAvailable } from "@/lib/gate.functions";
 import { GateMediaField } from "@/components/gate/gate-media-field";
@@ -77,9 +73,10 @@ interface GateFormProps {
   config: GateConfig;
   onChange: (config: GateConfig) => void;
   slugStatus: SlugStatus;
+  communityLabel: string;
 }
 
-export function GateForm({ config, onChange, slugStatus }: GateFormProps) {
+export function GateForm({ config, onChange, slugStatus, communityLabel }: GateFormProps) {
   const [advancedOpen, setAdvancedOpen] = useState(
     Boolean(config.logo_url || config.mascot_url || config.background_url),
   );
@@ -98,11 +95,23 @@ export function GateForm({ config, onChange, slugStatus }: GateFormProps) {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-6">
+        <Card className="border-primary/30 bg-primary/10 p-5 sm:p-6">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
+            Community mapping
+          </p>
+          <h2 className="mt-2 text-sm font-semibold tracking-tight">
+            This Gate serves {communityLabel}
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Standard profiles use one active community. Owners can switch the active community and
+            map Gates across several communities.
+          </p>
+        </Card>
         <Card className="p-5 sm:p-6">
           <h2 className="text-sm font-semibold tracking-tight">1. Choose a preset</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            One click sets the logo, mascot and background together. Pick any of the
-            {" "}{GATE_PRESETS.length} looks.
+            One click sets the logo, mascot and background together. Pick any of the{" "}
+            {GATE_PRESETS.length} looks.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {GATE_PRESETS.map((preset) => {
@@ -211,9 +220,9 @@ export function GateForm({ config, onChange, slugStatus }: GateFormProps) {
 
             <CollapsibleContent className="mt-5 space-y-4">
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Upload straight from your device — images, animated GIFs and short MP4 / WEBM
-                loops all work. Already hosted somewhere? Paste the public{" "}
-                <code>https://</code> link instead.
+                Upload straight from your device — images, animated GIFs and short MP4 / WEBM loops
+                all work. Already hosted somewhere? Paste the public <code>https://</code> link
+                instead.
               </p>
               {(
                 [

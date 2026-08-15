@@ -4,9 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Human verification</title>
-    <link rel="stylesheet" href="/styles.css" />
-    <script async defer type="module" src="/vendor/altcha/main/altcha.i18n.js?v=friskydev-logo-1"></script>
-    <script defer type="module" src="/app.js"></script>
+    <link rel="stylesheet" href="/styles.css?v=20260815-miniapp-2" />
+    <script defer type="module" src="/app.js?v=20260815-miniapp-7"></script>
   </head>
   <body>
     <main class="card" aria-labelledby="title">
@@ -30,7 +29,6 @@
       <form id="verification-form" action="/api/verify" method="post">
         <input id="fallback-grant" type="hidden" name="fallbackGrant" value="">
         <altcha-widget
-          challenge="/api/altcha/challenge"
           name="altcha"
           type="checkbox"
           display="standard"

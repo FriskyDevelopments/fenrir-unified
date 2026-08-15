@@ -7,23 +7,39 @@
 // POST /api/telegram/link/confirm (see confirm.ts).
 
 import { readSession } from "../../_lib/auth";
-import { dbNotConfiguredResponse, missingEnvResponse, type BillingEnv } from "../../_lib/billing-env";
+import {
+  dbNotConfiguredResponse,
+  missingEnvResponse,
+  type BillingEnv,
+} from "../../_lib/billing-env";
 import { noStoreJson } from "../../_lib/responses";
-import { createTelegramAccountLinkCode, getTelegramIdentityLink, telegramBotUsername } from "../../_lib/telegram-identity";
+import {
+  createTelegramAccountLinkCode,
+  getTelegramIdentityLink,
+  telegramBotUsername,
+} from "../../_lib/telegram-identity";
 import {
   accountLinksConfigured,
   createLinkCode,
   getAccountLinkByFriskyUser,
-  resolveSupabaseUserId
+  resolveSupabaseUserId,
+  upsertAccountLink,
 } from "../../_lib/account-links";
 
 export const onRequestGet: PagesFunction<BillingEnv> = async (context) => {
   const session = await readSession(context.request, context.env);
-  if (!session) return noStoreJson({ ok: false, error: "authentication_required" }, { status: 401 });
+  if (!session)
+    return noStoreJson(
+      { ok: false, error: "authentication_required" },
+      { status: 401 },
+    );
 
   // Source of Truth first.
   if (accountLinksConfigured(context.env)) {
-    const link = await getAccountLinkByFriskyUser(context.env, session.frisky_user_id);
+    const link = await getAccountLinkByFriskyUser(
+      context.env,
+      session.frisky_user_id,
+    );
     if (link) {
       return noStoreJson({
         ok: true,
@@ -31,27 +47,67 @@ export const onRequestGet: PagesFunction<BillingEnv> = async (context) => {
         source: "account_links",
         telegramUserId: link.telegram_id ? String(link.telegram_id) : null,
         telegramUsername: link.telegram_username ?? null,
-        linkedAt: link.verified_at ?? link.created_at
+        linkedAt: link.verified_at ?? link.created_at,
       });
     }
   }
 
   // Fallback to the D1 cache during transition.
   if (!context.env.DB) return dbNotConfiguredResponse();
-  const d1 = await getTelegramIdentityLink(context.env.DB, session.frisky_user_id);
+  const d1 = await getTelegramIdentityLink(
+    context.env.DB,
+    session.frisky_user_id,
+  );
+
+  // Repair existing canonical D1 links into the shared Supabase source of
+  // truth. This is idempotent and only runs for an already verified identity;
+  // it never mints a code or changes which Telegram account is linked.
+  if (d1 && accountLinksConfigured(context.env)) {
+    const supabaseUserId = await resolveSupabaseUserId(context.env, {
+      email: d1.email || session.email,
+      friskyUserId: d1.frisky_user_id || session.frisky_user_id,
+      telegramId: d1.telegram_user_id,
+    });
+    if (supabaseUserId) {
+      const repaired = await upsertAccountLink(context.env, {
+        supabaseUserId,
+        telegramId: d1.telegram_user_id,
+        telegramUsername: d1.telegram_username,
+        telegramFirstName: d1.telegram_first_name,
+        friskyUserId: d1.frisky_user_id,
+        friskyOrgId: d1.frisky_org_id,
+        email: d1.email || session.email,
+      });
+      if (repaired.ok) {
+        return noStoreJson({
+          ok: true,
+          linked: true,
+          source: "d1_reconciled",
+          telegramUserId: d1.telegram_user_id,
+          telegramUsername: d1.telegram_username,
+          linkedAt: d1.linked_at,
+        });
+      }
+    }
+  }
+
   return noStoreJson({
     ok: true,
     linked: Boolean(d1),
     source: "d1_cache",
     telegramUserId: d1?.telegram_user_id ?? null,
     telegramUsername: d1?.telegram_username ?? null,
-    linkedAt: d1?.linked_at ?? null
+    linkedAt: d1?.linked_at ?? null,
   });
 };
 
 export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
   const session = await readSession(context.request, context.env);
-  if (!session) return noStoreJson({ ok: false, error: "authentication_required" }, { status: 401 });
+  if (!session)
+    return noStoreJson(
+      { ok: false, error: "authentication_required" },
+      { status: 401 },
+    );
   if (!context.env.DB) return dbNotConfiguredResponse();
 
   const username = telegramBotUsername(context.env);
@@ -64,7 +120,7 @@ export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
   if (accountLinksConfigured(context.env)) {
     const supabaseUserId = await resolveSupabaseUserId(context.env, {
       email: session.email,
-      friskyUserId: session.frisky_user_id
+      friskyUserId: session.frisky_user_id,
     });
     if (supabaseUserId) {
       await createLinkCode(context.env, {
@@ -73,7 +129,7 @@ export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
         friskyUserId: session.frisky_user_id,
         friskyOrgId: session.frisky_org_id,
         email: session.email,
-        expiresAt: link.expiresAt
+        expiresAt: link.expiresAt,
       });
     }
   }
@@ -83,6 +139,6 @@ export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
     linked: false,
     code: link.code,
     expiresAt: link.expiresAt,
-    url: `https://t.me/${username}?start=link_${link.code}`
+    url: `https://t.me/${username}?start=link_${link.code}`,
   });
 };

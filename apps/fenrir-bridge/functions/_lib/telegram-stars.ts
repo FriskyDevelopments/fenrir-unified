@@ -14,8 +14,8 @@ export type TelegramStarsOrderRow = {
 const nowIso = () => new Date().toISOString();
 
 export function starsPrice(env: BillingEnv) {
-  const parsed = Number.parseInt(env.FENRIR_STARS_PRICE ?? "250", 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 250;
+  const parsed = Number.parseInt(env.FENRIR_STARS_PRICE ?? "1150", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1150;
 }
 
 export function starsBotUsername(env: BillingEnv) {
@@ -41,15 +41,15 @@ export function starsDeepLink(env: BillingEnv) {
 }
 
 export function starsTitle(env: BillingEnv) {
-  return env.FENRIR_STARS_TITLE?.trim() || "Fenrir Protocol Access";
+  return env.FENRIR_STARS_TITLE?.trim() || "MyFenrir Standard Pack · Founders Deal";
 }
 
 export function starsDescription(env: BillingEnv) {
-  return env.FENRIR_STARS_DESCRIPTION?.trim() || "Unlock Fenrir Protocol access with Telegram Stars while card billing is being reviewed.";
+  return env.FENRIR_STARS_DESCRIPTION?.trim() || "Activate Standard membership: 5 Gates for one active community. The card alternative is $15 USD.";
 }
 
 export function starsLabel(env: BillingEnv) {
-  return env.FENRIR_STARS_LABEL?.trim() || "Fenrir Protocol Access";
+  return env.FENRIR_STARS_LABEL?.trim() || "Standard Pack";
 }
 
 export async function createStarsOrder(db: D1Database, telegramUserId: string, telegramChatId: string, amount: number) {

@@ -27,6 +27,9 @@ const sliderStrength = document.querySelector('#slider-strength');
 const sliderRisk = document.querySelector('#slider-risk');
 const fallbackGrant = document.querySelector('#fallback-grant');
 const fallbackVerified = document.querySelector('#fallback-verified');
+let altchaPayload = '';
+let altchaSubmitting = false;
+let verificationSucceeded = false;
 let puzzleToken = '';
 let selectedRune = '';
 let sliderToken = '';
@@ -35,8 +38,22 @@ const verificationParams = new URLSearchParams(location.search);
 const verificationAudience = verificationParams.get('audience') || location.origin;
 const verificationContext = verificationParams.get('context') || crypto.randomUUID().replaceAll('-', '');
 const verificationQuery = new URLSearchParams({ audience: verificationAudience, context: verificationContext });
+document.documentElement.dataset.embed = verificationParams.get('embed') || '';
 const verificationEndpoint = (path) => `${path}?${verificationQuery.toString()}`;
+const altchaChallengeResponse = await fetch(verificationEndpoint('/api/altcha/challenge'), { cache: 'no-store' });
+if (altchaChallengeResponse.ok) widget.setAttribute('challenge', JSON.stringify(await altchaChallengeResponse.json()));
+await import('/vendor/altcha/main/altcha.i18n.js?v=friskydev-logo-1');
 let currentLanguage = ['en', 'es', 'fr', 'pt'].find((language) => navigator.language.toLowerCase().startsWith(language)) || 'en';
+
+if (window.parent !== window) {
+  const reportHeight = () => window.parent.postMessage({
+    type: 'friskydev-human-verification-resize',
+    context: verificationContext,
+    height: document.documentElement.scrollHeight,
+  }, verificationAudience);
+  new ResizeObserver(reportHeight).observe(document.documentElement);
+  addEventListener('load', reportHeight, { once: true });
+}
 
 const copy = {
   en: { title: 'Let’s make sure you’re human', intro: 'Private verification with no tracking. Complete the automatic challenge or use the puzzle instead.', continue: 'Continue', fallback: 'Having trouble? Use a puzzle', puzzleTitle: 'Match the signal', puzzleInstruction: 'Tap the identical signal below. Order matters.', legend: 'Select the matching signal', unlock: 'Unlock signal', privacy: 'No cookies · No fingerprinting · No image recognition', checking: 'Checking…', checkingAnswer: 'Checking your answer…', verified: 'Verified. You may continue.', failed: 'Automatic verification failed. Try the puzzle below.', failedPuzzle: 'Automatic verification failed. Complete the puzzle instead.', unavailable: 'The puzzle could not load. Please try again later.', mismatch: 'That signal didn’t match. Here’s a new puzzle.', then: 'then', risk: { low: 'LOW', medium: 'MEDIUM', high: 'HIGH' }, glyph: { moon: 'moon', paw: 'paw', spark: 'spark', eye: 'eye', bolt: 'bolt', diamond: 'diamond', flame: 'flame', orbit: 'orbit', wolf: 'wolf', star: 'star' } },
@@ -170,7 +187,6 @@ languageButtons.forEach((button) => button.addEventListener('click', async () =>
   if (!puzzleForm.hidden) await loadPuzzle();
 }));
 applyLanguage(currentLanguage);
-widget.setAttribute('challenge', verificationEndpoint('/api/altcha/challenge'));
 
 themeButtons.forEach((button) => button.addEventListener('click', () => {
   document.documentElement.dataset.theme = button.dataset.theme;
@@ -245,35 +261,53 @@ sliderForm.addEventListener('submit', async (event) => {
   }
 });
 
-let signalFallbackTimer = window.setTimeout(() => {
-  if (!fallbackGrant.value && sliderForm.hidden) {
-    setStatus(t('failed'));
-    showSlider.click();
-  }
-}, 5000);
-
 widget.addEventListener('statechange', (event) => {
-  if (event.detail?.state === 'verified') window.clearTimeout(signalFallbackTimer);
+  if (event.detail?.payload) altchaPayload = event.detail.payload;
+  if (event.detail?.state === 'verified' && altchaPayload) void submitAltcha(altchaPayload);
   if (event.detail?.state === 'error' || event.detail?.state === 'expired') {
-    window.clearTimeout(signalFallbackTimer);
+    if (verificationSucceeded || altchaPayload) return;
     setStatus(t('failed'));
-    if (!showSlider.hidden) showSlider.click();
   }
 });
+
+async function submitAltcha(payload) {
+  if (altchaSubmitting || verificationSucceeded) return;
+  altchaSubmitting = true;
+  setStatus(t('checking'));
+  try {
+    const response = await fetch(form.action, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ altcha: payload, fallbackGrant: fallbackGrant.value }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.verified || !result.grant) throw new Error('verification_failed');
+    verificationSucceeded = true;
+    setStatus(t('verified'), true);
+    form.querySelector('.primary').hidden = true;
+    showSlider.hidden = true;
+    showPuzzle.hidden = true;
+    notifyParent(result);
+  } catch {
+    setStatus(t('failed'));
+  } finally {
+    altchaSubmitting = false;
+  }
+}
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   setStatus(t('checking'));
   try {
-    const response = await fetch(form.action, { method: 'POST', body: new FormData(form) });
-    const result = await response.json();
-    setStatus(result.verified ? t('verified') : t('failed'), result.verified);
-    if (result.verified) form.querySelector('.primary').disabled = true;
-    if (result.verified) notifyParent(result);
-    if (!result.verified && !showSlider.hidden) showSlider.click();
+    const formPayload = new FormData(form).get('altcha');
+    const payload = altchaPayload || (typeof formPayload === 'string' ? formPayload : '');
+    if (!payload && !fallbackGrant.value) {
+      setStatus(t('checking'));
+      return;
+    }
+    await submitAltcha(payload);
   } catch {
     setStatus(t('failed'));
-    if (!showSlider.hidden) showSlider.click();
   }
 });
 

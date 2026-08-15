@@ -1218,7 +1218,10 @@ export function App() {
     const params = new URLSearchParams(window.location.search);
     const billing = params.get("billing");
     if (!billing) return;
-    if (billing === "success") setNotice(copy[locale].billingReturnSuccess);
+    if (billing === "success") {
+      setNotice(copy[locale].billingReturnSuccess);
+      triggerCelebration("Welcome to the Pack", "Your MyFenrir subscription is active. The pack is ready.", "commerce");
+    }
     if (billing === "cancel") setNotice(copy[locale].billingReturnCancel);
     if (billing === "portal_return") setNotice(copy[locale].billingReturnPortal);
     void refresh();
@@ -1640,20 +1643,21 @@ export function App() {
   const show = (...pages: PageKey[]) => pages.includes(active);
 
   return (
-    <div className="app">
+    <div className="app threshold-dashboard">
       {activationVisible && <ProtocolActivated />}
-      <aside className="sidebar">
+      <aside className="sidebar threshold-rail">
         <div className="brand">
           <img className="brand-wordmark" src="/fenrir-cut-wordmark.svg" alt="Fenrir" />
           <div className="brand-lockup">
-            <b>Telegram Lock</b>
-            <small>{c.brandSmall}</small>
+            <b>MyFenrir</b>
+            <small>CONTROL PLANE · R/01</small>
           </div>
         </div>
         <nav>
           {c.nav.map((item, index) => (
             <button className={active === pageKeys[index] ? "active" : ""} onClick={() => navigateActive(pageKeys[index])} key={item}>
-              {item}
+              <span className="threshold-nav-index">{String(index).padStart(2, "0")}</span>
+              <span>{item}</span>
             </button>
           ))}
         </nav>
@@ -1669,7 +1673,7 @@ export function App() {
         </div>
       </aside>
 
-      <main>
+      <main className="threshold-main">
         <div className="fenrir-wallpaper" aria-hidden="true">
           <span className="wallpaper-orbit orbit-one" />
           <span className="wallpaper-orbit orbit-two" />
@@ -1677,7 +1681,17 @@ export function App() {
           <span className="wallpaper-paw">F</span>
           <span className="wallpaper-bot">◈</span>
         </div>
-        <header className="topbar">
+        <header className="topbar threshold-topbar">
+          <div className="threshold-engine" aria-hidden="true">
+            <span className="threshold-engine-ring ring-a" />
+            <span className="threshold-engine-ring ring-b" />
+            <span className="threshold-engine-ring ring-c" />
+            <span className="threshold-engine-scan" />
+            <span className="threshold-engine-core"><b>R/01</b><small>THRESHOLD<br />ONLINE</small></span>
+            <span className="threshold-engine-node node-a" />
+            <span className="threshold-engine-node node-b" />
+            <span className="threshold-engine-node node-c" />
+          </div>
           <div>
             <p className="label">{c.heroLabel}</p>
             <h1>{c.heroTitle}</h1>
@@ -3165,7 +3179,7 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmedEmail, slug })
+        body: JSON.stringify({ email: trimmedEmail, slug, locale })
       });
       const body = await response.json().catch(() => null) as { message?: string; devLink?: string; error?: string; detail?: string | { message?: string } } | null;
       if (!response.ok) throw new Error(readableCommunityError(body?.detail, body?.error));
@@ -4245,7 +4259,14 @@ function LinkVaultPanel({
 function FaqPanel({ c }: { c: Copy }) {
   return (
     <section className="panel wide faq-panel">
-      <PanelTitle title={c.faqTitle} subtitle={c.faqSub} />
+      <div className="faq-heading-row">
+        <PanelTitle title={c.faqTitle} subtitle={c.faqSub} />
+        <a className="faq-wiki-link" href={knowledgeBaseUrl}>
+          <span>31 FIELD GUIDES</span>
+          <b>Open the new Wiki</b>
+          <i aria-hidden="true">↗</i>
+        </a>
+      </div>
       <div className="faq-grid">
         {c.faqs.map((item, index) => (
           <details className="faq-item" key={item[0]} open={index < 2}>
