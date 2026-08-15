@@ -26,6 +26,10 @@ const checks = [
       supabaseAuthSource.includes("signInWithOAuth")
   },
   {
+    name: "plain /login is not treated as an OAuth callback",
+    pass: !supabaseAuthSource.includes('normalizedPath === "/login"')
+  },
+  {
     name: `no WorkOS reference exists anywhere in the app (banned)${offenders ? ` — found in: ${offenders.replaceAll("\n", ", ")}` : ""}`,
     pass: offenders === ""
   }

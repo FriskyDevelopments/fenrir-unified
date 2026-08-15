@@ -55,7 +55,6 @@ function isAuthCallbackPath(pathname: string) {
   const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
   return normalizedPath === "/auth/callback" || 
          normalizedPath === "/auth/v1/callback" || 
-         normalizedPath === "/login" ||
          normalizedPath === sanitizeRedirectPath(authRedirectPath);
 }
 
