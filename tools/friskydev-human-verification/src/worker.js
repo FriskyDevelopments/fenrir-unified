@@ -120,6 +120,7 @@ async function verifyAltcha(value, secret) {
 async function body(request) {
   const type = request.headers.get("content-type") || "";
   if (type.includes("application/json")) return request.json();
+  if (type.includes("multipart/form-data")) return Object.fromEntries(await request.formData());
   return Object.fromEntries(new URLSearchParams(await request.text()));
 }
 
