@@ -1,6 +1,7 @@
 const form = document.querySelector('#verification-form');
 const puzzleForm = document.querySelector('#puzzle-form');
 const showPuzzle = document.querySelector('#show-puzzle');
+const showAltcha = document.querySelector('#show-altcha');
 const prompt = document.querySelector('#puzzle-prompt');
 const instruction = document.querySelector('#puzzle-instruction');
 const sequence = document.querySelector('#signal-sequence');
@@ -27,6 +28,7 @@ const sliderStrength = document.querySelector('#slider-strength');
 const sliderRisk = document.querySelector('#slider-risk');
 const fallbackGrant = document.querySelector('#fallback-grant');
 const fallbackVerified = document.querySelector('#fallback-verified');
+const altchaKicker = document.querySelector('#altcha-kicker');
 const brandKicker = document.querySelector('#brand-kicker');
 const puzzleKicker = document.querySelector('#puzzle-kicker');
 const sliderKicker = document.querySelector('#slider-kicker');
@@ -63,10 +65,10 @@ const loreCopy = {
 };
 
 const sliderCopy = {
-  en: { method: 'Use Signal Slider', puzzle: 'Use rune puzzle instead', title: 'Lock onto the signal', instruction: 'Drag the wolf into the glowing target.', verify: 'Verify position', aria: 'Signal position' },
-  es: { method: 'Usar Signal Slider', puzzle: 'Usar puzzle de runas', title: 'Sintoniza la señal', instruction: 'Arrastra el lobo hasta el objetivo brillante.', verify: 'Verificar posición', aria: 'Posición de la señal' },
-  fr: { method: 'Utiliser Signal Slider', puzzle: 'Utiliser le puzzle de runes', title: 'Verrouillez le signal', instruction: 'Faites glisser le loup dans la cible lumineuse.', verify: 'Vérifier la position', aria: 'Position du signal' },
-  pt: { method: 'Usar Signal Slider', puzzle: 'Usar puzzle de runas', title: 'Sintonize o sinal', instruction: 'Arraste o lobo até o alvo brilhante.', verify: 'Verificar posição', aria: 'Posição do sinal' },
+  en: { altcha: 'ALTCHA', method: 'Signal Slider', puzzle: 'Rune puzzle', altchaKicker: 'ALTCHA · PRIVATE PROOF', title: 'Lock onto the signal', instruction: 'Drag the wolf into the glowing target.', verify: 'Verify position', aria: 'Signal position' },
+  es: { altcha: 'ALTCHA', method: 'Signal Slider', puzzle: 'Puzzle de runas', altchaKicker: 'ALTCHA · PRUEBA PRIVADA', title: 'Sintoniza la señal', instruction: 'Arrastra el lobo hasta el objetivo brillante.', verify: 'Verificar posición', aria: 'Posición de la señal' },
+  fr: { altcha: 'ALTCHA', method: 'Signal Slider', puzzle: 'Puzzle de runes', altchaKicker: 'ALTCHA · PREUVE PRIVÉE', title: 'Verrouillez le signal', instruction: 'Faites glisser le loup dans la cible lumineuse.', verify: 'Vérifier la position', aria: 'Position du signal' },
+  pt: { altcha: 'ALTCHA', method: 'Signal Slider', puzzle: 'Puzzle de runas', altchaKicker: 'ALTCHA · PROVA PRIVADA', title: 'Sintonize o sinal', instruction: 'Arraste o lobo até o alvo brilhante.', verify: 'Verificar posição', aria: 'Posição do sinal' },
 };
 
 const glyphs = { moon: '◒', paw: '◆', spark: '✦', eye: '◉', bolt: 'ϟ', diamond: '◇', flame: '♨', orbit: '⊛', star: '★' };
@@ -106,7 +108,9 @@ function applyLanguage(language) {
   title.textContent = t('title');
   intro.textContent = t('intro');
   form.querySelector('.primary').textContent = t('continue');
+  showAltcha.textContent = sliderCopy[language].altcha;
   showPuzzle.textContent = sliderCopy[language].puzzle;
+  altchaKicker.textContent = sliderCopy[language].altchaKicker;
   prompt.textContent = t('puzzleTitle');
   instruction.textContent = t('puzzleInstruction');
   legend.textContent = t('legend');
@@ -218,21 +222,27 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
   });
 }
 
+function selectMethod(method) {
+  form.hidden = method !== 'altcha';
+  puzzleForm.hidden = method !== 'puzzle';
+  sliderForm.hidden = method !== 'slider';
+  widget.hidden = false;
+  form.querySelector('.primary').hidden = false;
+  for (const [button, name] of [[showAltcha, 'altcha'], [showSlider, 'slider'], [showPuzzle, 'puzzle']]) {
+    button.setAttribute('aria-pressed', String(method === name));
+  }
+  setStatus('');
+}
+
+showAltcha.addEventListener('click', () => selectMethod('altcha'));
+
 showPuzzle.addEventListener('click', async () => {
-  puzzleForm.hidden = false;
-  sliderForm.hidden = true;
-  showSlider.hidden = false;
-  showPuzzle.hidden = true;
+  selectMethod('puzzle');
   try { await loadPuzzle(); } catch { setStatus(t('unavailable')); }
 });
 
 showSlider.addEventListener('click', async () => {
-  puzzleForm.hidden = true;
-  showSlider.hidden = true;
-  sliderForm.hidden = false;
-  showPuzzle.hidden = false;
-  widget.hidden = true;
-  form.querySelector('.primary').hidden = true;
+  selectMethod('slider');
   try { await loadSlider(); } catch { setStatus(t('unavailable')); }
 });
 
@@ -266,19 +276,9 @@ sliderForm.addEventListener('submit', async (event) => {
   }
 });
 
-let signalFallbackTimer = window.setTimeout(() => {
-  if (!fallbackGrant.value && sliderForm.hidden) {
-    setStatus(t('failed'));
-    showSlider.click();
-  }
-}, 5000);
-
 widget.addEventListener('statechange', (event) => {
-  if (event.detail?.state === 'verified') window.clearTimeout(signalFallbackTimer);
   if (event.detail?.state === 'error' || event.detail?.state === 'expired') {
-    window.clearTimeout(signalFallbackTimer);
     setStatus(t('failed'));
-    if (!showSlider.hidden) showSlider.click();
   }
 });
 
@@ -291,10 +291,8 @@ form.addEventListener('submit', async (event) => {
     setStatus(result.verified ? t('verified') : t('failed'), result.verified);
     if (result.verified) form.querySelector('.primary').disabled = true;
     if (result.verified) notifyParent(result);
-    if (!result.verified && !showSlider.hidden) showSlider.click();
   } catch {
     setStatus(t('failed'));
-    if (!showSlider.hidden) showSlider.click();
   }
 });
 

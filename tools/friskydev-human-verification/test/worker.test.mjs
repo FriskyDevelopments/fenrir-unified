@@ -71,7 +71,11 @@ test("accepts LORE production and isolated preview as consuming audiences", asyn
 
 test("ships an audience-specific LORE presentation without making Authentik canonical", () => {
   const app = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
+  const page = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
   assert.match(app, /LORE · SIGNAL CHECK/);
   assert.match(app, /Prove the signal is yours/);
   assert.doesNotMatch(app, /loreAudiences[\s\S]*authentik\.friskydev\.com/);
+  assert.match(page, /id="show-altcha"/);
+  assert.match(page, /ALTCHA · PRIVATE PROOF/);
+  assert.doesNotMatch(app, /signalFallbackTimer/);
 });

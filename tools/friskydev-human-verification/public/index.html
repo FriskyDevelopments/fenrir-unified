@@ -27,7 +27,14 @@
       <h1 id="title">Let’s make sure you’re human</h1>
       <p id="intro" class="intro">Private verification with no tracking. Complete the automatic challenge or use the puzzle instead.</p>
 
+      <nav class="method-switcher" aria-label="Verification method">
+        <button id="show-altcha" type="button" aria-pressed="true">ALTCHA</button>
+        <button id="show-slider" type="button" aria-pressed="false">Signal Slider</button>
+        <button id="show-puzzle" type="button" aria-pressed="false">Rune puzzle</button>
+      </nav>
+
       <form id="verification-form" action="/api/verify" method="post">
+        <p id="altcha-kicker" class="method-kicker">ALTCHA · PRIVATE PROOF</p>
         <input id="fallback-grant" type="hidden" name="fallbackGrant" value="">
         <altcha-widget
           challenge="/api/altcha/challenge"
@@ -40,8 +47,6 @@
         <div id="fallback-verified" class="fallback-verified" hidden><span aria-hidden="true">✓</span><strong>Verified by alternative challenge</strong></div>
         <button class="primary" type="submit" data-i18n="continue">Continue</button>
       </form>
-
-      <button id="show-slider" class="link" type="button">Use Signal Slider</button>
 
       <form id="puzzle-form" class="puzzle" hidden>
         <div class="signal-head">
@@ -61,8 +66,6 @@
         </fieldset>
         <button class="unlock" type="submit" disabled><span id="unlock-label">Unlock signal</span><b aria-hidden="true">↗</b></button>
       </form>
-      <button id="show-puzzle" class="link alt-method" type="button" hidden>Use rune puzzle instead</button>
-
       <form id="slider-form" class="slider-challenge" hidden>
         <div class="slider-copy">
           <p id="slider-kicker" class="puzzle-label">SIGNAL SLIDER · FRISKYDEV</p>
