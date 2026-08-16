@@ -11,7 +11,7 @@ import {
   Sparkles,
   UsersRound,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import {
   createFoundersNowPaymentsCheckout,
@@ -38,6 +38,12 @@ const capabilities = [
   },
 ] as const;
 
+// Launch billing rail = Telegram Stars ONLY. Card (Stripe) and crypto (NOWPayments)
+// checkout stay in code but are hidden until card billing goes live, so no user can
+// reach /api/internal/founders-checkout — the Stripe path that 502s as
+// `stripe_checkout_failed`. Flip to true (or wire an env flag) when card billing is ready.
+const CARD_BILLING_ENABLED = false;
+
 export const Route = createFileRoute("/upgrade")({ ssr: false, component: UpgradePage });
 
 function UpgradePage() {
@@ -48,6 +54,9 @@ function UpgradePage() {
   const [stripeBusy, setStripeBusy] = useState(false);
   const [nowPaymentsReady, setNowPaymentsReady] = useState(false);
   const [billingMessage, setBillingMessage] = useState<string | null>(null);
+  // Honor the OS "reduce motion" setting: all looping/background motion turns
+  // off and entrances mount static for anyone who asks for it.
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     void getBillingOptions()
@@ -106,16 +115,25 @@ function UpgradePage() {
   }
   return (
     <main className="min-h-dvh overflow-hidden bg-background px-5 py-8 sm:px-8 sm:py-12">
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-background"
+      >
+        {/* Slow aurora: on-brand navy with controlled red + green light. */}
         <motion.div
-          className="absolute -left-24 top-16 h-96 w-96 rounded-full bg-primary/20 blur-[110px]"
-          animate={{ x: [0, 54, 0], y: [0, 24, 0], opacity: [0.35, 0.72, 0.35] }}
-          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute inset-[-25%] opacity-80 [background:radial-gradient(38%_34%_at_20%_25%,hsl(var(--primary)/0.18),transparent_60%),radial-gradient(36%_32%_at_82%_74%,rgba(16,185,129,0.14),transparent_60%),radial-gradient(46%_40%_at_62%_8%,rgba(16,185,129,0.05),transparent_65%)]"
+          animate={reduce ? undefined : { rotate: [0, 7, 0], scale: [1, 1.06, 1] }}
+          transition={reduce ? undefined : { duration: 28, repeat: Infinity, ease: "easeInOut" }}
         />
         <motion.div
-          className="absolute -right-24 bottom-0 h-96 w-96 rounded-full bg-violet-500/15 blur-[120px]"
-          animate={{ x: [0, -42, 0], y: [0, -30, 0], opacity: [0.25, 0.6, 0.25] }}
-          transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -left-24 top-16 h-96 w-96 rounded-full bg-primary/20 blur-[110px]"
+          animate={reduce ? undefined : { x: [0, 54, 0], y: [0, 24, 0], opacity: [0.3, 0.6, 0.3] }}
+          transition={reduce ? undefined : { duration: 13, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div
+          className="absolute -right-24 bottom-0 h-96 w-96 rounded-full bg-emerald-500/15 blur-[120px]"
+          animate={reduce ? undefined : { x: [0, -42, 0], y: [0, -30, 0], opacity: [0.22, 0.5, 0.22] }}
+          transition={reduce ? undefined : { duration: 16, repeat: Infinity, ease: "easeInOut" }}
         />
       </div>
       <div className="mx-auto max-w-6xl">
@@ -128,7 +146,7 @@ function UpgradePage() {
 
         <section className="grid gap-10 pb-12 pt-14 lg:grid-cols-[1.2fr_0.8fr] lg:items-end lg:pb-20">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={reduce ? false : { opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55 }}
           >
@@ -144,9 +162,9 @@ function UpgradePage() {
             </p>
           </motion.div>
           <motion.aside
-            initial={{ opacity: 0, scale: 0.96 }}
+            initial={reduce ? false : { opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.12, duration: 0.48 }}
+            transition={{ delay: reduce ? 0 : 0.12, duration: 0.48 }}
             className="relative overflow-hidden rounded-3xl border border-primary/35 bg-card/70 p-6 shadow-[0_28px_100px_-50px_hsl(var(--primary))] backdrop-blur"
           >
             <div
@@ -161,24 +179,28 @@ function UpgradePage() {
               Membership begins with your first Gate. Payment activates the Standard Pack: 5 Gates
               in one active community.
             </p>
-            <button
-              type="button"
-              disabled={stripeBusy}
-              onClick={() => void openStripe("annual")}
-              className="group relative mt-6 flex w-full items-center justify-center overflow-hidden rounded-xl border border-[#635bff]/60 bg-gradient-to-r from-[#635bff] to-violet-600 px-4 py-3 text-sm font-bold text-white shadow-[0_0_36px_rgba(99,91,255,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_48px_rgba(99,91,255,0.4)] disabled:cursor-wait disabled:opacity-60"
-            >
-              Commit more, pay less · US$149.90/year <ArrowUpRight className="ml-2 h-4 w-4" />
-            </button>
-            <p className="mt-2 text-center text-xs font-medium text-primary">Founders Deal · 2 months free</p>
-            <button
-              type="button"
-              disabled={stripeBusy}
-              onClick={() => void openStripe("monthly")}
-              className="mt-3 flex w-full items-center justify-center rounded-xl border border-[#635bff]/45 bg-[#635bff]/10 px-4 py-3 text-sm font-medium text-violet-100 transition-colors hover:border-[#8078ff]/70 hover:bg-[#635bff]/20 disabled:cursor-wait disabled:opacity-60"
-            >
-              Monthly · US$14.99/month <ArrowUpRight className="ml-2 h-4 w-4" />
-            </button>
-            {nowPaymentsReady ? (
+            {CARD_BILLING_ENABLED && (
+              <>
+                <button
+                  type="button"
+                  disabled={stripeBusy}
+                  onClick={() => void openStripe("annual")}
+                  className="group relative mt-6 flex w-full items-center justify-center overflow-hidden rounded-xl border border-[#635bff]/60 bg-gradient-to-r from-[#635bff] to-violet-600 px-4 py-3 text-sm font-bold text-white shadow-[0_0_36px_rgba(99,91,255,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_48px_rgba(99,91,255,0.4)] disabled:cursor-wait disabled:opacity-60"
+                >
+                  Commit more, pay less · US$149.90/year <ArrowUpRight className="ml-2 h-4 w-4" />
+                </button>
+                <p className="mt-2 text-center text-xs font-medium text-primary">Founders Deal · 2 months free</p>
+                <button
+                  type="button"
+                  disabled={stripeBusy}
+                  onClick={() => void openStripe("monthly")}
+                  className="mt-3 flex w-full items-center justify-center rounded-xl border border-[#635bff]/45 bg-[#635bff]/10 px-4 py-3 text-sm font-medium text-violet-100 transition-colors hover:border-[#8078ff]/70 hover:bg-[#635bff]/20 disabled:cursor-wait disabled:opacity-60"
+                >
+                  Monthly · US$14.99/month <ArrowUpRight className="ml-2 h-4 w-4" />
+                </button>
+              </>
+            )}
+            {CARD_BILLING_ENABLED && nowPaymentsReady ? (
               <button
                 type="button"
                 disabled={stripeBusy}
@@ -188,9 +210,21 @@ function UpgradePage() {
                 ₿ Crypto · $15 USD with NOWPayments <ArrowUpRight className="ml-2 h-4 w-4" />
               </button>
             ) : null}
-            <a
-              className="group relative mt-6 flex w-full items-center justify-center overflow-hidden rounded-xl border border-[#f4c542]/50 bg-[#f4c542] px-4 py-3 text-sm font-bold text-[#171204] shadow-[0_0_36px_rgba(244,197,66,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_48px_rgba(244,197,66,0.36)] active:translate-y-0"
+            <motion.a
+              className="group relative mt-6 flex w-full items-center justify-center overflow-hidden rounded-xl border border-[#f4c542]/50 bg-[#f4c542] px-4 py-3 text-sm font-bold text-[#171204] shadow-[0_0_36px_rgba(244,197,66,0.24)] transition-transform duration-300 hover:-translate-y-0.5 active:translate-y-0"
               href="https://t.me/Myfenrir_bot?start=fenrir_stars"
+              animate={
+                reduce
+                  ? undefined
+                  : {
+                      boxShadow: [
+                        "0 0 28px rgba(244,197,66,0.22)",
+                        "0 0 48px rgba(244,197,66,0.44)",
+                        "0 0 28px rgba(244,197,66,0.22)",
+                      ],
+                    }
+              }
+              transition={reduce ? undefined : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
             >
               <span
                 aria-hidden="true"
@@ -200,7 +234,7 @@ function UpgradePage() {
                 ⭐ Activate Standard Pack · 1,150 Stars{" "}
                 <ArrowUpRight className="ml-2 inline h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </span>
-            </a>
+            </motion.a>
             {billingMessage ? (
               <p className="mt-3 rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-center text-xs">
                 {billingMessage}
@@ -278,8 +312,11 @@ function UpgradePage() {
             {["Keep your address", "Connect your members", "Control access"].map((item, index) => (
               <motion.div
                 key={item}
-                whileHover={{ y: -5, scale: 1.015 }}
-                transition={{ type: "spring", stiffness: 320, damping: 22 }}
+                initial={reduce ? false : { opacity: 0, y: 14 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.4 }}
+                transition={{ delay: reduce ? 0 : index * 0.1, duration: 0.4 }}
+                whileHover={reduce ? undefined : { y: -5, scale: 1.015 }}
                 className="group rounded-2xl border border-border/70 bg-background/60 p-4 shadow-[0_10px_28px_-22px_black] transition-colors hover:border-primary/50"
               >
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
@@ -307,11 +344,13 @@ function UpgradePage() {
             </h2>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="fenrir" disabled={stripeBusy} onClick={() => void openStripe("annual")}>
-              <Sparkles className="mr-2 h-4 w-4" /> US$149.90/year · 2 months free
-            </Button>
-            <Button asChild variant="outline">
-              <a href="https://t.me/Myfenrir_bot?start=fenrir_stars">Pay 1,150 Stars</a>
+            {CARD_BILLING_ENABLED && (
+              <Button variant="fenrir" disabled={stripeBusy} onClick={() => void openStripe("annual")}>
+                <Sparkles className="mr-2 h-4 w-4" /> US$149.90/year · 2 months free
+              </Button>
+            )}
+            <Button asChild variant="fenrir">
+              <a href="https://t.me/Myfenrir_bot?start=fenrir_stars">⭐ Pay with Telegram Stars · The Pack</a>
             </Button>
           </div>
         </motion.section>
