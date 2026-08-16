@@ -24,7 +24,7 @@ import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, Frisky
 import { AuthProviderButton } from "./components/AuthProviderButton";
 import { AuthSurface } from "./components/AuthSurface";
 import { AltchaGate } from "./components/AltchaGate";
-import { communityBridgeDashboardUrl } from "./services/communityBridge";
+import { communityBridgeDashboardUrl, communityBridgeUrlForLocale } from "./services/communityBridge";
 import { CommunityBridgeHandoffPanel } from "./routes/communityGate";
 import { knowledgeBaseLabel, knowledgeBaseUrl } from "./services/knowledgeBase";
 import { CinematicLanding } from "./components/CinematicLanding";
@@ -35,6 +35,10 @@ import { brandThemes, themeClassName, themeCssVars } from "./theme/brandThemes";
 const defaultServiceOrg = (import.meta.env.VITE_DEFAULT_SERVICE_ORG ?? "Frisky Dev Workspace").trim();
 const defaultServiceSubdomain = (import.meta.env.VITE_DEFAULT_SERVICE_SUBDOMAIN ?? "vip.myfenrir.com").trim();
 const managedDashboardPath = "/main";
+function postLoginDestination() {
+  const requested = new URLSearchParams(window.location.search).get("next");
+  return requested?.startsWith("/") && !requested.startsWith("//") ? requested : managedDashboardPath;
+}
 const telegramLoginBotUsername = (
   import.meta.env.VITE_FENRIR_TELEGRAM_BOT_USERNAME ??
   import.meta.env.VITE_MYFENRIR_TELEGRAM_BOT_USERNAME ??
@@ -284,7 +288,7 @@ const uiCopy: Record<Locale, {
     communityEmailPlaceholder: "you@community.com",
     neonMagicBusy: "Creating Neon link...",
     neonMagicButton: "Send Neon magic link",
-    neonMagicSuccessMessage: "Neon auth link sent. Check your inbox and follow the latest approval step.",
+    neonMagicSuccessMessage: "Sign-in link sent. Check your inbox to continue into MyFenrir.",
     neonMagicDevLinkLabel: "Open dev auth link",
     fallbackPartnerLabel: "Fallback links",
     challengeLayer: "Challenge layer",
@@ -1133,6 +1137,10 @@ export function App() {
   async function refreshAuth() {
     const result = await authService.me();
     setAuth(result.data);
+    if (result.data.authenticated && window.location.pathname === "/api/telegram/link/start") {
+      window.location.assign("/api/telegram/link/start");
+      return;
+    }
     if (result.data.authenticated && (isAuthCallbackPath(window.location.pathname) || window.location.hash.includes("access_token="))) {
       window.history.replaceState({}, "", managedDashboardPath);
     }
@@ -1753,7 +1761,7 @@ export function App() {
             roomProvider={roomProviderInput}
             onDomain={() => navigateActive("domains")}
             onRoom={() => navigateActive("rooms")}
-            onCommunity={() => window.location.assign(communityBridgeDashboardUrl)}
+            onCommunity={() => window.location.assign(communityBridgeUrlForLocale(locale))}
           />
         )}
 
@@ -3099,57 +3107,57 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
   const gateText = {
     en: {
       kicker: "Private community access",
-      body: "Enter with a scoped Neon session. Fenrir keeps the client portal, invite checks, and community membership state separated.",
+      body: "One MyFenrir identity across the gate and Community Bridge. Sign in once — your session carries over automatically.",
       stepIdentity: "Identity",
       stepIdentityBody: "Email link confirms the person.",
       stepInvite: "Invite",
       stepInviteBody: "Community rules decide the next door.",
       stepSession: "Session",
-      stepSessionBody: "Access stays isolated from Frisky admin auth.",
+      stepSessionBody: "Your MyFenrir session carries into Community Bridge.",
       emailHint: "Use the email tied to your invite or membership request.",
-      trustA: "No shared client-portal cookie",
+      trustA: "One shared MyFenrir identity",
       trustB: "Invite code ready",
       trustC: "Audit trail on approval"
     },
     es: {
       kicker: "Acceso privado de comunidad",
-      body: "Entra con una sesion Neon separada. Fenrir mantiene aislados el portal de clientes, los invites y el estado de membresia.",
+      body: "Una sola identidad MyFenrir entre el gate y Community Bridge. Entra una vez — tu sesion se comparte automaticamente.",
       stepIdentity: "Identidad",
       stepIdentityBody: "El enlace por email confirma a la persona.",
       stepInvite: "Invite",
       stepInviteBody: "Las reglas de comunidad deciden la siguiente puerta.",
       stepSession: "Sesion",
-      stepSessionBody: "El acceso queda aislado del auth admin Frisky.",
+      stepSessionBody: "Tu sesion MyFenrir se comparte con Community Bridge.",
       emailHint: "Usa el correo ligado a tu invite o solicitud.",
-      trustA: "Sin cookie compartida del portal",
+      trustA: "Identidad MyFenrir compartida",
       trustB: "Invite listo",
       trustC: "Auditoria en aprobacion"
     },
     fr: {
       kicker: "Acces communaute privee",
-      body: "Entrez avec une session Neon separee. Fenrir isole le portail client, les invitations et l'etat membre.",
+      body: "Une seule identite MyFenrir entre le gate et Community Bridge. Connectez-vous une fois, votre session est partagee.",
       stepIdentity: "Identite",
       stepIdentityBody: "Le lien email confirme la personne.",
       stepInvite: "Invitation",
       stepInviteBody: "Les regles communaute ouvrent la prochaine porte.",
       stepSession: "Session",
-      stepSessionBody: "L'acces reste isole de l'auth admin Frisky.",
+      stepSessionBody: "Votre session MyFenrir passe dans Community Bridge.",
       emailHint: "Utilisez l'email lie a votre invitation ou demande.",
-      trustA: "Pas de cookie portail partage",
+      trustA: "Identite MyFenrir partagee",
       trustB: "Invitation prete",
       trustC: "Audit a l'approbation"
     },
     de: {
       kicker: "Privater Community-Zugang",
-      body: "Betritt die Community mit einer getrennten Neon-Session. Fenrir trennt Client-Portal, Einladungen und Mitgliedsstatus.",
+      body: "Eine MyFenrir-Identitaet fuer Gate und Community Bridge. Einmal anmelden — deine Session wird geteilt.",
       stepIdentity: "Identitaet",
       stepIdentityBody: "Der E-Mail-Link bestaetigt die Person.",
       stepInvite: "Einladung",
       stepInviteBody: "Community-Regeln bestimmen die naechste Tuer.",
       stepSession: "Session",
-      stepSessionBody: "Der Zugang bleibt vom Frisky-Admin-Auth isoliert.",
+      stepSessionBody: "Deine MyFenrir-Session gilt auch in Community Bridge.",
       emailHint: "Nutze die E-Mail deiner Einladung oder Anfrage.",
-      trustA: "Kein geteilter Portal-Cookie",
+      trustA: "Geteilte MyFenrir-Identitaet",
       trustB: "Einladung bereit",
       trustC: "Audit bei Freigabe"
     }
@@ -3311,7 +3319,7 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
     if (!verified) return;
     setAuthNote(null);
     void authService.me().then((result) => {
-      if (result.data.authenticated) window.location.assign(managedDashboardPath);
+      if (result.data.authenticated) window.location.assign(postLoginDestination());
     });
   }, []);
 
@@ -3339,11 +3347,11 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
             <div className="lovable-auth-card-line" aria-hidden="true" />
             <div className="lovable-auth-brand">
               <div className="lovable-auth-mark-shell">
-                <img src="/fenrir-splash-icon.svg?v=20260813-login" alt="MyFenrir logo" />
+                <img src="/fenrir-splash-icon.svg?v=20260813-login" alt="" />
               </div>
-              <img className="lovable-auth-wordmark" src="/fenrir-cut-wordmark.svg?v=20260813-login" alt="MyFenrir wordmark logo" />
-              <h1>Welcome back</h1>
-              <p>Sign in to continue to MyFenrir</p>
+              <strong className="lovable-auth-name">MYFENRIR</strong>
+              <h1>Secure sign-in</h1>
+              <p>Verify once, then continue with your account.</p>
             </div>
 
             <div className="lovable-auth-actions">
@@ -3455,27 +3463,27 @@ function CommunityAuthProposalPanel({ proposal, locale }: { proposal: CommunityA
   const text = {
     en: {
       title: "Community Gate auth",
-      body: "Fenrir Community Gate uses its own Neon database, tables, and session cookie. It does not share FriskyDev client-portal auth.",
-      configured: "Neon ready",
-      missing: "Neon env pending"
+      body: "The Community Gate signs you in with your MyFenrir identity (Supabase). One sign-in carries into Community Bridge.",
+      configured: "Identity ready",
+      missing: "Identity pending"
     },
     es: {
       title: "Auth de Community Gate",
-      body: "Fenrir Community Gate usa su propia base Neon, tablas y cookie de sesion. No comparte el auth del portal FriskyDev.",
-      configured: "Neon listo",
-      missing: "Faltan env de Neon"
+      body: "El Community Gate te autentica con tu identidad MyFenrir (Supabase). Un solo inicio pasa a Community Bridge.",
+      configured: "Identidad lista",
+      missing: "Identidad pendiente"
     },
     fr: {
       title: "Auth Community Gate",
-      body: "Fenrir Community Gate utilise sa propre base Neon, ses tables et son cookie de session. Il ne partage pas l'auth du portail FriskyDev.",
-      configured: "Neon pret",
-      missing: "Env Neon en attente"
+      body: "Le Community Gate vous connecte avec votre identite MyFenrir (Supabase). Une connexion passe dans Community Bridge.",
+      configured: "Identite prete",
+      missing: "Identite en attente"
     },
     de: {
       title: "Community Gate Auth",
-      body: "Fenrir Community Gate nutzt eine eigene Neon-Datenbank, eigene Tabellen und ein eigenes Session-Cookie. Es teilt nicht das FriskyDev Client-Portal-Auth.",
-      configured: "Neon bereit",
-      missing: "Neon env fehlt"
+      body: "Das Community Gate meldet dich mit deiner MyFenrir-Identitaet (Supabase) an. Eine Anmeldung gilt auch in Community Bridge.",
+      configured: "Identitaet bereit",
+      missing: "Identitaet ausstehend"
     }
   }[locale];
 
