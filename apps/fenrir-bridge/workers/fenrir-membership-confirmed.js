@@ -96,21 +96,108 @@ async function settle(env, orgId, subscriptionId, patch) {
 /* delivery                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/* --------------------------------------------------------------------------
+ * SENDER IDENTITY — this is a MyFenrir email and it may only leave as MyFenrir.
+ *
+ * The confirmation was going out as `noreply@hostcasa.app`. HostCasa is a
+ * different product with different customers. A member who paid for The Pack
+ * on MyFenrir receiving mail from another brand's domain reads as phishing,
+ * and mixing one client's identity into another's is not a fallback we take.
+ * That address was not a decision, it was the only domain verified in the
+ * Resend account, so the code drifted to whatever happened to deliver.
+ *
+ * Verified 2026-08-17, from DNS and the Resend API, not from memory:
+ *   myfenrir.com        SPF  "v=spf1 include:_spf.mx.cloudflare.net ~all"  PRESENT
+ *                       DKIM cf2024-1._domainkey.myfenrir.com              PRESENT
+ *                       MX   route{1,2,3}.mx.cloudflare.net                PRESENT
+ *                       DMARC _dmarc.myfenrir.com                          ABSENT
+ *   mail.myfenrir.com   SPF / DKIM / MX                                    ABSENT
+ *                       DMARC _dmarc.mail.myfenrir.com "v=DMARC1; p=reject;"
+ *   Resend GET /domains -> [{ name: "hostcasa.app", status: "verified" }]  ONLY
+ *
+ * Two conclusions follow.
+ *
+ * 1. mail.myfenrir.com is unusable. It publishes DMARC p=reject with no SPF and
+ *    no DKIM, so anything sent from it fails DMARC and is hard-rejected. The
+ *    comment in apps/myfenrir-emails/wrangler.toml was right and its own value
+ *    was wrong; that file is corrected in the same change. The root domain
+ *    myfenrir.com is the identity that authenticates.
+ *
+ * 2. Resend cannot send as myfenrir.com today — the domain is not even added to
+ *    the account. So this worker's rail is the thing that is wrong, not just the
+ *    address. The correct home for MyFenrir mail already exists: the
+ *    myfenrir-emails Worker, bound to Cloudflare Email Service on the
+ *    authenticated myfenrir.com. Moving this send onto it is the fix; adding
+ *    myfenrir.com to Resend is the alternative. Both need an operator, and this
+ *    file must not guess which.
+ *
+ * Until one of those lands, this refuses to send rather than send as the wrong
+ * brand. A refusal is recorded on membership_confirmations as a failure with a
+ * legible reason, so it is visible and countable. A confirmation that does not
+ * arrive is a bug we can see; a confirmation wearing HostCasa's name is a brand
+ * incident we cannot take back.
+ * -------------------------------------------------------------------------- */
+
+/** Domains this worker is allowed to introduce itself as. MyFenrir only. */
+const ALLOWED_FROM_DOMAINS = ["myfenrir.com"];
+
+/** The visible name is the brand, never the legal entity. Members bought from
+ *  MyFenrir; "Frisky Developments LLC" in a From line is the same category of
+ *  error as the wrong domain. */
+const DEFAULT_MAIL_FROM = "MyFenrir <noreply@myfenrir.com>";
+
+/** Extract the addr-spec from a "Name <addr>" string. */
+function fromAddress(value) {
+  const m = /<([^>]+)>/.exec(String(value || ""));
+  return (m ? m[1] : String(value || "")).trim().toLowerCase();
+}
+
+/**
+ * Reject a From that is not MyFenrir, before anything is sent.
+ * Subdomains are allowed (foo.myfenrir.com) so a future dedicated sending
+ * subdomain does not need a code change — but a bare different domain cannot
+ * slip through by being set in [vars].
+ */
+function assertMyFenrirSender(from) {
+  const addr = fromAddress(from);
+  const domain = addr.split("@")[1] || "";
+  const ok = ALLOWED_FROM_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`));
+  if (!ok) {
+    throw new Error(
+      `refused_foreign_sender:${domain || "unset"} — this is a MyFenrir email and may only be sent from ` +
+      `${ALLOWED_FROM_DOMAINS.join(", ")}. Nothing was sent. See the SENDER IDENTITY note in this file.`
+    );
+  }
+  if (domain === "mail.myfenrir.com") {
+    throw new Error(
+      "refused_sender:mail.myfenrir.com publishes DMARC p=reject with no SPF/DKIM and is hard-rejected. " +
+      "Use noreply@myfenrir.com."
+    );
+  }
+  return from;
+}
+
 /**
  * Send through Resend.
  *
- * NOTE ON THE FROM ADDRESS: `noreply@myfenrir.com` is NOT a verified sender in
- * the Resend account — only `hostcasa.app` is. Sending as myfenrir.com would be
- * rejected, so FENRIR_MAIL_FROM defaults to the address that actually delivers.
- * Verifying myfenrir.com in Resend is tracked as follow-up work; until then this
- * constant is the honest one rather than the one we wish were true.
+ * Guarded: the From is checked before the request leaves. Today myfenrir.com is
+ * not verified in this Resend account, so this throws `resend_403` and the
+ * confirmation is recorded as failed — which is the intended, visible outcome
+ * until the sender is provisioned. See the SENDER IDENTITY note above.
  */
 async function sendViaResend(env, { to, subject, html, text }) {
-  const from = env.FENRIR_MAIL_FROM || "MyFenrir <noreply@hostcasa.app>";
+  const from = assertMyFenrirSender(env.FENRIR_MAIL_FROM || DEFAULT_MAIL_FROM);
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
-    body: JSON.stringify({ from, to: [to], subject, html, text }),
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject,
+      html,
+      text,
+      reply_to: env.FENRIR_MAIL_REPLY_TO || "hola@myfenrir.com",
+    }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`resend_${res.status}:${body?.message || "unknown"}`);
@@ -125,20 +212,29 @@ async function sendViaResend(env, { to, subject, html, text }) {
 async function notifyTelegram(env, telegramUserId, facts) {
   if (!env.TELEGRAM_BOT_TOKEN || !telegramUserId) return { sent: false, reason: "no_telegram_target" };
   const plan = facts.plan.display ?? "your membership";
-  const paid = facts.amount.charged === false ? "No charge — granted" : (facts.amount.display ?? "amount not recorded");
+  // Same words as the bot's own activation message in fenrir-stars-payments.js
+  // ("Access: active / Stars: N / Payment rail: Telegram Stars") and the same
+  // feature names as the portal, so the two messages a buyer gets in the same
+  // minute do not use two different vocabularies for one purchase.
+  const paid =
+    facts.amount.charged === false
+      ? "No charge"
+      : facts.amount.currency === "XTR" && facts.amount.amount != null
+        ? `${Number(facts.amount.amount).toLocaleString("en-US")} Stars`
+        : (facts.amount.display ?? "Amount not recorded");
   const term = facts.term.currentPeriodEnd
-    ? `Renews ${new Date(facts.term.currentPeriodEnd).toISOString().slice(0, 10)}`
-    : "No renewal date on file";
+    ? `Renews: ${new Date(facts.term.currentPeriodEnd).toISOString().slice(0, 10)}`
+    : "Access: active — no end date";
   const lines = [
     `🐺 <b>You're in ${plan}.</b>`,
     "",
     `Paid: ${paid}`,
-    `Rail: ${facts.rail.label ?? "not recorded"}`,
+    `Payment rail: ${facts.rail.label ?? "not recorded"}`,
     term,
     "",
-    facts.limits?.locksUnlimited ? "Locks: unlimited · multi-admin · audit logs · custom domain" : "",
+    facts.limits?.locksUnlimited ? "Locks: unlimited · Multi-admin · Audit logs · Custom domain" : "",
     "",
-    `<a href="${env.FENRIR_PORTAL_URL || "https://www.myfenrir.com/dashboard"}">Open your portal →</a>`,
+    `<a href="${env.FENRIR_PORTAL_URL || "https://www.myfenrir.com/dashboard"}">Enter the Pack →</a>`,
   ].filter(Boolean);
 
   try {
@@ -166,7 +262,7 @@ async function notifyTelegram(env, telegramUserId, facts) {
  * Confirm one org. Idempotent, honest about every outcome.
  * `force` re-sends an already-settled confirmation (operator use only).
  */
-export async function confirmMembership(env, friskyOrgId, { force = false, locale = "en" } = {}) {
+export async function confirmMembership(env, friskyOrgId, { force = false } = {}) {
   const facts = await getMembershipFacts(env.DB, friskyOrgId);
 
   if (!facts.entitled) {
@@ -201,7 +297,6 @@ export async function confirmMembership(env, friskyOrgId, { force = false, local
   }
 
   const mail = membershipEmail(facts, {
-    locale,
     portalUrl: env.FENRIR_PORTAL_URL || "https://www.myfenrir.com/dashboard",
   });
 
@@ -236,7 +331,7 @@ export async function confirmMembership(env, friskyOrgId, { force = false, local
  * rail has to call anything for a new member to be confirmed. It is also the
  * safety net for hook delivery failures once the hooks do exist.
  */
-export async function reconcile(env, { limit = 25, locale = "en" } = {}) {
+export async function reconcile(env, { limit = 25 } = {}) {
   const rows = await env.DB.prepare(
     `SELECT s.frisky_org_id, s.stripe_subscription_id
        FROM billing_subscriptions s
@@ -254,7 +349,7 @@ export async function reconcile(env, { limit = 25, locale = "en" } = {}) {
   for (const row of rows.results ?? []) {
     results.push({
       org: row.frisky_org_id,
-      ...(await confirmMembership(env, row.frisky_org_id, { locale })),
+      ...(await confirmMembership(env, row.frisky_org_id)),
     });
   }
   return { ok: true, scanned: rows.results?.length ?? 0, results };
@@ -271,7 +366,9 @@ export default {
     // The hook. A rail calls this immediately after entitlement is written:
     //   POST /membership/confirmed
     //   x-fenrir-membership-signature: hmac_sha256(secret, rawBody)
-    //   { "frisky_org_id": "...", "locale": "en" }
+    //   { "frisky_org_id": "..." }
+    // A `locale` field is accepted and ignored: MyFenrir ships in English and
+    // the confirmation is English-only. See _lib/membership-email.js.
     if (request.method === "POST" && url.pathname === "/membership/confirmed") {
       const raw = await request.text();
       const secret = (env.MEMBERSHIP_CONFIRM_SECRET || "").trim();
@@ -287,10 +384,7 @@ export default {
       const orgId = String(body?.frisky_org_id || "").trim();
       if (!orgId) return json({ ok: false, error: "missing_frisky_org_id" }, 400);
 
-      const result = await confirmMembership(env, orgId, {
-        locale: body?.locale === "es" ? "es" : "en",
-        force: body?.force === true,
-      });
+      const result = await confirmMembership(env, orgId, { force: body?.force === true });
       return json(result, result.ok ? 200 : 502);
     }
 

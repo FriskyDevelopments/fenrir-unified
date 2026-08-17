@@ -26,10 +26,26 @@ database_id = "1238059e-2638-4317-982e-e74dda046ccb"
 
 [vars]
 FENRIR_PORTAL_URL = "https://www.myfenrir.com/dashboard"
-# myfenrir.com is NOT a verified sender in Resend — only hostcasa.app is.
-# Sending as noreply@myfenrir.com would be rejected outright. Change this the
-# day myfenrir.com is verified, not before.
-FENRIR_MAIL_FROM = "MyFenrir <noreply@hostcasa.app>"
+
+# SENDER IDENTITY. This was "MyFenrir <noreply@hostcasa.app>" — a different
+# product's domain, chosen only because it is the one domain verified in the
+# Resend account. That is brand contamination and reads as phishing to the
+# member; it is not an acceptable fallback. See the SENDER IDENTITY note in
+# workers/fenrir-membership-confirmed.js for the DNS/API evidence.
+#
+# myfenrir.com is the authenticated identity (SPF include:_spf.mx.cloudflare.net
+# + DKIM cf2024-1._domainkey, both live). Do NOT use mail.myfenrir.com: it
+# publishes DMARC p=reject with no SPF/DKIM and is hard-rejected.
+#
+# KNOWN STATE: myfenrir.com is NOT yet added to the Resend account, so this
+# address will fail with resend_403 until an operator either
+#   (a) adds + verifies myfenrir.com in Resend, or
+#   (b) moves this send onto the myfenrir-emails Worker, which is already bound
+#       to Cloudflare Email Service on myfenrir.com  <- preferred.
+# The failure is deliberate and is recorded on membership_confirmations. The
+# worker refuses to substitute another brand's domain.
+FENRIR_MAIL_FROM = "MyFenrir <noreply@myfenrir.com>"
+FENRIR_MAIL_REPLY_TO = "hola@myfenrir.com"
 
 [observability]
 enabled = true

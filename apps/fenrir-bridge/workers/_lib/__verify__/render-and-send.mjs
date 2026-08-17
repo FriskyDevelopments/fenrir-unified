@@ -1,7 +1,7 @@
 /**
  * render-and-send — end-to-end verification of the confirmation email.
  *
- *   node render-and-send.mjs <frisky_org_id> [--send] [--locale es] [--to addr]
+ *   node render-and-send.mjs <frisky_org_id> [--send] [--to addr]
  *
  * Runs getMembershipFacts() against production D1, renders membershipEmail(),
  * writes the HTML for screenshotting, and with --send delivers it via Resend.
@@ -23,12 +23,18 @@ const flag = (name) => {
   return i >= 0 ? argv[i + 1] : undefined;
 };
 const doSend = argv.includes("--send");
-const locale = flag("locale") || "en";
 const outPath = flag("out") || "/tmp/fenrir-membership-email.html";
 
 // Verification safety rail: only the account owner may receive a test send.
 const ALLOWED_TEST_RECIPIENTS = new Set(["babaji.alvarez@gmail.com"]);
-const FROM = "MyFenrir <noreply@hostcasa.app>"; // hostcasa.app is the Resend-verified domain
+// Same rule as the worker: a MyFenrir email leaves as MyFenrir or it does not
+// leave. This was hostcasa.app — another product's domain — because that is the
+// only domain verified in the Resend account. A verification send is still a
+// real email landing in a real inbox, so it does not get an exception.
+// Until myfenrir.com is provisioned (see docs/MYFENRIR_SENDER_IDENTITY.md) this
+// will fail with 403, which is the correct and visible outcome.
+const FROM = "MyFenrir <noreply@myfenrir.com>";
+const REPLY_TO = "hola@myfenrir.com";
 
 if (!orgId) {
   console.error("usage: render-and-send.mjs <frisky_org_id> [--send] [--locale es] [--to addr]");
@@ -44,7 +50,7 @@ if (!facts.entitled) {
   process.exit(0);
 }
 
-const mail = membershipEmail(facts, { locale, portalUrl: "https://www.myfenrir.com/dashboard" });
+const mail = membershipEmail(facts, { portalUrl: "https://www.myfenrir.com/dashboard" });
 writeFileSync(outPath, mail.html);
 console.log(`\n=== RENDERED ===\nsubject: ${mail.subject}\nhtml:    ${outPath}\n`);
 console.log(mail.text);
@@ -69,7 +75,7 @@ const apiKey = execFileSync("op", ["read", "op://FriskyDev-Infra/Email/password"
 const res = await fetch("https://api.resend.com/emails", {
   method: "POST",
   headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-  body: JSON.stringify({ from: FROM, to: [recipient], subject: mail.subject, html: mail.html, text: mail.text }),
+  body: JSON.stringify({ from: FROM, reply_to: REPLY_TO, to: [recipient], subject: mail.subject, html: mail.html, text: mail.text }),
 });
 const body = await res.json();
 console.log(`\n=== SEND ===\nHTTP ${res.status}`, body);

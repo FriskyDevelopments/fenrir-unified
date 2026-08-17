@@ -33,10 +33,23 @@ EMAIL_PROVIDER = "cloudflare"
 # Ordered fallback chain used automatically when the primary rail fails with an
 # infra error (no binding / no key / domain not configured / 5xx).
 EMAIL_FALLBACK = ""
-# Default envelope sender when a brand config doesn't specify one. Root domain
-# noreply@myfenrir.com is the identity that authenticates (SPF + DKIM). Do NOT
-# use mail.myfenrir.com (DMARC p=reject, no SPF/DKIM -> hard-rejected).
-DEFAULT_FROM_EMAIL = "noreply@mail.myfenrir.com"
+# Default envelope sender when a brand config doesn't specify one.
+#
+# This file used to contradict itself: the comment said "do not use
+# mail.myfenrir.com" and the value directly below it was mail.myfenrir.com.
+# Resolved 2026-08-17 by checking DNS rather than by picking a side. The
+# COMMENT was correct and the VALUE was wrong:
+#
+#   myfenrir.com       SPF   "v=spf1 include:_spf.mx.cloudflare.net ~all"  present
+#                      DKIM  cf2024-1._domainkey.myfenrir.com              present
+#   mail.myfenrir.com  SPF / DKIM                                          ABSENT
+#                      DMARC _dmarc.mail.myfenrir.com "v=DMARC1; p=reject;"
+#
+# So mail.myfenrir.com fails DMARC on every message and is hard-rejected. The
+# root domain is the identity that authenticates. Verify with:
+#   dig +short TXT myfenrir.com; dig +short TXT cf2024-1._domainkey.myfenrir.com
+#   dig +short TXT _dmarc.mail.myfenrir.com
+DEFAULT_FROM_EMAIL = "noreply@myfenrir.com"
 DEFAULT_FROM_NAME = "MyFenrir"
 DEFAULT_REPLY_TO = "hola@myfenrir.com"
 # Comma-separated brand ids allowed on /send (empty = allow all registered).
@@ -54,7 +67,7 @@ route = { pattern = "emails.myfenrir.com", custom_domain = true }
 [env.production.vars]
 EMAIL_PROVIDER = "cloudflare"
 EMAIL_FALLBACK = ""
-DEFAULT_FROM_EMAIL = "noreply@mail.myfenrir.com"
+DEFAULT_FROM_EMAIL = "noreply@myfenrir.com"
 DEFAULT_FROM_NAME = "MyFenrir"
 DEFAULT_REPLY_TO = "hola@myfenrir.com"
 ALLOWED_BRANDS = ""
