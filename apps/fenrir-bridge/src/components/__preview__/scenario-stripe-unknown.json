@@ -1,0 +1,16 @@
+{
+  "_comment": "SCENARIO, NOT LIVE DATA. A Stripe purchase of The Pack where the bridge cannot substantiate the amount (billing_subscriptions has no amount/currency column) and the rail recorded no period end. Exercises the honest-unknown rendering path.",
+  "entitled": true,
+  "plan": { "key": "standard", "display": "The Pack", "recognised": true },
+  "status": { "raw": "active", "needsAttention": false, "cancelAtPeriodEnd": false },
+  "term": { "currentPeriodEnd": null, "known": false, "reason": "no_period_end_recorded" },
+  "rail": { "key": "stripe", "label": "Stripe" },
+  "amount": { "charged": true, "display": null, "reason": "amount_not_recorded_in_bridge" },
+  "limits": {
+    "maxTelegramLocks": null,
+    "locksUnlimited": true,
+    "multiAdmin": true,
+    "auditLogs": true,
+    "customDomain": true
+  }
+}

@@ -1,0 +1,354 @@
+/* ============================================================================
+   PackCelebration — "the pack closes around you"
+   PROTOCOL kit surface. Gold over ink, diamond grid, sharp glass.
+   Palette + type read from [data-kit="fenrir"] (packages/tokens/src/brands/
+   fenrir.css). Fallbacks are the same literal hexes so this still renders
+   correctly if mounted outside a kit root.
+
+   Motion contract from the kit: transform / opacity only, never
+   background-position. Everything below honours prefers-reduced-motion.
+   ========================================================================== */
+
+.pk {
+  --pk-ink: var(--fn-ink, #0b0b0c);
+  --pk-panel: var(--fn-panel, #141414);
+  --pk-panel-2: var(--fn-panel-2, #1c1c1e);
+  --pk-line: var(--fn-line, #2a2a2c);
+  --pk-gold: var(--fn-gold, #c2a469);
+  --pk-teal: var(--fn-teal, #7fae9d);
+  --pk-paper: var(--fn-paper, #f4f0e6);
+  --pk-mute: var(--fn-mute, #9a9588);
+  --pk-display: var(--k-font-display, "Unbounded", "Space Grotesk", system-ui, sans-serif);
+  --pk-mono: var(--k-font-mono, "JetBrains Mono", ui-monospace, monospace);
+  --pk-body: var(--k-font-body, "Outfit", system-ui, sans-serif);
+
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background: var(--pk-ink);
+  color: var(--pk-paper);
+  font-family: var(--pk-body);
+  overflow: hidden;
+  animation: pk-wake 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes pk-wake { from { opacity: 0 } to { opacity: 1 } }
+
+/* --- atmosphere ---------------------------------------------------------- */
+
+/* Diamond protocol grid: the kit's 48px lattice, rotated to read as diamonds
+   rather than graph paper. Scaled up so rotation never exposes an edge. */
+.pk__grid {
+  position: absolute;
+  inset: -40%;
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--pk-teal) 30%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--pk-teal) 30%, transparent) 1px, transparent 1px);
+  background-size: 46px 46px;
+  transform: rotate(45deg) scale(1.25);
+  mask-image: radial-gradient(ellipse 58% 54% at 50% 34%, #000 6%, transparent 72%);
+  opacity: 0;
+  animation: pk-grid-in 1500ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+}
+@keyframes pk-grid-in {
+  from { opacity: 0; transform: rotate(45deg) scale(1.5) }
+  to   { opacity: 0.85; transform: rotate(45deg) scale(1.25) }
+}
+
+/* Gold field — the warm bloom behind the mark. */
+.pk__field {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  width: min(120vmin, 940px);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  background: radial-gradient(circle, color-mix(in oklab, var(--pk-gold) 32%, transparent) 0%, color-mix(in oklab, var(--pk-gold) 8%, transparent) 34%, transparent 64%);
+  opacity: 0;
+  animation: pk-field 2400ms cubic-bezier(0.22, 1, 0.36, 1) 220ms both;
+}
+@keyframes pk-field {
+  0%   { opacity: 0; transform: scale(0.55) }
+  55%  { opacity: 1 }
+  100% { opacity: 0.72; transform: scale(1) }
+}
+
+.pk__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 82% 74% at 50% 38%, transparent 30%, var(--pk-ink) 96%);
+  opacity: 0.72;
+}
+
+/* Film grain, kit default 0.08. Static — no animated noise. */
+.pk__grain {
+  position: absolute;
+  inset: 0;
+  opacity: var(--k-grain-opacity, 0.08);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+/* --- the formation ------------------------------------------------------- */
+
+.pk__stage {
+  position: relative;
+  width: min(92vw, 720px);
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.pk__sigil {
+  position: relative;
+  width: 300px;
+  height: 300px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 6px;
+}
+
+/* Gold ring that sweeps closed around the mark — the pack forming a circle. */
+.pk__ring {
+  position: absolute;
+  inset: 24px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in oklab, var(--pk-gold) 42%, transparent);
+  opacity: 0;
+  animation: pk-ring 1250ms cubic-bezier(0.22, 1, 0.36, 1) 520ms both;
+}
+.pk__ring--2 {
+  inset: 4px;
+  border-style: dashed;
+  border-color: color-mix(in oklab, var(--pk-teal) 26%, transparent);
+  animation-delay: 700ms;
+  animation-duration: 1500ms;
+}
+@keyframes pk-ring {
+  from { opacity: 0; transform: scale(1.32) rotate(-24deg) }
+  to   { opacity: 1; transform: scale(1) rotate(0deg) }
+}
+
+/* Six pack-mates converging inward. Each is placed on the ring by its own
+   --a angle, then travels from --r-far to --r-near as it fades up. */
+.pk__mate {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  opacity: 0;
+  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--pk-gold) 30%, transparent));
+  transform: rotate(var(--a)) translateY(var(--r-far)) rotate(calc(-1 * var(--a)));
+  animation: pk-mate 1150ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(620ms + var(--i) * 105ms);
+}
+@keyframes pk-mate {
+  from { opacity: 0; transform: rotate(var(--a)) translateY(var(--r-far)) rotate(calc(-1 * var(--a))) scale(0.7) }
+  to   { opacity: 0.88; transform: rotate(var(--a)) translateY(var(--r-near)) rotate(calc(-1 * var(--a))) scale(1) }
+}
+.pk__mate svg { width: 100%; height: 100% }
+
+/* The member's own mark, at centre, drawing itself in gold. */
+.pk__self {
+  width: 132px;
+  height: 132px;
+  filter: drop-shadow(0 0 26px color-mix(in oklab, var(--pk-gold) 46%, transparent));
+  animation: pk-self 900ms cubic-bezier(0.22, 1, 0.36, 1) 240ms both;
+}
+@keyframes pk-self {
+  from { opacity: 0; transform: scale(0.82) }
+  to   { opacity: 1; transform: scale(1) }
+}
+.pk__self path {
+  stroke-dasharray: 260;
+  stroke-dashoffset: 260;
+  animation: pk-draw 1700ms cubic-bezier(0.22, 1, 0.36, 1) 320ms forwards;
+}
+@keyframes pk-draw { to { stroke-dashoffset: 0 } }
+.pk__self circle {
+  opacity: 0;
+  animation: pk-eyes 620ms ease-out 1500ms forwards;
+}
+@keyframes pk-eyes { to { opacity: 1 } }
+
+/* --- copy ---------------------------------------------------------------- */
+
+.pk__eyebrow {
+  font-family: var(--pk-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--pk-teal);
+  margin-bottom: 18px;
+}
+
+.pk__title {
+  font-family: var(--pk-display);
+  font-weight: 800;
+  font-size: clamp(2.4rem, 7.2vw, 4.1rem);
+  line-height: 0.94;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  margin: 0;
+  background: linear-gradient(180deg, var(--pk-paper) 12%, var(--pk-gold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.pk__sub {
+  margin: 16px 0 0;
+  max-width: 46ch;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--pk-mute);
+}
+
+/* Staggered reveal for everything below the sigil. */
+.pk__rise { animation: pk-rise 760ms cubic-bezier(0.22, 1, 0.36, 1) both }
+@keyframes pk-rise {
+  from { opacity: 0; transform: translateY(18px) }
+  to   { opacity: 1; transform: none }
+}
+
+/* --- fact strip ---------------------------------------------------------- */
+
+.pk__facts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  width: 100%;
+  margin-top: 34px;
+  border: 1px solid var(--pk-line);
+  background: color-mix(in oklab, var(--pk-panel) 78%, transparent);
+  backdrop-filter: blur(var(--k-blur-panel, 16px));
+}
+
+.pk__fact {
+  padding: 15px 16px;
+  text-align: left;
+  border-right: 1px solid var(--pk-line);
+}
+.pk__fact:last-child { border-right: 0 }
+
+.pk__fact dt {
+  font-family: var(--pk-mono);
+  font-size: 0.5625rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--pk-teal);
+}
+.pk__fact dd {
+  margin: 8px 0 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--pk-paper);
+}
+/* A fact we could not substantiate says so, in muted italic — never a dash
+   that could be mistaken for a real value. */
+.pk__fact dd[data-unknown="true"] {
+  font-weight: 400;
+  font-style: italic;
+  font-size: 0.8125rem;
+  color: var(--pk-mute);
+}
+
+/* --- unlocked list ------------------------------------------------------- */
+
+.pk__unlocked {
+  width: 100%;
+  margin-top: 22px;
+  text-align: left;
+}
+.pk__unlocked h2 {
+  font-family: var(--pk-mono);
+  font-size: 0.5625rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--pk-teal);
+  margin: 0 0 10px;
+}
+.pk__unlocked ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--pk-line) }
+.pk__unlocked li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 15px;
+  background: var(--pk-panel);
+  font-size: 0.875rem;
+  color: var(--pk-mute);
+}
+.pk__unlocked li span:last-child { font-weight: 700; color: var(--pk-paper) }
+.pk__unlocked li[data-on="false"] span:last-child { font-weight: 400; color: var(--pk-mute) }
+.pk__dot {
+  width: 6px; height: 6px; flex: 0 0 6px;
+  background: var(--pk-gold);
+  margin-right: 10px;
+}
+.pk__unlocked li[data-on="false"] .pk__dot { background: var(--pk-line) }
+
+/* --- notes / actions ----------------------------------------------------- */
+
+.pk__note {
+  width: 100%;
+  margin-top: 20px;
+  padding: 14px 16px;
+  text-align: left;
+  border: 1px solid var(--pk-line);
+  border-left: 3px solid var(--pk-gold);
+  background: var(--pk-panel-2);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--pk-mute);
+}
+
+.pk__actions { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; justify-content: center }
+
+.pk__btn {
+  font-family: var(--pk-mono);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 14px 26px;
+  border: 1px solid transparent;
+  border-radius: var(--k-r-md, 8px);
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 140ms;
+}
+.pk__btn--primary {
+  background: var(--pk-gold);
+  color: var(--pk-ink);
+  box-shadow: var(--k-glow, 0 0 28px rgba(194, 164, 105, 0.18));
+}
+.pk__btn--ghost {
+  background: transparent;
+  color: var(--pk-paper);
+  border-color: color-mix(in oklab, var(--pk-gold) 42%, transparent);
+}
+.pk__btn:hover { transform: translateY(-1px) }
+.pk__btn:focus-visible { outline: none; box-shadow: var(--k-glow-strong, 0 0 0 3px rgba(194, 164, 105, 0.5)) }
+
+/* --- responsive ---------------------------------------------------------- */
+
+@media (max-width: 560px) {
+  .pk__sigil { width: 230px; height: 230px }
+  .pk__self { width: 104px; height: 104px }
+  .pk__facts { grid-template-columns: repeat(2, 1fr) }
+  .pk__fact:nth-child(2) { border-right: 0 }
+  .pk__fact:nth-child(-n + 2) { border-bottom: 1px solid var(--pk-line) }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pk, .pk *, .pk *::before, .pk *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+  .pk__self path { stroke-dashoffset: 0 }
+  .pk__mate { opacity: 0.62 }
+}
