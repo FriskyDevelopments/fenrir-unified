@@ -123,19 +123,20 @@ async function settle(env, orgId, subscriptionId, patch) {
  *    was wrong; that file is corrected in the same change. The root domain
  *    myfenrir.com is the identity that authenticates.
  *
- * 2. Resend cannot send as myfenrir.com today — the domain is not even added to
- *    the account. So this worker's rail is the thing that is wrong, not just the
- *    address. The correct home for MyFenrir mail already exists: the
- *    myfenrir-emails Worker, bound to Cloudflare Email Service on the
- *    authenticated myfenrir.com. Moving this send onto it is the fix; adding
- *    myfenrir.com to Resend is the alternative. Both need an operator, and this
- *    file must not guess which.
+ * 2. Resend is gone from this path. It could not send as myfenrir.com anyway —
+ *    the domain is not even added to that account — but the deciding reason is
+ *    that a second rail is how the drift to hostcasa.app happened in the first
+ *    place. One rail is one place it can break. Cloudflare Email Sending is
+ *    already authenticated for myfenrir.com and needs no DNS work, so this
+ *    worker now delivers through the myfenrir-emails Worker, which owns the
+ *    `send_email` binding. (That binding is Workers-only; it cannot live in the
+ *    fenrir-bridge Pages project, which is why the mail Worker exists.)
  *
- * Until one of those lands, this refuses to send rather than send as the wrong
- * brand. A refusal is recorded on membership_confirmations as a failure with a
- * legible reason, so it is visible and countable. A confirmation that does not
- * arrive is a bug we can see; a confirmation wearing HostCasa's name is a brand
- * incident we cannot take back.
+ * There is deliberately NO fallback. A fallback that sends as another client's
+ * brand is worse than no fallback. If Cloudflare fails, this fails: the outcome
+ * is written to membership_confirmations with a legible reason, so it is visible
+ * and countable. A confirmation that does not arrive is a bug we can see; a
+ * confirmation wearing HostCasa's name is a brand incident we cannot take back.
  * -------------------------------------------------------------------------- */
 
 /** Domains this worker is allowed to introduce itself as. MyFenrir only. */
@@ -178,29 +179,50 @@ function assertMyFenrirSender(from) {
 }
 
 /**
- * Send through Resend.
+ * Deliver through the myfenrir-emails Worker (Cloudflare Email Sending).
  *
- * Guarded: the From is checked before the request leaves. Today myfenrir.com is
- * not verified in this Resend account, so this throws `resend_403` and the
- * confirmation is recorded as failed — which is the intended, visible outcome
- * until the sender is provisioned. See the SENDER IDENTITY note above.
+ * Renders here, delivers there: the confirmation is built from D1 billing facts
+ * that belong to this service, while the mail Worker owns the authenticated
+ * sender and the `send_email` binding. It is handed the finished HTML via the
+ * `raw` shape on POST /send.
+ *
+ * `provider: "cloudflare"` is pinned in the request rather than left to the mail
+ * Worker's env, so a config change over there cannot silently move this
+ * confirmation onto another rail.
+ *
+ * Every failure mode throws with a legible reason and is recorded on
+ * membership_confirmations. Nothing here retries onto a different sender.
  */
-async function sendViaResend(env, { to, subject, html, text }) {
+async function sendViaMyFenrirMail(env, { to, subject, html, text }) {
   const from = assertMyFenrirSender(env.FENRIR_MAIL_FROM || DEFAULT_MAIL_FROM);
-  const res = await fetch("https://api.resend.com/emails", {
+  const endpoint = (env.MYFENRIR_MAIL_URL || "").trim();
+  const token = (env.MYFENRIR_MAIL_TOKEN || "").trim();
+
+  // Config gaps fail loudly and specifically. "not configured" is a different
+  // problem from "the send was rejected", and the operator needs to know which.
+  if (!endpoint) throw new Error("mail_not_configured:MYFENRIR_MAIL_URL is unset. Nothing was sent.");
+  if (!token) throw new Error("mail_not_configured:MYFENRIR_MAIL_TOKEN secret is unset. Nothing was sent.");
+
+  const addr = fromAddress(from);
+  const name = /^\s*([^<]+?)\s*</.exec(from)?.[1] || "MyFenrir";
+
+  const res = await fetch(`${endpoint.replace(/\/+$/, "")}/send`, {
     method: "POST",
-    headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify({
-      from,
-      to: [to],
-      subject,
-      html,
-      text,
-      reply_to: env.FENRIR_MAIL_REPLY_TO || "hola@myfenrir.com",
+      to,
+      provider: "cloudflare",
+      brand: "myfenrir",
+      from: { email: addr, name },
+      replyTo: env.FENRIR_MAIL_REPLY_TO || "hola@myfenrir.com",
+      raw: { subject, html, text },
     }),
   });
+
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`resend_${res.status}:${body?.message || "unknown"}`);
+  if (!res.ok || body?.ok === false) {
+    throw new Error(`cloudflare_mail_${res.status}:${body?.code || ""}:${body?.error || "unknown"}`.slice(0, 300));
+  }
   return body?.id ?? null;
 }
 
@@ -301,7 +323,7 @@ export async function confirmMembership(env, friskyOrgId, { force = false } = {}
   });
 
   try {
-    const messageId = await sendViaResend(env, {
+    const messageId = await sendViaMyFenrirMail(env, {
       to: facts.contact.email, subject: mail.subject, html: mail.html, text: mail.text,
     });
     await settle(env, friskyOrgId, subscriptionId, {

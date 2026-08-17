@@ -8,9 +8,17 @@ import type { Brand } from "./types";
 // Cyan #00E5FF is the primary accent; amethyst #8B7CFF the secondary; gold the
 // premium/dashboard tertiary. NO neon-lime (landing has one; excluded on purpose).
 //
-// Cloudflare Email Sending is onboarded for mail.myfenrir.com. The visible
-// sender therefore uses that authenticated subdomain; replies still go to the
-// root-domain support address.
+// SENDER: the root domain, noreply@myfenrir.com.
+//
+// This said "Cloudflare Email Sending is onboarded for mail.myfenrir.com" and
+// used that subdomain. Checked against DNS on 2026-08-17 — it is the other way
+// round. mail.myfenrir.com has no SPF and no DKIM and publishes
+// _dmarc.mail.myfenrir.com "v=DMARC1; p=reject;", so every message from it fails
+// DMARC and is hard-rejected. The ROOT domain is what carries the Cloudflare
+// records: SPF "v=spf1 include:_spf.mx.cloudflare.net ~all" and DKIM
+// cf2024-1._domainkey.myfenrir.com. This value wins over DEFAULT_FROM_EMAIL in
+// handleSend(), so it had to be corrected here too, not only in wrangler.toml.
+// See apps/fenrir-bridge/docs/MYFENRIR_SENDER_IDENTITY.md.
 export const myfenrir: Brand = {
   id: "myfenrir",
   name: "MyFenrir",
@@ -39,7 +47,7 @@ export const myfenrir: Brand = {
   },
   sender: {
     name: "MyFenrir",
-    email: "noreply@mail.myfenrir.com",
+    email: "noreply@myfenrir.com",
     replyTo: "hola@myfenrir.com",
   },
   footer: {

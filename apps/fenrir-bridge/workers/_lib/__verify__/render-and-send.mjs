@@ -4,14 +4,23 @@
  *   node render-and-send.mjs <frisky_org_id> [--send] [--to addr]
  *
  * Runs getMembershipFacts() against production D1, renders membershipEmail(),
- * writes the HTML for screenshotting, and with --send delivers it via Resend.
+ * writes the HTML for screenshotting, and with --send delivers it the same way
+ * the worker does — through the myfenrir-emails Worker on Cloudflare Email
+ * Sending. Resend is not used here any more, for the same reason it is not used
+ * in the worker: one rail, and never another client's brand.
+ *
+ * Needs MYFENRIR_MAIL_URL (e.g. https://emails.myfenrir.com) and
+ * MYFENRIR_MAIL_TOKEN in the environment. Read the token from 1Password rather
+ * than pasting it:
+ *   MYFENRIR_MAIL_URL=https://emails.myfenrir.com \
+ *   MYFENRIR_MAIL_TOKEN="$(op read op://FriskyDev-Infra/MyFenrir-Emails/SEND_AUTH_TOKEN)" \
+ *   node render-and-send.mjs <org> --send
  *
  * The recipient is NEVER inferred from a flag alone when sending: it comes from
  * resolveContact() unless --to is given, and --to is guarded by an allowlist so
  * a verification run can never reach a third party.
  */
 import { writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { db } from "./d1-cli-adapter.mjs";
 import { getMembershipFacts } from "../membership-facts.js";
 import { membershipEmail } from "../membership-email.js";
@@ -28,12 +37,11 @@ const outPath = flag("out") || "/tmp/fenrir-membership-email.html";
 // Verification safety rail: only the account owner may receive a test send.
 const ALLOWED_TEST_RECIPIENTS = new Set(["babaji.alvarez@gmail.com"]);
 // Same rule as the worker: a MyFenrir email leaves as MyFenrir or it does not
-// leave. This was hostcasa.app — another product's domain — because that is the
+// leave. This was hostcasa.app — another product's domain — because that was the
 // only domain verified in the Resend account. A verification send is still a
 // real email landing in a real inbox, so it does not get an exception.
-// Until myfenrir.com is provisioned (see docs/MYFENRIR_SENDER_IDENTITY.md) this
-// will fail with 403, which is the correct and visible outcome.
-const FROM = "MyFenrir <noreply@myfenrir.com>";
+const FROM_EMAIL = "noreply@myfenrir.com";
+const FROM_NAME = "MyFenrir";
 const REPLY_TO = "hola@myfenrir.com";
 
 if (!orgId) {
@@ -71,13 +79,28 @@ if (!ALLOWED_TEST_RECIPIENTS.has(recipient)) {
   process.exit(3);
 }
 
-const apiKey = execFileSync("op", ["read", "op://FriskyDev-Infra/Email/password"], { encoding: "utf8" }).trim();
-const res = await fetch("https://api.resend.com/emails", {
+const mailUrl = (process.env.MYFENRIR_MAIL_URL || "").trim();
+const mailToken = (process.env.MYFENRIR_MAIL_TOKEN || "").trim();
+if (!mailUrl || !mailToken) {
+  console.error("\nREFUSING TO SEND: MYFENRIR_MAIL_URL / MYFENRIR_MAIL_TOKEN are not set.");
+  console.error("See the header of this file. Nothing was sent.");
+  process.exit(5);
+}
+
+const res = await fetch(`${mailUrl.replace(/\/+$/, "")}/send`, {
   method: "POST",
-  headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-  body: JSON.stringify({ from: FROM, reply_to: REPLY_TO, to: [recipient], subject: mail.subject, html: mail.html, text: mail.text }),
+  headers: { authorization: `Bearer ${mailToken}`, "content-type": "application/json" },
+  body: JSON.stringify({
+    to: recipient,
+    provider: "cloudflare",
+    brand: "myfenrir",
+    from: { email: FROM_EMAIL, name: FROM_NAME },
+    replyTo: REPLY_TO,
+    raw: { subject: mail.subject, html: mail.html, text: mail.text },
+  }),
 });
-const body = await res.json();
+const body = await res.json().catch(() => ({}));
 console.log(`\n=== SEND ===\nHTTP ${res.status}`, body);
-if (!res.ok) process.exit(4);
-console.log(`Delivered to ${recipient} (resolved via ${facts.contact.source || "--to override"}).`);
+if (!res.ok || body?.ok === false) process.exit(4);
+console.log(`Accepted for ${recipient} (resolved via ${facts.contact.source || "--to override"}).`);
+console.log(`Message-ID: ${body?.id ?? "?"} — acceptance is not delivery. Confirm it landed.`);

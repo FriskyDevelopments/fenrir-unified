@@ -110,11 +110,64 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
+/**
+ * Pre-rendered send.
+ *
+ * Some emails are rendered by the service that owns their facts, not by this
+ * worker. The membership confirmation is the case in point: it is built from
+ * getMembershipFacts() against the fenrir-bridge D1, and moving it here would
+ * drag billing-table knowledge into the mail service. So the caller renders and
+ * this worker does what it is actually for — brand-correct, authenticated
+ * delivery on myfenrir.com.
+ *
+ * Shape: POST /send { "raw": { subject, html, text? }, "to": ... }
+ * Still behind the same bearer, still bound to the brand sender, and no
+ * fallback chain: `provider` is honoured but EMAIL_FALLBACK stays empty, so a
+ * failure here surfaces to the caller instead of quietly changing rails.
+ */
+async function handleRawSend(body: any, env: Env): Promise<Response> {
+  const raw = body.raw;
+  if (!raw?.subject || !raw?.html) {
+    return json({ ok: false, error: "'raw' requires 'subject' and 'html'" }, 400);
+  }
+  const brand: Brand = resolveBrand(body.brand);
+  const fromEmail = body?.from?.email || brand.sender.email || env.DEFAULT_FROM_EMAIL || "noreply@myfenrir.com";
+  const fromName = body?.from?.name || brand.sender.name || env.DEFAULT_FROM_NAME || "MyFenrir";
+  const replyTo = body?.replyTo || brand.sender.replyTo || env.DEFAULT_REPLY_TO;
+
+  const result = await dispatchSend(body.provider || env.EMAIL_PROVIDER || "cloudflare", env, {
+    to: body.to,
+    fromEmail,
+    fromName,
+    subject: raw.subject,
+    html: raw.html,
+    text: raw.text,
+    replyTo,
+    headers: body.headers,
+  });
+
+  return json(
+    {
+      ok: result.ok,
+      provider: result.provider,
+      id: result.id,
+      code: result.code,
+      error: result.error,
+      template: "raw",
+      brand: brand.id,
+      subject: raw.subject,
+    },
+    result.ok ? 200 : result.status || 500,
+  );
+}
+
 async function handleSend(body: any, env: Env): Promise<Response> {
+  if (!body?.to) return json({ ok: false, error: "'to' is required" }, 400);
+  if (body?.raw) return handleRawSend(body, env);
+
   const templateId = body?.template;
   const tpl = templateId ? getTemplate(templateId) : undefined;
   if (!tpl) return json({ ok: false, error: "Unknown or missing 'template'", templates: TEMPLATE_IDS }, 400);
-  if (!body?.to) return json({ ok: false, error: "'to' is required" }, 400);
 
   const brand: Brand = resolveBrand(body.brand);
   if (env.ALLOWED_BRANDS && brand.id && !env.ALLOWED_BRANDS.split(",").map((s) => s.trim()).includes(brand.id)) {
@@ -125,7 +178,8 @@ async function handleSend(body: any, env: Env): Promise<Response> {
   const rendered = tpl.render(brand, body.data || {}, locale);
   const provider = body.provider || env.EMAIL_PROVIDER || "cloudflare";
 
-  const fromEmail = body?.from?.email || brand.sender.email || env.DEFAULT_FROM_EMAIL || "noreply@mail.myfenrir.com";
+  // Never mail.myfenrir.com: DMARC p=reject with no SPF/DKIM (see wrangler.toml).
+  const fromEmail = body?.from?.email || brand.sender.email || env.DEFAULT_FROM_EMAIL || "noreply@myfenrir.com";
   const fromName = body?.from?.name || brand.sender.name || env.DEFAULT_FROM_NAME || "MyFenrir";
   const replyTo = body?.replyTo || brand.sender.replyTo || env.DEFAULT_REPLY_TO;
 
