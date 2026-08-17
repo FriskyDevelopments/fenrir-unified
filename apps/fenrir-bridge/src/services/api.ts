@@ -597,6 +597,45 @@ export const readinessService = {
   }
 };
 
+/**
+ * Membership state — the human-facing truth about an entitlement, including
+ * whether this user is owed the confirmation moment. Separate from
+ * billingService.getStatus(), which answers the narrower "which plan for
+ * feature gating" question.
+ */
+export type MembershipStatePayload = {
+  ok: true;
+  celebrate: boolean;
+  membership: {
+    entitled: boolean;
+    reason?: string;
+    subscriptionId?: string;
+    plan: { key: string | null; display: string | null; recognised: boolean };
+    status: { raw: string; needsAttention: boolean; cancelAtPeriodEnd: boolean };
+    term: { currentPeriodEnd: string | null; known: boolean; reason: string | null };
+    rail: { key: string; label: string | null };
+    amount: { charged: boolean | null; display: string | null; reason: string | null };
+    limits: {
+      maxTelegramLocks: number | null;
+      locksUnlimited: boolean;
+      multiAdmin: boolean;
+      auditLogs: boolean;
+      customDomain: boolean;
+    } | null;
+    startedAt?: string | null;
+  };
+};
+
+export const membershipService = {
+  async getState(): Promise<MembershipStatePayload> {
+    return apiRequest<MembershipStatePayload>("/api/membership/state");
+  },
+  /** Records that the moment has been shown, so it never fires twice. */
+  async acknowledgeCelebration(): Promise<{ ok: true; recorded: boolean }> {
+    return apiRequest<{ ok: true; recorded: boolean }>("/api/membership/celebrated", { method: "POST" });
+  }
+};
+
 export const billingService = {
   async getStatus(): Promise<BillingStatusPayload> {
     return apiRequest<BillingStatusPayload>("/api/billing/status");

@@ -12,8 +12,10 @@ import {
   readinessService,
   telegramIdentityService,
   telegramService,
+  membershipService,
   webauthnService,
   type AuthSession,
+  type MembershipStatePayload,
   type BillingStatusPayload,
   type PaidPlan,
   type ReadinessPayload,
@@ -52,6 +54,7 @@ import { activePageFromLocation, dashboardPathFor, isAuthCallbackPath, paidPlanF
 import { CommunityBridgeHandoffPanel, CommunityNeonGateRoute } from "./communityGate";
 import { FriskyBotOsRoute, FriskyGhostRoute, GoRoutePage, ProtocolActivated, PublicBridgeRoute, PublicRoomRoute } from "./publicRoutes";
 import { AuthGate } from "./authGate";
+import { PackCelebration } from "../components/PackCelebration";
 import { LegalPage } from "./legalPage";
 import {
   AccountServicePanel,
@@ -131,6 +134,9 @@ export function DashboardRoute() {
   const ui = uiCopy[locale];
   const [notice, setNotice] = useState<string>(c.initialNotice);
   const [celebration, setCelebration] = useState<Celebration | null>(null);
+  // The Pack moment is server-decided, not URL-decided. See the ?billing=success
+  // effect below for why the old trigger could not be trusted.
+  const [membership, setMembership] = useState<MembershipStatePayload | null>(null);
   const [billingStatus, setBillingStatus] = useState<BillingStatusPayload | null>(null);
   const [telegramIdentity, setTelegramIdentity] = useState<TelegramIdentityLinkPayload | null>(null);
   const [readiness, setReadiness] = useState<ReadinessPayload | null>(null);
@@ -267,14 +273,38 @@ export function DashboardRoute() {
     const billing = params.get("billing");
     if (!billing) return;
     if (billing === "success") {
+      // Notice only. This branch fires on Stripe's post-checkout redirect, which
+      // means the browser came back - NOT that the webhook has landed the
+      // entitlement. It used to assert "Your MyFenrir subscription is active"
+      // right here, a claim the backend had not yet made; and Stars buyers never
+      // saw it at all because they never pass through this URL. The moment
+      // itself is now driven by confirmed server state.
       setNotice(copy[locale].billingReturnSuccess);
-      triggerCelebration("Welcome to the Pack", "Your MyFenrir subscription is active. The pack is ready.", "commerce");
     }
     if (billing === "cancel") setNotice(copy[locale].billingReturnCancel);
     if (billing === "portal_return") setNotice(copy[locale].billingReturnPortal);
     void refresh();
     window.history.replaceState({}, "", window.location.pathname);
   }, [auth?.authenticated, locale]);
+
+  // Ask the server what this membership is and whether the moment is owed.
+  // Keyed on `state` so a purchase that lands while the portal is open is
+  // picked up by the next refresh() without a reload.
+  useEffect(() => {
+    if (!auth?.authenticated) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const payload = await membershipService.getState();
+        if (!cancelled) setMembership(payload);
+      } catch {
+        // A failed read must never fabricate a celebration. Staying null means
+        // the moment simply does not fire; MembershipPanel surfaces the error.
+        if (!cancelled) setMembership(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [auth?.authenticated, state]);
 
   useEffect(() => {
     if (!state || !activationVisible) return undefined;
@@ -1108,6 +1138,23 @@ export function DashboardRoute() {
         </div>
         <BrandSignature c={c} compact />
       </main>
+      {membership?.celebrate && membership.membership.entitled && (
+        <PackCelebration
+          facts={membership.membership as never}
+          locale={locale === "es" ? "es" : "en"}
+          onDismiss={() => {
+            // Close immediately, then record. If the write fails the moment may
+            // repeat once - preferable to a member who paid seeing nothing.
+            setMembership((current) => (current ? { ...current, celebrate: false } : current));
+            void membershipService.acknowledgeCelebration().catch(() => {});
+          }}
+          onOpenPortal={() => {
+            setMembership((current) => (current ? { ...current, celebrate: false } : current));
+            void membershipService.acknowledgeCelebration().catch(() => {});
+            navigateActive("billing");
+          }}
+        />
+      )}
       {celebration && (
         <CelebrationBurst
           celebration={celebration}
