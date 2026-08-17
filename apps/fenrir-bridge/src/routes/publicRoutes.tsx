@@ -101,9 +101,12 @@ function planLabel(plan: Plan) {
     free: "Free",
     starter: "Starter",
     pro: "Pro",
-    operator: "Operator"
+    operator: "Operator",
+    standard: "The Pack"
   };
-  return labels[plan];
+  // Unknown key returns the raw value, not undefined, so a future plan shows
+  // up as itself instead of rendering an empty slot.
+  return labels[plan] ?? String(plan ?? "");
 }
 
 function authProviderLabel(provider: string) {
@@ -121,9 +124,11 @@ function planLockLimit(plan: Plan) {
     free: "1",
     starter: "3",
     pro: "10",
-    operator: "unlimited"
+    operator: "unlimited",
+    standard: "unlimited"
   };
-  return limits[plan];
+  // Never claim an allowance for a plan we do not know.
+  return limits[plan] ?? "\u2014";
 }
 
 function SessionLabels({

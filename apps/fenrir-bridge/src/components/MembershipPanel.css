@@ -1,0 +1,200 @@
+/* ============================================================================
+   MembershipPanel — the portal's membership state, PROTOCOL surface.
+   Same token contract as PackCelebration so the celebration and the panel the
+   member lands on afterwards are visibly the same product.
+   ========================================================================== */
+
+.mp {
+  --mp-ink: var(--fn-ink, #0b0b0c);
+  --mp-panel: var(--fn-panel, #141414);
+  --mp-panel-2: var(--fn-panel-2, #1c1c1e);
+  --mp-line: var(--fn-line, #2a2a2c);
+  --mp-gold: var(--fn-gold, #c2a469);
+  --mp-teal: var(--fn-teal, #7fae9d);
+  --mp-paper: var(--fn-paper, #f4f0e6);
+  --mp-mute: var(--fn-mute, #9a9588);
+  --mp-danger: var(--fn-danger, #e85d4c);
+  --mp-display: var(--k-font-display, "Unbounded", system-ui, sans-serif);
+  --mp-mono: var(--k-font-mono, "JetBrains Mono", ui-monospace, monospace);
+  --mp-body: var(--k-font-body, "Outfit", system-ui, sans-serif);
+
+  position: relative;
+  border: 1px solid var(--mp-line);
+  background: color-mix(in oklab, var(--mp-panel) 88%, transparent);
+  backdrop-filter: blur(var(--k-blur-panel, 16px));
+  color: var(--mp-paper);
+  font-family: var(--mp-body);
+  overflow: hidden;
+}
+
+/* Gold spine on the left edge — the kit's accented-card signature. */
+.mp::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--mp-gold);
+  box-shadow: 0 0 16px -2px var(--mp-gold);
+}
+.mp[data-state="inactive"]::before { background: var(--mp-line); box-shadow: none }
+.mp[data-state="attention"]::before { background: var(--mp-danger); box-shadow: 0 0 16px -2px var(--mp-danger) }
+
+/* --- header -------------------------------------------------------------- */
+
+.mp__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 24px 18px;
+  border-bottom: 1px solid var(--mp-line);
+  flex-wrap: wrap;
+}
+
+.mp__eyebrow {
+  font-family: var(--mp-mono);
+  font-size: 0.5625rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--mp-teal);
+}
+
+.mp__plan {
+  margin: 9px 0 0;
+  font-family: var(--mp-display);
+  font-weight: 800;
+  font-size: 1.75rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--mp-paper);
+}
+/* An unrecognised plan is never dressed up as a product name. */
+.mp__plan[data-unknown="true"] {
+  font-family: var(--mp-body);
+  font-weight: 400;
+  font-size: 1.05rem;
+  font-style: italic;
+  text-transform: none;
+  color: var(--mp-mute);
+}
+
+.mp__badge {
+  font-family: var(--mp-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 7px 11px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+.mp__badge[data-tone="ok"] { color: var(--mp-teal); border-color: color-mix(in oklab, var(--mp-teal) 55%, transparent) }
+.mp__badge[data-tone="warn"] { color: var(--mp-gold); border-color: color-mix(in oklab, var(--mp-gold) 60%, transparent) }
+.mp__badge[data-tone="bad"] { color: var(--mp-danger); border-color: color-mix(in oklab, var(--mp-danger) 60%, transparent) }
+.mp__badge[data-tone="idle"] { color: var(--mp-mute); border-color: var(--mp-line) }
+
+/* --- facts --------------------------------------------------------------- */
+
+.mp__facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  border-bottom: 1px solid var(--mp-line);
+}
+.mp__fact { padding: 15px 24px; border-right: 1px solid var(--mp-line) }
+.mp__fact:last-child { border-right: 0 }
+.mp__fact dt {
+  font-family: var(--mp-mono);
+  font-size: 0.5625rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mp-teal);
+}
+.mp__fact dd {
+  margin: 8px 0 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--mp-paper);
+}
+/* Unsubstantiated => muted italic + the reason. Never an em-dash that could
+   pass for a value, never a plausible-looking default. */
+.mp__fact dd[data-unknown="true"] {
+  font-weight: 400;
+  font-style: italic;
+  font-size: 0.8125rem;
+  color: var(--mp-mute);
+}
+
+/* --- limits -------------------------------------------------------------- */
+
+.mp__limits { padding: 18px 24px 22px }
+.mp__limits h3 {
+  margin: 0 0 12px;
+  font-family: var(--mp-mono);
+  font-size: 0.5625rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mp-teal);
+}
+.mp__limits ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--mp-line) }
+.mp__limits li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  background: var(--mp-panel-2);
+  font-size: 0.875rem;
+  color: var(--mp-mute);
+}
+.mp__limits li b { font-weight: 700; color: var(--mp-paper) }
+.mp__limits li[data-on="false"] b { font-weight: 400; color: var(--mp-mute) }
+.mp__tick { width: 6px; height: 6px; flex: 0 0 6px; background: var(--mp-gold); margin-right: 10px }
+.mp__limits li[data-on="false"] .mp__tick { background: var(--mp-line) }
+
+/* --- notes / empty ------------------------------------------------------- */
+
+.mp__note {
+  margin: 0 24px 22px;
+  padding: 13px 15px;
+  border: 1px solid var(--mp-line);
+  border-left: 3px solid var(--mp-gold);
+  background: var(--mp-panel-2);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--mp-mute);
+}
+.mp__note[data-tone="bad"] { border-left-color: var(--mp-danger) }
+.mp__note p { margin: 0 }
+.mp__note p + p { margin-top: 9px }
+
+.mp__empty { padding: 28px 24px 30px }
+.mp__empty p { margin: 12px 0 0; font-size: 0.9375rem; line-height: 1.65; color: var(--mp-mute); max-width: 52ch }
+.mp__empty .mp__cta { margin-top: 20px }
+
+.mp__cta {
+  display: inline-block;
+  font-family: var(--mp-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 12px 22px;
+  border-radius: var(--k-r-md, 8px);
+  background: var(--mp-gold);
+  color: var(--mp-ink);
+  text-decoration: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* Skeleton — never shows a fake status while loading. */
+.mp__loading { padding: 26px 24px; font-family: var(--mp-mono); font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mp-mute) }
+
+@media (max-width: 620px) {
+  .mp__facts { grid-template-columns: 1fr }
+  .mp__fact { border-right: 0; border-bottom: 1px solid var(--mp-line) }
+  .mp__fact:last-child { border-bottom: 0 }
+}

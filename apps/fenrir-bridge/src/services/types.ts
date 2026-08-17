@@ -1,4 +1,9 @@
-export type Plan = "free" | "starter" | "pro" | "operator";
+// `standard` is The Pack — the plan key the Telegram Stars, courtesy and
+// referral rails actually write into billing_subscriptions (see
+// functions/_lib/plan-catalog.ts). It was missing from this union, so every
+// Pack member hit an undefined Record<Plan, …> lookup and the portal rendered
+// a blank plan label and a blank lock limit.
+export type Plan = "free" | "starter" | "pro" | "operator" | "standard";
 export type DomainStatus = "pending" | "verified" | "failed";
 export type DnsProvider = "cloudflare" | "external";
 export type CertificateStatus = "not_requested" | "dns_pending" | "issuing" | "active" | "failed";

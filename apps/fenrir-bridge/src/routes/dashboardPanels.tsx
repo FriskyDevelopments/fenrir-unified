@@ -57,9 +57,12 @@ export function planLabel(plan: Plan) {
     free: "Free",
     starter: "Starter",
     pro: "Pro",
-    operator: "Operator"
+    operator: "Operator",
+    standard: "The Pack"
   };
-  return labels[plan];
+  // An unknown key returns the raw value rather than undefined, so a future
+  // plan shows up as itself instead of rendering an empty slot.
+  return labels[plan] ?? String(plan ?? "");
 }
 
 export function authProviderLabel(provider: string) {
@@ -77,9 +80,12 @@ export function planLockLimit(plan: Plan) {
     free: "1",
     starter: "3",
     pro: "10",
-    operator: "unlimited"
+    operator: "unlimited",
+    standard: "unlimited"
   };
-  return limits[plan];
+  // Never claim an allowance for a plan we do not know. "—" is honest; a
+  // silently-undefined cell is not.
+  return limits[plan] ?? "—";
 }
 
 export function SessionLabels({

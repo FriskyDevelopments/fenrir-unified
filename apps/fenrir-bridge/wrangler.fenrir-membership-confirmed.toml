@@ -1,0 +1,35 @@
+# fenrir-membership-confirmed — the shared "entitlement confirmed" event.
+#
+# Reads billing_subscriptions and sends the confirmation. Never writes
+# entitlement, never participates in taking money.
+#
+# Secrets (wrangler secret put --config this-file):
+#   RESEND_API_KEY             op://FriskyDev-Infra/Email/password
+#   MEMBERSHIP_CONFIRM_SECRET  shared with whichever rail calls the hook
+#   TELEGRAM_BOT_TOKEN         optional; enables the in-Telegram confirmation
+
+name = "fenrir-membership-confirmed"
+main = "workers/fenrir-membership-confirmed.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
+
+# Hourly sweep. This is what lets the confirmation ship without editing the
+# charge path: entitlements that go active are picked up here even when no rail
+# calls the hook. Once the rails do call it, this is just the safety net.
+[triggers]
+crons = ["17 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fenrir-bridge"
+database_id = "1238059e-2638-4317-982e-e74dda046ccb"
+
+[vars]
+FENRIR_PORTAL_URL = "https://www.myfenrir.com/dashboard"
+# myfenrir.com is NOT a verified sender in Resend — only hostcasa.app is.
+# Sending as noreply@myfenrir.com would be rejected outright. Change this the
+# day myfenrir.com is verified, not before.
+FENRIR_MAIL_FROM = "MyFenrir <noreply@hostcasa.app>"
+
+[observability]
+enabled = true
