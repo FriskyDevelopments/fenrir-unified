@@ -2512,11 +2512,17 @@ const accessStateHelp: Record<DefaultAccessState, string> = {
 function communityAuthProviderLabel(provider: string) {
   if (provider === "magic_link") return "Magic link";
   if (provider === "microsoft") return "Microsoft";
+  if (provider === "authentik") return "FriskyDev Auth";
   return provider[0]?.toUpperCase() + provider.slice(1);
 }
 
-/** Providers the Community Gate OAuth bridge can complete end-to-end. */
-const communityOAuthProviders = ["google", "microsoft", "apple"] as const;
+/**
+ * Providers the Community Gate OAuth bridge can complete end-to-end.
+ * `authentik` is the broker: when it is enabled it fronts Google / Microsoft / Apple
+ * instead of sitting beside them, so a community normally enables EITHER authentik
+ * OR the direct three — not both. See docs/AUTHENTIK_OIDC_INTEGRATION.md.
+ */
+const communityOAuthProviders = ["google", "microsoft", "apple", "authentik"] as const;
 
 function communityOAuthStartUrl(provider: string, slug: string) {
   const params = new URLSearchParams({ slug, return_to: `/community/${slug}` });

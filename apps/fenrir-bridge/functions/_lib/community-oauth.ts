@@ -50,7 +50,7 @@ export function communityOAuthCallbackPath(provider: OAuthProvider) {
   return `/api/community-auth/oauth/callback/${provider}`;
 }
 
-const COMMUNITY_OAUTH_PROVIDERS: OAuthProvider[] = ["google", "microsoft", "apple"];
+const COMMUNITY_OAUTH_PROVIDERS: OAuthProvider[] = ["google", "microsoft", "apple", "authentik"];
 
 /**
  * Which providers actually have credentials bound in this environment. Lets the gate
