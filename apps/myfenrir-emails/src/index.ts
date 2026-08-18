@@ -125,7 +125,7 @@ async function handleSend(body: any, env: Env): Promise<Response> {
   const rendered = tpl.render(brand, body.data || {}, locale);
   const provider = body.provider || env.EMAIL_PROVIDER || "cloudflare";
 
-  const fromEmail = body?.from?.email || brand.sender.email || env.DEFAULT_FROM_EMAIL || "noreply@mail.myfenrir.com";
+  const fromEmail = body?.from?.email || brand.sender.email || env.DEFAULT_FROM_EMAIL || "noreply@myfenrir.com";
   const fromName = body?.from?.name || brand.sender.name || env.DEFAULT_FROM_NAME || "MyFenrir";
   const replyTo = body?.replyTo || brand.sender.replyTo || env.DEFAULT_REPLY_TO;
 

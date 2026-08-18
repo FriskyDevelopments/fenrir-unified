@@ -36,7 +36,9 @@ export type MyFenrirTemplateId =
   | "invitacion-lore"
   | "continuar-lore";
 
-export const FENRIR_MAIL_FROM = { email: "noreply@mail.myfenrir.com", name: "MyFenrir" } as const;
+// Raíz, no `mail.`: `myfenrir.com` tiene SPF + DKIM; `mail.myfenrir.com` tiene
+// DMARC p=reject sin SPF/DKIM y todo lo suyo se rechaza de plano.
+export const FENRIR_MAIL_FROM = { email: "noreply@myfenrir.com", name: "MyFenrir" } as const;
 export type MyFenrirEmailLocale = "en" | "es" | "fr" | "de";
 
 export function emailLocaleFromTelegram(languageCode?: string | null): MyFenrirEmailLocale {

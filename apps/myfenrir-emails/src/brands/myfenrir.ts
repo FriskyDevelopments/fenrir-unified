@@ -8,9 +8,13 @@ import type { Brand } from "./types";
 // Cyan #00E5FF is the primary accent; amethyst #8B7CFF the secondary; gold the
 // premium/dashboard tertiary. NO neon-lime (landing has one; excluded on purpose).
 //
-// Cloudflare Email Sending is onboarded for mail.myfenrir.com. The visible
-// sender therefore uses that authenticated subdomain; replies still go to the
-// root-domain support address.
+// El remitente visible va en la RAÍZ, `noreply@myfenrir.com`, porque ahí está
+// la identidad que autentica (SPF + DKIM `cf2024-1._domainkey`). El subdominio
+// `mail.myfenrir.com` tiene un DMARC `p=reject` SIN SPF ni DKIM que lo respalde:
+// todo lo enviado desde ahí se RECHAZA de plano, ni siquiera cae en spam.
+// OJO: este `sender.email` GANA sobre `env.DEFAULT_FROM_EMAIL` en handleSend()
+// (src/index.ts). Cambiar sólo el wrangler.toml no surte efecto.
+// Las respuestas siguen yendo a la dirección de soporte de la raíz.
 export const myfenrir: Brand = {
   id: "myfenrir",
   name: "MyFenrir",
@@ -39,7 +43,7 @@ export const myfenrir: Brand = {
   },
   sender: {
     name: "MyFenrir",
-    email: "noreply@mail.myfenrir.com",
+    email: "noreply@myfenrir.com",
     replyTo: "hola@myfenrir.com",
   },
   footer: {

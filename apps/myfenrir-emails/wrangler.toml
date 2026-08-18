@@ -36,7 +36,7 @@ EMAIL_FALLBACK = ""
 # Default envelope sender when a brand config doesn't specify one. Root domain
 # noreply@myfenrir.com is the identity that authenticates (SPF + DKIM). Do NOT
 # use mail.myfenrir.com (DMARC p=reject, no SPF/DKIM -> hard-rejected).
-DEFAULT_FROM_EMAIL = "noreply@mail.myfenrir.com"
+DEFAULT_FROM_EMAIL = "noreply@myfenrir.com"
 DEFAULT_FROM_NAME = "MyFenrir"
 DEFAULT_REPLY_TO = "hola@myfenrir.com"
 # Comma-separated brand ids allowed on /send (empty = allow all registered).
@@ -54,7 +54,7 @@ route = { pattern = "emails.myfenrir.com", custom_domain = true }
 [env.production.vars]
 EMAIL_PROVIDER = "cloudflare"
 EMAIL_FALLBACK = ""
-DEFAULT_FROM_EMAIL = "noreply@mail.myfenrir.com"
+DEFAULT_FROM_EMAIL = "noreply@myfenrir.com"
 DEFAULT_FROM_NAME = "MyFenrir"
 DEFAULT_REPLY_TO = "hola@myfenrir.com"
 ALLOWED_BRANDS = ""
