@@ -4,7 +4,6 @@
 # entitlement, never participates in taking money.
 #
 # Secrets (wrangler secret put --config this-file):
-#   MYFENRIR_MAIL_TOKEN        SEND_AUTH_TOKEN of the myfenrir-emails Worker
 #   MEMBERSHIP_CONFIRM_SECRET  shared with whichever rail calls the hook
 #   TELEGRAM_BOT_TOKEN         optional; enables the in-Telegram confirmation
 #
@@ -51,6 +50,13 @@ FENRIR_MAIL_REPLY_TO = "hola@myfenrir.com"
 # Left EMPTY on purpose: an unset value fails with `mail_not_configured` and is
 # recorded, which is louder and safer than a stale URL that silently 404s.
 MYFENRIR_MAIL_URL = ""
+
+# Internal-only delivery rail. This reaches the Worker that owns the
+# Cloudflare Email Sending binding without exposing a public bearer token or
+# relying on its value being available to the deployer.
+[[services]]
+binding = "EMAIL_SERVICE"
+service = "fenrir-transactional-email"
 
 [observability]
 enabled = true

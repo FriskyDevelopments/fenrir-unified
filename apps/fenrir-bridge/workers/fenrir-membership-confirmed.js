@@ -179,7 +179,10 @@ function assertMyFenrirSender(from) {
 }
 
 /**
- * Deliver through the myfenrir-emails Worker (Cloudflare Email Sending).
+ * Deliver through the internal transactional-email Worker (Cloudflare Email
+ * Sending). A service binding is the normal production path: it is private to
+ * this account and needs no copied bearer token. The authenticated HTTP path
+ * remains only for an explicit remote deployment where the binding is absent.
  *
  * Renders here, delivers there: the confirmation is built from D1 billing facts
  * that belong to this service, while the mail Worker owns the authenticated
@@ -195,16 +198,27 @@ function assertMyFenrirSender(from) {
  */
 async function sendViaMyFenrirMail(env, { to, subject, html, text }) {
   const from = assertMyFenrirSender(env.FENRIR_MAIL_FROM || DEFAULT_MAIL_FROM);
-  const endpoint = (env.MYFENRIR_MAIL_URL || "").trim();
-  const token = (env.MYFENRIR_MAIL_TOKEN || "").trim();
-
-  // Config gaps fail loudly and specifically. "not configured" is a different
-  // problem from "the send was rejected", and the operator needs to know which.
-  if (!endpoint) throw new Error("mail_not_configured:MYFENRIR_MAIL_URL is unset. Nothing was sent.");
-  if (!token) throw new Error("mail_not_configured:MYFENRIR_MAIL_TOKEN secret is unset. Nothing was sent.");
-
   const addr = fromAddress(from);
   const name = /^\s*([^<]+?)\s*</.exec(from)?.[1] || "MyFenrir";
+  const message = { to, from: { email: addr, name }, subject, html, text };
+
+  if (typeof env.EMAIL_SERVICE?.fetch === "function") {
+    const res = await env.EMAIL_SERVICE.fetch(new Request("https://email.internal/send", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(message),
+    }));
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body?.ok === false) {
+      throw new Error(`cloudflare_mail_${res.status}:${body?.error || "unknown"}`.slice(0, 300));
+    }
+    return body?.id ?? null;
+  }
+
+  const endpoint = (env.MYFENRIR_MAIL_URL || "").trim();
+  const token = (env.MYFENRIR_MAIL_TOKEN || "").trim();
+  if (!endpoint) throw new Error("mail_not_configured:EMAIL_SERVICE and MYFENRIR_MAIL_URL are unset. Nothing was sent.");
+  if (!token) throw new Error("mail_not_configured:MYFENRIR_MAIL_TOKEN secret is unset. Nothing was sent.");
 
   const res = await fetch(`${endpoint.replace(/\/+$/, "")}/send`, {
     method: "POST",
