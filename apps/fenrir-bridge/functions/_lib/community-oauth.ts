@@ -31,6 +31,7 @@ import {
   type OAuthIdentity,
   type OAuthProvider
 } from "./oauth";
+import { mintSupabaseSharedSessionCookies, type SupabaseSharedEnv } from "./supabase-shared-session";
 
 export type CommunityOAuthEnv = CommunityAuthEnv & OAuthEnv;
 
@@ -49,7 +50,7 @@ export function communityOAuthCallbackPath(provider: OAuthProvider) {
   return `/api/community-auth/oauth/callback/${provider}`;
 }
 
-const COMMUNITY_OAUTH_PROVIDERS: OAuthProvider[] = ["google", "microsoft", "apple"];
+const COMMUNITY_OAUTH_PROVIDERS: OAuthProvider[] = ["google", "microsoft", "apple", "authentik"];
 
 /**
  * Which providers actually have credentials bound in this environment. Lets the gate
@@ -182,6 +183,9 @@ export async function handleCommunityOAuthCallback(context: {
       "Set-Cookie": response.cookie
     });
     headers.append("Set-Cookie", clearCommunityTransactionCookie());
+    for (const supabaseCookie of response.supabaseCookies ?? []) {
+      headers.append("Set-Cookie", supabaseCookie);
+    }
     return new Response(null, { status: 302, headers });
   } catch (error) {
     const message = error instanceof Error ? error.message : "oauth_callback_failed";
@@ -226,6 +230,16 @@ export async function finalizeCommunityOAuthSignIn(options: {
   const session = await signCommunitySession(payload, options.env);
   const cookie = communitySessionSetCookie(session);
 
+  // ADDITIVE unification: also mint a real Supabase session for this email and
+  // set the `sb-<ref>-auth-token` cookie on `.myfenrir.com`, so Community Bridge
+  // (communities.myfenrir.com, Supabase-authed) recognizes the SAME identity
+  // natively. Best-effort — never breaks the existing Neon gate session.
+  const supabaseCookies = await mintSupabaseSharedSessionCookies(
+    options.env as unknown as SupabaseSharedEnv,
+    user.email,
+    { name: user.email, fenrirUserId: user.id },
+  );
+
   await createCommunitySessionRecord(options.env, {
     userId: user.id,
     sessionHash: await sha256Hex(session),
@@ -242,6 +256,7 @@ export async function finalizeCommunityOAuthSignIn(options: {
   return {
     location,
     cookie,
+    supabaseCookies,
     membership
   };
 }

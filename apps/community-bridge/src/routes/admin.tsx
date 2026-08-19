@@ -1,3 +1,4 @@
+import { getSiteUrl } from "@/config/site-url";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -25,9 +26,10 @@ import {
   adminSetUserTelegramId,
 } from "@/lib/admin.functions";
 import { useAuth, type AppRole } from "@/hooks/use-auth";
-import { RequireRole } from "@/components/auth/require-auth";
+import { RequireAuth } from "@/components/auth/require-auth";
 import { formatAuthError } from "@/lib/auth-errors";
 import { ArrowLeft, Loader2, Save, X } from "lucide-react";
+import { CourtesyPanel } from "@/components/admin/courtesy-panel";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
@@ -45,11 +47,11 @@ export const Route = createFileRoute("/admin")({
         content: "Manage MyFenrir portal members, roles and Telegram links.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://clipsflow-auth-hub.lovable.app/admin" },
+      { property: "og:url", content: `${getSiteUrl()}/admin` },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: "https://clipsflow-auth-hub.lovable.app/admin" }],
+    links: [{ rel: "canonical", href: `${getSiteUrl()}/admin` }],
   }),
   component: AdminPage,
 });
@@ -64,9 +66,9 @@ interface UserRow {
 
 function AdminPage() {
   return (
-    <RequireRole roles={["owner", "admin"]}>
+    <RequireAuth>
       <AdminConsole />
-    </RequireRole>
+    </RequireAuth>
   );
 }
 
@@ -78,6 +80,8 @@ function AdminConsole() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
   const [tgDrafts, setTgDrafts] = useState<Record<string, string>>({});
+  const effectiveOwner =
+    isOwner || rows?.some((row) => row.user_id === user?.id && row.role === "owner") === true;
 
   const fetchUsers = useServerFn(listUsersWithRoles);
   const updateRole = useServerFn(adminUpdateUserRole);
@@ -170,6 +174,7 @@ function AdminConsole() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-10">
+        {isOwner && rows ? <CourtesyPanel users={rows} /> : null}
         <div className="mb-6 flex items-baseline justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
@@ -227,7 +232,7 @@ function AdminConsole() {
                 </TableRow>
               )}
               {rows?.map((row) => {
-                const canEditOwner = isOwner || row.role !== "owner";
+                const canEditOwner = effectiveOwner || row.role !== "owner";
                 const draft = tgDrafts[row.user_id] ?? "";
                 const draftDirty = draft !== (row.telegram_id ? String(row.telegram_id) : "");
                 return (
@@ -248,7 +253,7 @@ function AdminConsole() {
                         <SelectContent>
                           <SelectItem value="user">User</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="owner" disabled={!isOwner}>
+                          <SelectItem value="owner" disabled={!effectiveOwner}>
                             Owner
                           </SelectItem>
                         </SelectContent>

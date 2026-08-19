@@ -24,6 +24,7 @@ import {
   type BrandTenantRow,
 } from "@/config/brand-tenant";
 import { BRANDS } from "@/config/brands";
+import { getSiteUrl } from "@/config/site-url";
 import { useBrandRegistry } from "@/config/brand-context";
 import { publishBrandUpdate } from "@/config/brand-sync";
 import {
@@ -37,7 +38,7 @@ import { RedirectPathField } from "@/components/brand/redirect-path-field";
 
 import { rowToBrandConfig } from "@/config/brand-tenant";
 
-const CANONICAL = "https://clipsflow-auth-hub.lovable.app/brands";
+const CANONICAL = `${getSiteUrl()}/brands`;
 
 export const Route = createFileRoute("/brands")({
   ssr: false,

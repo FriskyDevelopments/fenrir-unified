@@ -7,8 +7,8 @@ const json = (body, init = {}) =>
 const nowIso = () => new Date().toISOString();
 
 const starsPrice = (env) => {
-  const parsed = Number.parseInt(env.FENRIR_STARS_PRICE || "250", 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 250;
+  const parsed = Number.parseInt(env.FENRIR_STARS_PRICE || "1150", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1150;
 };
 
 const botUsername = (env) => (env.FENRIR_TELEGRAM_BOT_USERNAME || "").replace(/^@/, "").trim();
@@ -18,8 +18,264 @@ const botToken = (env, channel) => {
   return (env.TELEGRAM_PROD_BOT_TOKEN || env.TELEGRAM_BOT_TOKEN || "").trim();
 };
 
+function billingRequestAuthorized(request, env) {
+  const configured = normalizeText(env.COMMUNITY_BRIDGE_BILLING_SECRET);
+  const supplied = normalizeText(request.headers.get("authorization")).replace(/^Bearer\s+/i, "");
+  return Boolean(configured && supplied && configured === supplied);
+}
+
+export function isValidFoundersStripeSession(session, userId, orgId) {
+  const billingPeriod = session?.metadata?.billing_period;
+  const expectedAmount = billingPeriod === "annual" ? 14990 : 1499;
+  return Boolean(
+    session?.payment_status === "paid" &&
+      session?.mode === "subscription" &&
+      session?.client_reference_id === orgId &&
+      session?.metadata?.frisky_org_id === orgId &&
+      session?.metadata?.frisky_user_id === userId &&
+      session?.metadata?.plan === "standard" &&
+      session?.currency === "usd" &&
+      session?.amount_total === expectedAmount &&
+      session?.metadata?.offer === "founder_forever" &&
+      (billingPeriod === "monthly" || billingPeriod === "annual") &&
+      normalizeText(session?.subscription)
+  );
+}
+
+export function isValidStarsPayment(payment, order, telegramUserId) {
+  return Boolean(
+    payment?.invoice_payload?.startsWith("fenrir_stars:") &&
+      order &&
+      order.status === "pending" &&
+      String(order.telegram_user_id) === String(telegramUserId) &&
+      payment.currency === "XTR" &&
+      payment.total_amount === Number(order.amount)
+  );
+}
+
+async function stripeRequest(env, path, params) {
+  const key = normalizeText(env.STRIPE_SECRET_KEY);
+  if (!key) throw new Error("stripe_not_configured");
+  const response = await fetch(`https://api.stripe.com/v1${path}`, {
+    method: params ? "POST" : "GET",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      ...(params ? { "content-type": "application/x-www-form-urlencoded" } : {})
+    },
+    body: params ? new URLSearchParams(params) : undefined
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(`stripe_${response.status}:${body?.error?.code || "request_failed"}`);
+  return body;
+}
+
+function sortDeep(value) {
+  if (Array.isArray(value)) return value.map(sortDeep);
+  if (!value || typeof value !== "object") return value;
+  return Object.keys(value).sort().reduce((result, key) => {
+    result[key] = sortDeep(value[key]);
+    return result;
+  }, {});
+}
+
+async function verifyNowPaymentsIpn(request, env, body) {
+  const secret = normalizeText(env.NOWPAYMENTS_IPN_SECRET);
+  const supplied = normalizeText(request.headers.get("x-nowpayments-sig")).toLowerCase();
+  if (!secret || !supplied) return false;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-512" }, false, ["sign"]);
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(JSON.stringify(sortDeep(body))));
+  const expected = [...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return expected.length === supplied.length && expected.split("").every((char, index) => char === supplied[index]);
+}
+
+async function handleFoundersNowPaymentsCheckout(request, env) {
+  if (!billingRequestAuthorized(request, env)) return json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const apiKey = normalizeText(env.NOWPAYMENTS_API_KEY);
+  if (!apiKey || !normalizeText(env.NOWPAYMENTS_IPN_SECRET)) throw new Error("nowpayments_not_configured");
+  const body = await request.json().catch(() => null);
+  const userId = normalizeText(body?.userId);
+  if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ ok: false, error: "invalid_identity" }, { status: 400 });
+  const orderId = `mf-${userId}-${Date.now()}`;
+  const response = await fetch("https://api.nowpayments.io/v1/invoice", {
+    method: "POST",
+    headers: { "x-api-key": apiKey, "content-type": "application/json" },
+    body: JSON.stringify({
+      price_amount: 15,
+      price_currency: "usd",
+      order_id: orderId,
+      order_description: "MyFenrir Standard · Founders Deal · 5 Gates",
+      ipn_callback_url: "https://fenrir-stars-payments.hrgrrtks2p.workers.dev/api/nowpayments/ipn",
+      success_url: "https://communities.myfenrir.com/upgrade?nowpayments=processing",
+      cancel_url: "https://communities.myfenrir.com/upgrade?nowpayments=cancel",
+      partially_paid_url: "https://communities.myfenrir.com/upgrade?nowpayments=partial",
+      is_fixed_rate: true,
+      is_fee_paid_by_user: false
+    })
+  });
+  const invoice = await response.json().catch(() => null);
+  if (!response.ok || !invoice?.invoice_url) throw new Error(`nowpayments_${response.status}`);
+  return json({ ok: true, url: invoice.invoice_url });
+}
+
+async function handleNowPaymentsIpn(request, env) {
+  const body = await request.json().catch(() => null);
+  if (!body || !(await verifyNowPaymentsIpn(request, env, body))) return json({ ok: false, error: "invalid_signature" }, { status: 401 });
+  if (!new Set(["finished", "confirmed"]).has(normalizeText(body.payment_status).toLowerCase())) return json({ ok: true, activated: false });
+  const match = /^mf-([0-9a-f-]{36})-\d+$/i.exec(normalizeText(body.order_id));
+  if (
+    !match ||
+    normalizeText(body.price_currency).toLowerCase() !== "usd" ||
+    Math.abs(Number(body.price_amount) - 15) > 0.000001
+  ) {
+    return json({ ok: false, error: "invalid_order" }, { status: 400 });
+  }
+  const userId = match[1];
+  const paymentId = normalizeText(String(body.payment_id || body.invoice_id || ""));
+  if (!paymentId) return json({ ok: false, error: "missing_payment_id" }, { status: 400 });
+  const ts = nowIso();
+  await env.DB.prepare(
+    `INSERT INTO billing_subscriptions (
+      stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
+      current_period_end, cancel_at_period_end, created_at, updated_at
+    ) VALUES (?, ?, ?, 'standard', 'active', NULL, 0, ?, ?)
+    ON CONFLICT(stripe_subscription_id) DO UPDATE SET
+      frisky_org_id = excluded.frisky_org_id,
+      plan = 'standard',
+      status = 'active',
+      updated_at = excluded.updated_at`
+  ).bind(`nowpayments:${paymentId}`, userId, `nowpayments_${paymentId}`, ts, ts).run();
+  return json({ ok: true, activated: true });
+}
+
+async function handleFoundersCheckout(request, env) {
+  if (!billingRequestAuthorized(request, env)) return json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const body = await request.json().catch(() => null);
+  const userId = normalizeText(body?.userId);
+  const orgId = normalizeText(body?.orgId);
+  const email = normalizeText(body?.email).toLowerCase();
+  const billingPeriod = body?.billingPeriod === "annual" ? "annual" : "monthly";
+  const priceId = billingPeriod === "annual"
+    ? "price_1U4bO5LxUF54S071qvkmFT0V"
+    : "price_1U45nNLxUF54S071oRPYXOec";
+  if (!/^[0-9a-f-]{36}$/i.test(userId) || !/^[0-9a-f-]{36}$/i.test(orgId) || !email.includes("@")) {
+    return json({ ok: false, error: "invalid_identity" }, { status: 400 });
+  }
+  const successUrl = "https://communities.myfenrir.com/upgrade?stripe=success&session_id={CHECKOUT_SESSION_ID}";
+  const cancelUrl = "https://communities.myfenrir.com/upgrade?stripe=cancel";
+  const session = await stripeRequest(env, "/checkout/sessions", {
+    mode: "subscription",
+    customer_email: email,
+    client_reference_id: orgId,
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    "line_items[0][quantity]": "1",
+    "line_items[0][price]": priceId,
+    "metadata[frisky_user_id]": userId,
+    "metadata[frisky_org_id]": orgId,
+    "metadata[plan]": "standard",
+    "metadata[offer]": "founder_forever",
+    "metadata[billing_period]": billingPeriod,
+    "subscription_data[metadata][frisky_user_id]": userId,
+    "subscription_data[metadata][frisky_org_id]": orgId,
+    "subscription_data[metadata][plan]": "standard",
+    "subscription_data[metadata][offer]": "founder_forever"
+  });
+  if (!session?.url || !session?.id) throw new Error("stripe_checkout_missing_url");
+  return json({ ok: true, url: session.url, sessionId: session.id });
+}
+
+async function handleFoundersConfirm(request, env) {
+  if (!billingRequestAuthorized(request, env)) return json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const body = await request.json().catch(() => null);
+  const sessionId = normalizeText(body?.sessionId);
+  const userId = normalizeText(body?.userId);
+  const orgId = normalizeText(body?.orgId);
+  if (!/^cs_(test_|live_)?[A-Za-z0-9]+$/.test(sessionId)) return json({ ok: false, error: "invalid_session" }, { status: 400 });
+  const session = await stripeRequest(env, `/checkout/sessions/${encodeURIComponent(sessionId)}`);
+  const valid = isValidFoundersStripeSession(session, userId, orgId);
+  if (!valid) return json({ ok: false, error: "payment_not_confirmed" }, { status: 409 });
+  const ts = nowIso();
+  await env.DB.prepare(
+    `INSERT INTO billing_subscriptions (
+      stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
+      current_period_end, cancel_at_period_end, created_at, updated_at
+    ) VALUES (?, ?, ?, 'standard', 'active', NULL, 0, ?, ?)
+    ON CONFLICT(stripe_subscription_id) DO UPDATE SET
+      frisky_org_id = excluded.frisky_org_id,
+      plan = 'standard',
+      status = 'active',
+      updated_at = excluded.updated_at`
+  ).bind(normalizeText(session.subscription), orgId, normalizeText(session.customer) || `checkout_${session.id}`, ts, ts).run();
+  return json({ ok: true, plan: "standard", status: "active" });
+}
+
+async function handleCommunityBillingStatus(request, env) {
+  if (!billingRequestAuthorized(request, env)) return json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const body = await request.json().catch(() => null);
+  const userId = normalizeText(body?.userId);
+  const telegramUserId = normalizeText(body?.telegramUserId);
+  if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ ok: false, error: "invalid_identity" }, { status: 400 });
+
+  if (/^\d{5,20}$/.test(telegramUserId)) {
+    const [entitlement, identityLink] = await Promise.all([
+      getEntitlement(env, telegramUserId),
+      env.DB.prepare(
+        `SELECT frisky_user_id, frisky_org_id
+         FROM telegram_identity_links
+         WHERE telegram_user_id = ?
+         LIMIT 1`
+      ).bind(telegramUserId).first()
+    ]);
+    const identityMatches =
+      identityLink?.frisky_user_id === userId && identityLink?.frisky_org_id === userId;
+    if (entitlement?.status === "active" && identityMatches) {
+      const ts = nowIso();
+      await env.DB.batch([
+        env.DB.prepare(
+          `INSERT INTO billing_subscriptions (
+            stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
+            current_period_end, cancel_at_period_end, created_at, updated_at
+          ) VALUES (?, ?, ?, 'standard', 'active', NULL, 0, ?, ?)
+          ON CONFLICT(stripe_subscription_id) DO UPDATE SET
+            frisky_org_id = excluded.frisky_org_id, status = 'active', plan = 'standard', updated_at = excluded.updated_at`
+        ).bind(`stars:${telegramUserId}`, userId, `stars_${telegramUserId}`, ts, ts),
+        env.DB.prepare(
+          `UPDATE telegram_stars_entitlements SET frisky_org_id = ?, frisky_user_id = ?, plan = 'standard', updated_at = ? WHERE telegram_user_id = ?`
+        ).bind(userId, userId, ts, telegramUserId)
+      ]);
+    }
+  }
+
+  const subscription = await env.DB.prepare(
+    `SELECT plan, status FROM billing_subscriptions
+     WHERE frisky_org_id = ? AND status IN ('active','trialing','past_due')
+     ORDER BY updated_at DESC LIMIT 1`
+  ).bind(userId).first();
+  return json({
+    ok: true,
+    paid: Boolean(subscription),
+    plan: subscription?.plan || "free",
+    status: subscription?.status || null
+  });
+}
+
 const normalizeText = (value) => (value || "").trim();
 const BRIDGE_TARGET = "bridge.myfenrir.com";
+// Account linking is owned by Fenrir Bridge. Community Bridge's /activate
+// screen previously asked for a six-character code that this bot never minted.
+const MYFENRIR_APP_URL = "https://www.myfenrir.com/gate/miniapp";
+const MYFENRIR_FRONTEND_URL = "https://fenrir-bridge.pages.dev/gate/app";
+const BOT_OS_WELCOME_VIDEO_URL = "https://www.myfenrir.com/bot-os/media/fenrir-welcome.mp4";
+// Approved no-audio celebration clip for a successful Telegram-identity link.
+// Sent via sendAnimation (autoplay GIF). Reuses an existing approved bot-os clip.
+const BOT_OS_LINK_SUCCESS_ANIM_URL = "https://www.myfenrir.com/bot-os/media/fenrir-access.mp4";
+const LINK_SUCCESS_CAPTION = [
+  "🐺 *Linked in.* Your Telegram is now bound to your Frisky ID.",
+  "",
+  "Fenrir can connect this account to your workspace — you're clear to run the pack.",
+  "",
+  "Next: open MyFenrir to finish setup."
+].join("\n");
 
 const FENRIR_BOT_BRIEF = [
   "You are Fenrir Bot by Frisky.",
@@ -44,7 +300,7 @@ const FENRIR_BOT_BRIEF = [
   "PAYMENT BEHAVIOR:",
   "If user asks to buy, pay, upgrade, subscribe, unlock, activate, use Stars, or similar: say you are opening the official Fenrir payment box.",
   "Explain Telegram Stars handles the transaction and Fenrir verifies access after Telegram confirms payment.",
-  "If user asks for Stripe: explain Stripe Direct Billing is the professional card/invoice route for Pro and Operator, but only open it when the Stripe backend is configured. Otherwise say it is pending and offer Stars.",
+  "If user asks to pay: Stripe is the primary US$14.99/month card route at https://communities.myfenrir.com/upgrade. Telegram Stars at 1,150 Stars is the in-bot alternative.",
   "Do not ask for card details. Do not pretend payment is complete.",
   "STATUS BEHAVIOR:",
   "If user asks status/access/active/paid/subscription/entitlement: use backend entitlement_status. If active, say Fenrir Protocol is active. If inactive, say access is not active yet and invite them to subscribe.",
@@ -53,13 +309,10 @@ const FENRIR_BOT_BRIEF = [
   "DNS WIZARD:",
   "TXT: Type TXT, Name _fenrir, Value fenrir-verify=<token>, TTL Auto, Purpose proves domain ownership.",
   `CNAME: Type CNAME, Name join, Value ${BRIDGE_TARGET}, TTL Auto, Purpose routes the customer subdomain to Fenrir.`,
-  "PLANS:",
-  "Free $0: 1 Telegram Lock, 1 Fenrir subdomain, no custom domain, testing.",
-  "Starter $3/mo or equivalent Stars: 3 Telegram Locks, Fenrir subdomains, small communities.",
-  "Pro $7/mo or equivalent Stars: 10 Telegram Locks, custom domain support, paid groups, creators, small businesses.",
-  "Operator $15/mo or equivalent Stars: unlimited Telegram Locks, multi-admin workflows, audit logs, agencies/operators.",
-  "Upsells: done-for-you setup $25 one-time, domain concierge $15 one-time, emergency invite rotation $10 one-time.",
-  "Recommendation map: one group -> Starter; paid group/course/VIP/client community -> Pro; many groups/clients/ops -> Operator; testing -> Free.",
+  "PACKS:",
+  "Unpaid: no new Gates. Membership is required from Gate 1.",
+  "Standard Founders Deal: US$14.99/month by Stripe or 1,150 Telegram Stars; 5 Gates in one active community.",
+  "Owner: 20 Gates across multiple communities; assigned only to authorized owners.",
   "Keep replies concise. Use clean bullets when useful. No corporate fluff."
 ].join("\n");
 
@@ -96,6 +349,45 @@ async function getEntitlement(env, telegramUserId) {
   return env.DB.prepare(`SELECT * FROM telegram_stars_entitlements WHERE telegram_user_id = ?`)
     .bind(String(telegramUserId))
     .first();
+}
+
+async function applyStarsMembership(env, telegramUserId) {
+  const [link, entitlement] = await Promise.all([
+    env.DB.prepare(
+      `SELECT frisky_org_id, frisky_user_id FROM telegram_identity_links WHERE telegram_user_id = ? LIMIT 1`
+    ).bind(String(telegramUserId)).first(),
+    env.DB.prepare(
+      `SELECT telegram_user_id, status, stars_amount, payload, telegram_payment_charge_id
+       FROM telegram_stars_entitlements WHERE telegram_user_id = ? AND status = 'active' LIMIT 1`
+    ).bind(String(telegramUserId)).first()
+  ]);
+  if (!link || !entitlement) return { applied: false, reason: "telegram_not_linked" };
+
+  const plan = normalizeText(env.FENRIR_STARS_PLAN).toLowerCase() || "standard";
+  const safePlan = plan === "pro" || plan === "operator" ? plan : "standard";
+  const ts = nowIso();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO billing_subscriptions (
+        stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
+        current_period_end, cancel_at_period_end, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, 'active', NULL, 0, ?, ?)
+      ON CONFLICT(stripe_subscription_id) DO UPDATE SET
+        frisky_org_id = excluded.frisky_org_id,
+        stripe_customer_id = excluded.stripe_customer_id,
+        plan = excluded.plan,
+        status = 'active',
+        current_period_end = NULL,
+        cancel_at_period_end = 0,
+        updated_at = excluded.updated_at`
+    ).bind(`stars:${telegramUserId}`, link.frisky_org_id, `stars_${telegramUserId}`, safePlan, ts, ts),
+    env.DB.prepare(
+      `UPDATE telegram_stars_entitlements
+       SET frisky_org_id = ?, frisky_user_id = ?, plan = ?, updated_at = ?
+       WHERE telegram_user_id = ?`
+    ).bind(link.frisky_org_id, link.frisky_user_id, safePlan, ts, String(telegramUserId))
+  ]);
+  return { applied: true, plan: safePlan };
 }
 
 async function consumeTelegramLinkCode(env, code, message) {
@@ -159,12 +451,210 @@ async function consumeTelegramLinkCode(env, code, message) {
       code
     )
   ]);
+  await applyStarsMembership(env, telegramUserId);
   return { ok: true, friskyUserId: pending.frisky_user_id, friskyOrgId: pending.frisky_org_id };
+}
+
+async function notifyLinkConfirm(env, payload) {
+  const url = (env.FENRIR_LINK_CONFIRM_URL || "").trim();
+  const secret = (env.TELEGRAM_LINK_CONFIRM_SECRET || "").trim();
+  if (!url || !secret) return;
+  const body = JSON.stringify(payload);
+  const signature = await hmacHex(secret, body);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-fenrir-link-signature": signature },
+    body
+  });
+  if (!response.ok) throw new Error(`confirm_${response.status}`);
+}
+
+async function hmacHex(secret, data) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+  return [...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function linkCodeFromStart(text) {
   const match = text.match(/^\/start\s+link_([a-z0-9_-]{8,64})$/i);
   return match?.[1] || "";
+}
+
+function gateAccessTokenFromStart(text) {
+  const match = text.match(/^\/start(?:@[A-Za-z0-9_]+)?\s+(gate_[a-z0-9.\-_]{20,64})$/i);
+  return match?.[1] || "";
+}
+
+function base64Url(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function timingSafeBytesEqual(left, right) {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) difference |= left[index] ^ right[index];
+  return difference === 0;
+}
+
+async function gateAccessSignature(secret, payload) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload))).slice(0, 16);
+}
+
+function base64UrlToBytes(value) {
+  if (!/^[A-Za-z0-9_-]{20,24}$/.test(value)) return null;
+  try {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+    return Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
+  } catch {
+    return null;
+  }
+}
+
+export async function verifyGateAccessToken(secret, token, telegramUserId, now = Math.floor(Date.now() / 1000)) {
+  if (!secret || !token.startsWith("gate_")) return null;
+  const compact = token.slice(5);
+  const separator = compact.lastIndexOf(".");
+  if (separator < 1) return null;
+  const payload = compact.slice(0, separator);
+  const supplied = base64UrlToBytes(compact.slice(separator + 1));
+  if (!supplied || !/^1\.[0-9a-z]+\.[0-9a-z]+\.[0-9a-z]+\.[0-9a-z]+$/i.test(payload)) return null;
+  const expected = await gateAccessSignature(secret, payload);
+  if (!timingSafeBytesEqual(supplied, expected)) return null;
+
+  const [version, subjectText, chatText, expiresText] = payload.split(".");
+  const subject = Number.parseInt(subjectText, 36);
+  const chatMagnitude = Number.parseInt(chatText, 36);
+  const expiresAt = Number.parseInt(expiresText, 36);
+  if (
+    version !== "1" ||
+    !Number.isSafeInteger(subject) ||
+    !Number.isSafeInteger(chatMagnitude) ||
+    !Number.isSafeInteger(expiresAt) ||
+    subject !== Number(telegramUserId) ||
+    expiresAt < now ||
+    expiresAt > now + 6 * 60
+  ) return null;
+  return { telegramUserId: subject, chatId: `-${chatMagnitude}`, expiresAt };
+}
+
+async function handleGateAccessStart(env, channel, message, token) {
+  const chat = message?.chat;
+  const telegramUserId = message?.from?.id;
+  if (!telegramUserId || chat?.type !== "private") return false;
+  const claims = await verifyGateAccessToken(normalizeText(env.FENRIR_GATE_ACCESS_SECRET), token, telegramUserId);
+  if (!claims) {
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: chat.id,
+      text: "This Gate handoff is expired or invalid. Return to the Gate and request a fresh secure handoff."
+    });
+    return true;
+  }
+
+  const bot = await telegramApi(env, channel, "getMe", {});
+  const botId = bot?.result?.id;
+  const botMember = botId
+    ? await telegramApi(env, channel, "getChatMember", { chat_id: claims.chatId, user_id: botId }).catch(() => null)
+    : null;
+  const botStatus = botMember?.result?.status;
+  const botCanInvite = botStatus === "creator" || botStatus === "owner" || botMember?.result?.can_invite_users === true;
+  if (!(botStatus === "administrator" || botStatus === "creator" || botStatus === "owner") || !botCanInvite) {
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: chat.id,
+      text: "This Gate's Telegram destination is not ready to issue secure invites. Please contact the community owner."
+    });
+    return true;
+  }
+
+  const member = await telegramApi(env, channel, "getChatMember", { chat_id: claims.chatId, user_id: telegramUserId }).catch(() => null);
+  const memberStatus = member?.result?.status;
+  if (["creator", "owner", "administrator", "member"].includes(memberStatus) || (memberStatus === "restricted" && member?.result?.is_member)) {
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: chat.id,
+      text: "Your Telegram identity already has access to this community."
+    });
+    return true;
+  }
+
+  const invite = await telegramApi(env, channel, "createChatInviteLink", {
+    chat_id: claims.chatId,
+    name: `Fenrir Gate ${telegramUserId}`.slice(0, 32),
+    expire_date: Math.min(claims.expiresAt, Math.floor(Date.now() / 1000) + 5 * 60),
+    member_limit: 1,
+    creates_join_request: false
+  }).catch(() => null);
+  const inviteUrl = invite?.result?.invite_link;
+  if (!inviteUrl) {
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: chat.id,
+      text: "Fenrir could not issue the one-use invite just now. Return to the Gate to request a fresh handoff."
+    });
+    return true;
+  }
+  await telegramApi(env, channel, "sendMessage", {
+    chat_id: chat.id,
+    text: `Your one-use community invite is ready. It expires in five minutes:\n${inviteUrl}`,
+    disable_web_page_preview: true
+  });
+  return true;
+}
+
+function maskEmail(email) {
+  const [local, domain] = normalizeText(email).split("@");
+  if (!local || !domain) return "MyFenrir account";
+  return `${local.slice(0, 2)}${"•".repeat(Math.max(2, Math.min(6, local.length - 2)))}@${domain}`;
+}
+
+async function sendIdentityWelcome(env, channel, message) {
+  const telegramUserId = String(message.from?.id || message.chat.id);
+  const linked = await env.DB.prepare(
+    `SELECT email FROM telegram_identity_links WHERE telegram_user_id = ? LIMIT 1`
+  ).bind(telegramUserId).first();
+  const name = normalizeText(message.from?.first_name) || "there";
+
+  if (linked) {
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: message.chat.id,
+      text: [
+        `🐺 Welcome, ${name}.`,
+        "",
+        "✅ Account linked with Frisky Dev",
+        `MyFenrir account · ${maskEmail(linked.email)}`,
+        "",
+        "Your verified Telegram identity is ready for Community Gates.",
+        "",
+        "Tap Confirm access in MyFenrir below to finish setup."
+      ].join("\n"),
+      reply_markup: { inline_keyboard: [[{ text: "Confirm access in MyFenrir", web_app: { url: MYFENRIR_APP_URL } }]] }
+    });
+    return;
+  }
+
+  await telegramApi(env, channel, "sendMessage", {
+    chat_id: message.chat.id,
+    text: [
+      `🐺 Welcome, ${name}.`,
+      "",
+      "Your Telegram identity is not linked yet.",
+      "Open MyFenrir and choose Link Telegram securely. Return through the generated one-time link to confirm this account."
+    ].join("\n"),
+    reply_markup: { inline_keyboard: [[{ text: "Link with MyFenrir", web_app: { url: MYFENRIR_APP_URL } }]] }
+  });
 }
 
 async function markPaid(env, payment, message, order) {
@@ -210,14 +700,14 @@ async function sendStarsInvoice(env, channel, message) {
   const payload = await createOrder(env, String(message.from?.id || message.chat.id), String(message.chat.id), amount);
   await telegramApi(env, channel, "sendInvoice", {
     chat_id: message.chat.id,
-    title: env.FENRIR_STARS_TITLE || "Fenrir Protocol Access",
+    title: env.FENRIR_STARS_TITLE || "MyFenrir Standard Pack · Founders Deal",
     description:
       env.FENRIR_STARS_DESCRIPTION ||
-      "Unlock Fenrir Protocol access with Telegram Stars while card billing is being reviewed.",
+      "Activate Standard membership: 5 Gates for one active community. Card alternative: $15 USD.",
     payload,
     provider_token: "",
     currency: "XTR",
-    prices: [{ label: env.FENRIR_STARS_LABEL || "Fenrir Protocol Access", amount }],
+    prices: [{ label: env.FENRIR_STARS_LABEL || "Standard Pack", amount }],
     protect_content: true
   });
 }
@@ -248,69 +738,156 @@ function menuIntent(text) {
   return /^\/(start|menu|help)\b/i.test(text) || /\b(menu|commands|modulos|módulos|ayuda|help)\b/i.test(text);
 }
 
+function commandForThisBot(text, command, env) {
+  const match = text.match(new RegExp(`^/${command}(?:@([A-Za-z0-9_]+))?(?:\\s|$)`, "i"));
+  if (!match) return false;
+  const target = normalizeText(match[1]).toLowerCase();
+  return !target || target === botUsername(env).toLowerCase();
+}
+
+async function sendTelegramLinkStart(env, channel, message) {
+  if (message.chat?.type && message.chat.type !== "private") {
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: message.chat.id,
+      text: "For security, send /link to me in a private chat."
+    });
+    return;
+  }
+
+  const menuButton = {
+    type: "web_app",
+    text: "Open MyFenrir",
+    web_app: { url: MYFENRIR_APP_URL }
+  };
+  try {
+    await telegramApi(env, channel, "setChatMenuButton", { menu_button: menuButton });
+  } catch (error) {
+    console.error("telegram_menu_button_failed", String(error));
+  }
+  await telegramApi(env, channel, "sendMessage", {
+    chat_id: message.chat.id,
+    text: [
+      "MyFenrir account linking",
+      "",
+      "1. Open MyFenrir and sign in.",
+      "2. In your dashboard, tap Link Telegram ID.",
+      "3. Telegram opens automatically to confirm — there is no code to copy.",
+      "",
+      "The Open MyFenrir Mini App button is now enabled in this chat."
+    ].join("\n"),
+    reply_markup: {
+      inline_keyboard: [[{ text: "Open MyFenrir", web_app: { url: MYFENRIR_APP_URL } }]]
+    }
+  });
+}
+
 function spanishIntent(text) {
   return /\b(si|sí|como|cómo|cuanto|precio|pagar|comprar|dominio|grupo|configurar|estado|activo|pagado|quiero|tengo)\b/i.test(text);
 }
 
-function modularMenuText(text, entitlement) {
+export function modularMenuText(text, entitlement) {
   const active = entitlement?.status === "active";
   if (spanishIntent(text)) {
     return [
-      "FENRIR BOT OS | Menu",
-      `Estado: ${active ? "activo" : "pendiente"}`,
+      "MYFENRIR | Control de comunidad",
+      `Plan: ${active ? "The Pack · activo" : "Free · listo para tu primer Gate"}`,
       "",
-      "MOD 01 | Setup",
-      "Dominio, DNS, bot admin y primer bridge.",
+      "Tu siguiente paso · protege un grupo de Telegram",
       "",
-      "MOD 02 | Planes",
-      "Free, Starter, Pro, Operator.",
+      "1 · Crea un Gate",
+      "Da a tu comunidad una página de entrada con reglas y una solicitud de acceso.",
       "",
-      "MOD 03 | Pago",
-      "Abre la caja oficial de Telegram Stars.",
+      "2 · Vincula y verifica tu grupo",
+      "Agrega Fenrir como admin con permiso para crear invitaciones. Tú aceptas a cada persona antes de que reciba una invitación.",
       "",
-      "MOD 04 | Estado",
-      "Verifica si tu acceso esta activo.",
+      "3 · Elige tu plan cuando lo necesites",
+      "Free incluye 1 Lock y un subdominio Fenrir. The Pack cuesta US$15/mes y añade Locks ilimitados, multi-admin y auditoría.",
       "",
-      "Comandos: /setup /plans /subscribe /status"
+      "Puedes crear tu primer Gate sin pagar ni configurar DNS.",
+      "",
+      "Elige una acción abajo para continuar."
     ].join("\n");
   }
   return [
-    "FENRIR BOT OS | Menu",
-    `Status: ${active ? "active" : "pending"}`,
+    "MYFENRIR | Community control",
+    `Plan: ${active ? "The Pack · active" : "Free · ready for your first Gate"}`,
     "",
-    "MOD 01 | Setup",
-    "Domain, DNS, bot admin permissions, and first bridge.",
+    "Your next step · protect a Telegram group",
     "",
-    "MOD 02 | Plans",
-    "Free, Starter, Pro, Operator.",
+    "1 · Create a Gate",
+    "Give your community an entrance page with rules and an access request.",
     "",
-    "MOD 03 | Payment",
-    "Open the official Telegram Stars payment box.",
+    "2 · Link and verify your group",
+    "Make Fenrir an admin with Invite Users. You approve each person before the bot creates their invite.",
     "",
-    "MOD 04 | Status",
-    "Check whether backend entitlement is active.",
+    "3 · Choose a plan when you need it",
+    "Free includes 1 Lock and a Fenrir subdomain. The Pack is US$15/month for unlimited Locks, multi-admin workflows, and audit logs.",
     "",
-    "Commands: /setup /plans /subscribe /status"
+    "You can create your first Gate without paying or setting up DNS.",
+    "",
+    "Choose an action below to continue."
   ].join("\n");
 }
 
+export function botMenuKeyboard(entitlement) {
+  return [
+    [{ text: "Create my Gate", callback_data: "fenrir_setup" }],
+    [
+      { text: "Compare plans", callback_data: "fenrir_plans" },
+      { text: "My access", callback_data: "fenrir_status" }
+    ],
+    ...(entitlement?.status === "active"
+      ? []
+      : [[{ text: "Activate The Pack · Stars", callback_data: "fenrir_subscribe" }]])
+  ];
+}
+
 async function sendBotMenu(env, channel, message, entitlement) {
-  await telegramApi(env, channel, "sendMessage", {
+  const payload = {
     chat_id: message.chat.id,
-    text: modularMenuText(message.text || "", entitlement),
+    caption: modularMenuText(message.text || "", entitlement),
+    video: BOT_OS_WELCOME_VIDEO_URL,
+    supports_streaming: true,
     reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "MOD 01 · Setup", callback_data: "fenrir_setup" },
-          { text: "MOD 02 · Plans", callback_data: "fenrir_plans" }
-        ],
-        [
-          { text: "MOD 03 · Stars", callback_data: "fenrir_subscribe" },
-          { text: "MOD 04 · Status", callback_data: "fenrir_status" }
-        ]
-      ]
+      inline_keyboard: botMenuKeyboard(entitlement)
     }
-  });
+  };
+  try {
+    await telegramApi(env, channel, "sendVideo", payload);
+  } catch (error) {
+    console.error("bot_os_welcome_video_failed", String(error));
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: payload.chat_id,
+      text: payload.caption,
+      reply_markup: payload.reply_markup
+    });
+  }
+}
+
+// Celebratory render for a successful Telegram-identity link: an approved
+// no-audio clip autoplayed as a GIF via sendAnimation, with the upgraded copy
+// and an "Open MyFenrir" CTA. Falls back to a plain message if the animation
+// cannot be delivered (mirrors the sendBotMenu fallback pattern).
+async function sendLinkLinkedAnimation(env, channel, message) {
+  const reply_markup = {
+    inline_keyboard: [[{ text: "Confirm access in MyFenrir →", web_app: { url: MYFENRIR_APP_URL } }]]
+  };
+  try {
+    await telegramApi(env, channel, "sendAnimation", {
+      chat_id: message.chat.id,
+      animation: BOT_OS_LINK_SUCCESS_ANIM_URL,
+      caption: LINK_SUCCESS_CAPTION,
+      parse_mode: "Markdown",
+      reply_markup
+    });
+  } catch (error) {
+    console.error("link_success_animation_failed", String(error));
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: message.chat.id,
+      text: "🐺 Linked in. Your Telegram is now bound to your Frisky ID. Fenrir can connect this account to your workspace — open MyFenrir to finish setup.",
+      reply_markup
+    });
+  }
 }
 
 function fallbackMind(text, entitlement) {
@@ -329,32 +906,25 @@ function fallbackMind(text, entitlement) {
 
   if (pricingIntent(text)) {
     return [
-      "FENRIR PROTOCOL | Plans",
+      "MYFENRIR | Community Packs",
       "",
-      "Free — $0: 1 Telegram Lock, 1 Fenrir subdomain, for testing.",
-      "Starter — $3/mo or Stars: 3 Telegram Locks, Fenrir subdomains.",
-      "Pro — $7/mo or Stars: 10 Telegram Locks, custom domain support.",
-      "Operator — $15/mo or Stars: unlimited Locks, multi-admin workflows, audit logs.",
+      "Standard Founders Deal — $15 USD by Stripe or 1,150 Telegram Stars.",
+      "Includes 5 Gates for one active community.",
+      "Membership is required from Gate 1.",
       "",
-      "One group: Starter. Paid VIP/course/client community: Pro. Many groups or clients: Operator."
+      "Owner profiles receive 20 Gates across multiple communities."
     ].join("\n");
   }
 
   if (stripeIntent(text)) {
     return [
-      "FENRIR PROTOCOL | Direct Billing",
-      "Gateway: Stripe Secure",
-      "Status: pending backend activation",
+      "MYFENRIR | Secure checkout",
+      "Primary gateway: Stripe",
+      "Price: $15 USD",
       "",
-      "Stripe Direct Billing is the professional card and invoice route for Pro and Operator users.",
-      "",
-      "What it supports once active:",
-      "• Card, Apple Pay, and Google Pay through Stripe Checkout",
-      "• Stripe Customer Portal",
-      "• Business invoices",
-      "• Pro and Operator subscriptions",
-      "",
-      "For now, I can open the official Telegram Stars payment box. Telegram handles the transaction, and Fenrir activates access after confirmation."
+      "Open https://communities.myfenrir.com/upgrade to pay by card.",
+      "Or use /subscribe for the 1,150 Stars in-bot alternative.",
+      "Fenrir activates Standard only after the selected payment provider confirms payment."
     ].join("\n");
   }
 
@@ -499,10 +1069,23 @@ async function handleTelegramWebhook(request, env, url) {
   if (message?.successful_payment) {
     const payment = message.successful_payment;
     const order = await getOrder(env, payment.invoice_payload);
+    const telegramUserId = String(message.from?.id || message.chat.id);
+    const valid = isValidStarsPayment(payment, order, telegramUserId);
+    if (!valid) {
+      console.error("stars_payment_validation_failed", telegramUserId);
+      await telegramApi(env, channel, "sendMessage", {
+        chat_id: message.chat.id,
+        text: "This payment did not match an active MyFenrir invoice. Membership was not changed. Run /subscribe for a fresh invoice."
+      });
+      return json({ ok: true });
+    }
     await markPaid(env, payment, message, order);
+    const membership = await applyStarsMembership(env, telegramUserId);
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
-      text: `Fenrir Protocol activated.\n\nAccess: active\nStars: ${payment.total_amount}\nPayment rail: Telegram Stars`
+      text: membership.applied
+        ? `MyFenrir Standard Pack activated.\n\nAccess: active\nGates: 5\nActive communities: 1\nStars: ${payment.total_amount}\nPayment rail: Telegram Stars`
+        : `Stars payment confirmed.\n\nStars: ${payment.total_amount}\nNext: open MyFenrir → Settings → Link Telegram. Standard will activate automatically after linking.`
     });
     return json({ ok: true });
   }
@@ -512,20 +1095,44 @@ async function handleTelegramWebhook(request, env, url) {
 
   const entitlement = await getEntitlement(env, message.from?.id || message.chat.id);
 
-  if (menuIntent(text)) {
-    await sendBotMenu(env, channel, message, entitlement);
+  const gateAccessToken = gateAccessTokenFromStart(text);
+  if (gateAccessToken) {
+    await handleGateAccessStart(env, channel, message, gateAccessToken);
+    return json({ ok: true });
+  }
+
+  if (/^\/start(?:@[A-Za-z0-9_]+)?(?:\s+gate)?$/i.test(text)) {
+    await sendIdentityWelcome(env, channel, message);
+    return json({ ok: true });
+  }
+
+  if (commandForThisBot(text, "link", env)) {
+    await sendTelegramLinkStart(env, channel, message);
     return json({ ok: true });
   }
 
   const linkCode = linkCodeFromStart(text);
   if (linkCode) {
     const result = await consumeTelegramLinkCode(env, linkCode, message);
-    await telegramApi(env, channel, "sendMessage", {
-      chat_id: message.chat.id,
-      text: result.ok
-        ? "Telegram identity linked to your Frisky ID. Fenrir can now connect this Telegram account to your workspace."
-        : "This Fenrir link code is expired or invalid. Open MyFenrir and generate a fresh Telegram link."
-    });
+    if (result.ok) {
+      await notifyLinkConfirm(env, {
+        code: linkCode,
+        telegramId: String(message.from?.id || message.chat.id),
+        telegramUsername: message.from?.username || null,
+        telegramFirstName: message.from?.first_name || null
+      }).catch((error) => console.error("link_confirm_failed", String(error)));
+      await sendLinkLinkedAnimation(env, channel, message);
+    } else {
+      await telegramApi(env, channel, "sendMessage", {
+        chat_id: message.chat.id,
+        text: "This Fenrir link code is expired or invalid. Open MyFenrir and generate a fresh Telegram link."
+      });
+    }
+    return json({ ok: true });
+  }
+
+  if (menuIntent(text)) {
+    await sendBotMenu(env, channel, message, entitlement);
     return json({ ok: true });
   }
 
@@ -578,6 +1185,78 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/telegram/bot-health" && request.method === "GET") {
+      try {
+        const me = await telegramApi(env, "prod", "getMe", {});
+        let webhook = await telegramApi(env, "prod", "getWebhookInfo", {});
+        const canonicalWebhook = `${url.origin}/api/telegram/webhook?bot=prod`;
+        const registeredWebhook = normalizeText(webhook.result?.url);
+        if (registeredWebhook !== canonicalWebhook) {
+          const webhookSecret = normalizeText(env.TELEGRAM_WEBHOOK_SECRET);
+          if (!webhookSecret) throw new Error("telegram_webhook_secret_missing");
+          await telegramApi(env, "prod", "setWebhook", {
+            url: canonicalWebhook,
+            secret_token: webhookSecret,
+            allowed_updates: ["message", "pre_checkout_query"]
+          });
+          webhook = await telegramApi(env, "prod", "getWebhookInfo", {});
+        }
+        // Keep Telegram's global/default menu aligned with the canonical
+        // account-linking surface. This is idempotent and repairs BotFather or
+        // dashboard drift whenever the health monitor runs.
+        await telegramApi(env, "prod", "setChatMenuButton", {
+          menu_button: {
+            type: "web_app",
+            text: "Open MyFenrir",
+            web_app: { url: MYFENRIR_APP_URL }
+          }
+        });
+        const menu = await telegramApi(env, "prod", "getChatMenuButton", {});
+        const registered = normalizeText(webhook.result?.url);
+        const registeredUrl = registered ? new URL(registered) : null;
+        return json({
+          ok: true,
+          username: me.result?.username || null,
+          webhook: registeredUrl ? `${registeredUrl.origin}${registeredUrl.pathname}` : null,
+          pending: webhook.result?.pending_update_count ?? 0,
+          lastError: webhook.result?.last_error_message || null,
+          menuButton: menu.result || null
+        });
+      } catch {
+        return json({ ok: false, error: "telegram_bot_auth_failed" }, { status: 503 });
+      }
+    }
+
+    if (url.pathname === "/api/internal/founders-checkout" && request.method === "POST") {
+      try { return await handleFoundersCheckout(request, env); }
+      catch (error) { console.error("founders_checkout_failed", String(error)); return json({ ok: false, error: "stripe_checkout_failed" }, { status: 502 }); }
+    }
+    if (url.pathname === "/api/internal/billing-options" && request.method === "POST") {
+      if (!billingRequestAuthorized(request, env)) return json({ ok: false, error: "unauthorized" }, { status: 401 });
+      return json({
+        ok: true,
+        stripe: Boolean(normalizeText(env.STRIPE_SECRET_KEY)),
+        nowpayments: Boolean(normalizeText(env.NOWPAYMENTS_API_KEY) && normalizeText(env.NOWPAYMENTS_IPN_SECRET)),
+        stars: Boolean(botToken(env, "prod"))
+      });
+    }
+    if (url.pathname === "/api/internal/founders-nowpayments-checkout" && request.method === "POST") {
+      try { return await handleFoundersNowPaymentsCheckout(request, env); }
+      catch (error) { console.error("founders_nowpayments_checkout_failed", String(error)); return json({ ok: false, error: "nowpayments_checkout_failed" }, { status: 502 }); }
+    }
+    if (url.pathname === "/api/nowpayments/ipn" && request.method === "POST") {
+      try { return await handleNowPaymentsIpn(request, env); }
+      catch (error) { console.error("nowpayments_ipn_failed", String(error)); return json({ ok: false, error: "ipn_failed" }, { status: 500 }); }
+    }
+    if (url.pathname === "/api/internal/founders-confirm" && request.method === "POST") {
+      try { return await handleFoundersConfirm(request, env); }
+      catch (error) { console.error("founders_confirm_failed", String(error)); return json({ ok: false, error: "stripe_confirmation_failed" }, { status: 502 }); }
+    }
+    if (url.pathname === "/api/internal/community-billing-status" && request.method === "POST") {
+      try { return await handleCommunityBillingStatus(request, env); }
+      catch (error) { console.error("community_billing_status_failed", String(error)); return json({ ok: false, error: "billing_status_failed" }, { status: 502 }); }
+    }
+
     if (url.pathname === "/api/telegram/webhook" && request.method === "POST") {
       // KILL SWITCH: BOT_SILENCE=1 → accept every update with 200 and send nothing
       // (halts a runaway spam loop instantly). Then ALWAYS 200: any thrown error
@@ -625,8 +1304,8 @@ export default {
     }
 
     // Telegram Mini App links must open the app shell, not the worker health response.
-    if (url.pathname === "/" && request.method === "GET") {
-      return Response.redirect("https://www.myfenrir.com/gate/app", 302);
+    if ((url.pathname === "/" || url.pathname === "/app" || url.pathname === "/gate/app") && request.method === "GET") {
+      return Response.redirect(MYFENRIR_FRONTEND_URL, 302);
     }
 
     return json({ ok: true, service: "fenrir-stars-payments" });

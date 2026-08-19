@@ -37,6 +37,7 @@ const secretGroups = [
   {
     title: "Neon community gate",
     fields: [
+      ["NEON_API_KEY", "Neon management API key used to discover projects and obtain a runtime connection URI"],
       ["NEON_DATABASE_URL", "Runtime database URL only if Fenrir Community Gate needs direct DB access. Neon management uses OAuth connector."],
       ["FENRIR_COMMUNITY_AUTH_SECRET", "Community auth signing secret"]
     ]

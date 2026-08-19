@@ -42,8 +42,6 @@ export const moderateUpload = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const key = process.env["MODERATION_API_KEY"];
     if (!key) {
-      // Sin clave no se puede clasificar. Se manda a revisión en vez de dejar
-      // pasar: una mala configuración no puede convertirse en vía libre.
       await enqueue(data, "other", null, null, "unconfigured");
       return { decision: "review" as const, reason: "moderation_not_configured" };
     }
@@ -105,7 +103,6 @@ async function enqueue(
   model: string,
 ): Promise<void> {
   const sql = neonSql();
-  // Idempotente: un reintento del cliente no duplica la fila pendiente.
   const existing = (await sql`
     select id from cb_moderation_reviews
     where subject_ref = ${data.subject_ref} and status = 'pending' limit 1

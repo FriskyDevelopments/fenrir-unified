@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { startRegistration } from "@simplewebauthn/browser";
 import { copy, detectLocale, languageNames, locales, type Copy, type Locale } from "../i18n";
 import {
   aiOpsService,
@@ -32,7 +31,6 @@ import {
   domainSearchCandidates,
   domainTagPresets,
   findCommissionLink,
-  friskySignalDevRequestUrl,
   legalRoutes,
   liveRoomProviders,
   lookupDomainDns,
@@ -203,7 +201,11 @@ export function DashboardRoute() {
     const params = new URLSearchParams(window.location.search);
     const staleAuthError = params.get("auth_error");
     if (!staleAuthError) return;
-    if (staleAuthError.startsWith("missing_env:") || staleAuthError === "direct_oauth_disabled") {
+    if (
+      staleAuthError.startsWith("missing_env:") ||
+      staleAuthError === "direct_oauth_disabled" ||
+      staleAuthError === "supabase_session_failed:human_verification_required"
+    ) {
       params.delete("auth_error");
       const nextSearch = params.toString();
       window.history.replaceState({}, "", `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`);
@@ -264,7 +266,10 @@ export function DashboardRoute() {
     const params = new URLSearchParams(window.location.search);
     const billing = params.get("billing");
     if (!billing) return;
-    if (billing === "success") setNotice(copy[locale].billingReturnSuccess);
+    if (billing === "success") {
+      setNotice(copy[locale].billingReturnSuccess);
+      triggerCelebration("Welcome to the Pack", "Your MyFenrir subscription is active. The pack is ready.", "commerce");
+    }
     if (billing === "cancel") setNotice(copy[locale].billingReturnCancel);
     if (billing === "portal_return") setNotice(copy[locale].billingReturnPortal);
     void refresh();
@@ -586,6 +591,9 @@ export function DashboardRoute() {
     try {
       setNotice(c.passkeyBusy);
       const { optionsJSON } = await webauthnService.registerOptions();
+      // Carga diferida: @simplewebauthn/browser sale del chunk inicial y sólo
+      // se descarga al registrar un passkey desde el dashboard.
+      const { startRegistration } = await import("@simplewebauthn/browser");
       const registration = await startRegistration({ optionsJSON });
       await webauthnService.registerVerify(registration);
       setNotice(c.passkeySuccess);
@@ -648,20 +656,21 @@ export function DashboardRoute() {
   const show = (...pages: PageKey[]) => pages.includes(active);
 
   return (
-    <div className="app">
+    <div className="app threshold-dashboard">
       {activationVisible && <ProtocolActivated />}
-      <aside className="sidebar">
+      <aside className="sidebar threshold-rail">
         <div className="brand">
           <img className="brand-wordmark" src="/fenrir-cut-wordmark.svg" alt="Fenrir" />
           <div className="brand-lockup">
-            <b>Telegram Lock</b>
-            <small>{c.brandSmall}</small>
+            <b>MyFenrir</b>
+            <small>CONTROL PLANE · R/01</small>
           </div>
         </div>
         <nav>
           {c.nav.map((item, index) => (
             <button className={active === pageKeys[index] ? "active" : ""} onClick={() => navigateActive(pageKeys[index])} key={item}>
-              {item}
+              <span className="threshold-nav-index">{String(index).padStart(2, "0")}</span>
+              <span>{item}</span>
             </button>
           ))}
         </nav>
@@ -676,7 +685,7 @@ export function DashboardRoute() {
         </div>
       </aside>
 
-      <main>
+      <main className="threshold-main">
         <div className="fenrir-wallpaper" aria-hidden="true">
           <span className="wallpaper-orbit orbit-one" />
           <span className="wallpaper-orbit orbit-two" />
@@ -684,7 +693,17 @@ export function DashboardRoute() {
           <span className="wallpaper-paw">F</span>
           <span className="wallpaper-bot">◈</span>
         </div>
-        <header className="topbar">
+        <header className="topbar threshold-topbar">
+          <div className="threshold-engine" aria-hidden="true">
+            <span className="threshold-engine-ring ring-a" />
+            <span className="threshold-engine-ring ring-b" />
+            <span className="threshold-engine-ring ring-c" />
+            <span className="threshold-engine-scan" />
+            <span className="threshold-engine-core"><b>R/01</b><small>THRESHOLD<br />ONLINE</small></span>
+            <span className="threshold-engine-node node-a" />
+            <span className="threshold-engine-node node-b" />
+            <span className="threshold-engine-node node-c" />
+          </div>
           <div>
             <p className="label">{c.heroLabel}</p>
             <h1>{c.heroTitle}</h1>
@@ -1026,7 +1045,6 @@ export function DashboardRoute() {
               <div className="row-actions">
                 {!telegramIdentity?.linked ? <button type="button" onClick={() => void linkTelegramIdentity()}>{ui.linkTelegramId}</button> : null}
                 {telegramIdentity?.linked ? <button type="button" onClick={() => void requestTelegramReadd()}>{ui.telegramReaddButton}</button> : null}
-                <a className="button-link ghost" href={friskySignalDevRequestUrl} target="_blank" rel="noreferrer">{ui.devRequestViaSignal}</a>
               </div>
             </div>
             <div className="form-column">
@@ -1050,9 +1068,6 @@ export function DashboardRoute() {
               <button onClick={() => runAiOps("jules")}>{c.julesTicket}</button>
               <button className="secondary" onClick={() => runAiOps("gemini")}>{c.geminiDnsGuide}</button>
               <button className="ghost" onClick={() => runAiOps("cursor")}>{c.cursorHandoff}</button>
-            <a className="button-link ghost" href={friskySignalDevRequestUrl} target="_blank" rel="noreferrer">
-              {ui.devRequestViaSignal}
-            </a>
             </div>
             <p className="muted">{c.opsStackBody}</p>
           </section>}

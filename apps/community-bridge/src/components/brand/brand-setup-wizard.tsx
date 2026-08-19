@@ -64,6 +64,9 @@ export function BrandSetupWizard({
 }: BrandSetupWizardProps) {
   const [step, setStep] = useState(0);
   const [slugTouched, setSlugTouched] = useState(false);
+  // Bring-your-own-domain is advanced/optional. Hidden by default so a new room
+  // reads as "free Fenrir address, ready now" instead of "buy a domain first".
+  const [showCustomDomain, setShowCustomDomain] = useState(false);
   const [draft, setDraft] = useState<BrandTenantInput>(() => emptyBrandTenant());
   const [previewOpened, setPreviewOpened] = useState(false);
 
@@ -227,21 +230,59 @@ export function BrandSetupWizard({
               onChange={(e) => set("community_id", slugify(e.target.value))}
             />
           </Field>
-          <Field label="Hostnames (optional, comma separated)">
-            <Input
-              value={draft.hostnames.join(", ")}
-              onChange={(e) =>
-                set(
-                  "hostnames",
-                  e.target.value
-                    .split(",")
-                    .map((v) => v.trim().toLowerCase())
-                    .filter(Boolean),
-                )
-              }
-              placeholder="portal.lore.myfenrir.com"
-            />
-          </Field>
+          <div className="space-y-3 rounded-xl border border-emerald-400/30 bg-emerald-400/5 p-4 sm:col-span-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-300">
+              ✓ Your free Fenrir address — nothing to buy
+            </p>
+            <p className="text-sm text-foreground">
+              Your community goes live on Fenrir the moment you create it — no domain, no DNS.
+              Members reach your entrances at{" "}
+              <span className="break-all font-mono text-primary">
+                communities.myfenrir.com/g/&lt;gate&gt;
+              </span>
+              .
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowCustomDomain((v) => !v)}
+              className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+              aria-expanded={showCustomDomain}
+            >
+              {showCustomDomain
+                ? "Hide custom domain"
+                : "Advanced: bring your own domain (optional) →"}
+            </button>
+            {showCustomDomain ? (
+              <div className="space-y-2 border-t border-emerald-400/20 pt-3">
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/30 px-3 py-2">
+                  <span className="text-xs text-muted-foreground">
+                    Branded subdomain{" "}
+                    <span className="font-mono text-foreground/70">&lt;slug&gt;.myfenrir.com</span>
+                  </span>
+                  <Badge variant="secondary">Coming soon</Badge>
+                </div>
+                <Field label="Custom domain (optional — requires DNS)">
+                  <Input
+                    value={draft.hostnames.join(", ")}
+                    onChange={(e) =>
+                      set(
+                        "hostnames",
+                        e.target.value
+                          .split(",")
+                          .map((v) => v.trim().toLowerCase())
+                          .filter(Boolean),
+                      )
+                    }
+                    placeholder="portal.yourbrand.com"
+                  />
+                </Field>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Optional. Point your own domain’s DNS to Fenrir to use it instead. Your free
+                  Fenrir address keeps working until then — you can add this any time later.
+                </p>
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -489,8 +530,12 @@ export function BrandSetupWizard({
             <Summary label="Providers" value={draft.providers.join(" → ")} />
             <Summary label="Gate preset" value={draft.gate_preset} />
             <Summary
-              label="Hostnames"
-              value={draft.hostnames.length ? draft.hostnames.join(", ") : "none"}
+              label="Address"
+              value={
+                draft.hostnames.length
+                  ? draft.hostnames.join(", ")
+                  : "Free Fenrir address (communities.myfenrir.com) — no domain needed"
+              }
             />
           </dl>
 

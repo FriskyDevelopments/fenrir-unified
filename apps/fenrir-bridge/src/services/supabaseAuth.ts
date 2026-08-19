@@ -1,4 +1,9 @@
-import { createClient, type Provider, type SupabaseClient } from "@supabase/supabase-js";
+// `@supabase/supabase-js` se importa SOLO como tipo aquí: los tipos se borran
+// en compilación y no arrastran la librería al chunk inicial. El runtime
+// (`createClient`) se carga con dynamic import dentro de `supabaseClient()`, que
+// únicamente se invoca en flujos de auth (login / callback / logout). Así la
+// landing no paga el peso de supabase-js hasta que el usuario interactúa.
+import type { Provider, SupabaseClient } from "@supabase/supabase-js";
 import { sharedSessionStorage, sharedStorageKey } from "./sharedSession";
 
 type AuthProvider = "google" | "microsoft" | "apple";
@@ -13,6 +18,7 @@ const authRedirectOrigin = (import.meta.env.VITE_AUTH_REDIRECT_ORIGIN ?? "https:
 const authRedirectPath = (import.meta.env.VITE_AUTH_REDIRECT_PATH ?? "/auth/callback").trim();
 const fenrirManagedUrl = (import.meta.env.VITE_FENRIR_MANAGED_URL ?? "/main").trim();
 const postAuthDestinationKey = "fenrir_post_auth_destination";
+const humanVerificationRequired = "human_verification_required";
 
 function sanitizeRedirectPath(path: string) {
   if (!path) return "/auth/callback";
@@ -49,7 +55,6 @@ function isAuthCallbackPath(pathname: string) {
   const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
   return normalizedPath === "/auth/callback" || 
          normalizedPath === "/auth/v1/callback" || 
-         normalizedPath === "/login" ||
          normalizedPath === sanitizeRedirectPath(authRedirectPath);
 }
 
@@ -71,6 +76,8 @@ function isSafeRedirectPath(path: string | null) {
 }
 
 function currentPostAuthDestination() {
+  const requested = new URLSearchParams(window.location.search).get("next");
+  if (isSafeRedirectPath(requested)) return requested as string;
   const destination = window.location.pathname;
   return destination === "/" || !isSafeRedirectPath(destination) ? fallbackPostAuthDestination() : destination;
 }
@@ -100,7 +107,7 @@ function callbackDestinationPath(pathname: string, hasCallbackParams = false) {
 }
 
 export async function signInWithSupabase(providerName: AuthProvider) {
-  const supabase = supabaseClient();
+  const supabase = await supabaseClient();
   rememberPostAuthDestination();
   const { error } = await supabase.auth.signInWithOAuth({
     provider: supabaseProvider(providerName),
@@ -124,7 +131,7 @@ export async function completeSupabaseSession() {
     return false;
   }
 
-  const supabase = supabaseClient();
+  const supabase = await supabaseClient();
   const code = params.code;
 
   if (code) {
@@ -152,7 +159,18 @@ export async function completeSupabaseSession() {
     body: JSON.stringify({ accessToken })
   });
   if (!response.ok) {
-    setAuthCallbackError(`supabase_session_failed:${encodeURIComponent(await readResponseError(response))}`);
+    const responseError = await readResponseError(response);
+    if (response.status === 403 && responseError === humanVerificationRequired) {
+      // The provider callback is already safely stored in the Supabase client.
+      // Do not turn the expected pre-login gate into a user-facing auth error:
+      // clear callback material, show HumanVerification, then retry after it succeeds.
+      if (params.hasCallbackParams || isAuthCallbackPath(window.location.pathname)) {
+        clearCallbackParameters(params.hasCallbackParams);
+      }
+      clearDeferredVerificationError();
+      return false;
+    }
+    setAuthCallbackError(`supabase_session_failed:${encodeURIComponent(responseError)}`);
     return false;
   }
   if (params.hasCallbackParams || isAuthCallbackPath(window.location.pathname)) {
@@ -168,14 +186,17 @@ export async function signOutSupabase() {
   } catch {
     // Ignore storage cleanup failures.
   }
-  await supabaseClient().auth.signOut();
+  await (await supabaseClient()).auth.signOut();
 }
 
-function supabaseClient() {
+async function supabaseClient() {
   if (!isSupabaseAuthConfigured()) {
     console.warn("Supabase auth is not configured correctly. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env. Placeholder 'example.supabase.co' is not allowed.");
     throw new Error("supabase_auth_not_configured");
   }
+  // Carga diferida de supabase-js: sale del chunk inicial y sólo se descarga
+  // cuando de verdad se necesita un cliente (login/callback/logout).
+  const { createClient } = await import("@supabase/supabase-js");
   // La sesión se guarda en una cookie de `.myfenrir.com` para que valga en
   // todas las superficies (communities.myfenrir.com incluida) — ver
   // services/sharedSession.ts. La clave es la que Supabase usa por defecto,
@@ -237,6 +258,15 @@ function setAuthCallbackError(code: string) {
     return;
   }
   window.history.replaceState({}, "", `${destinationPath}${nextSearch ? `?${nextSearch}` : ""}`);
+}
+
+function clearDeferredVerificationError() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("auth_error") !== `supabase_session_failed:${humanVerificationRequired}`) return;
+  params.delete("auth_error");
+  params.delete("auth_error_detail");
+  const nextSearch = params.toString();
+  window.history.replaceState({}, "", `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`);
 }
 
 const callbackParameterKeys = ["code", "error", "error_description", "state", "scope", "access_token", "id_token", "refresh_token", "token_type", "expires_in"];

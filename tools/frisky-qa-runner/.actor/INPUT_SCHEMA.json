@@ -1,0 +1,41 @@
+{
+  "title": "Frisky QA Runner input",
+  "description": "Quality-only E2E. The test identity is NEVER passed here — it is read from the Apify Secret env var QA_SUPABASE_ACCESS_TOKEN (a short-lived, quality-only Supabase access token).",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "baseUrl": {
+      "title": "MyFenrir Quality base URL",
+      "type": "string",
+      "editor": "textfield",
+      "default": "https://quality.myfenrir.com"
+    },
+    "communityUrl": {
+      "title": "Community Bridge Quality URL",
+      "type": "string",
+      "editor": "textfield",
+      "default": "https://communities-quality.myfenrir.com"
+    },
+    "communityGatePath": {
+      "title": "Community gate path",
+      "type": "string",
+      "editor": "textfield",
+      "default": "/gate?onboarding=1"
+    },
+    "runAuthenticated": {
+      "title": "Run authenticated legs (requires QA_SUPABASE_ACCESS_TOKEN secret)",
+      "type": "boolean",
+      "default": true
+    },
+    "viewports": {
+      "title": "Viewports to capture",
+      "type": "array",
+      "editor": "json",
+      "default": [
+        { "name": "desktop", "width": 1440, "height": 900 },
+        { "name": "mobile", "width": 390, "height": 844 }
+      ]
+    }
+  },
+  "required": ["baseUrl"]
+}

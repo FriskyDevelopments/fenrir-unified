@@ -13,11 +13,13 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 
 import {
+  authentikEndpoints,
   clearCommunityTransactionCookie,
   communityTransactionSetCookie,
   createCommunityOAuthTransaction,
   getAuthorizationUrl,
   isCommunityOAuthProvider,
+  isDirectOAuthAvailable,
   readCommunityOAuthTransaction,
   safeCommunityReturnPath,
   type OAuthEnv
@@ -351,4 +353,115 @@ test("callback rejects workos outright", async () => {
     provider: "workos"
   });
   assert.equal(response.status, 404);
+});
+
+/* ---------------------------------------------------------------------------
+ * Authentik broker. These assert the SAFETY property that matters most for this
+ * rollout: with the flag off, nothing about the live gate changes.
+ * ------------------------------------------------------------------------- */
+
+const AUTHENTIK_ISSUER = "https://authentik.friskydev.com/application/o/community-bridge/";
+
+/** Env with Authentik credentials bound but the flag deliberately left unset. */
+function authentikEnv(overrides: Partial<CommunityOAuthEnv> = {}): CommunityOAuthEnv {
+  return testEnv({
+    AUTHENTIK_ISSUER,
+    AUTHENTIK_CLIENT_ID: "placeholder-authentik-client-id",
+    AUTHENTIK_CLIENT_SECRET: "placeholder-authentik-client-secret",
+    ...overrides
+  } as Partial<CommunityOAuthEnv>);
+}
+
+test("authentikEndpoints derives the global triple and the per-app jwks", () => {
+  const endpoints = authentikEndpoints(AUTHENTIK_ISSUER);
+  assert.equal(endpoints.authorize, "https://authentik.friskydev.com/application/o/authorize/");
+  assert.equal(endpoints.token, "https://authentik.friskydev.com/application/o/token/");
+  assert.equal(endpoints.userinfo, "https://authentik.friskydev.com/application/o/userinfo/");
+  assert.equal(endpoints.jwks, `${AUTHENTIK_ISSUER}jwks/`);
+  // A pasted issuer without the trailing slash must normalize to the same thing.
+  assert.deepEqual(authentikEndpoints(AUTHENTIK_ISSUER.replace(/\/$/, "")), endpoints);
+});
+
+test("authentik stays invisible until AUTHENTIK_ENABLED is exactly true", () => {
+  assert.equal(isDirectOAuthAvailable("authentik", authentikEnv()), false);
+  assert.equal(isDirectOAuthAvailable("authentik", authentikEnv({ AUTHENTIK_ENABLED: "false" } as never)), false);
+  assert.equal(isDirectOAuthAvailable("authentik", authentikEnv({ AUTHENTIK_ENABLED: "1" } as never)), false);
+  assert.equal(isDirectOAuthAvailable("authentik", authentikEnv({ AUTHENTIK_ENABLED: "true" } as never)), true);
+});
+
+test("authentik needs credentials AND a parseable issuer even with the flag on", () => {
+  const enabled = { AUTHENTIK_ENABLED: "true" } as never;
+  assert.equal(
+    isDirectOAuthAvailable("authentik", testEnv({ ...(enabled as object) } as Partial<CommunityOAuthEnv>)),
+    false,
+    "flag alone must not enable the provider"
+  );
+  assert.equal(
+    isDirectOAuthAvailable("authentik", authentikEnv({ ...(enabled as object), AUTHENTIK_ISSUER: "not-a-url" } as never)),
+    false,
+    "a malformed issuer must fail closed, not throw mid-redirect"
+  );
+});
+
+test("flag off leaves the advertised provider list byte-identical", () => {
+  const live = testEnv({
+    MICROSOFT_CLIENT_ID: "x",
+    MICROSOFT_CLIENT_SECRET: "x"
+  } as Partial<CommunityOAuthEnv>);
+  const withAuthentikCreds = authentikEnv({
+    MICROSOFT_CLIENT_ID: "x",
+    MICROSOFT_CLIENT_SECRET: "x"
+  } as never);
+  assert.deepEqual(availableCommunityAuthProviders(withAuthentikCreds), availableCommunityAuthProviders(live));
+  assert.equal(availableCommunityAuthProviders(withAuthentikCreds).includes("authentik"), false);
+});
+
+test("authentik authorize URL carries PKCE, nonce and the bridge callback", async () => {
+  const env = authentikEnv({ AUTHENTIK_ENABLED: "true" } as never);
+  const tx = await createCommunityOAuthTransaction("authentik", env as OAuthEnv, {
+    community: "fenrir",
+    returnTo: "/community/fenrir"
+  });
+  const callbackUri = `${ORIGIN}${communityOAuthCallbackPath("authentik")}`;
+  const url = new URL(await getAuthorizationUrl("authentik", env as OAuthEnv, callbackUri, tx));
+
+  assert.equal(url.origin + url.pathname, "https://authentik.friskydev.com/application/o/authorize/");
+  assert.equal(url.searchParams.get("redirect_uri"), callbackUri);
+  assert.equal(url.searchParams.get("response_type"), "code");
+  assert.equal(url.searchParams.get("scope"), "openid email profile");
+  assert.equal(url.searchParams.get("code_challenge_method"), "S256");
+  assert.equal(url.searchParams.get("state"), tx.state);
+  assert.equal(url.searchParams.get("nonce"), tx.nonce);
+  // The verifier must never leave the signed cookie.
+  assert.equal(url.toString().includes(tx.verifier), false);
+});
+
+test("authentik uses SameSite=Lax — only Apple needs None", async () => {
+  const env = authentikEnv({ AUTHENTIK_ENABLED: "true" } as never);
+  const tx = await createCommunityOAuthTransaction("authentik", env as OAuthEnv, {
+    community: "fenrir",
+    returnTo: "/community/fenrir"
+  });
+  const cookie = await communityTransactionSetCookie(tx, env as OAuthEnv);
+  assert.match(cookie, /SameSite=Lax/);
+  const roundTripped = await readCommunityOAuthTransaction(
+    requestWithCookie(`${ORIGIN}/api/community-auth/x`, cookieHeaderFrom(cookie)),
+    env as OAuthEnv
+  );
+  assert.equal(roundTripped?.provider, "authentik");
+});
+
+test("authentik start bounces to provider_not_configured while the flag is off", async () => {
+  const response = await handleCommunityOAuthStart({
+    request: new Request(`${ORIGIN}/api/community-auth/oauth/authentik?slug=fenrir`),
+    env: authentikEnv(),
+    provider: "authentik"
+  });
+  assert.equal(response.status, 302);
+  assert.match(response.headers.get("Location") ?? "", /auth_error=provider_not_configured$/);
+});
+
+test("authentik is a recognized community provider", () => {
+  assert.equal(isCommunityOAuthProvider("authentik"), true);
+  assert.equal(communityOAuthCallbackPath("authentik"), "/api/community-auth/oauth/callback/authentik");
 });

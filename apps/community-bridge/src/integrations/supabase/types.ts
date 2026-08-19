@@ -250,6 +250,54 @@ export type Database = {
           },
         ]
       }
+      account_links: {
+        Row: {
+          created_at: string
+          email: string | null
+          frisky_org_id: string | null
+          frisky_user_id: string | null
+          id: string
+          provider: string
+          status: string
+          supabase_user_id: string
+          telegram_first_name: string | null
+          telegram_id: number | null
+          telegram_username: string | null
+          updated_at: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          frisky_org_id?: string | null
+          frisky_user_id?: string | null
+          id?: string
+          provider?: string
+          status?: string
+          supabase_user_id: string
+          telegram_first_name?: string | null
+          telegram_id?: number | null
+          telegram_username?: string | null
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          frisky_org_id?: string | null
+          frisky_user_id?: string | null
+          id?: string
+          provider?: string
+          status?: string
+          supabase_user_id?: string
+          telegram_first_name?: string | null
+          telegram_id?: number | null
+          telegram_username?: string | null
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       telegram_link_codes: {
         Row: {
           code: string

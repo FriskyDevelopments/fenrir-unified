@@ -11,7 +11,6 @@ import {
   domainSearchCandidates,
   domainTagPresets,
   domainSearchTlds,
-  friskySignalDevRequestUrl,
   liveRoomProviders,
   lookupDomainDns,
   openAnyUrl,
@@ -27,6 +26,7 @@ import {
   type VaultLink
 } from "../app/shared";
 import type { UiCopy } from "../app/uiCopy";
+import { knowledgeBaseUrl } from "../services/knowledgeBase";
 import { buildVaultLinks, createVaultShareUrl } from "./vaultRoutes";
 import { BrandSignature, bridgeGroupPhotoUrl, GroupAvatar, PanelTitle, providerLabel, ProviderBadge } from "./routeCommon";
 export { BrandSignature, bridgeGroupPhotoUrl, GroupAvatar, PanelTitle, providerLabel, ProviderBadge } from "./routeCommon";
@@ -778,7 +778,14 @@ export function LinkVaultPanel({
 export function FaqPanel({ c }: { c: Copy }) {
   return (
     <section className="panel wide faq-panel">
-      <PanelTitle title={c.faqTitle} subtitle={c.faqSub} />
+      <div className="faq-heading-row">
+        <PanelTitle title={c.faqTitle} subtitle={c.faqSub} />
+        <a className="faq-wiki-link" href={knowledgeBaseUrl}>
+          <span>31 FIELD GUIDES</span>
+          <b>Open the new Wiki</b>
+          <i aria-hidden="true">↗</i>
+        </a>
+      </div>
       <div className="faq-grid">
         {c.faqs.map((item, index) => (
           <details className="faq-item" key={item[0]} open={index < 2}>

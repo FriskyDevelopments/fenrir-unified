@@ -1,8 +1,13 @@
 import type { AuthEnv } from "./auth";
 
 export type BillingEnv = AuthEnv & {
-  EMAIL?: { send(message: { to: string; from: { email: string; name?: string }; subject: string; html: string; text: string }): Promise<unknown> };
+  EMAIL?: {
+    send?: (message: { to: string; from: { email: string; name?: string }; subject: string; html: string; text: string }) => Promise<unknown>;
+    fetch?: (request: Request) => Promise<Response>;
+  };
   DB?: D1Database;
+  /** R2 bucket for MyFenrir member media (avatars/covers/uploads); bound as MEDIA in wrangler.jsonc. */
+  MEDIA?: R2Bucket;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_STARTER_PRICE_ID?: string;
@@ -14,6 +19,8 @@ export type BillingEnv = AuthEnv & {
   TELEGRAM_PROD_BOT_TOKEN?: string;
   TELEGRAM_DEV_BOT_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
+  TELEGRAM_LINK_CONFIRM_SECRET?: string;
+  FENRIR_LINK_CONFIRM_URL?: string;
   FENRIR_TELEGRAM_BOT_USERNAME?: string;
   MYFENRIR_TELEGRAM_BOT_USERNAME?: string;
   FENRIR_TELEGRAM_DEV_BOT_USERNAME?: string;
@@ -35,6 +42,8 @@ export type BillingEnv = AuthEnv & {
   PUBLIC_AUTH_URL?: string;
   /** Comma-separated list of allowed redirect URIs for authentication. */
   ALLOWED_REDIRECT_URIS?: string;
+  /** Optional dedicated ALTCHA secret. SESSION_SECRET is used with domain separation when absent. */
+  ALTCHA_HMAC_SECRET?: string;
 };
 
 export function requireEnv(value: string | undefined, name: string): string {

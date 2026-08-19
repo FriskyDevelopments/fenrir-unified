@@ -426,6 +426,31 @@ export function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
           </div>
         </div>
 
+        <section className="bot-os-media" aria-label="Fenrir Bot OS motion system">
+          <video
+            className="bot-os-media-hero"
+            src="/bot-os/media/fenrir-welcome.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+          />
+          <div className="bot-os-media-grid">
+            {[
+              ["Pulse", "/bot-os/media/fenrir-pulse.mp4"],
+              ["Access", "/bot-os/media/fenrir-access.mp4"],
+              ["Beam", "/bot-os/media/fenrir-beam.mp4"],
+              ["Signal", "/bot-os/media/fenrir-signal.mp4"]
+            ].map(([label, src]) => (
+              <figure key={src}>
+                <video src={src} autoPlay muted loop playsInline preload="metadata" />
+                <figcaption>{label}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+
         <div className="bot-module-grid">
           {botModules.map((module) => (
             <GlowCard as="article" className="bot-module-card" key={module.code}>

@@ -70,6 +70,17 @@ function clearChunks(name: string) {
   }
 }
 
+function writeChunked(name: string, value: string) {
+  clearChunks(name);
+  if (value.length <= CHUNK_SIZE) {
+    writeCookie(name, value);
+    return;
+  }
+  for (let index = 0; index * CHUNK_SIZE < value.length; index += 1) {
+    writeCookie(`${name}.${index}`, value.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE));
+  }
+}
+
 /**
  * Almacén de sesión para `createClient`. La cookie manda; localStorage se
  * mantiene como espejo para que un fallo al escribir la cookie no tire la
@@ -86,7 +97,11 @@ export const sharedSessionStorage = {
       // Cookies bloqueadas: seguimos con el espejo local.
     }
     try {
-      return window.localStorage.getItem(key);
+      const legacy = window.localStorage.getItem(key);
+      // Promote sessions created before cross-subdomain SSO into the shared
+      // cookie the first time the canonical app reads them.
+      if (legacy) writeChunked(key, legacy);
+      return legacy;
     } catch {
       return null;
     }
@@ -95,14 +110,7 @@ export const sharedSessionStorage = {
   setItem(key: string, value: string): void {
     if (!isBrowser()) return;
     try {
-      clearChunks(key);
-      if (value.length <= CHUNK_SIZE) {
-        writeCookie(key, value);
-      } else {
-        for (let index = 0; index * CHUNK_SIZE < value.length; index += 1) {
-          writeCookie(`${key}.${index}`, value.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE));
-        }
-      }
+      writeChunked(key, value);
     } catch {
       // Sin cookies solo se pierde el SSO entre subdominios, no la sesión.
     }

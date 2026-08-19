@@ -1,0 +1,50 @@
+.human-verification {
+  --hv: #22c7a8;
+  --hv-coral: #ff334e;
+  --hv-gold: #f1b75c;
+  position: relative;
+  width: min(100%, 360px);
+  margin: 8px auto;
+  padding: 10px 11px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / .1);
+  border-radius: 9px;
+  background: linear-gradient(145deg, rgb(8 11 12 / .97), rgb(13 17 18 / .96));
+  box-shadow: inset 0 1px rgb(255 255 255 / .035), 0 10px 28px rgb(0 0 0 / .2);
+  color: #edf8f5;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+.human-verification::before { position: absolute; inset: 0 auto 0 0; width: 2px; background: var(--hv-coral); opacity: .62; content: ""; }
+.human-verification header { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-bottom: 7px; }
+.human-verification header img { width: 21px; height: 21px; object-fit: contain; opacity: .88; filter: grayscale(.18); }
+.human-verification header div { display: grid; min-width: 0; text-align: left; }
+.human-verification header b { font-size: .64rem; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; }
+.human-verification header small { overflow: hidden; color: rgb(225 240 236 / .62); font-size: .59rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.human-verification header > span { padding: 3px 5px; border: 1px solid rgb(255 255 255 / .1); border-radius: 4px; color: rgb(225 235 232 / .52); font-size: .48rem; letter-spacing: .1em; text-transform: uppercase; }
+.verification-method { margin: 0; color: rgb(221 239 234 / .58); font-size: .56rem; letter-spacing: .09em; text-transform: uppercase; }
+.rune-puzzle { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; align-items: center; }
+.rune-puzzle > .verification-method, .rune-puzzle > .rune-choices, .rune-puzzle > .verification-switches { grid-column: 1 / -1; }
+.rune-sequence, .rune-answer, .rune-choices { display: flex; justify-content: center; gap: 5px; margin: 0; }
+.rune-sequence span, .rune-answer span, .rune-choices button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid rgb(34 199 168 / .3); border-radius: 7px 2px 7px 2px; background: rgb(255 255 255 / .035); color: #effaf7; font: inherit; font-size: .88rem; }
+.rune-sequence span { border-color: rgb(255 255 255 / .16); color: #e8efed; box-shadow: none; }
+.rune-answer span { color: var(--hv); }
+.rune-choices button { cursor: pointer; transition: border-color 140ms ease, background 140ms ease, transform 140ms ease; }
+.rune-choices button:hover { border-color: var(--hv); background: rgb(34 199 168 / .1); transform: translateY(-1px); }
+.verification-switches { display: flex; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.verification-switches button { min-height: 29px; padding: 4px 6px; border: 1px solid transparent; border-radius: 6px 2px 6px 2px; background: transparent; color: rgb(220 239 234 / .68); font: inherit; font-size: .56rem; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
+.verification-switches button:hover { border-color: rgb(255 255 255 / .13); color: #f2f7f5; background: rgb(255 255 255 / .035); }
+.verification-switches--altcha { margin-top: 5px; }
+.rune-choices button:focus-visible, .verification-switches button:focus-visible, .wolf-slider input:focus-visible { outline: 2px solid var(--hv-gold); outline-offset: 2px; }
+.altcha-shell { position: relative; width: min(100%, 320px); margin: auto; padding: 0; }
+altcha-widget { display: block; width: 100%; --altcha-color-border: rgb(255 255 255 / .13); --altcha-color-base: #0b0f10; --altcha-color-text: #e6ecea; --altcha-color-border-focus: var(--hv-coral); }
+.wolf-slider { display: grid; gap: 5px; padding: 2px; }
+.wolf-slider__track { position: relative; height: 10px; border-radius: 2px; background: #151d1c; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08); }
+.wolf-slider__track i { position: absolute; top: -4px; width: 2px; height: 18px; background: rgb(239 245 243 / .72); }
+.wolf-slider__track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, rgb(255 51 78 / .72), var(--hv)); box-shadow: none; }
+.wolf-slider input { width: 100%; margin: 0; accent-color: var(--hv); }
+.signal-slider__name { display: block; margin: 0; color: rgb(230 240 237 / .78); font-size: .58rem; letter-spacing: .13em; text-transform: uppercase; }
+.verification-success { display: flex; gap: 8px; align-items: center; justify-content: center; padding: 5px; color: #a8eadc; font-size: .68rem; }
+.verification-success span { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid rgb(34 199 168 / .35); border-radius: 50%; background: rgb(34 199 168 / .08); color: var(--hv); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 420px) { .human-verification { padding: 9px; } .rune-sequence span, .rune-answer span, .rune-choices button { width: 30px; height: 30px; } .verification-switches { gap: 4px; } .verification-switches button { font-size: .53rem; } }
+@media (prefers-reduced-motion: reduce) { .rune-choices button { transition: none; } }

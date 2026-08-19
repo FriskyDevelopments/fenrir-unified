@@ -21,6 +21,42 @@ create table if not exists cb_gate_configs (
 );
 create index if not exists cb_gate_configs_owner_idx on cb_gate_configs (user_id, brand_id);
 
+-- A Gate belongs to a community; chat platforms are replaceable destinations.
+-- Telegram is active today. Discord and future adapters can attach without
+-- changing the Gate slug, QR, ownership or community limits.
+create table if not exists cb_community_destinations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  community_id text not null,
+  provider text not null check (provider in ('telegram', 'discord', 'whatsapp', 'slack', 'other')),
+  adapter_version text not null default 'v1',
+  setup_mode text not null default 'custom' check (setup_mode in ('bot_admin', 'oauth', 'provider_account', 'custom')),
+  external_id text,
+  display_name text,
+  status text not null default 'pending' check (status in ('pending', 'verified', 'paused', 'revoked')),
+  capabilities jsonb not null default '{}'::jsonb,
+  metadata jsonb not null default '{}'::jsonb,
+  verified_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, community_id, provider, external_id)
+);
+
+-- Existing installs receive the adapter fields without recreating the table.
+alter table cb_community_destinations add column if not exists adapter_version text not null default 'v1';
+alter table cb_community_destinations
+  add column if not exists setup_mode text not null default 'custom'
+  check (setup_mode in ('bot_admin', 'oauth', 'provider_account', 'custom'));
+
+-- Widen the original Telegram/Discord constraint on existing databases.
+alter table cb_community_destinations
+  drop constraint if exists cb_community_destinations_provider_check;
+alter table cb_community_destinations
+  add constraint cb_community_destinations_provider_check
+  check (provider in ('telegram', 'discord', 'whatsapp', 'slack', 'other'));
+create index if not exists cb_community_destinations_owner_idx
+  on cb_community_destinations (user_id, community_id, status);
+
 create table if not exists cb_gate_views (
   id uuid primary key default gen_random_uuid(),
   gate_id uuid not null references cb_gate_configs (id) on delete cascade,
