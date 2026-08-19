@@ -5,17 +5,17 @@ HOSTS=("https://myfenrir.com" "https://www.myfenrir.com")
 FAIL=0
 
 for base in "${HOSTS[@]}"; do
-  code="$(curl -sS -L -o /dev/null -w "%{http_code}" --max-time 20 "${base}/healthz" || echo "000")"
+  code="$(curl -sS -L -o /dev/null -w "%{http_code}" --max-time 20 "${base}/api/health" || echo "000")"
   if [[ "$code" != "200" ]]; then
-    echo "FAIL ${base}/healthz HTTP ${code} (expected 200; 522 = origin timeout)"
+    echo "FAIL ${base}/api/health HTTP ${code} (expected 200; 522 = origin timeout)"
     FAIL=1
   else
-    body="$(curl -sS -L --max-time 20 "${base}/healthz")"
-    if [[ "$body" != "ok" ]]; then
-      printf "FAIL %s/healthz body=%q (expected ok; SPA fallback = deploy /healthz function)\n" "$base" "$body"
+    body="$(curl -sS -L --max-time 20 "${base}/api/health")"
+    if [[ "$body" != *'"ok":true'* || "$body" != *'"service":"fenrir-bridge-pages-functions"'* ]]; then
+      printf "FAIL %s/api/health body=%q (expected Fenrir Pages health JSON)\n" "$base" "$body"
       FAIL=1
     else
-      echo "OK   ${base}/healthz"
+      echo "OK   ${base}/api/health"
     fi
   fi
 
@@ -48,11 +48,13 @@ for base in "${HOSTS[@]}"; do
   fi
 
   direct_oauth_response="$(curl -sS -i -L --max-time 20 "${base}/api/auth/callback/apple" || printf '\nHTTP/1.1 000')"
-  if [[ "$direct_oauth_response" != *"HTTP/1.1 302"* && "$direct_oauth_response" != *"HTTP/2 302"* ]] || [[ "$direct_oauth_response" != *"auth_error=missing_code"* ]]; then
-    echo "FAIL ${base}/api/auth/callback/apple expected 302 redirect to missing_code (Apple OAuth is enabled)"
-    FAIL=1
+  if [[ ( "$direct_oauth_response" == *"HTTP/1.1 302"* || "$direct_oauth_response" == *"HTTP/2 302"* ) && "$direct_oauth_response" == *"auth_error=missing_code"* ]]; then
+    echo "OK   ${base}/api/auth/callback/apple direct OAuth enabled"
+  elif [[ ( "$direct_oauth_response" == *"HTTP/1.1 410"* || "$direct_oauth_response" == *"HTTP/2 410"* ) && "$direct_oauth_response" == *'"error":"direct_oauth_disabled"'* ]]; then
+    echo "OK   ${base}/api/auth/callback/apple direct OAuth intentionally disabled; broker flow owns alpha login"
   else
-    echo "OK   ${base}/api/auth/callback/apple"
+    echo "FAIL ${base}/api/auth/callback/apple returned an unexpected auth contract"
+    FAIL=1
   fi
 
   readiness_response="$(curl -sS -L --max-time 20 -w $'\n%{http_code}' "${base}/api/readiness" || printf '\n000')"
