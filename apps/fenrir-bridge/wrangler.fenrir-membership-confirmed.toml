@@ -40,7 +40,7 @@ FENRIR_PORTAL_URL = "https://www.myfenrir.com/dashboard"
 # + DKIM cf2024-1._domainkey, both live). Do NOT use mail.myfenrir.com: it
 # publishes DMARC p=reject with no SPF/DKIM and is hard-rejected. The worker
 # refuses any From outside myfenrir.com before the request leaves.
-FENRIR_MAIL_FROM = "MyFenrir <noreply@myfenrir.com>"
+FENRIR_MAIL_FROM = "MyFenrir <noreply@mail.myfenrir.com>"
 FENRIR_MAIL_REPLY_TO = "hola@myfenrir.com"
 
 # DELIVERY RAIL — Cloudflare Email Sending, via the myfenrir-emails Worker.

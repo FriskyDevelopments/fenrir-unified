@@ -97,46 +97,12 @@ async function settle(env, orgId, subscriptionId, patch) {
 /* -------------------------------------------------------------------------- */
 
 /* --------------------------------------------------------------------------
- * SENDER IDENTITY — this is a MyFenrir email and it may only leave as MyFenrir.
+ * SENDER IDENTITY
  *
- * The confirmation was going out as `noreply@hostcasa.app`. HostCasa is a
- * different product with different customers. A member who paid for The Pack
- * on MyFenrir receiving mail from another brand's domain reads as phishing,
- * and mixing one client's identity into another's is not a fallback we take.
- * That address was not a decision, it was the only domain verified in the
- * Resend account, so the code drifted to whatever happened to deliver.
- *
- * Verified 2026-08-17, from DNS and the Resend API, not from memory:
- *   myfenrir.com        SPF  "v=spf1 include:_spf.mx.cloudflare.net ~all"  PRESENT
- *                       DKIM cf2024-1._domainkey.myfenrir.com              PRESENT
- *                       MX   route{1,2,3}.mx.cloudflare.net                PRESENT
- *                       DMARC _dmarc.myfenrir.com                          ABSENT
- *   mail.myfenrir.com   SPF / DKIM / MX                                    ABSENT
- *                       DMARC _dmarc.mail.myfenrir.com "v=DMARC1; p=reject;"
- *   Resend GET /domains -> [{ name: "hostcasa.app", status: "verified" }]  ONLY
- *
- * Two conclusions follow.
- *
- * 1. mail.myfenrir.com is unusable. It publishes DMARC p=reject with no SPF and
- *    no DKIM, so anything sent from it fails DMARC and is hard-rejected. The
- *    comment in apps/myfenrir-emails/wrangler.toml was right and its own value
- *    was wrong; that file is corrected in the same change. The root domain
- *    myfenrir.com is the identity that authenticates.
- *
- * 2. Resend is gone from this path. It could not send as myfenrir.com anyway —
- *    the domain is not even added to that account — but the deciding reason is
- *    that a second rail is how the drift to hostcasa.app happened in the first
- *    place. One rail is one place it can break. Cloudflare Email Sending is
- *    already authenticated for myfenrir.com and needs no DNS work, so this
- *    worker now delivers through the myfenrir-emails Worker, which owns the
- *    `send_email` binding. (That binding is Workers-only; it cannot live in the
- *    fenrir-bridge Pages project, which is why the mail Worker exists.)
- *
- * There is deliberately NO fallback. A fallback that sends as another client's
- * brand is worse than no fallback. If Cloudflare fails, this fails: the outcome
- * is written to membership_confirmations with a legible reason, so it is visible
- * and countable. A confirmation that does not arrive is a bug we can see; a
- * confirmation wearing HostCasa's name is a brand incident we cannot take back.
+ * This is a MyFenrir email and it may only leave as MyFenrir. Cloudflare Email
+ * Sending is configured for `mail.myfenrir.com`; its SPF, DKIM and DMARC
+ * records are the authoritative production evidence. A secondary provider may
+ * never substitute another product's sender identity.
  * -------------------------------------------------------------------------- */
 
 /** Domains this worker is allowed to introduce itself as. MyFenrir only. */
@@ -145,7 +111,7 @@ const ALLOWED_FROM_DOMAINS = ["myfenrir.com"];
 /** The visible name is the brand, never the legal entity. Members bought from
  *  MyFenrir; "Frisky Developments LLC" in a From line is the same category of
  *  error as the wrong domain. */
-const DEFAULT_MAIL_FROM = "MyFenrir <noreply@myfenrir.com>";
+const DEFAULT_MAIL_FROM = "MyFenrir <noreply@mail.myfenrir.com>";
 
 /** Extract the addr-spec from a "Name <addr>" string. */
 function fromAddress(value) {
@@ -167,12 +133,6 @@ function assertMyFenrirSender(from) {
     throw new Error(
       `refused_foreign_sender:${domain || "unset"} — this is a MyFenrir email and may only be sent from ` +
       `${ALLOWED_FROM_DOMAINS.join(", ")}. Nothing was sent. See the SENDER IDENTITY note in this file.`
-    );
-  }
-  if (domain === "mail.myfenrir.com") {
-    throw new Error(
-      "refused_sender:mail.myfenrir.com publishes DMARC p=reject with no SPF/DKIM and is hard-rejected. " +
-      "Use noreply@myfenrir.com."
     );
   }
   return from;
@@ -369,14 +329,17 @@ export async function confirmMembership(env, friskyOrgId, { force = false } = {}
  */
 export async function reconcile(env, { limit = 25 } = {}) {
   const rows = await env.DB.prepare(
-    `SELECT s.frisky_org_id, s.stripe_subscription_id
+    `SELECT s.frisky_org_id, s.stripe_subscription_id, c.status AS confirmation_status, c.attempts AS confirmation_attempts
        FROM billing_subscriptions s
        LEFT JOIN membership_confirmations c
               ON c.frisky_org_id = s.frisky_org_id
              AND c.subscription_id = s.stripe_subscription_id
       WHERE s.status IN ('active','trialing')
         AND (s.current_period_end IS NULL OR s.current_period_end > ?1)
-        AND c.frisky_org_id IS NULL
+        AND (
+          c.frisky_org_id IS NULL
+          OR (c.status = 'failed' AND c.attempts < 3)
+        )
       ORDER BY s.updated_at DESC
       LIMIT ?2`
   ).bind(nowIso(), limit).all();
@@ -385,7 +348,7 @@ export async function reconcile(env, { limit = 25 } = {}) {
   for (const row of rows.results ?? []) {
     results.push({
       org: row.frisky_org_id,
-      ...(await confirmMembership(env, row.frisky_org_id)),
+      ...(await confirmMembership(env, row.frisky_org_id, { force: row.confirmation_status === "failed" })),
     });
   }
   return { ok: true, scanned: rows.results?.length ?? 0, results };
