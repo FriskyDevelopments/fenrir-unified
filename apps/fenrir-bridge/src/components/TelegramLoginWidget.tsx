@@ -65,7 +65,7 @@ export function TelegramLoginWidget({ botUsername, onSuccess }: TelegramLoginWid
         <ul className="telegram-setup-checklist">
           <li>Create / reclaim the Fenrir bot with BotFather</li>
           <li>Enable the Telegram Login Widget domain for myfenrir.com</li>
-          <li>Point the webhook at <code>/api/telegram/webhook</code></li>
+          <li>Use the verified Gatekeeper webhook endpoint from the active deployment; never use the legacy Pages webhook path</li>
           <li>Re-run <code>npm run verify:readiness</code> until Stars + webhook are green</li>
         </ul>
       </div>

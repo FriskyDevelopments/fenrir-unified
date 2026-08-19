@@ -25,7 +25,7 @@ Bot OS exports a community blueprint JSON that MyFenrir / gatekeeper consume:
   "miniAppUrl": "https://www.myfenrir.com/gate/verify",
   "gates": ["turnstile", "oauth", "rules", "vibe"],
   "inviteTtlSeconds": 300,
-  "webhookPath": "/api/telegram/webhook"
+  "webhookEndpoint": "verified Gatekeeper endpoint from the active deployment"
 }
 ```
 
@@ -36,6 +36,8 @@ Bot OS exports a community blueprint JSON that MyFenrir / gatekeeper consume:
 3. Coolify / Azure / CF Worker deploy `fenrir-gatekeeper` with that config.
 4. MyFenrir readiness shows `telegramBotConfigured` + `telegramStarsConfigured`.
 5. Admin tests: join waiting room → Verify Now → invite → Stars unlock.
+
+The legacy Pages path `/api/telegram/webhook` remains routed to payments and must not be used for Gatekeeper updates.
 
 ## Do not
 
