@@ -397,13 +397,13 @@ export function CinematicLanding() {
           {titleLetters.map((letter, index) => <span key={`${letter}-${index}`}>{letter}</span>)}
         </h1>
         <div className="cinematic-landing__line" aria-hidden="true" />
-        <p className="cinematic-landing__tagline">The signal is yours. The way in is waiting.</p>
+        <p className="cinematic-landing__tagline">Secure the front door to your Telegram group.</p>
         <p className="cinematic-landing__pitch">
-          Fenrir is the front door of the Frisky ecosystem: one identity for your Telegram
-          communities, invite rotation, and Stars payments — behind a single gate.
+          Fenrir Bridge protects private communities with identity checks, access gates,
+          admin-controlled entry flows, and invite rotation.
         </p>
         <div className="cinematic-landing__actions">
-          <a className="cinematic-landing__enter" href="/login">Enter</a>
+          <a className="cinematic-landing__enter" href="/login">Request Alpha Access</a>
           <a className="cinematic-landing__docs" href={knowledgeBaseUrl} target="_blank" rel="noreferrer">
             Wiki <i>↗</i>
           </a>
