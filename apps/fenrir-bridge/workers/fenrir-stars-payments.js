@@ -657,46 +657,61 @@ function spanishIntent(text) {
   return /\b(si|sí|como|cómo|cuanto|precio|pagar|comprar|dominio|grupo|configurar|estado|activo|pagado|quiero|tengo)\b/i.test(text);
 }
 
-function modularMenuText(text, entitlement) {
+export function modularMenuText(text, entitlement) {
   const active = entitlement?.status === "active";
   if (spanishIntent(text)) {
     return [
-      "FENRIR BOT OS | Menu",
-      `Estado: ${active ? "activo" : "pendiente"}`,
+      "MYFENRIR | Control de comunidad",
+      `Plan: ${active ? "The Pack · activo" : "Free · listo para tu primer Gate"}`,
       "",
-      "MOD 01 | Setup",
-      "Dominio, DNS, bot admin y primer bridge.",
+      "Tu siguiente paso · protege un grupo de Telegram",
       "",
-      "MOD 02 | Planes",
-      "Free, Starter, Pro, Operator.",
+      "1 · Crea un Gate",
+      "Da a tu comunidad una página de entrada con reglas y una solicitud de acceso.",
       "",
-      "MOD 03 | Pago",
-      "Abre la caja oficial de Telegram Stars.",
+      "2 · Vincula y verifica tu grupo",
+      "Agrega Fenrir como admin con permiso para crear invitaciones. Tú aceptas a cada persona antes de que reciba una invitación.",
       "",
-      "MOD 04 | Estado",
-      "Verifica si tu acceso esta activo.",
+      "3 · Elige tu plan cuando lo necesites",
+      "Free incluye 1 Lock y un subdominio Fenrir. The Pack cuesta US$15/mes y añade Locks ilimitados, multi-admin y auditoría.",
       "",
-      "Comandos: /setup /plans /subscribe /status"
+      "Puedes crear tu primer Gate sin pagar ni configurar DNS.",
+      "",
+      "Elige una acción abajo para continuar."
     ].join("\n");
   }
   return [
-    "FENRIR BOT OS | Menu",
-    `Status: ${active ? "active" : "pending"}`,
+    "MYFENRIR | Community control",
+    `Plan: ${active ? "The Pack · active" : "Free · ready for your first Gate"}`,
     "",
-    "MOD 01 | Setup",
-    "Domain, DNS, bot admin permissions, and first bridge.",
+    "Your next step · protect a Telegram group",
     "",
-    "MOD 02 | Plans",
-    "Free, Starter, Pro, Operator.",
+    "1 · Create a Gate",
+    "Give your community an entrance page with rules and an access request.",
     "",
-    "MOD 03 | Payment",
-    "Open the official Telegram Stars payment box.",
+    "2 · Link and verify your group",
+    "Make Fenrir an admin with Invite Users. You approve each person before the bot creates their invite.",
     "",
-    "MOD 04 | Status",
-    "Check whether backend entitlement is active.",
+    "3 · Choose a plan when you need it",
+    "Free includes 1 Lock and a Fenrir subdomain. The Pack is US$15/month for unlimited Locks, multi-admin workflows, and audit logs.",
     "",
-    "Commands: /setup /plans /subscribe /status"
+    "You can create your first Gate without paying or setting up DNS.",
+    "",
+    "Choose an action below to continue."
   ].join("\n");
+}
+
+export function botMenuKeyboard(entitlement) {
+  return [
+    [{ text: "Create my Gate", callback_data: "fenrir_setup" }],
+    [
+      { text: "Compare plans", callback_data: "fenrir_plans" },
+      { text: "My access", callback_data: "fenrir_status" }
+    ],
+    ...(entitlement?.status === "active"
+      ? []
+      : [[{ text: "Activate The Pack · Stars", callback_data: "fenrir_subscribe" }]])
+  ];
 }
 
 async function sendBotMenu(env, channel, message, entitlement) {
@@ -706,16 +721,7 @@ async function sendBotMenu(env, channel, message, entitlement) {
     video: BOT_OS_WELCOME_VIDEO_URL,
     supports_streaming: true,
     reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "MOD 01 · Setup", callback_data: "fenrir_setup" },
-          { text: "MOD 02 · Plans", callback_data: "fenrir_plans" }
-        ],
-        [
-          { text: "MOD 03 · Stars", callback_data: "fenrir_subscribe" },
-          { text: "MOD 04 · Status", callback_data: "fenrir_status" }
-        ]
-      ]
+      inline_keyboard: botMenuKeyboard(entitlement)
     }
   };
   try {
