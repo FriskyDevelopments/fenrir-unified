@@ -1,6 +1,6 @@
 import { resolveBrand, BRANDS } from "./brands";
 import type { Brand } from "./brands/types";
-import { getTemplate, TEMPLATES, TEMPLATE_IDS } from "./templates";
+import { getTemplate, TEMPLATES, TEMPLATE_IDS, REQUIRED_FIELDS, missingRequiredFields } from "./templates";
 import { dispatchSend, PROVIDERS } from "./providers";
 import type { EmailBinding } from "./providers/types";
 import { DEFAULT_LOCALE, LOCALES, resolveLocale } from "./locale";
@@ -115,6 +115,25 @@ async function handleSend(body: any, env: Env): Promise<Response> {
   const tpl = templateId ? getTemplate(templateId) : undefined;
   if (!tpl) return json({ ok: false, error: "Unknown or missing 'template'", templates: TEMPLATE_IDS }, 400);
   if (!body?.to) return json({ ok: false, error: "'to' is required" }, 400);
+
+  // Guarda de datos: aborta antes de renderizar si falta un campo crítico.
+  // Sin esto, un `undefined` se maqueta como si fuera contenido real — el OTP
+  // sale espaciado dígito a dígito y el usuario recibe "U N D E F I N E D".
+  const missing = missingRequiredFields(templateId, body.data);
+  if (missing.length) {
+    console.error(
+      `[send] ABORT template='${templateId}' campos_faltantes=${missing.join(",")} ` +
+      `claves_recibidas=${Object.keys(body.data ?? {}).join(",") || "(ninguna)"}`
+    );
+    return json({
+      ok: false,
+      error: "missing_required_fields",
+      template: templateId,
+      missing,
+      received: Object.keys(body.data ?? {}),
+      hint: `La plantilla '${templateId}' requiere: ${(REQUIRED_FIELDS[templateId] ?? []).join(", ")}. Revisa que el nombre de la clave coincida (p. ej. 'codigo', no 'code').`,
+    }, 422);
+  }
 
   const brand: Brand = resolveBrand(body.brand);
   if (env.ALLOWED_BRANDS && brand.id && !env.ALLOWED_BRANDS.split(",").map((s) => s.trim()).includes(brand.id)) {

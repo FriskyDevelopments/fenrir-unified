@@ -34,6 +34,30 @@ export const TEMPLATES: Record<string, TemplateModule> = {
 
 export const TEMPLATE_IDS = Object.keys(TEMPLATES);
 
+// Campos sin los cuales el correo NO tiene sentido enviarse. Existen porque un
+// `undefined` aquí no rompe nada visiblemente: la plantilla lo maqueta igual de
+// bonito (el OTP incluso queda espaciado dígito a dígito) y el usuario recibe
+// "U N D E F I N E D" donde debería ir su código. Falla ruidoso en logs antes
+// que silencioso en la bandeja de alguien.
+export const REQUIRED_FIELDS: Record<string, string[]> = {
+  "verificacion-codigo": ["codigo"],
+  "acceso": ["url"],
+  "activacion-identidad": ["url"],
+  "invitacion-lore": ["url"],
+  "continuar-lore": ["url"],
+};
+
+/** Devuelve los campos obligatorios ausentes/vacíos para una plantilla. */
+export function missingRequiredFields(id: string, data: Record<string, unknown> | undefined): string[] {
+  const required = REQUIRED_FIELDS[id];
+  if (!required) return [];
+  const d = data ?? {};
+  return required.filter((k) => {
+    const v = d[k];
+    return v === undefined || v === null || String(v).trim() === "" || String(v).trim().toLowerCase() === "undefined";
+  });
+}
+
 export function getTemplate(id: string): TemplateModule | undefined {
   const template = TEMPLATES[id];
   if (!template) return undefined;
