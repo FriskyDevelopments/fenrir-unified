@@ -1,0 +1,62 @@
+# fenrir-membership-confirmed — the shared "entitlement confirmed" event.
+#
+# Reads billing_subscriptions and sends the confirmation. Never writes
+# entitlement, never participates in taking money.
+#
+# Secrets (wrangler secret put --config this-file):
+#   MEMBERSHIP_CONFIRM_SECRET  shared with whichever rail calls the hook
+#   TELEGRAM_BOT_TOKEN         optional; enables the in-Telegram confirmation
+#
+# RESEND_API_KEY is intentionally NOT here any more. This worker has one
+# delivery rail — Cloudflare Email Sending via the myfenrir-emails Worker — and
+# no fallback. See the SENDER IDENTITY note in workers/fenrir-membership-confirmed.js.
+
+name = "fenrir-membership-confirmed"
+main = "workers/fenrir-membership-confirmed.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
+
+# Hourly sweep. This is what lets the confirmation ship without editing the
+# charge path: entitlements that go active are picked up here even when no rail
+# calls the hook. Once the rails do call it, this is just the safety net.
+[triggers]
+crons = ["17 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fenrir-bridge"
+database_id = "1238059e-2638-4317-982e-e74dda046ccb"
+
+[vars]
+FENRIR_PORTAL_URL = "https://www.myfenrir.com/dashboard"
+
+# SENDER IDENTITY. This was "MyFenrir <noreply@hostcasa.app>" — a different
+# product's domain, chosen only because it was the one domain verified in the
+# Resend account. That is brand contamination and reads as phishing to the
+# member; it is not an acceptable fallback. See the SENDER IDENTITY note in
+# workers/fenrir-membership-confirmed.js for the DNS evidence.
+#
+# myfenrir.com is the authenticated identity (SPF include:_spf.mx.cloudflare.net
+# + DKIM cf2024-1._domainkey, both live). Do NOT use mail.myfenrir.com: it
+# publishes DMARC p=reject with no SPF/DKIM and is hard-rejected. The worker
+# refuses any From outside myfenrir.com before the request leaves.
+FENRIR_MAIL_FROM = "MyFenrir <noreply@myfenrir.com>"
+FENRIR_MAIL_REPLY_TO = "hola@myfenrir.com"
+
+# DELIVERY RAIL — Cloudflare Email Sending, via the myfenrir-emails Worker.
+# One rail, no fallback. Set this to that Worker's URL once it is deployed:
+#   production custom domain  https://emails.myfenrir.com
+#   or the workers.dev URL    https://myfenrir-emails.<subdomain>.workers.dev
+# Left EMPTY on purpose: an unset value fails with `mail_not_configured` and is
+# recorded, which is louder and safer than a stale URL that silently 404s.
+MYFENRIR_MAIL_URL = ""
+
+# Internal-only delivery rail. This reaches the Worker that owns the
+# Cloudflare Email Sending binding without exposing a public bearer token or
+# relying on its value being available to the deployer.
+[[services]]
+binding = "EMAIL_SERVICE"
+service = "fenrir-transactional-email"
+
+[observability]
+enabled = true
