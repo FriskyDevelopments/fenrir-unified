@@ -113,8 +113,5 @@ fenrir-bridge:deploy:
         fi
       done
     - $WRANGLER pages deploy dist --project-name fenrir-bridge --branch main
-    # Verify production responds as expected.
-    - |
-      hz="$(curl -s -o /dev/null -w '%{http_code}' https://www.myfenrir.com/healthz || echo ERR)"
-      echo "healthz=$hz (expect 200)"
-      test "$hz" = "200"
+    # Verify the complete public contract after the deployment reaches Pages.
+    - bash scripts/verify-myfenrir.sh
