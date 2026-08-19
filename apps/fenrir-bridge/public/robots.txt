@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /main
+Disallow: /join/
+Disallow: /room/
+Disallow: /go/
+Disallow: /vault
+
+Sitemap: https://www.myfenrir.com/sitemap.xml

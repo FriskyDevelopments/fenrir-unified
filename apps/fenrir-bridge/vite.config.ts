@@ -35,6 +35,18 @@ export default defineConfig(({ mode }) => {
     ],
     server: {
       port: 5177
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            "vendor-react": ["react", "react-dom"],
+            "vendor-supabase": ["@supabase/supabase-js"],
+            "vendor-posthog": ["posthog-js"],
+            "vendor-webauthn": ["@simplewebauthn/browser"]
+          }
+        }
+      }
     }
   };
 });
