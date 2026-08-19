@@ -486,6 +486,134 @@ function linkCodeFromStart(text) {
   return match?.[1] || "";
 }
 
+function gateAccessTokenFromStart(text) {
+  const match = text.match(/^\/start(?:@[A-Za-z0-9_]+)?\s+(gate_[a-z0-9.\-_]{20,64})$/i);
+  return match?.[1] || "";
+}
+
+function base64Url(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function timingSafeBytesEqual(left, right) {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) difference |= left[index] ^ right[index];
+  return difference === 0;
+}
+
+async function gateAccessSignature(secret, payload) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload))).slice(0, 16);
+}
+
+function base64UrlToBytes(value) {
+  if (!/^[A-Za-z0-9_-]{20,24}$/.test(value)) return null;
+  try {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+    return Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
+  } catch {
+    return null;
+  }
+}
+
+export async function verifyGateAccessToken(secret, token, telegramUserId, now = Math.floor(Date.now() / 1000)) {
+  if (!secret || !token.startsWith("gate_")) return null;
+  const compact = token.slice(5);
+  const separator = compact.lastIndexOf(".");
+  if (separator < 1) return null;
+  const payload = compact.slice(0, separator);
+  const supplied = base64UrlToBytes(compact.slice(separator + 1));
+  if (!supplied || !/^1\.[0-9a-z]+\.[0-9a-z]+\.[0-9a-z]+\.[0-9a-z]+$/i.test(payload)) return null;
+  const expected = await gateAccessSignature(secret, payload);
+  if (!timingSafeBytesEqual(supplied, expected)) return null;
+
+  const [version, subjectText, chatText, expiresText] = payload.split(".");
+  const subject = Number.parseInt(subjectText, 36);
+  const chatMagnitude = Number.parseInt(chatText, 36);
+  const expiresAt = Number.parseInt(expiresText, 36);
+  if (
+    version !== "1" ||
+    !Number.isSafeInteger(subject) ||
+    !Number.isSafeInteger(chatMagnitude) ||
+    !Number.isSafeInteger(expiresAt) ||
+    subject !== Number(telegramUserId) ||
+    expiresAt < now ||
+    expiresAt > now + 6 * 60
+  ) return null;
+  return { telegramUserId: subject, chatId: `-${chatMagnitude}`, expiresAt };
+}
+
+async function handleGateAccessStart(env, channel, message, token) {
+  const chat = message?.chat;
+  const telegramUserId = message?.from?.id;
+  if (!telegramUserId || chat?.type !== "private") return false;
+  const claims = await verifyGateAccessToken(normalizeText(env.FENRIR_GATE_ACCESS_SECRET), token, telegramUserId);
+  if (!claims) {
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: chat.id,
+      text: "This Gate handoff is expired or invalid. Return to the Gate and request a fresh secure handoff."
+    });
+    return true;
+  }
+
+  const bot = await telegramApi(env, channel, "getMe", {});
+  const botId = bot?.result?.id;
+  const botMember = botId
+    ? await telegramApi(env, channel, "getChatMember", { chat_id: claims.chatId, user_id: botId }).catch(() => null)
+    : null;
+  const botStatus = botMember?.result?.status;
+  const botCanInvite = botStatus === "creator" || botStatus === "owner" || botMember?.result?.can_invite_users === true;
+  if (!(botStatus === "administrator" || botStatus === "creator" || botStatus === "owner") || !botCanInvite) {
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: chat.id,
+      text: "This Gate's Telegram destination is not ready to issue secure invites. Please contact the community owner."
+    });
+    return true;
+  }
+
+  const member = await telegramApi(env, channel, "getChatMember", { chat_id: claims.chatId, user_id: telegramUserId }).catch(() => null);
+  const memberStatus = member?.result?.status;
+  if (["creator", "owner", "administrator", "member"].includes(memberStatus) || (memberStatus === "restricted" && member?.result?.is_member)) {
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: chat.id,
+      text: "Your Telegram identity already has access to this community."
+    });
+    return true;
+  }
+
+  const invite = await telegramApi(env, channel, "createChatInviteLink", {
+    chat_id: claims.chatId,
+    name: `Fenrir Gate ${telegramUserId}`.slice(0, 32),
+    expire_date: Math.min(claims.expiresAt, Math.floor(Date.now() / 1000) + 5 * 60),
+    member_limit: 1,
+    creates_join_request: false
+  }).catch(() => null);
+  const inviteUrl = invite?.result?.invite_link;
+  if (!inviteUrl) {
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: chat.id,
+      text: "Fenrir could not issue the one-use invite just now. Return to the Gate to request a fresh handoff."
+    });
+    return true;
+  }
+  await telegramApi(env, channel, "sendMessage", {
+    chat_id: chat.id,
+    text: `Your one-use community invite is ready. It expires in five minutes:\n${inviteUrl}`,
+    disable_web_page_preview: true
+  });
+  return true;
+}
+
 function maskEmail(email) {
   const [local, domain] = normalizeText(email).split("@");
   if (!local || !domain) return "MyFenrir account";
@@ -966,6 +1094,12 @@ async function handleTelegramWebhook(request, env, url) {
   if (!text) return json({ ok: true });
 
   const entitlement = await getEntitlement(env, message.from?.id || message.chat.id);
+
+  const gateAccessToken = gateAccessTokenFromStart(text);
+  if (gateAccessToken) {
+    await handleGateAccessStart(env, channel, message, gateAccessToken);
+    return json({ ok: true });
+  }
 
   if (/^\/start(?:@[A-Za-z0-9_]+)?(?:\s+gate)?$/i.test(text)) {
     await sendIdentityWelcome(env, channel, message);
