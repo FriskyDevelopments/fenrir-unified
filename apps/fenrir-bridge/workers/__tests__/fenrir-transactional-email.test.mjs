@@ -25,7 +25,7 @@ test("delivers only a valid MyFenrir message through the email binding", async (
   const message = {
     to: "member@example.com",
     subject: "Membership confirmed",
-    from: { email: "noreply@myfenrir.com", name: "MyFenrir" },
+    from: { email: "noreply@mail.myfenrir.com", name: "MyFenrir" },
     text: "Your membership is active.",
   };
   const response = await worker.fetch(new Request("https://email.internal/send", {
