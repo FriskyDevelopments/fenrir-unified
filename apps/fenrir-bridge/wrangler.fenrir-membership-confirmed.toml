@@ -20,7 +20,10 @@ workers_dev = true
 # charge path: entitlements that go active are picked up here even when no rail
 # calls the hook. Once the rails do call it, this is just the safety net.
 [triggers]
-crons = ["17 * * * *"]
+# The Stars rail grants access immediately in Telegram. Reconcile email within
+# five minutes when an account link becomes available, instead of waiting up
+# to an hour for the previous once-per-hour safety net.
+crons = ["*/5 * * * *"]
 
 [[d1_databases]]
 binding = "DB"
