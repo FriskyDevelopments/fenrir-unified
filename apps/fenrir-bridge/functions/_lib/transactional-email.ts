@@ -3,14 +3,12 @@ import type { BillingEnv } from "./billing-env";
 /**
  * Remitente único de todo el correo saliente de Fenrir.
  *
- * Va en la RAÍZ, no en `mail.`, porque ahí es donde está la identidad que
- * autentica: `myfenrir.com` tiene SPF y DKIM (`cf2024-1._domainkey`), mientras
- * que `mail.myfenrir.com` solo tiene un DMARC `p=reject` sin SPF ni DKIM que lo
- * respalden — todo lo enviado desde ese subdominio se RECHAZA de plano, sin
- * caer siquiera en spam. Mantener los dos remitentes vivos hacía que el correo
- * transaccional se perdiera en silencio.
+ * Cloudflare Email Sending autoriza `mail.myfenrir.com`; sus registros SPF,
+ * DKIM y DMARC son la identidad de envío activa. Usar el root domain provoca
+ * un rechazo explícito del binding, así que este valor debe coincidir con la
+ * configuración del Worker transaccional.
  */
-export const FENRIR_MAIL_FROM = { email: "noreply@myfenrir.com", name: "MyFenrir" } as const;
+export const FENRIR_MAIL_FROM = { email: "noreply@mail.myfenrir.com", name: "MyFenrir" } as const;
 
 const esc = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c] ?? c));
 

@@ -55,4 +55,25 @@ describe("sendMyFenrirEmail", () => {
 
     expect(result).toEqual({ ok: false, via: "worker", error: "Unauthorized" });
   });
+
+  it("uses the private service binding when Pages has no direct send_email binding", async () => {
+    const bindingFetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const result = await sendMyFenrirEmail({
+      EMAIL: { fetch: bindingFetch },
+    }, {
+      template: "acceso",
+      to: "qa@example.com",
+      data: { url: "https://myfenrir.com/main", minutos: 15 },
+    });
+
+    expect(result).toEqual({ ok: true, via: "binding" });
+    expect(bindingFetch).toHaveBeenCalledOnce();
+    const [request] = bindingFetch.mock.calls[0] as [Request];
+    expect(request.url).toBe("https://email.internal/send");
+    expect(request.method).toBe("POST");
+    expect(await request.json()).toMatchObject({
+      to: "qa@example.com",
+      from: { email: "noreply@mail.myfenrir.com", name: "MyFenrir" },
+    });
+  });
 });

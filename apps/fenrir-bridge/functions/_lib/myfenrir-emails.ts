@@ -23,7 +23,10 @@
 export type MyFenrirEmailEnv = {
   MYFENRIR_EMAILS_URL?: string;
   MYFENRIR_EMAILS_TOKEN?: string;
-  EMAIL?: { send(message: { to: string; from: { email: string; name?: string }; subject: string; html: string; text: string }): Promise<unknown> };
+  EMAIL?: {
+    send?: (message: { to: string; from: { email: string; name?: string }; subject: string; html: string; text: string }) => Promise<unknown>;
+    fetch?: (request: Request) => Promise<Response>;
+  };
 };
 
 export type MyFenrirTemplateId =
@@ -97,8 +100,20 @@ export async function sendMyFenrirEmail(env: MyFenrirEmailEnv, input: SendTempla
   // (2) Fallback path: send a compact on-brand shell via the Pages EMAIL binding.
   if (env.EMAIL) {
     const { subject, html, text } = renderFallback(input);
+    const message = { to: input.to, from: FENRIR_MAIL_FROM, subject: input.subject ?? subject, html, text };
     try {
-      await env.EMAIL.send({ to: input.to, from: FENRIR_MAIL_FROM, subject: input.subject ?? subject, html, text });
+      if (typeof env.EMAIL.send === "function") {
+        await env.EMAIL.send(message);
+      } else if (typeof env.EMAIL.fetch === "function") {
+        const response = await env.EMAIL.fetch(new Request("https://email.internal/send", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(message),
+        }));
+        if (!response.ok) throw new Error(`email_service_failed:${response.status}`);
+      } else {
+        return { ok: false, via: "binding", error: "email_binding_unavailable" };
+      }
       return { ok: true, via: "binding" };
     } catch (e: any) {
       return { ok: false, via: "binding", error: e?.message ?? "binding_send_failed" };
