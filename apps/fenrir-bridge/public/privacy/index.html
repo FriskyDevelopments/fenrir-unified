@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#00e5ff" />
+    <meta name="robots" content="index,follow" />
+    <title>Privacy — MyFenrir (Fenrir Bridge by Frisky)</title>
+    <meta name="description" content="Plain-language privacy baseline for Fenrir Bridge: what account and operational data is collected, why, and how private destinations and passkeys are handled." />
+    <link rel="canonical" href="https://www.myfenrir.com/privacy" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="MyFenrir" />
+    <meta property="og:title" content="Privacy — MyFenrir" />
+    <meta property="og:description" content="Plain-language privacy baseline for Fenrir Bridge accounts, OAuth data, passkeys, and private link operations." />
+    <meta property="og:url" content="https://www.myfenrir.com/privacy" />
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; background: #12171c; color: #e9ebe7;
+        font: 400 16px/1.65 "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+      .wrap { max-width: 760px; margin: 0 auto; padding: 40px 22px 72px; }
+      a { color: #00e5ff; }
+      header { display: flex; align-items: center; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid #2b333b; }
+      header img { height: 34px; width: auto; }
+      .status { display: inline-block; font-size: 12px; letter-spacing: .04em; text-transform: uppercase;
+        color: #7fae9d; border: 1px solid #2b333b; border-radius: 999px; padding: 4px 10px; margin: 22px 0 6px; }
+      h1 { font-size: 30px; line-height: 1.2; margin: 6px 0 4px; }
+      h2 { font-size: 20px; margin: 34px 0 8px; }
+      .sub { color: #a9b3bc; margin: 0 0 4px; }
+      small { color: #8b959e; }
+      nav.legalnav { margin-top: 26px; font-size: 14px; }
+      nav.legalnav a { margin-right: 16px; }
+      footer { margin-top: 46px; padding-top: 18px; border-top: 1px solid #2b333b; font-size: 14px; color: #a9b3bc; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <a href="/"><img src="/fenrir-cut-wordmark.svg" alt="Fenrir" /></a>
+      </header>
+
+      <span class="status">Public legal center</span>
+      <h1>Privacy</h1>
+      <p class="sub">Plain-language legal baseline for Fenrir Bridge accounts, domains, payments, and private link operations.</p>
+      <small>Last updated: May 7, 2026</small>
+
+      <nav class="legalnav">
+        <a href="/legal">Legal center</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+      </nav>
+
+      <h2>What we collect and why</h2>
+      <p>Fenrir collects account identity data from OAuth providers, including email, display name, provider identifier, and generated Frisky IDs. The service also stores operational metadata such as domains, link slugs, audit events, billing state, and connected provider status.</p>
+      <p>OAuth data is requested to verify the admin signing in, create or restore the correct Fenrir workspace, secure the session cookie, and display account identity inside the dashboard. Fenrir does not request access to email contents, contacts, calendars, files, or social graph data.</p>
+      <p>When you register a passkey, Fenrir stores the credential identifier and public key material required to verify later sign-ins. Raw private keys never leave your device.</p>
+      <p>Raw private destinations, such as Telegram invite links or meeting links, should be treated as sensitive data. Production deployments should store these values server-side and avoid exposing them in public bundles or unauthenticated APIs.</p>
+      <p>Infrastructure and identity providers may process data to operate the service, including Cloudflare, Google, Microsoft, Apple, Stripe, and any future database or notification provider enabled by the workspace.</p>
+
+      <h2>Contact</h2>
+      <p>For legal, abuse, billing, privacy, or security requests, contact Frisky Developments through Frisky Signal or use the configured support channel for your workspace.</p>
+      <p><small>This page is the current operating legal baseline for Fenrir Bridge and should be reviewed by counsel as paid usage scales.</small></p>
+
+      <footer>
+        <p><a href="/">← Back to MyFenrir</a> · The interactive legal center with language options lives in the app.</p>
+      </footer>
+    </div>
+  </body>
+</html>
+
