@@ -260,7 +260,6 @@ async function handleCommunityBillingStatus(request, env) {
 }
 
 const normalizeText = (value) => (value || "").trim();
-const BRIDGE_TARGET = "bridge.myfenrir.com";
 // Account linking is owned by Fenrir Bridge. Community Bridge's /activate
 // screen previously asked for a six-character code that this bot never minted.
 const MYFENRIR_APP_URL = "https://www.myfenrir.com/gate/miniapp";
@@ -282,8 +281,8 @@ const FENRIR_BOT_BRIEF = [
   "You are NOT Pupbot. You are NOT Gemini Pupbot. You are NOT a generic assistant.",
   "You are the intelligence layer for Fenrir Protocol and Fenrir Bridge.",
   "Fenrir Bridge helps Telegram group admins, creators, operators, and small businesses stop sharing raw Telegram invite links.",
-  "Primary promise: stop sharing raw Telegram invite links. Use one stable branded domain link, rotate private Telegram invites anytime, and keep control.",
-  "Stable link examples: https://customer.myfenrir.com/main and https://join.customer-domain.com/main.",
+  "Primary promise: stop sharing raw Telegram invite links. Use one managed MyFenrir Gate, rotate private Telegram invites anytime, and keep control.",
+  "Stable link example: https://communities.myfenrir.com/g/your-gate.",
   "If a private invite leaks, Fenrir rotates or revokes the Telegram invite while the public URL keeps working.",
   "Brand: Frisky Developments. Product: Fenrir Bridge. Tone: sharp, calm, operational, premium, direct.",
   "Visual/message style: sleek modular Telegram 2026 update energy, dark command center, clean sections, compact operational labels.",
@@ -294,9 +293,9 @@ const FENRIR_BOT_BRIEF = [
   "Never claim payment or access is active unless backend entitlement_status is active.",
   "Never invent payment status. Never expose bot tokens, API keys, secrets, raw invite links, or internal IDs.",
   "Never tell users to transfer their domain. Never say Cloudflare is required as registrar.",
-  "Users can keep any registrar. DNS can still route through Cloudflare.",
+  "Custom-domain DNS is not active yet. Do not give users CNAME instructions.",
   "Never reference fenrirprotocol.com as live infrastructure. Use myfenrir.com as the owned Fenrir domain.",
-  `The canonical bridge target is ${BRIDGE_TARGET} unless changed in production config.`,
+  "Customer custom domains are not active yet. Use a managed MyFenrir Gate instead.",
   "PAYMENT BEHAVIOR:",
   "If user asks to buy, pay, upgrade, subscribe, unlock, activate, use Stars, or similar: say you are opening the official Fenrir payment box.",
   "Explain Telegram Stars handles the transaction and Fenrir verifies access after Telegram confirms payment.",
@@ -305,10 +304,9 @@ const FENRIR_BOT_BRIEF = [
   "STATUS BEHAVIOR:",
   "If user asks status/access/active/paid/subscription/entitlement: use backend entitlement_status. If active, say Fenrir Protocol is active. If inactive, say access is not active yet and invite them to subscribe.",
   "SETUP BEHAVIOR:",
-  "Setup path: choose Fenrir subdomain or custom domain; add Fenrir bot to Telegram group; make bot admin; allow create/revoke invite links; create bridge slug; share stable public URL; rotate/revoke raw Telegram invites when needed.",
+  "Setup path: create a managed MyFenrir Gate; add Fenrir bot to Telegram group; make bot admin; allow create/revoke invite links; create bridge slug; share stable public URL; rotate/revoke raw Telegram invites when needed.",
   "DNS WIZARD:",
-  "TXT: Type TXT, Name _fenrir, Value fenrir-verify=<token>, TTL Auto, Purpose proves domain ownership.",
-  `CNAME: Type CNAME, Name join, Value ${BRIDGE_TARGET}, TTL Auto, Purpose routes the customer subdomain to Fenrir.`,
+  "Custom domains are not active. Do not provide TXT or CNAME records.",
   "PACKS:",
   "Unpaid: no new Gates. Membership is required from Gate 1.",
   "Standard Founders Deal: US$14.99/month by Stripe or 1,150 Telegram Stars; 5 Gates in one active community.",
@@ -800,27 +798,27 @@ function fallbackMind(text, entitlement) {
         "Si. Fenrir te da un link stable y dejas de compartir invitaciones crudas de Telegram.",
         "",
         "Ruta de setup:",
-        "1. Usa un subdominio Fenrir o tu dominio.",
+        "1. Crea un Gate administrado de MyFenrir.",
         "2. Agrega Fenrir Bot al grupo.",
         "3. Hazlo admin.",
         "4. Permite crear y revocar invites.",
         "5. Crea el slug del bridge.",
         "6. Comparte el link estable.",
         "",
-        `DNS custom: CNAME join -> ${BRIDGE_TARGET}. No tienes que transferir tu dominio.`
+        "Tu dominio propio estará disponible cuando el enrutamiento seguro esté activo."
       ].join("\n");
     }
     return [
       "Fenrir Bridge setup path:",
       "",
-      "1. Choose a Fenrir subdomain or custom domain.",
+      "1. Create a managed MyFenrir Gate.",
       "2. Add Fenrir Bot to the Telegram group.",
       "3. Make the bot admin.",
       "4. Allow it to create and revoke invite links.",
       "5. Create a bridge slug.",
       "6. Share the stable public URL.",
       "",
-      `Custom DNS: CNAME join -> ${BRIDGE_TARGET}. You can keep any registrar.`,
+      "Custom domains will be available when secure routing is live.",
       "",
       "Say “buy” when you want me to open the Stars payment box."
     ].join("\n");
