@@ -105,7 +105,7 @@ export function WowMvpRoute() {
           <article>
             <span>RECOMMENDED · GUIDED</span><i><LineIcon name="sparkle" /></i>
             <h3>From Community Bridge</h3>
-            <ol><li>Open your Gate and choose its community.</li><li>Tap <b>Add bot as admin</b> and enable <b>Invite Users</b>.</li><li>Return to Telegram—the community ID is already included. Confirm and open the Gate.</li></ol>
+            <ol><li>Create your Gate and choose its presentation.</li><li>Tap <b>Add bot as admin</b> and enable <b>Invite Users</b>.</li><li>Confirm the group in Telegram, then return and select the verified group for your Gate.</li></ol>
             <a className="cb-primary" href={communityBridgeDashboardUrl}>Open Community Bridge <LineIcon name="arrow" /></a>
           </article>
           <article>

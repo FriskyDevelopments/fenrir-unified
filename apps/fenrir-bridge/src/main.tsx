@@ -31,7 +31,7 @@ if (typeof window !== "undefined") {
 
 // Expose a non-sensitive release marker and force a fresh content hash when a
 // broken edge response has been cached under a previous asset URL.
-document.documentElement.dataset.fenrirRelease = "supabase-auth-2026-08-07b";
+document.documentElement.dataset.fenrirRelease = "community-gate-contract-2026-08-20";
 
 const isWowMvpRoute = window.location.pathname === "/wow" || window.location.pathname === "/visual-lab";
 

@@ -13,7 +13,13 @@ export type AltchaChallenge = {
   signature: string;
 };
 
-type AltchaPayload = AltchaChallenge & { number: number };
+// The ALTCHA web component returns the solved number, salt, challenge and
+// signature, but omits `maxnumber` from its submitted payload. The server
+// owns that fixed bound, so it must not require a client echo of it.
+type AltchaPayload = Omit<AltchaChallenge, "maxnumber"> & {
+  maxnumber?: number;
+  number: number;
+};
 
 function toHex(bytes: ArrayBuffer) {
   return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -48,10 +54,15 @@ async function signChallenge(challenge: string, env: BillingEnv) {
   return toHex(await crypto.subtle.sign("HMAC", await signingKey(env), encoder.encode(challenge)));
 }
 
-export async function createAltchaChallenge(env: BillingEnv, now = Date.now()): Promise<AltchaChallenge> {
+export async function createAltchaChallenge(
+  env: BillingEnv,
+  now = Date.now(),
+  proofNumber?: number,
+): Promise<AltchaChallenge> {
   const random = new Uint32Array(1);
   crypto.getRandomValues(random);
-  const number = random[0]! % (maxNumber + 1);
+  const randomNumber = random[0]! % (maxNumber + 1);
+  const number = proofNumber == null ? randomNumber : Math.max(0, Math.min(maxNumber, Math.floor(proofNumber)));
   const nonce = crypto.randomUUID().replaceAll("-", "");
   const expires = Math.floor(now / 1000) + lifetimeSeconds;
   const salt = `${nonce}?expires=${expires}&`;
@@ -74,7 +85,6 @@ function decodePayload(payload: string): AltchaPayload | null {
     if (
       parsed.algorithm !== algorithm ||
       typeof parsed.challenge !== "string" ||
-      typeof parsed.maxnumber !== "number" ||
       typeof parsed.number !== "number" ||
       typeof parsed.salt !== "string" ||
       typeof parsed.signature !== "string"
@@ -87,7 +97,7 @@ function decodePayload(payload: string): AltchaPayload | null {
 
 export async function verifyAltchaPayload(payload: string, env: BillingEnv, now = Date.now()) {
   const parsed = decodePayload(payload);
-  if (!parsed || parsed.maxnumber !== maxNumber || !Number.isInteger(parsed.number)) return false;
+  if (!parsed || !Number.isInteger(parsed.number)) return false;
   if (parsed.number < 0 || parsed.number > maxNumber) return false;
 
   const expires = Number(new URLSearchParams(parsed.salt.split("?", 2)[1] || "").get("expires"));
