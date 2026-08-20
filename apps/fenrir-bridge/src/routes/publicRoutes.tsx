@@ -386,10 +386,10 @@ export function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
     },
     {
       code: "MOD 04",
-      title: "DNS Wizard",
-      status: "Fenrir Bridge DNS",
-      body: "Keeps registrar choice open while routing CNAME records through Fenrir Bridge infrastructure.",
-      actions: ["TXT _fenrir", "CNAME join", "SSL"]
+      title: "Managed Gate URL",
+      status: "Secure by default",
+      body: "Every Community Gate receives a managed MyFenrir URL without DNS setup.",
+      actions: ["SSO", "Telegram", "Private invite"]
     },
     {
       code: "MOD 05",

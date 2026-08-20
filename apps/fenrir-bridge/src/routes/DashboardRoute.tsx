@@ -883,61 +883,8 @@ export function DashboardRoute() {
           />}
 
           {show("command", "domains", "dns") && <section className="panel wide">
-            <PanelTitle title={c.dnsWizard} subtitle={c.dnsWizardSub} />
-            <LiveDomainSearchPanel
-              value={domainSearchInput}
-              results={domainSearchResults}
-              busy={domainSearchBusy}
-              onValue={setDomainSearchInput}
-              onSearch={() => void runDomainSearch()}
-              onPick={(domain) => {
-                setDomainInput(domain);
-                setDomainTagsInput(addDomainTag(domainTagsInput, "launch"));
-                setNotice(`${domain} moved into the Fenrir domain wizard.`);
-              }}
-              onOpenRegistrar={(domain) => {
-                const query = encodeURIComponent(domain);
-                openSafeUrl(`https://www.dynadot.com/domain/search?domain=${query}`);
-              }}
-            />
-            <div className="domain-builder-layout">
-              <div className="domain-builder-form">
-                <input value={domainInput} onChange={(event) => setDomainInput(event.target.value)} aria-label="Domain input" placeholder={ui.setupInputDomain} />
-                <input value={domainTagsInput} onChange={(event) => setDomainTagsInput(event.target.value)} aria-label="Domain tags" placeholder="launch, client, paid" />
-                <div className="domain-tag-presets" aria-label="Domain tag presets">
-                  {domainTagPresets.map((tag) => (
-                    <button type="button" className="compact-button ghost" key={tag} onClick={() => setDomainTagsInput(addDomainTag(domainTagsInput, tag))}>
-                      #{tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="domain-builder-actions">
-              <button onClick={addNewDomain}>{c.addDomain}</button>
-              {selectedDomainRecord && <button className="secondary" onClick={() => checkDns(selectedDomainRecord)}>{c.checkDns}</button>}
-              </div>
-            </div>
-            {selectedDomainRecord && (
-              <div className="domain-tag-strip" aria-label="Selected domain tags">
-                <b>{selectedDomainRecord.domain}</b>
-                {selectedDomainTags.map((tag) => <span key={tag}>#{tag}</span>)}
-              </div>
-            )}
-            <div className="domain-wow-steps" aria-label="Domain launch steps">
-              <span className="active"><b>1</b> Name</span>
-              <span className={domainInput.trim() || selectedDomainRecord ? "active" : ""}><b>2</b> Tags</span>
-              <span className={selectedDomainRecord ? "active" : ""}><b>3</b> DNS</span>
-              <span className={selectedDomainRecord?.certificateStatus === "active" ? "active" : ""}><b>4</b> Live</span>
-            </div>
-            <DomainChoice c={c} />
-            <DnsWizard domains={state.domains} selected={selectedDomainRecord} onSelect={setSelectedDomain} c={c} />
-            <RecommendedTools state={state} c={c} onOpen={(slug) => {
-              const link = commerceService.click(slug);
-              const label = link?.label ?? slug;
-              setNotice(`Tracked setup click: ${label}. Purchase/setup path opened.`);
-              triggerCelebration("Setup path unlocked", `${label} is tracked for the Telegram Lock setup flow.`, "commerce");
-              refresh();
-            }} />
+            <PanelTitle title="Managed Gate URLs" subtitle="Custom domains are not available yet." />
+            <p className="muted">Create a Community Gate and share its secure MyFenrir URL. DNS setup will return only after custom hostname certificates and routing are live.</p>
           </section>}
 
         {show("command", "rooms", "billing") && <section className="panel wide live-room-panel">
