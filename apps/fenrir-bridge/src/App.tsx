@@ -1367,6 +1367,10 @@ export function App() {
   async function createBridge() {
     const domainId = selectedDomainRecord?.id;
     if (!domainId) return;
+    if (!chatInput.trim()) {
+      setNotice(ui.telegramReaddNeedChat);
+      return;
+    }
     const result = await bridgeService.create({
       domainId,
       slug: slugInput.trim() || ui.setupInputTelegramSlug,

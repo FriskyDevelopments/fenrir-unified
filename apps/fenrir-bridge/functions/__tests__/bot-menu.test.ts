@@ -7,7 +7,7 @@ describe("member-facing bot menu", () => {
 
     expect(menu).toContain("Create a Gate");
     expect(menu).toContain("Link and verify your group");
-    expect(menu).toContain("The Pack is US$15/month");
+    expect(menu).toContain("The Pack: US$14.99/month");
     expect(menu).not.toContain("Founder Deal");
     expect(menu).not.toContain("MOD 01");
   });
