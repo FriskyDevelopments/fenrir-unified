@@ -212,7 +212,7 @@ export function GatePreview({
         )}
 
         <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-white/40">
-          Secured · End-to-end encrypted
+          Secured · private access only
         </p>
       </div>
     </div>
