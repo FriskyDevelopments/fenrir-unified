@@ -2,11 +2,10 @@
 
 Canonical privacy-safe human-check for FriskyDEV applications.
 
-Order of methods:
+Available native methods:
 
-1. ALTCHA proof of work
-2. Signal Slider fallback
-3. Rune puzzle alternative
+1. Signal Slider
+2. Frisky Runes
 
 Application handoffs are allowed only for explicitly listed origins. Every
 proof is signed, expires after five minutes, and is bound to both the consuming

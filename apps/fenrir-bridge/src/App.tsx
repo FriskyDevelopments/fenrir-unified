@@ -23,7 +23,7 @@ import {
 import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan } from "./services/types";
 import { AuthProviderButton } from "./components/AuthProviderButton";
 import { AuthSurface } from "./components/AuthSurface";
-import { AltchaGate } from "./components/AltchaGate";
+import { HumanVerificationGate } from "./components/HumanVerificationGate";
 import { communityBridgeDashboardUrl, communityBridgeGateUrl, communityBridgeUrlForLocale } from "./services/communityBridge";
 import { CommunityBridgeHandoffPanel } from "./routes/communityGate";
 import { knowledgeBaseLabel, knowledgeBaseUrl } from "./services/knowledgeBase";
@@ -3311,7 +3311,7 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
             </div>
 
             <div className="lovable-auth-actions">
-              <AltchaGate onVerified={onHumanVerified} />
+              <HumanVerificationGate onVerified={onHumanVerified} />
               {(["apple", "google", "microsoft"] as AuthProvider[]).map((provider) => (
                 <AuthProviderButton
                   key={provider}

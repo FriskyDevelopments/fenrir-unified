@@ -41,8 +41,8 @@ function constantTimeEqual(left: string, right: string) {
 }
 
 async function signingKey(env: BillingEnv) {
-  const secret = env.ALTCHA_HMAC_SECRET?.trim() || env.SESSION_SECRET?.trim();
-  if (!secret) throw new Error("missing_env:ALTCHA_HMAC_SECRET_or_SESSION_SECRET");
+  const secret = env.HUMAN_VERIFICATION_HMAC_SECRET?.trim() || env.SESSION_SECRET?.trim();
+  if (!secret) throw new Error("missing_env:HUMAN_VERIFICATION_HMAC_SECRET_or_SESSION_SECRET");
   return crypto.subtle.importKey("raw", encoder.encode(`myfenrir-verification-v1:${secret}`), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
 }
 

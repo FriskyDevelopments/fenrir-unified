@@ -44,8 +44,8 @@ export type BillingEnv = AuthEnv & {
   PUBLIC_AUTH_URL?: string;
   /** Comma-separated list of allowed redirect URIs for authentication. */
   ALLOWED_REDIRECT_URIS?: string;
-  /** Optional dedicated ALTCHA secret. SESSION_SECRET is used with domain separation when absent. */
-  ALTCHA_HMAC_SECRET?: string;
+  /** Optional dedicated secret for native Frisky human challenges. SESSION_SECRET is used when absent. */
+  HUMAN_VERIFICATION_HMAC_SECRET?: string;
 };
 
 export function requireEnv(value: string | undefined, name: string): string {

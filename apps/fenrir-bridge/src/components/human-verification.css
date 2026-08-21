@@ -33,10 +33,7 @@
 .verification-switches { display: flex; justify-content: space-between; gap: 8px; margin-top: 2px; }
 .verification-switches button { min-height: 29px; padding: 4px 6px; border: 1px solid transparent; border-radius: 6px 2px 6px 2px; background: transparent; color: rgb(220 239 234 / .68); font: inherit; font-size: .56rem; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
 .verification-switches button:hover { border-color: rgb(255 255 255 / .13); color: #f2f7f5; background: rgb(255 255 255 / .035); }
-.verification-switches--altcha { margin-top: 5px; }
 .rune-choices button:focus-visible, .verification-switches button:focus-visible, .wolf-slider input:focus-visible { outline: 2px solid var(--hv-gold); outline-offset: 2px; }
-.altcha-shell { position: relative; width: min(100%, 320px); margin: auto; padding: 0; }
-altcha-widget { display: block; width: 100%; --altcha-color-border: rgb(255 255 255 / .13); --altcha-color-base: #0b0f10; --altcha-color-text: #e6ecea; --altcha-color-border-focus: var(--hv-coral); }
 .wolf-slider { display: grid; gap: 5px; padding: 2px; }
 .wolf-slider__track { position: relative; height: 10px; border-radius: 2px; background: #151d1c; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08); }
 .wolf-slider__track i { position: absolute; top: -4px; width: 2px; height: 18px; background: rgb(239 245 243 / .72); }

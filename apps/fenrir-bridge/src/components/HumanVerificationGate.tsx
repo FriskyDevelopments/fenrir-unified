@@ -2,21 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "./human-verification.css";
 
 const verifierOrigin = "https://friskydev-human-verification.hrgrrtks2p.workers.dev";
-
-// The human-verification pass used to live only in React state, so any full-page
-// navigation in the sign-on round-trip (OAuth redirect, magic-link consume, a
-// plain reload) remounted this component and re-showed the captcha — an endless
-// "solve it again" loop even though the verify itself succeeded. We now persist
-// the confirmed pass in a short-lived, first-party cookie and rehydrate from it
-// on mount so a solved gate stays solved across reloads/redirects.
 const passCookieName = "fenrir_human_verified";
 const passTtlSeconds = 15 * 60;
 
 function passCookieDomainAttr() {
   const host = window.location.hostname;
-  // Scope to all first-party MyFenrir subdomains so the pass survives an
-  // apex<->www / community redirect during sign-on. On preview/other hosts
-  // (e.g. *.pages.dev) fall back to a host-only cookie.
   return host === "myfenrir.com" || host.endsWith(".myfenrir.com") ? "; Domain=.myfenrir.com" : "";
 }
 
@@ -37,8 +27,8 @@ type VerificationMessage = {
   height?: number;
 };
 
-/** Embed the canonical FriskyDev verifier and consume its signed grant. */
-export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => void }) {
+/** Embeds the canonical Frisky Slider / Frisky Runes verifier. */
+export function HumanVerificationGate({ onVerified }: { onVerified: (verified: boolean) => void }) {
   const context = useMemo(() => crypto.randomUUID().replaceAll("-", ""), []);
   const [height, setHeight] = useState(510);
   const [verified, setVerified] = useState<boolean>(() => hasVerificationPass());
@@ -60,8 +50,6 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
     }
   };
 
-  // Rehydrate a still-valid pass so a reload/redirect during sign-on does not
-  // re-prompt the captcha (this is what broke the loop).
   useEffect(() => {
     if (hasVerificationPass()) markVerified(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,9 +81,9 @@ export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => 
   }, [context, onVerified]);
 
   return (
-    <section className={`canonical-verification ${verified ? "is-verified" : ""}`} aria-label="Canonical FriskyDev human verification">
+    <section className={`canonical-verification ${verified ? "is-verified" : ""}`} aria-label="Frisky human verification">
       {verified ? <div className="verification-success"><span>✓</span>Verified. You may continue.</div> : (
-        <iframe title="FriskyDev human verification" src={source} style={{ height }} referrerPolicy="no-referrer" />
+        <iframe title="Frisky human verification" src={source} style={{ height }} referrerPolicy="no-referrer" />
       )}
       {note ? <p className="canonical-verification__note" role="status">{note}</p> : null}
     </section>

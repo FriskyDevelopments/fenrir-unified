@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import worker from "../src/worker.js";
 
 const env = { VERIFICATION_SECRET: "test-only-secret-with-sufficient-entropy" };
-const origin = "https://friskydev-human-verification.zainxantoine.workers.dev";
+const origin = "https://friskydev-human-verification.hrgrrtks2p.workers.dev";
 const audience = "https://quality.communities.myfenrir.com";
 const authentikAudience = "https://authentik.friskydev.com";
 const context = "a".repeat(32);
@@ -52,4 +52,13 @@ test("accepts the canonical FriskyDEV Authentik gateway as an audience", async (
   const challenge = await response.json();
   assert.equal(challenge.risk, "medium");
   assert.equal(decodeBody(challenge.token).audience, authentikAudience);
+});
+
+test("offers only native Frisky challenges, never an ALTCHA route", async () => {
+  const query = new URLSearchParams({ audience, context });
+  const slider = await worker.fetch(new Request(`${origin}/api/slider?${query}`), env);
+  assert.equal(slider.status, 200);
+
+  const removed = await worker.fetch(new Request(`${origin}/api/altcha/challenge?${query}`), env);
+  assert.equal(removed.status, 404);
 });

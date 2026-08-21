@@ -8,7 +8,7 @@ import { GlowCard } from "../components/GlowCard";
 import { brandThemes } from "../theme/brandThemes";
 import { managedDashboardPath, twoFactorHelpLinks } from "../app/shared";
 import { BrandSignature } from "./routeCommon";
-import { AltchaGate } from "../components/AltchaGate";
+import { HumanVerificationGate } from "../components/HumanVerificationGate";
 
 function postLoginDestination() {
   const requested = new URLSearchParams(window.location.search).get("next");
@@ -62,7 +62,7 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
           <h2 className="auth-enter-title" data-text={c.authTitle}>
             <span>{c.authTitle}</span>
           </h2>
-          <AltchaGate onVerified={onHumanVerified} />
+          <HumanVerificationGate onVerified={onHumanVerified} />
           <div className="auth-actions">
             <AuthProviderButton provider="apple" label={c.continueApple} disabled={!humanVerified} onClick={() => void signInWithProvider("apple")} />
             <AuthProviderButton provider="google" label={c.continueGoogle} disabled={!humanVerified} onClick={() => void signInWithProvider("google")} />
