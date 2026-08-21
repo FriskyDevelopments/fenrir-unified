@@ -233,36 +233,6 @@ export function addDomain(domain: string): FriskyDomain {
   return item;
 }
 
-export function addBridge(domainId: string, slug: string, telegramChatId: string, telegramGroupName: string, telegramGroupImageUrl: string): FriskyBridge {
-  const domain = store.domains.find((item) => item.id === domainId) ?? store.domains[0];
-  const invite: FriskyTelegramInvite = {
-    id: createFriskyId("invite", slug),
-    bridgeId: "",
-    inviteLink: `https://t.me/+${slug}FenrirInvite${Math.random().toString(36).slice(2, 5)}`,
-    status: "active",
-    createdAt: new Date().toISOString()
-  };
-  const bridge: FriskyBridge = {
-    id: createFriskyId("bridge", slug),
-    orgId: store.org.id,
-    domainId: domain.id,
-    slug,
-    publicUrl: `https://${domain.domain}/${slug}`,
-    telegramChatId,
-    telegramGroupName: telegramGroupName || `${slug} Telegram Group`,
-    telegramGroupImageUrl,
-    currentInviteId: invite.id,
-    status: "active",
-    createdAt: new Date().toISOString(),
-    rotatedAt: new Date().toISOString()
-  };
-  invite.bridgeId = bridge.id;
-  store.bridges.unshift(bridge);
-  store.invites.unshift(invite);
-  appendAudit("bridge_created", "FriskyBridge", bridge.id, { slug, telegramChatId });
-  return bridge;
-}
-
 export function addLiveRoom(domainId: string, slug: string, title: string, provider: LiveRoomProvider, targetUrl: string, coverImageUrl: string): FriskyLiveRoom {
   const domain = store.domains.find((item) => item.id === domainId) ?? store.domains[0];
   const room: FriskyLiveRoom = {
