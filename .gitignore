@@ -44,3 +44,6 @@ apps/fenrir-gatekeeper-worker
 
 # Ajustes locales de herramientas del desarrollador, no del proyecto.
 .claude/settings.local.json
+
+# Harness de previsualización de motion (local, no se despliega)
+apps/community-bridge/.motion-preview/

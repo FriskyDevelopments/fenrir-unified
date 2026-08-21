@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, Bitcoin, CreditCard, Loader2 } from "lucide-react";
-import { motion, useReducedMotion, type Transition } from "motion/react";
+import {
+  motion,
+  useMotionTemplate,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+  type Transition,
+} from "motion/react";
 
 import {
   confirmFoundersStripeCheckout,
@@ -47,77 +54,77 @@ const PRICE = {
 /** $14.99 x 12 = $179.88. $179.88 - $149 = $30.88. Say the money, not the percent. */
 const ANNUAL_SAVING = "$30.88";
 
+/**
+ * Methods that ride the card rail's Stripe Checkout session.
+ *
+ * This is a list, not three hardcoded words, so adding a method tomorrow is one
+ * entry — the rail was built to carry several.
+ *
+ * Only methods Stripe supports for RECURRING billing may be listed here.
+ * Verified against Stripe docs on 2026-08-21:
+ *
+ *   Cash App Pay — "Recurring payments: ✓ Supported", Billing ✓, Checkout ✓.
+ *                  USD, US-only customers. Listed.
+ *   OXXO         — "Recurring payments: ✗ Not supported", Billing ✗, Invoicing ✗,
+ *                  MXN only, and its prohibited-MCC list includes 5968 "Direct
+ *                  Marketing - Subscription" and 6538 "Software". NOT listed.
+ *   SPEI / bank transfer — same family; on Invoicing it only works with the
+ *                  `send_invoice` collection method, not an automatic
+ *                  subscription charge. NOT listed.
+ *   Venmo        — not a Stripe payment method at all (PayPal). NOT listed.
+ *
+ * Painting a method that cannot take a monthly charge is a lie on screen and a
+ * guaranteed refund. If a method is not verified recurring, it does not go here.
+ */
+const CARD_METHODS = [
+  { id: "card", label: "Card" },
+  { id: "apple_pay", label: "Apple Pay" },
+  { id: "google_pay", label: "Google Pay" },
+  { id: "cashapp", label: "Cash App Pay", region: "US" },
+] as const;
+
 type Period = keyof typeof PRICE;
 type Rail = "card" | "stars" | "crypto";
 type Options = { stripe: boolean; nowpayments: boolean; stars: boolean };
 
-const LOCALES = ["es", "en"] as const;
-type Locale = (typeof LOCALES)[number];
-
+/**
+ * Copy lives as keys, not loose literals, so a translation layer can be dropped
+ * in later without touching the markup. English is the base and the only set
+ * shipped today — `community-bridge` has no i18n system yet. When one lands,
+ * follow the pattern already in apps/fenrir-bridge/src/i18n.ts (a `copy` record
+ * keyed by locale, English-first `detectLocale`) rather than inventing another.
+ *
+ * Do NOT hardcode any other language in this component.
+ */
 const COPY = {
-  es: {
-    vendor: "Frisky Developments",
-    product: "Fenrir · The Pack",
-    lede: "Control de admisión para la comunidad que administras.",
-    per: "/mes por comunidad enlazada",
-    perAnnual: "/año por comunidad enlazada",
-    monthly: "Mensual",
-    annual: "Anual",
-    savingNote: `${ANNUAL_SAVING} menos al año.`,
-    card: "Pagar con tarjeta",
-    cardNote: "Apple Pay y Google Pay incluidos.",
-    stars: "Pagar con Telegram Stars",
-    starsNote: "El equivalente en Stars, facturado cada mes.",
-    starsAnnual: "Telegram fija el periodo en 30 días. No hay plan anual en Stars.",
-    crypto: "Pagar con cripto",
-    cryptoNote: "NOWPayments muestra su comisión antes de que pagues.",
-    cryptoAnnual: "La factura anual en cripto todavía no está conectada.",
-    cardOff: "El cobro con tarjeta se está configurando.",
-    starsOff: "El bot de Telegram está fuera de línea.",
-    cryptoOff: "El cobro con cripto se está configurando.",
-    checking: "Comprobando disponibilidad…",
-    active: "The Pack está activo en esta cuenta.",
-    footer: "Mismo precio en cada riel. Cancelas cuando quieras.",
-    scope: "Se cobra por comunidad enlazada, no por cuenta.",
-    failed: "Ese riel no respondió. Prueba otro.",
-    noOptions: "No se pudieron leer las opciones de pago.",
-    noConfirm: "El pago aún no se pudo confirmar.",
-  },
-  en: {
-    vendor: "Frisky Developments",
-    product: "Fenrir · The Pack",
-    lede: "Admission control for the community you run.",
-    per: "/month per linked community",
-    perAnnual: "/year per linked community",
-    monthly: "Monthly",
-    annual: "Annual",
-    savingNote: `${ANNUAL_SAVING} less per year.`,
-    card: "Pay by card",
-    cardNote: "Apple Pay and Google Pay included.",
-    stars: "Pay with Telegram Stars",
-    starsNote: "The Stars equivalent, billed monthly.",
-    starsAnnual: "Telegram fixes the period at 30 days. There is no annual Stars plan.",
-    crypto: "Pay with crypto",
-    cryptoNote: "NOWPayments shows its processing fee before you pay.",
-    cryptoAnnual: "The annual crypto invoice is not wired up yet.",
-    cardOff: "Card payments are being set up.",
-    starsOff: "The Telegram bot is offline.",
-    cryptoOff: "Crypto payments are being set up.",
-    checking: "Checking availability…",
-    active: "The Pack is active on this account.",
-    footer: "Same price on every rail. Cancel any time.",
-    scope: "Billed per linked community, not per account.",
-    failed: "That rail did not respond. Try another.",
-    noOptions: "Could not read payment options.",
-    noConfirm: "Payment could not be confirmed yet.",
-  },
-} satisfies Record<Locale, Record<string, string>>;
+  vendor: "Frisky Developments",
+  product: "Fenrir · The Pack",
+  lede: "Admission control for the community you run.",
+  per: "/month per linked community",
+  perAnnual: "/year per linked community",
+  monthly: "Monthly",
+  annual: "Annual",
+  savingNote: `${ANNUAL_SAVING} less per year.`,
+  card: "Pay by card",
+  cardNote: "Apple Pay, Google Pay and Cash App Pay included.",
+  stars: "Pay with Telegram Stars",
+  starsNote: "The Stars equivalent, billed monthly.",
+  starsAnnual: "Telegram fixes the period at 30 days. There is no annual Stars plan.",
+  crypto: "Pay with crypto",
+  cryptoNote: "NOWPayments shows its processing fee before you pay.",
+  cryptoAnnual: "The annual crypto invoice is not wired up yet.",
+  cardOff: "Card payments are being set up.",
+  starsOff: "The Telegram bot is offline.",
+  cryptoOff: "Crypto payments are being set up.",
+  checking: "Checking availability…",
+  active: "The Pack is active on this account.",
+  footer: "Same price on every rail. Cancel any time.",
+  scope: "Billed per linked community, not per account.",
+  failed: "That rail did not respond. Try another.",
+  noOptions: "Could not read payment options.",
+  noConfirm: "Payment could not be confirmed yet.",
+} as const;
 
-/** Spanish is the primary market: anything that is not explicitly English gets es. */
-function normalizeLocale(value: string | null | undefined): Locale {
-  const normalized = (value ?? "").slice(0, 2).toLowerCase();
-  return normalized === "en" ? "en" : "es";
-}
 
 /**
  * Local palette. Fenrir brandbook substrate (midnight / indigo / ice / muted)
@@ -141,21 +148,12 @@ const SPRING: Transition = { type: "spring", stiffness: 420, damping: 32, mass: 
 
 export function PackRails() {
   const reduce = useReducedMotion();
-  const [locale, setLocale] = useState<Locale>("es");
   const [period, setPeriod] = useState<Period>("monthly");
   const [options, setOptions] = useState<Options | null>(null);
   const [busy, setBusy] = useState<Rail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<string | null>(null);
-  const t = COPY[locale];
-
-  // Locale resolution mirrors the rest of the app: ?lang= wins, then the stored
-  // preference, then the browser. Spanish is the fallback, not English.
-  useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("lang");
-    const stored = window.localStorage.getItem("myfenrir_locale");
-    setLocale(normalizeLocale(requested ?? stored ?? navigator.language));
-  }, []);
+  const t = COPY;
 
   useEffect(() => {
     let alive = true;
@@ -214,21 +212,69 @@ export function PackRails() {
   const annual = period === "annual";
   const price = PRICE[period];
 
+  // Cursor spotlight. A soft light that tracks the pointer across the panel.
+  // Reason: it makes the card feel like a physical surface being lit rather
+  // than a flat div, and it only exists while the operator is actually on it.
+  const mx = useSpring(useMotionValue(50), { stiffness: 240, damping: 34 });
+  const my = useSpring(useMotionValue(0), { stiffness: 240, damping: 34 });
+  const spotlight = useMotionTemplate`radial-gradient(340px circle at ${mx}% ${my}%, rgba(183,255,42,0.10), transparent 70%)`;
+
+  const onMove = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      if (reduce) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      mx.set(((event.clientX - rect.left) / rect.width) * 100);
+      my.set(((event.clientY - rect.top) / rect.height) * 100);
+    },
+    [mx, my, reduce],
+  );
+
   return (
-    <section
-      style={TOKENS}
-      className="relative overflow-hidden rounded-[28px] border border-white/10 p-6 sm:p-7"
-    >
-      {/* Substrate: a still, deep indigo field. It does not animate — the panel
+    <div style={TOKENS} className="relative">
+      {/* ORBIT — a conic ring of light rotating around the card's edge, 18s per
+          turn. Reason: it marks this panel as the one object on the page that
+          matters, without making it bigger or louder. It is the Fenrir ring,
+          read as a border. Off entirely under reduced motion. */}
+      {!reduce ? (
+        <motion.div
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-px rounded-[29px]"
+          style={{
+            background:
+              "conic-gradient(from 0deg, transparent 0deg, rgba(139,124,255,0.55) 42deg, rgba(183,255,42,0.9) 74deg, rgba(79,215,224,0.5) 104deg, transparent 150deg, transparent 360deg)",
+            WebkitMask:
+              "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+            WebkitMaskComposite: "xor",
+            maskComposite: "exclude",
+            padding: 1,
+          }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+        />
+      ) : null}
+
+      <section
+        onPointerMove={onMove}
+        className="relative overflow-hidden rounded-[28px] border border-white/10 p-6 sm:p-7"
+      >
+        {/* Substrate: a still, deep indigo field. It does not animate — the panel
           is the quiet ground the moving parts are read against. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10"
-        style={{
-          background:
-            "radial-gradient(120% 80% at 12% 0%, var(--fd-indigo-lift) 0%, var(--fd-surface) 46%, var(--fd-midnight) 100%)",
-        }}
-      />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10"
+          style={{
+            background:
+              "radial-gradient(120% 80% at 12% 0%, var(--fd-indigo-lift) 0%, var(--fd-surface) 46%, var(--fd-midnight) 100%)",
+          }}
+        />
+        {/* Cursor spotlight layer. */}
+        {!reduce ? (
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-10"
+            style={{ background: spotlight }}
+          />
+        ) : null}
 
       {/* ── Vendor handshake ─────────────────────────────────────────────────
           Motion 1 — SIGIL IGNITION. The real FriskyDev sigil (public/brand/
@@ -247,9 +293,12 @@ export function PackRails() {
           <motion.span
             className="absolute inset-0 block"
             style={{
+              // Rests lime — the sweep is a white highlight travelling across
+              // the mark, not a colour change. The sigil is always FriskyDev
+              // green once it settles.
               backgroundImage:
-                "linear-gradient(115deg, var(--fd-violet) 0%, var(--fd-ice) 38%, var(--fd-lime) 62%, var(--fd-violet) 100%)",
-              backgroundSize: "320% 100%",
+                "linear-gradient(115deg, var(--fd-lime) 0%, var(--fd-lime) 30%, var(--fd-ice) 46%, var(--fd-violet) 58%, var(--fd-lime) 74%, var(--fd-lime) 100%)",
+              backgroundSize: "300% 100%",
               WebkitMaskImage: "url(/brand/friskydev-sigil-solid.svg)",
               maskImage: "url(/brand/friskydev-sigil-solid.svg)",
               WebkitMaskSize: "contain",
@@ -282,7 +331,7 @@ export function PackRails() {
           alt=""
           aria-hidden="true"
           draggable={false}
-          className="ml-auto h-9 w-9 shrink-0 rounded-xl opacity-80"
+          className="ml-auto h-10 w-10 shrink-0 rounded-xl ring-1 ring-white/10"
         />
       </header>
 
@@ -407,6 +456,33 @@ export function PackRails() {
           onClick={() => void go("card")}
         />
 
+        {/* Methods riding the card rail. They enter after the rail itself
+            (+240ms) so the button is read first and these register as its
+            contents, not as four more choices competing with it. */}
+        <motion.ul
+          className="flex flex-wrap justify-center gap-1.5 pt-0.5"
+          initial={reduce ? false : { opacity: 0 }}
+          animate={{ opacity: loading || !(options?.stripe ?? false) ? 0.45 : 1 }}
+          transition={reduce ? undefined : { delay: 0.24, duration: 0.4 }}
+        >
+          {CARD_METHODS.map((method) => (
+            <li
+              key={method.id}
+              className="rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide"
+              style={{
+                borderColor: "rgba(255,255,255,0.10)",
+                background: "rgba(22,28,61,0.45)",
+                color: "var(--fd-muted)",
+              }}
+            >
+              {method.label}
+              {"region" in method ? (
+                <span style={{ opacity: 0.6 }}> · {method.region}</span>
+              ) : null}
+            </li>
+          ))}
+        </motion.ul>
+
         <RailButton
           index={1}
           reduce={reduce}
@@ -452,11 +528,15 @@ export function PackRails() {
         <p className="text-xs leading-relaxed" style={{ color: "var(--fd-muted)" }}>
           {t.footer}
         </p>
-        <p className="text-[11px] leading-relaxed" style={{ color: "var(--fd-muted)", opacity: 0.75 }}>
-          {t.scope}
-        </p>
-      </footer>
-    </section>
+          <p
+            className="text-[11px] leading-relaxed"
+            style={{ color: "var(--fd-muted)", opacity: 0.75 }}
+          >
+            {t.scope}
+          </p>
+        </footer>
+      </section>
+    </div>
   );
 }
 
