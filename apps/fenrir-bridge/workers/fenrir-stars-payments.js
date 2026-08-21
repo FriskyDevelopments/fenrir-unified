@@ -1282,6 +1282,88 @@ export function telegramCommunityId(chatId) {
   return `telegram-${String(chatId).replace(/^-/, "")}`;
 }
 
+/**
+ * Gobierno del grupo: quién es el dueño y quiénes los admins, con permisos.
+ *
+ * `getChatAdministrators` lo da todo en UNA llamada. Se guarda para dos cosas:
+ * saber de quién es el grupo de verdad, y detectar más tarde que el dueño
+ * cambió — hoy sólo se comprobaba que quien escribe sea admin, y eso no dice
+ * nada de los demás.
+ *
+ * Nunca lanza. Si Telegram no responde, devuelve `null` y el alta sigue sin
+ * gobierno: registrar el grupo es más importante que adornarlo.
+ */
+async function mapGroupGovernance(env, channel, chatId) {
+  const res = await telegramApi(env, channel, "getChatAdministrators", { chat_id: chatId }).catch(() => null);
+  const list = res?.result;
+  if (!Array.isArray(list)) return null;
+  const admins = list.map((entry) => ({
+    telegramUserId: String(entry?.user?.id ?? ""),
+    status: entry?.status === "creator" ? "creator" : "administrator",
+    isBot: entry?.user?.is_bot === true,
+    // El dueño tiene todos los permisos implícitos; Telegram no siempre los
+    // incluye en su variante de ChatMember.
+    canInviteUsers: entry?.status === "creator" || entry?.can_invite_users === true,
+    canRestrictMembers: entry?.status === "creator" || entry?.can_restrict_members === true,
+    canPromoteMembers: entry?.status === "creator" || entry?.can_promote_members === true
+  })).filter((admin) => admin.telegramUserId);
+  if (admins.length === 0) return null;
+  const owner = admins.find((admin) => admin.status === "creator");
+  return {
+    ownerTelegramUserId: owner ? owner.telegramUserId : null,
+    admins: admins.slice(0, 100),
+    mappedAt: nowIso()
+  };
+}
+
+/**
+ * Cribado de los admins contra la lista de bloqueo.
+ *
+ * SE LLAMA APARTE Y DESPUÉS del alta, a propósito. Un timeout de un tercero no
+ * puede tumbar el registro de un grupo: si el proveedor tarda o cae, el estado
+ * queda `unavailable` y el destino se verifica igual. Sólo un `blocked` real
+ * —una respuesta afirmativa, no una ausencia de respuesta— retiene la
+ * verificación.
+ *
+ * Los bots del propio grupo se excluyen: no son personas y no se criban.
+ *
+ * NOTA DE ALCANCE: Didit es la fuente de verdad de bloqueos porque ya lo es
+ * para el KYC de activación; una tabla casera crearía dos listas que divergen.
+ * El puente concreto con su API todavía no está cableado — hasta entonces esto
+ * devuelve `pending` de forma explícita, que es la verdad, en vez de fingir un
+ * `clear` que nadie ha comprobado.
+ */
+async function screenGroupAdmins(env, governance) {
+  if (!governance) return { state: "pending", provider: "didit", reason: "governance_unavailable" };
+  const humans = governance.admins.filter((admin) => !admin.isBot).map((admin) => admin.telegramUserId);
+  if (humans.length === 0) return { state: "clear", provider: "didit", checkedAt: nowIso() };
+  const endpoint = normalizeText(env.DIDIT_BLOCKLIST_CHECK_URL);
+  const key = normalizeText(env.DIDIT_API_KEY);
+  if (!endpoint || !key) {
+    // Sin configurar no es "limpio": es "no comprobado". Se dice cuál de los dos.
+    return { state: "pending", provider: "didit", reason: "screening_not_configured" };
+  }
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ telegramUserIds: humans })
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok || !body) {
+      console.error("group_admin_screening_unavailable", response.status || 0);
+      return { state: "unavailable", provider: "didit", reason: "provider_error" };
+    }
+    const blocked = Array.isArray(body.blocked) ? body.blocked.map(String) : [];
+    return blocked.length > 0
+      ? { state: "blocked", provider: "didit", checkedAt: nowIso(), blockedTelegramUserIds: blocked }
+      : { state: "clear", provider: "didit", checkedAt: nowIso() };
+  } catch {
+    console.error("group_admin_screening_failed");
+    return { state: "unavailable", provider: "didit", reason: "request_failed" };
+  }
+}
+
 async function syncVerifiedTelegramDestination(env, channel, message) {
   const secret = normalizeText(env.COMMUNITY_BRIDGE_DESTINATION_SYNC_SECRET);
   if (!secret) return { ok: false, reason: "sync_not_configured" };
@@ -1307,6 +1389,17 @@ async function syncVerifiedTelegramDestination(env, channel, message) {
     return { ok: false, reason: "bot_permissions_missing" };
   }
 
+  // DOS TIEMPOS, en este orden y no al revés.
+  //
+  // 1) El gobierno del grupo se mapea antes del alta porque es una sola llamada
+  //    a Telegram —el mismo servicio con el que ya estamos hablando— y sin él
+  //    el cribado no sabría a quién cribar. Si falla, `null`: el alta sigue.
+  // 2) El cribado va DESPUÉS y contra un tercero. Nunca bloquea el alta por
+  //    indisponibilidad: sólo un `blocked` afirmativo retiene la verificación.
+  //    El servidor deriva el `status` del `screening`; aquí no se elige.
+  const governance = await mapGroupGovernance(env, channel, chat.id);
+  const screening = await screenGroupAdmins(env, governance);
+
   const destinationUrl =
     normalizeText(env.COMMUNITY_BRIDGE_DESTINATION_SYNC_URL) ||
     "https://communities.myfenrir.com/api/internal/telegram-destination";
@@ -1318,7 +1411,9 @@ async function syncVerifiedTelegramDestination(env, channel, message) {
       communityId: telegramCommunityId(chat.id),
       telegramChatId: String(chat.id),
       displayName: normalizeText(chat.title) || `Telegram group ${chat.id}`,
-      capabilities: { botAdmin: true, canInviteUsers: true }
+      capabilities: { botAdmin: true, canInviteUsers: true },
+      ...(governance ? { governance } : {}),
+      screening
     })
   }).catch(() => null);
   const body = response ? await response.json().catch(() => null) : null;
@@ -1326,7 +1421,12 @@ async function syncVerifiedTelegramDestination(env, channel, message) {
     console.error("telegram_destination_sync_failed", response?.status || 0, body?.error || "request_failed");
     return { ok: false, reason: body?.error || "sync_failed" };
   }
-  return { ok: true, communityId: telegramCommunityId(chat.id) };
+  // El detalle de quién está bloqueado va al log interno, jamás al chat.
+  if (screening.state === "blocked") {
+    console.error("group_admin_screening_blocked", telegramCommunityId(chat.id), (screening.blockedTelegramUserIds || []).join(","));
+    return { ok: false, reason: "screening_blocked" };
+  }
+  return { ok: true, communityId: telegramCommunityId(chat.id), screening: screening.state };
 }
 // Member profile: plan, access, and courtesy window if any. Resolves from the
 // Telegram identity link → billing_subscriptions (with expiry) and the Stars
@@ -2056,6 +2156,10 @@ async function handleTelegramWebhook(request, env, url) {
       bot_permissions_missing: "Make Fenrir an admin and enable Invite Users, then run /connect again.",
       telegram_identity_not_linked: "Link your MyFenrir account first in a private chat with /link, then run /connect here again.",
       sync_not_configured: "Group verification is not configured yet. Please contact the MyFenrir team.",
+      // Ni se nombra a nadie ni se dice que haya alguien bloqueado: lo primero
+      // es una acusación pública, lo segundo convierte el grupo en una cacería.
+      // El motivo y los IDs quedan en el log interno y en la pantalla del dueño.
+      screening_blocked: "Fenrir could not verify this group. Open MyFenrir to continue.",
       sync_failed: "Fenrir could not save this group just now. Please try again."
     };
     await telegramApi(env, channel, "sendMessage", {
