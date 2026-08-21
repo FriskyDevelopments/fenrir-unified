@@ -45,7 +45,7 @@ export function starsTitle(env: BillingEnv) {
 }
 
 export function starsDescription(env: BillingEnv) {
-  return env.FENRIR_STARS_DESCRIPTION?.trim() || "The Pack — $15/month. Multi-admin and audit logs. Billed monthly in Telegram Stars.";
+  return env.FENRIR_STARS_DESCRIPTION?.trim() || "The Pack — $14.99/month. Multi-admin and audit logs. Billed monthly in Telegram Stars.";
 }
 
 export function starsLabel(env: BillingEnv) {

@@ -166,7 +166,7 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
         "· `/help` — this message",
         "· `/subscribe` · `/unlock` — open the Telegram Stars box (⭐1,150)",
         "",
-        "The Pack is $15/month. Card, Stars, or crypto — same price.",
+        "The Pack is $14.99/month. Card, Stars, or crypto — same price.",
         "",
         "Link Telegram from the MyFenrir dashboard (Settings → Link Telegram), then manage locks there.",
         "",
@@ -216,7 +216,7 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
     payload,
     // `provider_token` must be OMITTED for XTR, not sent empty (empty string
     // previously returned PROVIDER_ACCOUNT_INVALID). `subscription_period` is
-    // required or Telegram charges once while we advertise "$15/month".
+    // required or Telegram charges once while we advertise "$14.99/month".
     currency: "XTR",
     prices: [{ label: starsLabel(env), amount }],
     subscription_period: 2592000,
