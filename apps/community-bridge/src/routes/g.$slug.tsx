@@ -9,6 +9,9 @@ import { useAuth } from "@/hooks/use-auth";
 
 import { createGateTelegramHandoff, getPublicGate } from "@/lib/gate.functions";
 import { GATE_UNAVAILABLE_MESSAGE, isGateUnavailableError } from "@/lib/gate-availability";
+// Copy del Gate: una sola fuente en src/i18n, ya no una isla local.
+import { detectLocale, LOCALE_NAMES, LOCALES, type Locale } from "@/i18n/locale";
+import { gateCopy, type GateCopy } from "@/i18n/gate";
 import {
   requestGateAccess,
   runGateSecurityPreflight,
@@ -23,109 +26,6 @@ const TELEGRAM_BOT_USERNAME = (
   (import.meta.env["VITE_TELEGRAM_BOT_USERNAME"] as string | undefined) ?? "Myfenrir_bot"
 ).replace(/^@/, "");
 
-const GATE_LOCALES = ["en", "es", "fr", "de"] as const;
-type GateLocale = (typeof GATE_LOCALES)[number];
-const GATE_LOCALE_LABELS: Record<GateLocale, string> = {
-  en: "English",
-  es: "Español",
-  fr: "Français",
-  de: "Deutsch",
-};
-const GATE_COPY = {
-  en: {
-    openMyGates: "Open my Gates",
-    ownerAccessActive: "Owner access is active. Manage this community's Gates.",
-    proceedSso: "Proceed to SSO",
-    verifyHuman: "Verify human signal",
-    runningSecurity: "Running Gate security…",
-    reviewSubmitted: "Security review submitted",
-    continueGate: "Continue Gate",
-    resultLabel: "Gate result",
-    grantedTitle: "You’re in.",
-    grantedBody: "Security cleared. Confirmation sent. Opening the private handoff…",
-    blockedTitle: "Access denied.",
-    blockedBody: "The Gate security screen blocked this entry. No private invite was issued.",
-    reviewTitle: "Request received.",
-    reviewBody: "Security flagged this for owner review. They can approve, deny, or ask for more info.",
-    emailPrefix: "Confirmation email",
-    securityComplete: "Gate security complete",
-    humanStep: "Step 1 of 3 · private access",
-    humanTitle: "Verify before entering",
-    humanBody: "Complete one private check. Then we’ll continue to this Gate—nothing is shared or published.",
-    humanBack: "← Back to Gate",
-  },
-  es: {
-    openMyGates: "Abrir mis Gates",
-    ownerAccessActive: "El acceso de owner está activo. Administra los Gates de esta comunidad.",
-    proceedSso: "Continuar a SSO",
-    verifyHuman: "Verificar señal humana",
-    runningSecurity: "Corriendo seguridad del Gate…",
-    reviewSubmitted: "Revisión de seguridad enviada",
-    continueGate: "Continuar Gate",
-    resultLabel: "Resultado del Gate",
-    grantedTitle: "Estás dentro.",
-    grantedBody: "Seguridad aprobada. Confirmación enviada. Abriendo el handoff privado…",
-    blockedTitle: "Acceso denegado.",
-    blockedBody: "La seguridad del Gate bloqueó esta entrada. No se emitió invite privado.",
-    reviewTitle: "Solicitud recibida.",
-    reviewBody: "Seguridad marcó este acceso para revisión del owner. Puede aprobar, negar o pedir más info.",
-    emailPrefix: "Correo de confirmación",
-    securityComplete: "Seguridad del Gate completa",
-    humanStep: "Paso 1 de 3 · acceso privado",
-    humanTitle: "Verifica antes de entrar",
-    humanBody: "Completa una revisión privada. Luego seguimos en este Gate; nada se comparte ni se publica.",
-    humanBack: "← Volver al Gate",
-  },
-  fr: {
-    openMyGates: "Ouvrir mes Gates",
-    ownerAccessActive: "L’accès owner est actif. Gérez les Gates de cette communauté.",
-    proceedSso: "Continuer vers SSO",
-    verifyHuman: "Vérifier le signal humain",
-    runningSecurity: "Contrôle Gate en cours…",
-    reviewSubmitted: "Revue de sécurité envoyée",
-    continueGate: "Continuer le Gate",
-    resultLabel: "Résultat du Gate",
-    grantedTitle: "Vous êtes dedans.",
-    grantedBody: "Sécurité validée. Confirmation envoyée. Ouverture du handoff privé…",
-    blockedTitle: "Accès refusé.",
-    blockedBody: "Le contrôle de sécurité du Gate a bloqué cette entrée. Aucun lien privé n’a été émis.",
-    reviewTitle: "Demande reçue.",
-    reviewBody: "La sécurité a envoyé cette entrée en revue owner. Ils peuvent approuver, refuser ou demander plus d’infos.",
-    emailPrefix: "Email de confirmation",
-    securityComplete: "Sécurité Gate terminée",
-    humanStep: "Étape 1 sur 3 · accès privé",
-    humanTitle: "Vérifiez avant d’entrer",
-    humanBody: "Complétez une vérification privée. Ensuite nous continuons vers ce Gate — rien n’est partagé ni publié.",
-    humanBack: "← Retour au Gate",
-  },
-  de: {
-    openMyGates: "Meine Gates öffnen",
-    ownerAccessActive: "Der Owner-Zugriff ist aktiv. Verwalte die Gates dieser Community.",
-    proceedSso: "Weiter zu SSO",
-    verifyHuman: "Human-Signal prüfen",
-    runningSecurity: "Gate-Sicherheit läuft…",
-    reviewSubmitted: "Sicherheitsprüfung eingereicht",
-    continueGate: "Gate fortsetzen",
-    resultLabel: "Gate-Ergebnis",
-    grantedTitle: "Du bist drin.",
-    grantedBody: "Sicherheit freigegeben. Bestätigung gesendet. Privater Handoff wird geöffnet…",
-    blockedTitle: "Zugriff verweigert.",
-    blockedBody: "Die Gate-Sicherheitsprüfung hat diesen Eintritt blockiert. Kein privater Invite wurde erstellt.",
-    reviewTitle: "Anfrage erhalten.",
-    reviewBody: "Die Sicherheit hat diesen Eintritt zur Owner-Prüfung markiert. Sie können genehmigen, ablehnen oder mehr Infos anfordern.",
-    emailPrefix: "Bestätigungs-E-Mail",
-    securityComplete: "Gate-Sicherheit abgeschlossen",
-    humanStep: "Schritt 1 von 3 · privater Zugriff",
-    humanTitle: "Vor dem Eintritt verifizieren",
-    humanBody: "Schließe eine private Prüfung ab. Danach geht es mit diesem Gate weiter — nichts wird geteilt oder veröffentlicht.",
-    humanBack: "← Zurück zum Gate",
-  },
-} satisfies Record<GateLocale, Record<string, string>>;
-
-function normalizeGateLocale(value: string | null | undefined): GateLocale {
-  const normalized = (value ?? "").toLowerCase().slice(0, 2);
-  return GATE_LOCALES.includes(normalized as GateLocale) ? (normalized as GateLocale) : "en";
-}
 
 function telegramDeepLink(start: string) {
   return `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${encodeURIComponent(start)}`;
@@ -276,9 +176,7 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
   const createTelegramHandoff = useServerFn(createGateTelegramHandoff);
   const requestAccess = useServerFn(requestGateAccess);
   const runSecurityPreflight = useServerFn(runGateSecurityPreflight);
-  const [locale, setLocale] = useState<GateLocale>(() =>
-    typeof navigator === "undefined" ? "en" : normalizeGateLocale(navigator.language)
-  );
+  const [locale, setLocale] = useState<Locale>(detectLocale);
   const [handoffPending, setHandoffPending] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [accessRequested, setAccessRequested] = useState(false);
@@ -299,7 +197,7 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
   // that transient state; it strands them at a second login wall instead of
   // starting the Gate's SSO journey.
   const authenticatedStaff = Boolean(session && isStaff);
-  const copy = GATE_COPY[locale];
+  const copy = gateCopy[locale];
 
   useTrackGateView(params.slug, config.preset);
 
@@ -412,7 +310,7 @@ function GateOutcomeCelebration({
 }: {
   outcome: "granted" | "review" | "pending" | "blocked";
   email: string | null;
-  copy: (typeof GATE_COPY)[GateLocale];
+  copy: GateCopy;
 }) {
   const outcomeCopy =
     outcome === "granted"
@@ -437,7 +335,7 @@ function GateOutcomeCelebration({
   );
 }
 
-function GateSecurityPanel({ preflight, copy }: { preflight: GateSecurityPreflight; copy: (typeof GATE_COPY)[GateLocale] }) {
+function GateSecurityPanel({ preflight, copy }: { preflight: GateSecurityPreflight; copy: GateCopy }) {
   return (
     <aside className="absolute inset-x-0 bottom-24 z-10 mx-auto w-[min(92vw,430px)] rounded-3xl border border-white/12 bg-black/70 p-4 text-white shadow-2xl backdrop-blur-xl">
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/45">
@@ -459,8 +357,8 @@ function GateLanguageSwitcher({
   locale,
   onChange,
 }: {
-  locale: GateLocale;
-  onChange: (locale: GateLocale) => void;
+  locale: Locale;
+  onChange: (locale: Locale) => void;
 }) {
   return (
     <div
@@ -468,13 +366,13 @@ function GateLanguageSwitcher({
       className="absolute right-4 top-4 z-20 rounded-full border border-white/12 bg-black/35 p-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55 shadow-2xl backdrop-blur-xl"
       role="group"
     >
-      {GATE_LOCALES.map((item) => (
+      {LOCALES.map((item) => (
         <button
           key={item}
           type="button"
           onClick={() => onChange(item)}
           className={`rounded-full px-3 py-1.5 transition ${locale === item ? "bg-white text-black" : "hover:bg-white/10 hover:text-white"}`}
-          aria-label={GATE_LOCALE_LABELS[item]}
+          aria-label={LOCALE_NAMES[item]}
           aria-pressed={locale === item}
         >
           {item}
