@@ -1,6 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -8,23 +6,17 @@ import {
   Crown,
   Globe2,
   LockKeyhole,
-  Sparkles,
   UsersRound,
 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import {
-  createFoundersNowPaymentsCheckout,
-  createFoundersStripeCheckout,
-  confirmFoundersStripeCheckout,
-  getFoundersBillingOptions,
-} from "@/lib/founders-billing.functions";
+import { PackRails } from "@/components/billing/pack-rails";
 
 const capabilities = [
   {
     icon: Globe2,
-    title: "A home that is yours",
-    body: "Bring a community domain and make every gate feel like part of the same world.",
+    title: "A home that is ready",
+    body: "Every Gate receives a managed MyFenrir URL, ready to share without DNS setup.",
   },
   {
     icon: LockKeyhole,
@@ -38,81 +30,13 @@ const capabilities = [
   },
 ] as const;
 
-// Launch billing rail = Telegram Stars ONLY. Card (Stripe) and crypto (NOWPayments)
-// checkout stay in code but are hidden until card billing goes live, so no user can
-// reach /api/internal/founders-checkout — the Stripe path that 502s as
-// `stripe_checkout_failed`. Flip to true (or wire an env flag) when card billing is ready.
-const CARD_BILLING_ENABLED = false;
-
 export const Route = createFileRoute("/upgrade")({ ssr: false, component: UpgradePage });
 
 function UpgradePage() {
-  const createNowPaymentsCheckout = useServerFn(createFoundersNowPaymentsCheckout);
-  const createStripeCheckout = useServerFn(createFoundersStripeCheckout);
-  const confirmStripeCheckout = useServerFn(confirmFoundersStripeCheckout);
-  const getBillingOptions = useServerFn(getFoundersBillingOptions);
-  const [stripeBusy, setStripeBusy] = useState(false);
-  const [nowPaymentsReady, setNowPaymentsReady] = useState(false);
-  const [billingMessage, setBillingMessage] = useState<string | null>(null);
   // Honor the OS "reduce motion" setting: all looping/background motion turns
   // off and entrances mount static for anyone who asks for it.
   const reduce = useReducedMotion();
 
-  useEffect(() => {
-    void getBillingOptions()
-      .then((options) => setNowPaymentsReady(options.nowpayments))
-      .catch(() => setNowPaymentsReady(false));
-  }, [getBillingOptions]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const sessionId = params.get("session_id");
-    if (params.get("stripe") === "success" && sessionId) {
-      setStripeBusy(true);
-      void confirmStripeCheckout({ data: { sessionId } })
-        .then(() => setBillingMessage("✅ Standard activated. Your 5 Gates are ready."))
-        .catch((error: unknown) =>
-          setBillingMessage(error instanceof Error ? error.message : "Payment confirmation failed"),
-        )
-        .finally(() => setStripeBusy(false));
-      return;
-    }
-    const status = params.get("nowpayments");
-    if (status === "processing")
-      setBillingMessage(
-        "🟣 Payment received by NOWPayments. Standard activates automatically after blockchain confirmation.",
-      );
-    if (status === "partial")
-      setBillingMessage(
-        "🟠 Partial payment detected. Complete the remaining amount in NOWPayments.",
-      );
-  }, [confirmStripeCheckout]);
-
-  async function openStripe(billingPeriod: "monthly" | "annual" = "monthly") {
-    setStripeBusy(true);
-    setBillingMessage(null);
-    try {
-      const { url } = await createStripeCheckout({ data: { billingPeriod } });
-      window.location.assign(url);
-    } catch (error) {
-      setBillingMessage(error instanceof Error ? error.message : "Stripe checkout unavailable");
-      setStripeBusy(false);
-    }
-  }
-
-  async function openNowPayments() {
-    setStripeBusy(true);
-    setBillingMessage(null);
-    try {
-      const { url } = await createNowPaymentsCheckout();
-      window.location.assign(url);
-    } catch (error) {
-      setBillingMessage(
-        error instanceof Error ? error.message : "NOWPayments checkout unavailable",
-      );
-      setStripeBusy(false);
-    }
-  }
   return (
     <main className="min-h-dvh overflow-hidden bg-background px-5 py-8 sm:px-8 sm:py-12">
       <div
@@ -171,79 +95,13 @@ function UpgradePage() {
               aria-hidden="true"
               className="absolute -right-8 -top-8 h-32 w-32 rounded-full border border-primary/30"
             />
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              Founders Deal · Standard Pack
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Make your Gates a Pack.</h2>
+            <h2 className="text-3xl font-semibold tracking-tight">Make your Gates a Pack.</h2>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Membership begins with your first Gate. Payment activates the Standard Pack: 5 Gates
-              in one active community.
+              Activate The Pack for multi-admin workflows and audit logs.
             </p>
-            {CARD_BILLING_ENABLED && (
-              <>
-                <button
-                  type="button"
-                  disabled={stripeBusy}
-                  onClick={() => void openStripe("annual")}
-                  className="group relative mt-6 flex w-full items-center justify-center overflow-hidden rounded-xl border border-[#635bff]/60 bg-gradient-to-r from-[#635bff] to-violet-600 px-4 py-3 text-sm font-bold text-white shadow-[0_0_36px_rgba(99,91,255,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_48px_rgba(99,91,255,0.4)] disabled:cursor-wait disabled:opacity-60"
-                >
-                  Commit more, pay less · US$149.90/year <ArrowUpRight className="ml-2 h-4 w-4" />
-                </button>
-                <p className="mt-2 text-center text-xs font-medium text-primary">Founders Deal · 2 months free</p>
-                <button
-                  type="button"
-                  disabled={stripeBusy}
-                  onClick={() => void openStripe("monthly")}
-                  className="mt-3 flex w-full items-center justify-center rounded-xl border border-[#635bff]/45 bg-[#635bff]/10 px-4 py-3 text-sm font-medium text-violet-100 transition-colors hover:border-[#8078ff]/70 hover:bg-[#635bff]/20 disabled:cursor-wait disabled:opacity-60"
-                >
-                  Monthly · US$14.99/month <ArrowUpRight className="ml-2 h-4 w-4" />
-                </button>
-              </>
-            )}
-            {CARD_BILLING_ENABLED && nowPaymentsReady ? (
-              <button
-                type="button"
-                disabled={stripeBusy}
-                onClick={() => void openNowPayments()}
-                className="mt-3 flex w-full items-center justify-center rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 text-sm font-medium text-violet-200 transition-colors hover:border-violet-300/70 hover:bg-violet-500/20 disabled:cursor-wait disabled:opacity-60"
-              >
-                ₿ Crypto · $15 USD with NOWPayments <ArrowUpRight className="ml-2 h-4 w-4" />
-              </button>
-            ) : null}
-            <motion.a
-              className="group relative mt-6 flex w-full items-center justify-center overflow-hidden rounded-xl border border-[#f4c542]/50 bg-[#f4c542] px-4 py-3 text-sm font-bold text-[#171204] shadow-[0_0_36px_rgba(244,197,66,0.24)] transition-transform duration-300 hover:-translate-y-0.5 active:translate-y-0"
-              href="https://t.me/Myfenrir_bot?start=fenrir_stars"
-              animate={
-                reduce
-                  ? undefined
-                  : {
-                      boxShadow: [
-                        "0 0 28px rgba(244,197,66,0.22)",
-                        "0 0 48px rgba(244,197,66,0.44)",
-                        "0 0 28px rgba(244,197,66,0.22)",
-                      ],
-                    }
-              }
-              transition={reduce ? undefined : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <span
-                aria-hidden="true"
-                className="absolute inset-x-0 -top-8 h-12 -translate-x-full rotate-12 bg-primary-foreground/20 blur-md transition-transform duration-700 group-hover:translate-x-full"
-              />
-              <span className="relative">
-                ⭐ Activate Standard Pack · 1,150 Stars{" "}
-                <ArrowUpRight className="ml-2 inline h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-              </span>
-            </motion.a>
-            {billingMessage ? (
-              <p className="mt-3 rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-center text-xs">
-                {billingMessage}
-              </p>
-            ) : null}
-            <p className="mt-3 text-center text-xs text-muted-foreground">
-              Telegram confirms Stars inside the bot. Your linked MyFenrir account becomes Pack
-              immediately after payment.
-            </p>
+            <div id="pack-rails" className="mt-6 scroll-mt-24">
+              <PackRails />
+            </div>
           </motion.aside>
         </section>
 
@@ -340,17 +198,12 @@ function UpgradePage() {
               Ready when you are
             </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-              Activate the Standard Pack and create your first Gate.
+              Activate The Pack and create your first Gate.
             </h2>
           </div>
           <div className="flex flex-wrap gap-2">
-            {CARD_BILLING_ENABLED && (
-              <Button variant="fenrir" disabled={stripeBusy} onClick={() => void openStripe("annual")}>
-                <Sparkles className="mr-2 h-4 w-4" /> US$149.90/year · 2 months free
-              </Button>
-            )}
             <Button asChild variant="fenrir">
-              <a href="https://t.me/Myfenrir_bot?start=fenrir_stars">⭐ Pay with Telegram Stars · The Pack</a>
+              <a href="#pack-rails">Choose how you pay · $14.99/month</a>
             </Button>
           </div>
         </motion.section>
