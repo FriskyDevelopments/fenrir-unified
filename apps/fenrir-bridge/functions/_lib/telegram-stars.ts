@@ -41,15 +41,15 @@ export function starsDeepLink(env: BillingEnv) {
 }
 
 export function starsTitle(env: BillingEnv) {
-  return env.FENRIR_STARS_TITLE?.trim() || "MyFenrir Standard Pack · Founders Deal";
+  return env.FENRIR_STARS_TITLE?.trim() || "The Pack · MyFenrir";
 }
 
 export function starsDescription(env: BillingEnv) {
-  return env.FENRIR_STARS_DESCRIPTION?.trim() || "Activate Standard membership: 5 Gates for one active community. The card alternative is $15 USD.";
+  return env.FENRIR_STARS_DESCRIPTION?.trim() || "The Pack — $15/month. Multi-admin and audit logs. Billed monthly in Telegram Stars.";
 }
 
 export function starsLabel(env: BillingEnv) {
-  return env.FENRIR_STARS_LABEL?.trim() || "Standard Pack";
+  return env.FENRIR_STARS_LABEL?.trim() || "The Pack";
 }
 
 export async function createStarsOrder(db: D1Database, telegramUserId: string, telegramChatId: string, amount: number) {
