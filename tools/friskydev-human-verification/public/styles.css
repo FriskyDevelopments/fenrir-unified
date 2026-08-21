@@ -21,11 +21,6 @@ body::after { content: ''; position: fixed; z-index: -1; inset: 0; opacity: .11;
 .eyebrow { margin: 25px 0 8px; color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .15em; }
 h1 { margin: 0; font-size: clamp(29px, 7vw, 42px); line-height: 1.03; letter-spacing: -.045em; text-wrap: balance; text-shadow: 0 12px 35px rgba(0,0,0,.35); }
 .intro { margin: 16px 0 28px; color: #b7bdcb; line-height: 1.55; }
-altcha-widget { width: 100%; --altcha-border-radius: 12px; --altcha-color-base: #171b24; --altcha-color-border: #3d4353; --altcha-color-text: #f7f8fb; --altcha-color-border-focus: var(--accent); }
-.fallback-verified { min-height: 50px; display: flex; align-items: center; gap: 11px; padding: 0 15px; border: 1px solid rgba(var(--accent-rgb),.45); border-radius: 12px; background: rgba(var(--accent-rgb),.08); color: var(--accent); }
-.fallback-verified[hidden] { display: none; }
-.fallback-verified span { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: #0b0e12; font-weight: 900; }
-.fallback-verified strong { color: #eef2f7; font-size: 13px; }
 button, input { font: inherit; }
 button { cursor: pointer; }
 .primary, .answer-row button { width: 100%; margin-top: 14px; padding: 14px 18px; border: 0; border-radius: 12px; background: var(--accent); color: #111; font-weight: 800; }

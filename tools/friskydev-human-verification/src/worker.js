@@ -21,8 +21,8 @@ const allowedAudiences = new Set([
 // the apex (myfenrir.com), www, community subdomains, and the fenrir-bridge Pages
 // project (its production alias plus per-deploy preview hostnames). Requiring an
 // exact match against the static Set above rejected every origin except
-// https://www.myfenrir.com, which failed challenge issuance for all three
-// methods (altcha / puzzle / slider). Accept the explicit Set plus any HTTPS
+// https://www.myfenrir.com, which failed challenge issuance for the native
+// Frisky Runes and Signal Slider methods. Accept the explicit Set plus any HTTPS
 // first-party MyFenrir or fenrir-bridge.pages.dev origin.
 const isAllowedAudience = (audience) => {
   if (allowedAudiences.has(audience)) return true;
@@ -109,38 +109,6 @@ async function issueGrant(method, secret, binding) {
   }, secret);
 }
 
-async function sha256(value) {
-  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(value)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-async function altchaChallenge(secret, binding) {
-  const maxnumber = 120000;
-  const number = randomInt(0, maxnumber + 1);
-  const saltParams = new URLSearchParams({
-    expires: String(Math.floor(Date.now() / 1000) + lifetime),
-    audience: binding.audience,
-    context: binding.context,
-  });
-  const salt = `${crypto.randomUUID().replaceAll("-", "")}?${saltParams.toString()}&`;
-  const challenge = await sha256(`${salt}${number}`);
-  const signature = await hmac(challenge, secret, "friskydev-altcha-v1");
-  return { algorithm: "SHA-256", challenge, maxnumber, salt, signature };
-}
-
-async function verifyAltcha(value, secret) {
-  try {
-    const parsed = JSON.parse(decode64(String(value || "")));
-    const saltParams = new URLSearchParams(parsed.salt.split("?", 2)[1] || "");
-    const expires = Number(saltParams.get("expires"));
-    const binding = { audience: saltParams.get("audience") || "", context: saltParams.get("context") || "" };
-    if (!isAllowedAudience(binding.audience) || !/^[A-Za-z0-9_-]{32,128}$/.test(binding.context)) return null;
-    if (parsed.algorithm !== "SHA-256" || !Number.isInteger(parsed.number)) return null;
-    if (parsed.number < 0 || parsed.number > 120000 || expires * 1000 < Date.now()) return null;
-    if (!equal(parsed.challenge, await sha256(`${parsed.salt}${parsed.number}`))) return null;
-    return equal(parsed.signature, await hmac(parsed.challenge, secret, "friskydev-altcha-v1")) ? binding : null;
-  } catch { return null; }
-}
-
 async function body(request) {
   const type = request.headers.get("content-type") || "";
   if (type.includes("application/json")) return request.json();
@@ -156,22 +124,11 @@ export default {
       return json({ status: "ok", service: "friskydev-human-verification", secret: Boolean(secret) });
     }
 
+    // Never let the assets single-page fallback turn a retired verification URL
+    // into a successful HTML response.
+    if (url.pathname.startsWith("/api/altcha/")) return json({ error: "not_found" }, 404);
+
     if (!secret && url.pathname.startsWith("/api/")) return json({ error: "verification_unavailable" }, 503);
-
-    if (request.method === "GET" && url.pathname === "/api/altcha/challenge") {
-      const binding = verificationBinding(url);
-      if (!binding) return json({ error: "invalid_verification_binding" }, 400);
-      return json(await altchaChallenge(secret, binding), 200, { "x-verification-risk": riskFor(request) });
-    }
-
-    if (request.method === "POST" && url.pathname === "/api/verify") {
-      const input = await body(request);
-      const existingGrant = await readToken(input.fallbackGrant, secret, "verification-grant");
-      if (existingGrant) return json({ verified: true, method: existingGrant.method, grant: input.fallbackGrant });
-      const binding = await verifyAltcha(input.altcha, secret);
-      const verified = Boolean(binding);
-      return json({ verified, method: "altcha", grant: verified ? await issueGrant("altcha", secret, binding) : undefined }, verified ? 200 : 400);
-    }
 
     if (request.method === "POST" && url.pathname === "/api/grant/verify") {
       const input = await body(request);

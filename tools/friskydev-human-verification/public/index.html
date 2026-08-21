@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Human verification</title>
-    <link rel="stylesheet" href="/styles.css?v=20260815-miniapp-2" />
-    <script defer type="module" src="/app.js?v=20260815-miniapp-7"></script>
+    <link rel="stylesheet" href="/styles.css?v=20260821-native-1" />
+    <script defer type="module" src="/app.js?v=20260821-native-1"></script>
   </head>
   <body>
     <main class="card" aria-labelledby="title">
@@ -24,22 +24,7 @@
       <div class="mark" role="img" aria-label="FriskyDev wolf logo"></div>
       <p class="eyebrow">FRISKYDEV · SECURE CHECK</p>
       <h1 id="title">Let’s make sure you’re human</h1>
-      <p id="intro" class="intro">Private verification with no tracking. Complete the automatic challenge or use the puzzle instead.</p>
-
-      <form id="verification-form" action="/api/verify" method="post">
-        <input id="fallback-grant" type="hidden" name="fallbackGrant" value="">
-        <altcha-widget
-          name="altcha"
-          type="checkbox"
-          display="standard"
-          auto="off"
-          configuration='{"hideFooter":true,"hideLogo":false}'
-        ></altcha-widget>
-        <div id="fallback-verified" class="fallback-verified" hidden><span aria-hidden="true">✓</span><strong>Verified by alternative challenge</strong></div>
-        <button class="primary" type="submit" data-i18n="continue">Continue</button>
-      </form>
-
-      <button id="show-slider" class="link" type="button">Use Signal Slider</button>
+      <p id="intro" class="intro">Choose a private Frisky challenge. No tracking, third-party CAPTCHA, or image recognition.</p>
 
       <form id="puzzle-form" class="puzzle" hidden>
         <div class="signal-head">
@@ -59,9 +44,9 @@
         </fieldset>
         <button class="unlock" type="submit" disabled><span id="unlock-label">Unlock signal</span><b aria-hidden="true">↗</b></button>
       </form>
-      <button id="show-puzzle" class="link alt-method" type="button" hidden>Use rune puzzle instead</button>
+      <button id="show-puzzle" class="link alt-method" type="button">Use rune puzzle instead</button>
 
-      <form id="slider-form" class="slider-challenge" hidden>
+      <form id="slider-form" class="slider-challenge">
         <div class="slider-copy">
           <p class="puzzle-label">SIGNAL SLIDER · FRISKYDEV</p>
           <h2 id="slider-title">Lock onto the signal</h2>
@@ -81,6 +66,7 @@
         </div>
         <button class="slider-submit" type="submit">Verify position <b aria-hidden="true">↗</b></button>
       </form>
+      <button id="show-slider" class="link alt-method" type="button" hidden>Use Signal Slider instead</button>
 
       <p id="status" class="status" role="status" aria-live="polite"></p>
       <p id="privacy" class="privacy">No cookies · No fingerprinting · No image recognition</p>
