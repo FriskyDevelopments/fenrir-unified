@@ -188,9 +188,8 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
   const telegramCommunity = config.community_id;
   const communityConfirmed = Boolean(telegramCommunity);
   const ssoHref = communitySsoUrl(params.slug, config.brand_id);
-  // A visitor's first Gate action is ALTCHA, then MyFenrir SSO. Once SSO has
-  // returned a session, the Gate must run the security preflight instead of
-  // bouncing back to SSO because a Telegram signal is incomplete.
+  // A visitor starts with MyFenrir SSO. Once SSO has returned a session, the
+  // Gate runs its security preflight instead of bouncing back to SSO.
   const needsSso = checkingAccess || !session;
   // `isStaff` can hydrate from a cached role result before an SSO session is
   // available. Public visitors must never see the internal Gates shortcut in
@@ -249,6 +248,12 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
     }
   }
 
+  function explainSetupPending() {
+    // A published-but-unlinked Gate must never fall through to the preview's
+    // default login URL. It is intentionally not an access route yet.
+    setHandoffError(copy.gateSetupPending);
+  }
+
   return (
     <div className="relative">
       <GatePreview
@@ -276,16 +281,18 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
                 ? handoffError
                 : handoffPending
                   ? copy.runningSecurity
-                  : accessRequested
+                : accessRequested
                     ? copy.reviewSubmitted
                     : communityConfirmed
                       ? copy.continueGate
-                      : copy.proceedSso
+                      : copy.gateSetupPending
         }
         onAction={
           session && !authenticatedStaff && !accessRequested && communityConfirmed
             ? runSecurityThenRequestAccess
-            : undefined
+            : session && !authenticatedStaff && !accessRequested
+              ? explainSetupPending
+              : undefined
         }
         actionPending={handoffPending}
       />
