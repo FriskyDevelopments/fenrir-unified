@@ -51,6 +51,37 @@ export const GATE_PRESETS: GatePreset[] = [
     brandId: "lore",
   },
   {
+    /*
+     * Paleta tomada de pupfrisky.com, no inventada. La página la declara ella
+     * misma —"Hazard yellow · Electric cyan · Neon amethyst"— sobre un
+     * `meta-theme-color: #121212`, y el cian es verificable: `#00e5ff` es el
+     * color literal que pasa a su reproductor de SoundCloud.
+     *
+     * Es el preset más ruidoso del set a propósito. El resto de los Gates
+     * asumen una marca sobria; este asume lo contrario: amarillo de peligro
+     * como acento, cian eléctrico entrando por abajo, amatista arriba, y negro
+     * casi puro de fondo para que los tres neones corten. Tres focos en vez de
+     * dos, que es lo que le da el brillo de arcade.
+     *
+     * brandId queda en "myfenrir" porque NO existe un tenant `pupfrisky`
+     * —comprobado: cero coincidencias en src/—. Crear el tenant es un cambio
+     * de datos aparte; este preset sólo aporta el aspecto.
+     */
+    id: "pup-hazard",
+    name: "Pup hazard",
+    tagline: "Hazard yellow, electric cyan, neon amethyst — hood up",
+    logoUrl: DEFAULT_LOGO_URL,
+    mascot: "wolf",
+    atmosphere:
+      "radial-gradient(ellipse 72% 55% at 50% 0%, oklch(0.65 0.23 305 / 42%), transparent 70%), radial-gradient(ellipse 62% 48% at 12% 100%, oklch(0.84 0.14 202 / 40%), transparent 72%), radial-gradient(ellipse 45% 38% at 88% 88%, oklch(0.88 0.18 96 / 26%), transparent 70%), linear-gradient(180deg, oklch(0.19 0.01 285), oklch(0.13 0.005 280))",
+    accent: "oklch(0.88 0.18 96)",
+    overlay:
+      "linear-gradient(180deg, oklch(0.13 0.008 285 / 70%), oklch(0.11 0.004 280 / 94%))",
+    thumb:
+      "radial-gradient(circle at 28% 18%, oklch(0.65 0.23 305 / 72%), transparent 60%), radial-gradient(circle at 78% 82%, oklch(0.84 0.14 202 / 62%), transparent 60%), radial-gradient(circle at 52% 55%, oklch(0.88 0.18 96 / 40%), transparent 55%), linear-gradient(160deg, oklch(0.20 0.012 285), oklch(0.12 0.005 280))",
+    brandId: "myfenrir",
+  },
+  {
     id: "fenrir-dark",
     name: "Fenrir dark",
     tagline: "House style — deep navy with ember red",
