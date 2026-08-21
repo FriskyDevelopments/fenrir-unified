@@ -1705,7 +1705,6 @@ function fallbackMind(text, entitlement) {
         "Enlazar una comunidad requiere The Pack.",
         "",
         "The Pack · $14.99/mes",
-        "Tres comunidades = $45/mes.",
         "Multi-admin y registros de auditoría.",
         "",
         "Cómo pagar · mismo precio en los tres:",
@@ -1724,7 +1723,6 @@ function fallbackMind(text, entitlement) {
       "Linking a community requires The Pack.",
       "",
       "The Pack · $14.99/month",
-      "Three communities = $45/month.",
       "Multi-admin and audit logs.",
       "",
       "How to pay · same price on all three:",
@@ -1983,7 +1981,7 @@ async function handleTelegramWebhook(request, env, url) {
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
       text: membership.applied
-        ? `The Pack activated.\n\nAccess: active\nCovers: 1 linked community\nMulti-admin · audit logs\nStars: ${payment.total_amount}\nPayment rail: Telegram Stars\nRenews monthly. Each extra community is $15/month.`
+        ? `The Pack activated.\n\nAccess: active\nCovers: 1 linked community\nMulti-admin · audit logs\nStars: ${payment.total_amount}\nPayment rail: Telegram Stars\nRenews monthly.`
         : `Stars payment confirmed.\n\nStars: ${payment.total_amount}\nNext: open MyFenrir → Settings → Link Telegram. The Pack will activate automatically after linking.`
     });
     return json({ ok: true });
