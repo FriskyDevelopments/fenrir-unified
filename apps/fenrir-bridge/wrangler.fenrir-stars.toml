@@ -10,9 +10,9 @@ GEMINI_MODEL = "gemini-3-flash-preview"
 FENRIR_TELEGRAM_BOT_USERNAME = "Myfenrir_bot"
 FENRIR_STARS_PRICE = "1150"
 FENRIR_STARS_PLAN = "standard"
-FENRIR_STARS_TITLE = "MyFenrir Standard Pack · Founders Deal"
-FENRIR_STARS_DESCRIPTION = "Activate the Standard Pack: 5 Gates for one active community. Card alternative: $15 USD."
-FENRIR_STARS_LABEL = "Standard Pack"
+FENRIR_STARS_TITLE = "The Pack · MyFenrir"
+FENRIR_STARS_DESCRIPTION = "The Pack — $15/month. Multi-admin and audit logs. Billed monthly in Telegram Stars."
+FENRIR_STARS_LABEL = "The Pack"
 FENRIR_LINK_CONFIRM_URL = "https://www.myfenrir.com/api/telegram/link/confirm"
 
 [[d1_databases]]
