@@ -506,6 +506,16 @@ export const telegramService = {
   ]
 };
 
+// Kept as a named service so the optional report panel can remain type-safe
+// when a community security endpoint is enabled for a deployment.
+export const communitySecurityService = {
+  async getReport(communitySlug: string): Promise<{ ok: true; data: CommunitySecurityReport }> {
+    return apiRequest<{ ok: true; data: CommunitySecurityReport }>(
+      `/api/community-security/${encodeURIComponent(communitySlug)}`
+    );
+  }
+};
+
 export const aiOpsService = {
   julesTicket() {
     appendAudit("jules_ticket_created", "FriskyOrg", store.org.id, { label: "backend hardening task" });
