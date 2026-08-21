@@ -28,41 +28,78 @@ export const getFoundersBillingOptions = createServerFn({ method: "GET" })
     };
   });
 
+/**
+ * Identity for the billing worker. It validates userId and orgId as UUIDs and
+ * binds the Stripe session to both, so a session bought by one account can
+ * never be confirmed by another. There is no separate org entity yet: the
+ * Supabase user is the org, which is what isValidFoundersStripeSession already
+ * assumes (client_reference_id === orgId === userId).
+ */
+function billingIdentity(context: { userId: string; claims: Record<string, unknown> }) {
+  const userId = String(context.userId ?? "").trim();
+  const email = String((context.claims as { email?: unknown })?.email ?? "").trim().toLowerCase();
+  if (!/^[0-9a-f-]{36}$/i.test(userId)) throw new Error("Your session is missing a valid account id. Sign in again.");
+  if (!email.includes("@")) throw new Error("Your account has no email address on file. Add one before paying by card.");
+  return { userId, orgId: userId, email };
+}
+
+/**
+ * Card rail — first on screen. The checkout session itself is built by
+ * fenrir-stars-payments (/api/internal/founders-checkout), which owns the live
+ * Stripe key and the Pack price id. Nothing about pricing is decided here.
+ */
 export const createFoundersStripeCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
-    z.object({ billingPeriod: z.enum(["monthly", "annual"]).default("monthly") }).parse(data),
+  .validator((data) =>
+    z
+      .object({
+        billingPeriod: z.enum(["monthly", "annual"]).default("monthly"),
+        refCode: z.string().regex(/^[A-Za-z0-9]{6,16}$/).optional(),
+      })
+      .parse(data),
   )
-  .handler(async ({ context, data }) => {
-    const email = typeof context.claims.email === "string" ? context.claims.email : "";
-    if (!email) throw new Error("Your signed-in account has no email address");
+  .handler(async ({ data, context }) => {
+    const { userId, orgId, email } = billingIdentity(context);
     const result = await billingRequest("/api/internal/founders-checkout", {
-      userId: context.userId,
-      orgId: context.userId,
+      userId,
+      orgId,
       email,
       billingPeriod: data.billingPeriod,
+      ...(data.refCode ? { refCode: data.refCode } : {}),
     });
-    return { url: String(result["url"]) };
+    const url = typeof result["url"] === "string" ? result["url"] : "";
+    if (!url) throw new Error("Stripe did not return a checkout URL. Try again in a moment.");
+    return { url, sessionId: typeof result["sessionId"] === "string" ? result["sessionId"] : "" };
   });
 
+/**
+ * Crypto rail — same $14.99 as card and Stars. NOWPayments shows its own fee on
+ * its checkout screen; we never fold a fee into the advertised number.
+ */
 export const createFoundersNowPaymentsCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
+  .validator(() => undefined)
   .handler(async ({ context }) => {
-    const result = await billingRequest("/api/internal/founders-nowpayments-checkout", {
-      userId: context.userId,
-      orgId: context.userId,
-    });
-    return { url: String(result["url"]) };
+    const { userId } = billingIdentity(context);
+    const result = await billingRequest("/api/internal/founders-nowpayments-checkout", { userId });
+    const url = typeof result["url"] === "string" ? result["url"] : "";
+    if (!url) throw new Error("NOWPayments did not return an invoice URL. Try again in a moment.");
+    return { url };
   });
 
+/** Called on return from Stripe with ?stripe=success&session_id=… */
 export const confirmFoundersStripeCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ sessionId: z.string().regex(/^cs_(?:test_|live_)?[A-Za-z0-9]+$/) }).parse(data))
-  .handler(async ({ context, data }) => {
-    await billingRequest("/api/internal/founders-confirm", {
+  .validator((data) => z.object({ sessionId: z.string().regex(/^cs_(?:test_|live_)?[A-Za-z0-9]+$/) }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId, orgId } = billingIdentity(context);
+    const result = await billingRequest("/api/internal/founders-confirm", {
       sessionId: data.sessionId,
-      userId: context.userId,
-      orgId: context.userId,
+      userId,
+      orgId,
     });
-    return { ok: true as const };
+    return {
+      plan: typeof result["plan"] === "string" ? result["plan"] : "standard",
+      status: typeof result["status"] === "string" ? result["status"] : "active",
+    };
   });
