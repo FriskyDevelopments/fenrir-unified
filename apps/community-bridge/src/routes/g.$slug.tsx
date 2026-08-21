@@ -25,9 +25,16 @@ const TELEGRAM_BOT_USERNAME = (
 
 const GATE_LOCALES = ["en", "es", "fr", "de"] as const;
 type GateLocale = (typeof GATE_LOCALES)[number];
+const GATE_LOCALE_LABELS: Record<GateLocale, string> = {
+  en: "English",
+  es: "Español",
+  fr: "Français",
+  de: "Deutsch",
+};
 const GATE_COPY = {
   en: {
     openMyGates: "Open my Gates",
+    ownerAccessActive: "Owner access is active. Manage this community's Gates.",
     proceedSso: "Proceed to SSO",
     verifyHuman: "Verify human signal",
     runningSecurity: "Running Gate security…",
@@ -49,6 +56,7 @@ const GATE_COPY = {
   },
   es: {
     openMyGates: "Abrir mis Gates",
+    ownerAccessActive: "El acceso de owner está activo. Administra los Gates de esta comunidad.",
     proceedSso: "Continuar a SSO",
     verifyHuman: "Verificar señal humana",
     runningSecurity: "Corriendo seguridad del Gate…",
@@ -70,6 +78,7 @@ const GATE_COPY = {
   },
   fr: {
     openMyGates: "Ouvrir mes Gates",
+    ownerAccessActive: "L’accès owner est actif. Gérez les Gates de cette communauté.",
     proceedSso: "Continuer vers SSO",
     verifyHuman: "Vérifier le signal humain",
     runningSecurity: "Contrôle Gate en cours…",
@@ -91,6 +100,7 @@ const GATE_COPY = {
   },
   de: {
     openMyGates: "Meine Gates öffnen",
+    ownerAccessActive: "Der Owner-Zugriff ist aktiv. Verwalte die Gates dieser Community.",
     proceedSso: "Weiter zu SSO",
     verifyHuman: "Human-Signal prüfen",
     runningSecurity: "Gate-Sicherheit läuft…",
@@ -284,6 +294,11 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
   // returned a session, the Gate must run the security preflight instead of
   // bouncing back to SSO because a Telegram signal is incomplete.
   const needsSso = checkingAccess || !session;
+  // `isStaff` can hydrate from a cached role result before an SSO session is
+  // available. Public visitors must never see the internal Gates shortcut in
+  // that transient state; it strands them at a second login wall instead of
+  // starting the Gate's SSO journey.
+  const authenticatedStaff = Boolean(session && isStaff);
   const copy = GATE_COPY[locale];
 
   useTrackGateView(params.slug, config.preset);
@@ -339,17 +354,23 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
   return (
     <div className="relative">
       <GatePreview
-        config={config}
+        config={{
+          ...config,
+          // An owner landing back on a public Gate already has a valid
+          // session. Leaving the visitor-only "Sign in" subtitle here made
+          // that otherwise correct "Open my Gates" shortcut look broken.
+          subheadline: authenticatedStaff ? copy.ownerAccessActive : config.subheadline,
+        }}
         hideLogo
         actionHref={
-          isStaff
+          authenticatedStaff
             ? "/gates"
             : needsSso
               ? ssoHref
               : undefined
         }
         actionLabel={
-          isStaff
+          authenticatedStaff
             ? copy.openMyGates
             : needsSso
               ? copy.proceedSso
@@ -364,7 +385,7 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
                       : copy.proceedSso
         }
         onAction={
-          session && !isStaff && !accessRequested && communityConfirmed
+          session && !authenticatedStaff && !accessRequested && communityConfirmed
             ? runSecurityThenRequestAccess
             : undefined
         }
@@ -442,13 +463,18 @@ function GateLanguageSwitcher({
   onChange: (locale: GateLocale) => void;
 }) {
   return (
-    <div className="absolute right-4 top-4 z-20 rounded-full border border-white/12 bg-black/35 p-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55 shadow-2xl backdrop-blur-xl">
+    <div
+      aria-label="Choose language"
+      className="absolute right-4 top-4 z-20 rounded-full border border-white/12 bg-black/35 p-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55 shadow-2xl backdrop-blur-xl"
+      role="group"
+    >
       {GATE_LOCALES.map((item) => (
         <button
           key={item}
           type="button"
           onClick={() => onChange(item)}
           className={`rounded-full px-3 py-1.5 transition ${locale === item ? "bg-white text-black" : "hover:bg-white/10 hover:text-white"}`}
+          aria-label={GATE_LOCALE_LABELS[item]}
           aria-pressed={locale === item}
         >
           {item}
