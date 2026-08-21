@@ -17,7 +17,7 @@ function stripeSession(overrides: Record<string, unknown> = {}) {
     mode: "subscription",
     client_reference_id: userId,
     currency: "usd",
-    amount_total: 1500,
+    amount_total: 1499,
     subscription: "sub_founder_pack",
     metadata: {
       frisky_org_id: userId,
@@ -34,7 +34,7 @@ describe("Community Bridge Standard billing validation", () => {
   it("accepts only the exact paid Stripe offer bound to the signed-in user", () => {
     expect(isValidFoundersStripeSession(stripeSession(), userId, userId)).toBe(true);
     expect(
-      isValidFoundersStripeSession(stripeSession({ amount_total: 1499 }), userId, userId),
+      isValidFoundersStripeSession(stripeSession({ amount_total: 1500 }), userId, userId),
     ).toBe(false);
     expect(
       isValidFoundersStripeSession(
@@ -82,7 +82,7 @@ describe("Community Bridge Gate limits", () => {
   });
 
   // Canon: The Pack does not lift the Gate count — it buys the right to *link*
-  // a Gate to a live community, at $15/month per linked community. The paid
+  // a Gate to a live community, at $14.99/month per linked community. The paid
   // axis is `activeCommunityLimit`, not `limit`.
   it("keeps The Pack at the same Gate count and lifts the community limit", () => {
     expect(PACK_GATE_LIMIT).toBe(5);

@@ -26,8 +26,8 @@ function billingRequestAuthorized(request, env) {
 
 export function isValidFoundersStripeSession(session, userId, orgId) {
   const billingPeriod = session?.metadata?.billing_period;
-  // Canon: $15.00/month = 1500. The old 1499 matched the $14.99 decoy price.
-  const expectedAmount = billingPeriod === "annual" ? 14990 : 1500;
+  // Canon: $14.99/month = 1499 (confirmado por Francisco). No es 1500.
+  const expectedAmount = billingPeriod === "annual" ? 14990 : 1499;
   return Boolean(
     session?.payment_status === "paid" &&
       session?.mode === "subscription" &&
@@ -78,9 +78,9 @@ async function stripeRequest(env, path, params) {
 // Live Pack price IDs are the default, but stay overridable per environment so
 // the checkout + webhook path can be exercised end-to-end against a Stripe
 // sandbox without pointing anything at real money.
-// Canon: The Pack is $15.00/month. price_1U45nN… ($14.99) and price_1U45nI… ($19.99)
-// are decoys on the same Stripe product and must not be wired here.
-const LIVE_FOUNDERS_MONTHLY_PRICE = "price_1U44coLxUF54S071p2EP0H93";
+// Canon: The Pack is $14.99/month → price_1U45nN…. price_1U44co… ($15.00) and
+// price_1U45nI… ($19.99) exist on the same product but are NOT the price.
+const LIVE_FOUNDERS_MONTHLY_PRICE = "price_1U45nNLxUF54S071oRPYXOec";
 const LIVE_FOUNDERS_ANNUAL_PRICE = "price_1U4bO5LxUF54S071qvkmFT0V";
 export function foundersPriceId(env, billingPeriod) {
   return billingPeriod === "annual"
@@ -215,10 +215,10 @@ async function handleFoundersNowPaymentsCheckout(request, env) {
     method: "POST",
     headers: { "x-api-key": apiKey, "content-type": "application/json" },
     body: JSON.stringify({
-      price_amount: 15,
+      price_amount: 14.99,
       price_currency: "usd",
       order_id: orderId,
-      order_description: "MyFenrir Standard · Founders Deal · 5 Gates",
+      order_description: "The Pack · MyFenrir · $14.99/month",
       ipn_callback_url: "https://fenrir-stars-payments.hrgrrtks2p.workers.dev/api/nowpayments/ipn",
       success_url: "https://communities.myfenrir.com/upgrade?nowpayments=processing",
       cancel_url: "https://communities.myfenrir.com/upgrade?nowpayments=cancel",
@@ -429,8 +429,8 @@ const FENRIR_BOT_BRIEF = [
   "PAYMENT BEHAVIOR:",
   "If user asks to buy, pay, upgrade, subscribe, unlock, activate, or similar: say you are opening the official Fenrir payment box.",
   "Payment rails, in this order: card (Apple Pay / Google Pay) first, Telegram Stars second, crypto third.",
-  "Same price on every rail. Card and crypto are US$15. Telegram Stars is the equivalent, 1,150 Stars.",
-  "Crypto is billed through NOWPayments, which adds a US$0.75 processing fee — say the amount, never a percentage.",
+  "Same price on every rail: US$14.99 for card and crypto. Telegram Stars is the equivalent, 1,150 Stars.",
+  "Crypto is billed through NOWPayments at the same US$14.99. Any processing fee is shown by NOWPayments on its own checkout screen before paying — quote amounts, never percentages.",
   "Telegram Stars is NOT the only rail. Never tell a user card billing is unavailable or coming later.",
   "In-bot, /subscribe opens the Telegram Stars box. For card or crypto, point the user to MyFenrir → Upgrade.",
   "Explain Fenrir verifies access only after the payment processor confirms it.",
@@ -444,8 +444,8 @@ const FENRIR_BOT_BRIEF = [
   "Custom domains are not active. Do not provide TXT or CNAME records.",
   "PLANS (two tiers only):",
   "Free ($0): 5 gates to build and test, plus a managed MyFenrir Gate URL. Linking a community requires The Pack.",
-  "The Pack ($15/month): multi-admin workflows and audit logs.",
-  "Never say 'unlimited Locks'. The Pack is $15/month; never describe any allowance as unlimited.",
+  "The Pack ($14.99/month): multi-admin workflows and audit logs.",
+  "Never say 'unlimited Locks'. The Pack is $14.99/month; never describe any allowance as unlimited.",
   "There is no Starter or Pro tier. Do not mention Starter, Pro, or Operator — those are retired.",
   "Communities are adults only.",
   "Keep replies concise. Use clean bullets when useful. No corporate fluff."
@@ -1376,7 +1376,7 @@ async function memberProfileText(env, telegramUserId, from) {
     "",
     `Referrals: ${refStats.converted}/${refStats.invited} converted · ${refStats.rewardDays} days earned`,
     "Get your invite link with /referral.",
-    ...(active ? [] : ["", "Activate The Pack — $15/month.", "Card or crypto in MyFenrir → Upgrade, Telegram Stars with /subscribe, or a courtesy code via /redeem."])
+    ...(active ? [] : ["", "Activate The Pack — $14.99/month.", "Card or crypto in MyFenrir → Upgrade, Telegram Stars with /subscribe, or a courtesy code via /redeem."])
   ].join("\n");
 }
 
@@ -1469,14 +1469,14 @@ async function sendStarsInvoice(env, channel, message) {
   // PROVIDER_ACCOUNT_INVALID), exactly ONE entry in `prices`, and no
   // shipping/address/phone/email/need_* /is_flexible fields.
   // `subscription_period` is REQUIRED for a recurring Stars subscription:
-  // without it Telegram charges ONCE while we advertise "$15/month".
+  // without it Telegram charges ONCE while we advertise "$14.99/month".
   // 2592000 seconds (30 days) is the only value Telegram accepts.
   await telegramApi(env, channel, "sendInvoice", {
     chat_id: message.chat.id,
     title: env.FENRIR_STARS_TITLE || "The Pack · MyFenrir",
     description:
       env.FENRIR_STARS_DESCRIPTION ||
-      "The Pack — $15/month. Multi-admin and audit logs. Billed monthly in Telegram Stars.",
+      "The Pack — $14.99/month. Multi-admin and audit logs. Billed monthly in Telegram Stars.",
     payload,
     currency: "XTR",
     prices: [{ label: env.FENRIR_STARS_LABEL || "The Pack", amount }],
@@ -1574,7 +1574,7 @@ export function modularMenuText(text, entitlement) {
       "Agrega Fenrir como admin con permiso para crear invitaciones. Tú aceptas a cada persona antes de que reciba una invitación.",
       "",
       "3 · Elige tu plan cuando lo necesites",
-      "Gratis incluye 5 gates para armar y probar. Enlazar una comunidad requiere The Pack: US$15/mes, con multi-admin y auditoría.",
+      "Gratis incluye 5 gates para armar y probar. Enlazar una comunidad requiere The Pack: US$14.99/mes, con multi-admin y auditoría.",
       "",
       "Puedes crear tu primer Gate sin pagar ni configurar DNS.",
       "",
@@ -1594,7 +1594,7 @@ export function modularMenuText(text, entitlement) {
     "Make Fenrir an admin with Invite Users. You approve each person before the bot creates their invite.",
     "",
     "3 · Choose a plan when you need it",
-    "Free includes 5 gates to build and test. Linking a community requires The Pack: US$15/month, with multi-admin and audit logs.",
+    "Free includes 5 gates to build and test. Linking a community requires The Pack: US$14.99/month, with multi-admin and audit logs.",
     "",
     "You can create your first Gate without paying or setting up DNS.",
     "",
@@ -1688,11 +1688,11 @@ function fallbackMind(text, entitlement) {
     if (spanishIntent(text)) {
       return entitlement?.status === "active"
         ? `Fenrir Protocol esta activo.\n\nAcceso: activo\nStars: ${entitlement.stars_amount}\nModo: Telegram Stars`
-        : "Fenrir Protocol todavia no esta activo.\n\n$15/mes.\nTarjeta y cripto en MyFenrir → Upgrade. /subscribe abre la caja de Telegram Stars (⭐1,150).";
+        : "Fenrir Protocol todavia no esta activo.\n\n$14.99/mes.\nTarjeta y cripto en MyFenrir → Upgrade. /subscribe abre la caja de Telegram Stars (⭐1,150).";
     }
     return entitlement?.status === "active"
       ? `Fenrir Protocol is active.\n\nAccess: unlocked\nStars: ${entitlement.stars_amount}\nMode: Telegram Stars`
-      : "Fenrir Protocol is not active yet.\n\n$15/month.\nCard and crypto in MyFenrir → Upgrade. /subscribe opens the Telegram Stars box (⭐1,150).";
+      : "Fenrir Protocol is not active yet.\n\n$14.99/month.\nCard and crypto in MyFenrir → Upgrade. /subscribe opens the Telegram Stars box (⭐1,150).";
   }
 
   if (pricingIntent(text)) {
@@ -1704,14 +1704,14 @@ function fallbackMind(text, entitlement) {
         "5 gates para armar y probar.",
         "Enlazar una comunidad requiere The Pack.",
         "",
-        "The Pack · $15/mes",
+        "The Pack · $14.99/mes",
         "Tres comunidades = $45/mes.",
         "Multi-admin y registros de auditoría.",
         "",
         "Cómo pagar · mismo precio en los tres:",
-        "1. Tarjeta (Apple Pay / Google Pay) — $15",
+        "1. Tarjeta (Apple Pay / Google Pay) — $14.99",
         "2. Telegram Stars — ⭐1,150",
-        "3. Cripto — $15.75 ($0.75 de comisión de NOWPayments)",
+        "3. Cripto — $14.99 · NOWPayments te muestra su comisión antes de pagar",
         "",
         "/subscribe abre la caja de Stars. Tarjeta y cripto en MyFenrir → Upgrade."
       ].join("\n");
@@ -1723,14 +1723,14 @@ function fallbackMind(text, entitlement) {
       "5 gates to build and test.",
       "Linking a community requires The Pack.",
       "",
-      "The Pack · $15/month",
+      "The Pack · $14.99/month",
       "Three communities = $45/month.",
       "Multi-admin and audit logs.",
       "",
       "How to pay · same price on all three:",
-      "1. Card (Apple Pay / Google Pay) — $15",
+      "1. Card (Apple Pay / Google Pay) — $14.99",
       "2. Telegram Stars — ⭐1,150",
-      "3. Crypto — $15.75 ($0.75 NOWPayments fee)",
+      "3. Crypto — $14.99 · NOWPayments shows its fee before you pay",
       "",
       "/subscribe opens the Stars box. Card and crypto in MyFenrir → Upgrade."
     ].join("\n");
@@ -1741,11 +1741,11 @@ function fallbackMind(text, entitlement) {
       return [
         "MYFENRIR | Pago",
         "",
-        "The Pack cuesta $15/mes.",
+        "The Pack cuesta $14.99/mes.",
         "",
-        "1. Tarjeta (Apple Pay / Google Pay) — $15",
+        "1. Tarjeta (Apple Pay / Google Pay) — $14.99",
         "2. Telegram Stars — ⭐1,150",
-        "3. Cripto — $15.75 ($0.75 de comisión de NOWPayments)",
+        "3. Cripto — $14.99 · NOWPayments te muestra su comisión antes de pagar",
         "",
         "/subscribe abre la caja de Telegram Stars.",
         "Fenrir activa el acceso sólo cuando el procesador confirma el pago."
@@ -1754,11 +1754,11 @@ function fallbackMind(text, entitlement) {
     return [
       "MYFENRIR | Payment",
       "",
-      "The Pack is $15/month.",
+      "The Pack is $14.99/month.",
       "",
-      "1. Card (Apple Pay / Google Pay) — $15",
+      "1. Card (Apple Pay / Google Pay) — $14.99",
       "2. Telegram Stars — ⭐1,150",
-      "3. Crypto — $15.75 ($0.75 NOWPayments fee)",
+      "3. Crypto — $14.99 · NOWPayments shows its fee before you pay",
       "",
       "/subscribe opens the Telegram Stars box.",
       "Fenrir activates access only after the processor confirms payment."
@@ -1778,7 +1778,7 @@ function fallbackMind(text, entitlement) {
         "5. Crea el slug del bridge.",
         "6. Comparte el link estable.",
         "",
-        "Gratis te da 5 gates para probar. Enlazar una comunidad requiere The Pack ($15/mes)."
+        "Gratis te da 5 gates para probar. Enlazar una comunidad requiere The Pack ($14.99/mes)."
       ].join("\n");
     }
     return [
@@ -1791,7 +1791,7 @@ function fallbackMind(text, entitlement) {
       "5. Create a bridge slug.",
       "6. Share the stable public URL.",
       "",
-      "Free gives you 5 gates to test. Linking a community requires The Pack ($15/month).",
+      "Free gives you 5 gates to test. Linking a community requires The Pack ($14.99/month).",
       "",
       "Say “buy” and I’ll show you the three ways to pay."
     ].join("\n");
@@ -1942,7 +1942,7 @@ async function handleTelegramWebhook(request, env, url) {
     if (query.data === "fenrir_subscribe") {
       await telegramApi(env, channel, "sendMessage", {
         chat_id: callbackMessage.chat.id,
-        text: "Opening the Telegram Stars box — ⭐1,150 for The Pack, one linked community, billed monthly.\nPrefer card or crypto at the same $15? MyFenrir → Upgrade.\nFenrir activates access only after the payment is confirmed."
+        text: "Opening the Telegram Stars box — ⭐1,150 for The Pack, one linked community, billed monthly.\nPrefer card or crypto at the same $14.99? MyFenrir → Upgrade.\nFenrir activates access only after the payment is confirmed."
       });
       await sendStarsInvoice(env, channel, callbackMessage);
       return json({ ok: true });
