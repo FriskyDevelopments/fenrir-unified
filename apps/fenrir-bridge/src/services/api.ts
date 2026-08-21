@@ -8,9 +8,9 @@ import {
   type DomainSearchResult
 } from "../../shared/domain-search";
 import { copy } from "../i18n";
-import { addBridge, addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
+import { addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
 import { completeSupabaseSession, hasSupabaseCallbackInLocation, isSupabaseAuthConfigured, signInWithSupabase, signOutSupabase } from "./supabaseAuth";
-import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck, TrialPublic, TrialStatusPayload } from "./types";
+import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TrialPublic, TrialStatusPayload } from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
 export const defaultBillingCheckoutErrorMessage = copy.en.checkoutErrorGeneric;
@@ -219,38 +219,7 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
     }
     return { ok: true, data: domain } as T;
   }
-  if (path === "/api/bridges" && method === "POST") {
-    const bridge = addBridge(
-      String(body.domainId || store.domains[0]?.id || ""),
-      String(body.slug || "main"),
-      String(body.telegramChatId || "-10020260513"),
-      String(body.telegramGroupName || ""),
-      String(body.telegramGroupImageUrl || "")
-    );
-    const invite = store.invites.find((item) => item.id === bridge.currentInviteId);
-    return { ok: true, data: bridge, invite } as T;
-  }
-  if (path === "/api/bridges/rotate" && method === "POST") {
-    const bridge = store.bridges.find((item) => item.id === body.bridgeId);
-    if (!bridge) throw new Error("bridge_not_found");
-    const currentInvite = store.invites.find((item) => item.id === bridge.currentInviteId);
-    if (currentInvite) {
-      currentInvite.status = "revoked";
-      currentInvite.revokedAt = new Date().toISOString();
-    }
-    const invite: FriskyTelegramInvite = {
-      id: `frisky_invite_${Date.now()}`,
-      bridgeId: bridge.id,
-      inviteLink: `https://t.me/+${bridge.slug}Rotated${Math.random().toString(36).slice(2, 5)}`,
-      status: "active",
-      createdAt: new Date().toISOString()
-    };
-    store.invites.unshift(invite);
-    bridge.currentInviteId = invite.id;
-    bridge.status = "active";
-    bridge.rotatedAt = new Date().toISOString();
-    return { ok: true, data: bridge, invite } as T;
-  }
+  if (path === "/api/bridges" || path === "/api/bridges/rotate") throw new Error("legacy_bridge_retired");
   if (path === "/api/bridges/revoke" && method === "POST") {
     const bridge = store.bridges.find((item) => item.id === body.bridgeId);
     if (!bridge) throw new Error("bridge_not_found");
@@ -279,24 +248,7 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
     if (!room) throw new Error("room_not_found");
     return { ok: true, data: room } as T;
   }
-  if (path === "/api/telegram/check" && method === "POST") {
-    const check: TelegramPermissionCheck = {
-      chatId: String(body.chatId || "-10020260513"),
-      botIsAdmin: true,
-      canInviteUsers: true,
-      canRevokeLinks: true,
-      status: "ready"
-    };
-    store.telegramChecks.unshift(check);
-    return { ok: true, data: check } as T;
-  }
-  if (path.startsWith("/api/public/bridge/")) {
-    const slug = decodeURIComponent(path.split("/").pop() || "");
-    const bridge = store.bridges.find((item) => item.slug === slug && item.status === "active");
-    const invite = bridge ? store.invites.find((item) => item.id === bridge.currentInviteId && item.status === "active") : null;
-    if (!bridge || !invite) throw new Error("bridge_not_found");
-    return { ok: true, bridge, invite } as T;
-  }
+  if (path === "/api/telegram/check" || path.startsWith("/api/public/bridge/")) throw new Error("legacy_bridge_retired");
   if (path.startsWith("/api/public/room/")) {
     const slug = decodeURIComponent(path.split("/").pop() || "");
     const room = store.liveRooms.find((item) => item.slug === slug && item.status === "active");
@@ -545,12 +497,6 @@ export const bridgeService = {
 };
 
 export const telegramService = {
-  async checkPermissions(chatId: string): Promise<{ ok: true; data: TelegramPermissionCheck }> {
-    return apiRequest<{ ok: true; data: TelegramPermissionCheck }>("/api/telegram/check", {
-      method: "POST",
-      body: JSON.stringify({ chatId })
-    });
-  },
   commandExamples: [
     "/bridge_link main <telegram_group_id>",
     "/bridge_rotate main",
