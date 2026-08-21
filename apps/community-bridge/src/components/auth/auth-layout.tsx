@@ -122,7 +122,7 @@ export function AuthLayout({
 
         <div className="pt-1 text-center">
           <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-muted-foreground/70">
-            Secured · End-to-end encrypted
+            Secured · private access only
           </p>
           <div className="mt-3 flex justify-center">
             <BrandBadge />

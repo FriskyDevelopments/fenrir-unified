@@ -73,10 +73,9 @@ interface GateFormProps {
   config: GateConfig;
   onChange: (config: GateConfig) => void;
   slugStatus: SlugStatus;
-  communityLabel: string;
 }
 
-export function GateForm({ config, onChange, slugStatus, communityLabel }: GateFormProps) {
+export function GateForm({ config, onChange, slugStatus }: GateFormProps) {
   const [advancedOpen, setAdvancedOpen] = useState(
     Boolean(config.logo_url || config.mascot_url || config.background_url),
   );
@@ -95,18 +94,6 @@ export function GateForm({ config, onChange, slugStatus, communityLabel }: GateF
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-6">
-        <Card className="border-primary/30 bg-primary/10 p-5 sm:p-6">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-            Community mapping
-          </p>
-          <h2 className="mt-2 text-sm font-semibold tracking-tight">
-            This Gate serves {communityLabel}
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Standard profiles use one active community. Owners can switch the active community and
-            map Gates across several communities.
-          </p>
-        </Card>
         <Card className="p-5 sm:p-6">
           <h2 className="text-sm font-semibold tracking-tight">1. Choose a preset</h2>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -174,12 +161,13 @@ export function GateForm({ config, onChange, slugStatus, communityLabel }: GateF
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="gate-headline">Headline</Label>
+              <Label htmlFor="gate-headline">Gate name</Label>
               <Input
                 id="gate-headline"
                 value={config.headline}
                 onChange={(e) => set("headline", e.target.value)}
                 maxLength={80}
+                placeholder="VIP entrance"
               />
             </div>
             <div className="space-y-2 sm:col-span-2">

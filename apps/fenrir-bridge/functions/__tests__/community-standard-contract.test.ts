@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  OWNER_GATE_LIMIT,
-  STANDARD_GATE_LIMIT,
+  FREE_GATE_LIMIT,
+  PACK_GATE_LIMIT,
   gateQuota,
 } from "../../../community-bridge/src/lib/gate-limits";
 import {
@@ -70,33 +70,36 @@ describe("Community Bridge Standard billing validation", () => {
 });
 
 describe("Community Bridge Gate limits", () => {
-  it("requires membership from Gate 1", () => {
+  it("includes five Gates on the Free plan", () => {
+    expect(FREE_GATE_LIMIT).toBe(5);
     expect(gateQuota(0, false, false)).toMatchObject({
-      limit: 0,
-      canCreate: false,
-      profileType: "unpaid",
-      activeCommunityLimit: 0,
-    });
-  });
-
-  it("limits Standard to 5 Gates in one active community", () => {
-    expect(STANDARD_GATE_LIMIT).toBe(5);
-    expect(gateQuota(4, false, true)).toMatchObject({
-      remaining: 1,
+      limit: 5,
       canCreate: true,
+      profileType: "free",
       activeCommunityLimit: 1,
     });
-    expect(gateQuota(5, false, true).canCreate).toBe(false);
+    expect(gateQuota(5, false, false).canCreate).toBe(false);
   });
 
-  it("limits Owner to 20 Gates across multiple communities", () => {
-    expect(OWNER_GATE_LIMIT).toBe(20);
-    expect(gateQuota(19, true, true)).toMatchObject({
-      remaining: 1,
+  // Canon: The Pack does not lift the Gate count — it buys the right to *link*
+  // a Gate to a live community, at $14.99/month per linked community. The paid
+  // axis is `activeCommunityLimit`, not `limit`.
+  it("keeps The Pack at the same Gate count and lifts the community limit", () => {
+    expect(PACK_GATE_LIMIT).toBe(5);
+    expect(gateQuota(2, false, true)).toMatchObject({
+      remaining: 3,
       canCreate: true,
+      profileType: "pack",
+      activeCommunityLimit: null,
+    });
+  });
+
+  it("keeps owner access on the same Gate count with no community cap", () => {
+    expect(gateQuota(100, true, true)).toMatchObject({
+      remaining: 0,
+      canCreate: false,
       profileType: "owner",
       activeCommunityLimit: null,
     });
-    expect(gateQuota(20, true, true).canCreate).toBe(false);
   });
 });

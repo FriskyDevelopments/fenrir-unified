@@ -32,7 +32,15 @@ export type ReadinessSnapshot = {
   };
 };
 
-export function computeReadiness(env: OAuthEnv): ReadinessSnapshot {
+export type ManagedTelegramRail = {
+  starsConfigured: boolean;
+  webhookConfigured: boolean;
+};
+
+export function computeReadiness(
+  env: OAuthEnv,
+  managedRail: ManagedTelegramRail = { starsConfigured: false, webhookConfigured: false }
+): ReadinessSnapshot {
   const supabaseConfigured = nonEmpty(env.SUPABASE_URL) && nonEmpty(env.SUPABASE_ANON_KEY);
   const directGoogle = nonEmpty(env.GOOGLE_CLIENT_ID) && nonEmpty(env.GOOGLE_CLIENT_SECRET);
   const directMicrosoft = nonEmpty(env.MICROSOFT_CLIENT_ID) && nonEmpty(env.MICROSOFT_CLIENT_SECRET);
@@ -56,8 +64,10 @@ export function computeReadiness(env: OAuthEnv): ReadinessSnapshot {
       nonEmpty(env.STRIPE_OPERATOR_PRICE_ID),
     telegramBotConfigured,
     telegramBotUsernameConfigured,
-    telegramStarsConfigured: telegramBotConfigured && telegramBotUsernameConfigured,
-    telegramWebhookSecretConfigured: nonEmpty(env.TELEGRAM_WEBHOOK_SECRET),
+    // Bot OS owns the production bot and canonical webhook. Do not falsely
+    // require duplicate secrets in the Pages dashboard runtime.
+    telegramStarsConfigured: (telegramBotConfigured && telegramBotUsernameConfigured) || managedRail.starsConfigured,
+    telegramWebhookSecretConfigured: nonEmpty(env.TELEGRAM_WEBHOOK_SECRET) || managedRail.webhookConfigured,
     d1Configured: env.DB != null,
     neonConfigured: nonEmpty(env.NEON_DATABASE_URL)
   };

@@ -89,7 +89,11 @@ function EditGatePage() {
           community_label: communityLabel,
           ...rest
         } = row;
-        setCommunity({ id: communityId ?? brand.community.id, label: communityLabel });
+        setCommunity(
+          communityId && communityId !== "myfenrir-core"
+            ? { id: communityId, label: communityLabel }
+            : null,
+        );
         setConfig(rest);
       })
       .catch((error: unknown) => {
@@ -119,11 +123,22 @@ function EditGatePage() {
           ...config,
           id,
           brand_id: brand.id,
-          community_id: community?.id ?? brand.community.id,
         },
       });
-      const { id: _id, updated_at: _updatedAt, ...rest } = saved;
-      setConfig(rest);
+      const {
+        id: _id,
+        updated_at: _updatedAt,
+        brand_id: _brandId,
+        community_id: communityId,
+        community_label: communityLabel,
+        ...nextConfig
+      } = saved;
+      setCommunity(
+        communityId && communityId !== "myfenrir-core"
+          ? { id: communityId, label: communityLabel }
+          : null,
+      );
+      setConfig(nextConfig);
       toast.success("Gate updated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not update gate");
@@ -234,11 +249,19 @@ function EditGatePage() {
           </div>
         </div>
 
+        <Card variant="muted" className="mb-5 p-5 sm:p-6">
+          <p className="text-sm font-semibold text-foreground">Telegram mapping</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            {community
+              ? `${community.label} is confirmed by Fenrir. To change it, verify another group with /connect in Telegram, then select it from My Gates.`
+              : "No group is confirmed yet. An admin must run /connect inside the protected Telegram group, then select it from My Gates. Fenrir confirms its permissions before this Gate goes live."}
+          </p>
+        </Card>
+
         <GateForm
           config={config}
           onChange={(next) => setConfig(next)}
           slugStatus={slugStatus}
-          communityLabel={community?.label ?? brand.community.label}
         />
       </main>
     </div>

@@ -11,7 +11,7 @@ FENRIR_TELEGRAM_BOT_USERNAME = "Myfenrir_bot"
 FENRIR_STARS_PRICE = "1150"
 FENRIR_STARS_PLAN = "standard"
 FENRIR_STARS_TITLE = "The Pack · MyFenrir"
-FENRIR_STARS_DESCRIPTION = "Activate The Pack ($15/mo): unlimited Telegram Locks, multi-admin workflows, audit logs, and custom domain support. Paid in Telegram Stars."
+FENRIR_STARS_DESCRIPTION = "The Pack — $14.99/month. Multi-admin and audit logs. Billed monthly in Telegram Stars."
 FENRIR_STARS_LABEL = "The Pack"
 FENRIR_LINK_CONFIRM_URL = "https://www.myfenrir.com/api/telegram/link/confirm"
 

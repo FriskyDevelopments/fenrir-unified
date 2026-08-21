@@ -125,6 +125,15 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("lang");
+    const locale = requested && ["en", "es", "fr", "de"].includes(requested)
+      ? requested
+      : window.localStorage.getItem("myfenrir_locale") || "en";
+    window.localStorage.setItem("myfenrir_locale", locale);
+    document.documentElement.lang = locale;
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrandProvider>

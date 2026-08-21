@@ -32,3 +32,18 @@ apps/fenrir-gatekeeper-worker
 
 # Supabase CLI local state (cache, auth, temp) — never versioned.
 **/supabase/.temp/
+
+# Respaldos con fecha (p. ej. index.html.bak-20260817). Nunca se versionan: si
+# caen dentro de public/ Vite los copia verbatim al build y quedarían servidos
+# —texto legal viejo accesible junto al vigente—. El archivo histórico vive en
+# apps/fenrir-bridge/legal-archive/, fuera de todo directorio publicado.
+*.bak-*
+
+# Sonda de permisos de escritura creada por una sesión de agente. Sin función.
+.__probe
+
+# Ajustes locales de herramientas del desarrollador, no del proyecto.
+.claude/settings.local.json
+
+# Harness de previsualización de motion (local, no se despliega)
+apps/community-bridge/.motion-preview/

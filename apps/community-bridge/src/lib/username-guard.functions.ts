@@ -63,7 +63,7 @@ export interface HandleVerdict {
  * `review` si coincide con uno marcado para revisión humana.
  */
 export const checkHandle = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ handle: z.string().trim().min(1).max(120) }).parse(data))
+  .validator((data) => z.object({ handle: z.string().trim().min(1).max(120) }).parse(data))
   .handler(async ({ data }): Promise<HandleVerdict> => {
     const normalized = normalizeHandle(data.handle);
     if (!normalized) return { decision: "allow", matched: null };
@@ -116,7 +116,7 @@ export const listBlockedTerms = createServerFn({ method: "GET" })
 /** Añadir un término sin desplegar — que es el punto de tenerlo en tabla. */
 export const addBlockedTerm = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z
       .object({
         term: z.string().trim().min(2).max(120),
@@ -140,7 +140,7 @@ export const addBlockedTerm = createServerFn({ method: "POST" })
 
 export const removeBlockedTerm = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ id: z.string().uuid() }).parse(data))
+  .validator((data) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ context, data }) => {
     await assertStaff(context as unknown as AuthedContext);
     const sql = neonSql();

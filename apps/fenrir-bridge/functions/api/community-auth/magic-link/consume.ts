@@ -20,6 +20,12 @@ type MagicLinkConsume = {
   token?: unknown;
 };
 
+const COMMUNITY_BRIDGE_ORIGIN = "https://communities.myfenrir.com";
+
+function communityBridgeGateLocation(slug: string) {
+  return new URL(`/g/${encodeURIComponent(slug)}`, COMMUNITY_BRIDGE_ORIGIN).toString();
+}
+
 export async function onRequestPost(context: any) {
   if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured(context.env);
 
@@ -96,7 +102,7 @@ async function consumeMagicLink(context: any, token: string, redirectAfter: bool
 
     if (redirectAfter) {
       const headers = new Headers({
-        Location: new URL(`/community/${slug}`, context.request.url).toString(),
+        Location: communityBridgeGateLocation(slug),
         "Cache-Control": "no-store",
       });
       headers.append("Set-Cookie", cookie);

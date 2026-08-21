@@ -20,7 +20,7 @@ import {
   type TelegramIdentityLinkPayload
 } from "../services/api";
 import type { AppState, FriskyBridge, FriskyDomain, FriskyLiveRoom, LiveRoomProvider, Plan } from "../services/types";
-import { communityBridgeDashboardUrl } from "../services/communityBridge";
+import { communityBridgeDashboardUrl, communityBridgeUrlForLocale } from "../services/communityBridge";
 import { uiCopy, type UiCopy } from "../app/uiCopy";
 import {
   addDomainTag,
@@ -48,7 +48,7 @@ import {
   type PersonalLink,
   type VaultLink
 } from "../app/shared";
-import { activePageFromLocation, dashboardPathFor, isAuthCallbackPath, paidPlanFromProductLabel } from "../app/routing";
+import { activePageFromLocation, dashboardPathFor, isAuthCallbackPath } from "../app/routing";
 import { CommunityBridgeHandoffPanel, CommunityNeonGateRoute } from "./communityGate";
 import { FriskyBotOsRoute, FriskyGhostRoute, GoRoutePage, ProtocolActivated, PublicBridgeRoute, PublicRoomRoute } from "./publicRoutes";
 import { AuthGate } from "./authGate";
@@ -76,6 +76,7 @@ import {
   Metric,
   overlayAuthState,
   PanelTitle,
+  planLabel,
   ProductionReadinessPanel,
   ProtocolLivingSystem,
   ProviderBadge,
@@ -389,6 +390,10 @@ export function DashboardRoute() {
   async function createBridge() {
     const domainId = selectedDomainRecord?.id;
     if (!domainId) return;
+    if (!chatInput.trim()) {
+      setNotice(ui.telegramReaddNeedChat);
+      return;
+    }
     const result = await bridgeService.create({
       domainId,
       slug: slugInput.trim() || ui.setupInputTelegramSlug,
@@ -441,12 +446,6 @@ export function DashboardRoute() {
   async function pauseRoom(room: FriskyLiveRoom) {
     await liveRoomService.pause(room.id);
     setNotice(`${room.publicUrl} is paused. The meeting target stays private.`);
-    await refresh();
-  }
-
-  async function checkTelegram() {
-    const result = await telegramService.checkPermissions(chatInput.trim());
-    setNotice(result.data.status === "ready" ? `${ui.readiness} ${ui.telegramStatusCheck.toLowerCase()}.` : "Missing Telegram permissions.");
     await refresh();
   }
 
@@ -560,14 +559,13 @@ export function DashboardRoute() {
   }
 
   function onPaidPlanPickedFromPricing(planLabel: string) {
-    const key = paidPlanFromProductLabel(planLabel);
-    if (!key) {
-      setNotice(planLabel.trim().toLowerCase() === "free" ? copy[locale].billingFreeTier : copy[locale].billingPaidPlanOnly);
+    if (planLabel.trim().toLowerCase() === "free") {
+      setNotice(copy[locale].billingFreeTier);
       return;
     }
-    setCheckoutPlan(key);
-    navigateActive("billing");
-    void startStripeCheckout(key);
+    // The Pack has a single authoritative checkout path: Telegram Stars. The
+    // legacy card-plan keys are retained only to display old records safely.
+    void startTelegramStars();
   }
 
   function navigateActive(page: PageKey) {
@@ -732,7 +730,7 @@ export function DashboardRoute() {
               ))}
             </select>
           <span className="status good">{state.user.authProvider} OAuth</span>
-          <span className="status amber">{state.org.plan}</span>
+          <span className="status amber">{planLabel(state.org.plan)}</span>
             <button className="ghost compact-button" onClick={signOut}>{c.signOut}</button>
           </div>
         </header>
@@ -765,7 +763,7 @@ export function DashboardRoute() {
             roomProvider={roomProviderInput}
             onDomain={() => navigateActive("domains")}
             onRoom={() => navigateActive("rooms")}
-            onCommunity={() => window.location.assign(communityBridgeDashboardUrl)}
+            onCommunity={() => window.location.assign(communityBridgeUrlForLocale(locale))}
           />
         )}
 
@@ -820,25 +818,7 @@ export function DashboardRoute() {
         {show("command", "brands") && <CommunityBridgeHandoffPanel />}
 
         <div className="content-grid">
-          {show("command", "locks", "telegram") && <section className="panel wide">
-            <PanelTitle title={c.activeTelegramLocks} subtitle={c.activeTelegramLocksSub} />
-            <div className="form-row lock-form">
-              <select value={selectedDomain} onChange={(event) => setSelectedDomain(event.target.value)}>
-                <option value="" disabled>{c.chooseDomain}</option>
-                {state.domains.map((domain) => (
-                  <option key={domain.id} value={domain.id}>
-                    {domain.domain}
-                  </option>
-                ))}
-              </select>
-              <input value={slugInput} onChange={(event) => setSlugInput(event.target.value)} aria-label="Telegram lock slug" placeholder={ui.setupInputTelegramSlug} />
-              <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} aria-label="Telegram chat id" placeholder={ui.setupInputTelegramId} />
-              <input value={groupNameInput} onChange={(event) => setGroupNameInput(event.target.value)} aria-label="Telegram group name" placeholder={ui.setupInputGroupName} />
-              <input value={groupImageInput} onChange={(event) => setGroupImageInput(event.target.value)} aria-label="Telegram group image url" placeholder={ui.setupInputGroupPhoto} />
-              <button onClick={createBridge}>{c.createLock}</button>
-            </div>
-            <BridgeGallery bridges={state.bridges} invites={state.invites} onRotate={rotateBridge} onRevoke={revokeBridge} c={c} />
-          </section>}
+          {show("command", "locks", "telegram") && <CommunityBridgeHandoffPanel />}
 
           {show("command", "billing") && <section className="panel">
             <PanelTitle title={c.friskyAccount} subtitle={c.accountSub} />
@@ -849,7 +829,7 @@ export function DashboardRoute() {
             <KeyValue label={c.billingStatusLabel} value={billingStatus?.subscriptionStatus ?? c.billingStatusPlaceholder} />
             {billingStatus && (
               <p className="muted">
-                Limits: {billingStatus.limits.maxTelegramLocks ?? "∞"} locks · custom domain {billingStatus.limits.customDomainSupported ? "yes" : "no"}
+                Gates: 5 · linked community {billingStatus.limits.customDomainSupported ? "The Pack active" : "not active"}
                 {" · "}live rooms {billingStatus.limits.liveRoomsSupported ? "yes" : "no"}
               </p>
             )}
@@ -993,7 +973,7 @@ export function DashboardRoute() {
               <input value={roomSlugInput} onChange={(event) => setRoomSlugInput(event.target.value)} aria-label="Live room slug" placeholder={ui.setupInputRoomSlug} />
               <input value={roomTitleInput} onChange={(event) => setRoomTitleInput(event.target.value)} aria-label="Live room title" placeholder={ui.setupInputRoomTitle} />
               <input value={roomTargetInput} onChange={(event) => setRoomTargetInput(event.target.value)} aria-label="Call target URL" placeholder={roomProviderPlaceholder(roomProviderInput)} />
-              <input value={roomCoverInput} onChange={(event) => setRoomCoverInput(event.target.value)} aria-label="Pro logo or room image URL" placeholder={ui.setupInputRoomCover} />
+              <input value={roomCoverInput} onChange={(event) => setRoomCoverInput(event.target.value)} aria-label="Logo or room image URL" placeholder={ui.setupInputRoomCover} />
               <button onClick={createLiveRoom}>{c.createPaidRoom}</button>
             </div>
             <div className="room-logo-actions" aria-label="Live room logo presets">
@@ -1048,17 +1028,8 @@ export function DashboardRoute() {
               </div>
             </div>
             <div className="form-column">
-              <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} aria-label="Telegram permission chat id" />
-              <button onClick={checkTelegram}>{c.checkBotPermissions}</button>
-            </div>
-            <div className="checks">
-              {state.telegramChecks.map((check) => (
-                <div className="check" key={check.chatId}>
-                  <b>{check.chatId}</b>
-                  <span className={check.status === "ready" ? "status good" : "status danger"}>{check.status}</span>
-                  <small>admin: {check.botIsAdmin ? "yes" : "no"} · invite: {check.canInviteUsers ? "yes" : "no"}</small>
-                </div>
-              ))}
+              <small>Fenrir verifies group administrator access and invite permission from the bot itself. Choose the verified group in Community Bridge.</small>
+              <a className="button-link" href={communityBridgeDashboardUrl}>Open Community Bridge →</a>
             </div>
           </section>}
 

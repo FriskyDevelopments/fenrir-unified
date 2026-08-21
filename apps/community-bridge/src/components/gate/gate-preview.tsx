@@ -10,11 +10,18 @@ import {
 } from "@/lib/gate-presets";
 
 function gateLoginHref(slug?: string, brandId?: string) {
-  const params = new URLSearchParams({
-    next: slug ? `/g/${encodeURIComponent(slug)}` : "/",
-  });
-  if (brandId) params.set("brand", brandId);
-  return `/login?${params.toString()}`;
+  const next = slug ? `/g/${encodeURIComponent(slug)}` : "/";
+  const ssoNext = `https://communities.myfenrir.com${next}`;
+  const sso = new URL("https://www.myfenrir.com/api/auth/community-sso");
+  sso.searchParams.set("next", ssoNext);
+  if (brandId) sso.searchParams.set("brand", brandId);
+
+  if (typeof window === "undefined") {
+    return sso.toString();
+  }
+
+  sso.searchParams.set("next", `${window.location.origin}${next}`);
+  return sso.toString();
 }
 
 const MASCOT_ICONS = {
@@ -48,12 +55,18 @@ export function GatePreview({
   compact = false,
   actionHref,
   actionLabel,
+  onAction,
+  actionPending = false,
+  hideLogo = false,
 }: {
   config: Omit<GateConfig, "slug"> & { slug?: string };
   className?: string;
   compact?: boolean;
   actionHref?: string;
   actionLabel?: string;
+  onAction?: () => void;
+  actionPending?: boolean;
+  hideLogo?: boolean;
 }) {
   const preset = getPreset(config.preset);
   const logo =
@@ -105,25 +118,27 @@ export function GatePreview({
       ) : null}
 
       <div className="relative flex w-full max-w-sm flex-col items-center gap-6">
-        {isVideoUrl(logo) ? (
-          <video
-            src={logo}
-            aria-hidden="true"
-            className={cn("w-full object-contain", compact ? "max-w-[150px]" : "max-w-[220px]")}
-            muted
-            loop
-            autoPlay
-            playsInline
-            preload="metadata"
-          />
-        ) : (
-          <img
-            src={logo}
-            alt="Gate logo"
-            className={cn("w-full object-contain", compact ? "max-w-[150px]" : "max-w-[220px]")}
-            decoding="async"
-          />
-        )}
+        {!hideLogo ? (
+          isVideoUrl(logo) ? (
+            <video
+              src={logo}
+              aria-hidden="true"
+              className={cn("w-full object-contain", compact ? "max-w-[150px]" : "max-w-[220px]")}
+              muted
+              loop
+              autoPlay
+              playsInline
+              preload="metadata"
+            />
+          ) : (
+            <img
+              src={logo}
+              alt="Gate logo"
+              className={cn("w-full object-contain", compact ? "max-w-[150px]" : "max-w-[220px]")}
+              decoding="async"
+            />
+          )
+        ) : null}
 
         {mascotUrl ? (
           isVideoUrl(mascotUrl) ? (
@@ -172,8 +187,17 @@ export function GatePreview({
 
         {!compact ? (
           <a
-            href={actionHref ?? gateLoginHref(config.slug, preset.brandId)}
-            className="flex h-11 w-full items-center justify-center rounded-xl font-medium text-white transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+            href={actionHref ?? (onAction ? "#telegram-handoff" : gateLoginHref(config.slug, preset.brandId))}
+            onClick={(event) => {
+              if (!onAction) return;
+              event.preventDefault();
+              if (!actionPending) onAction();
+            }}
+            aria-disabled={actionPending || undefined}
+            className={cn(
+              "flex h-11 w-full items-center justify-center rounded-xl font-medium text-white transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80",
+              actionPending && "pointer-events-none cursor-wait opacity-75",
+            )}
             style={{
               background: `color-mix(in oklab, ${preset.accent} 85%, black)`,
               boxShadow: `0 0 40px -10px ${preset.accent}`,
@@ -188,7 +212,7 @@ export function GatePreview({
         )}
 
         <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-white/40">
-          Secured · End-to-end encrypted
+          Secured · private access only
         </p>
       </div>
     </div>

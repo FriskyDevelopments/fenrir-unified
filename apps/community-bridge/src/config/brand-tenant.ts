@@ -99,6 +99,10 @@ export const brandTenantSchema = z.object({
     .nullable(),
   terms_url: linkField,
   privacy_url: linkField,
+  // Per-community PostHog survey rollout: 0–100 (%). The gate shows the survey
+  // to this share of members who pass the gate (once per person, respects
+  // dismiss). Editable per community by the operator. Default 50.
+  survey_sample_pct: z.number().int().min(0).max(100).default(50),
   is_active: z.boolean(),
 });
 
@@ -110,7 +114,7 @@ export interface BrandTenantRow extends BrandTenantInput {
 }
 
 export const BRAND_TENANT_COLUMNS =
-  "id, updated_at, brand_id, name, tagline, hostnames, providers, theme, logo_url, wordmark_url, community_id, community_label, gate_preset, terminal_command, login_headline, login_subheadline, login_signin_label, login_signup_label, login_forgot_label, login_terminal_header, login_terminal_lines, activate_headline, activate_subheadline, activate_steps_title, activate_bot_label, activate_submit_label, activate_success_headline, after_login_path, oauth_return_path, site_url, terms_url, privacy_url, is_active";
+  "id, updated_at, brand_id, name, tagline, hostnames, providers, theme, logo_url, wordmark_url, community_id, community_label, gate_preset, terminal_command, login_headline, login_subheadline, login_signin_label, login_signup_label, login_forgot_label, login_terminal_header, login_terminal_lines, activate_headline, activate_subheadline, activate_steps_title, activate_bot_label, activate_submit_label, activate_success_headline, after_login_path, oauth_return_path, site_url, terms_url, privacy_url, survey_sample_pct, is_active";
 
 
 export function emptyBrandTenant(): BrandTenantInput {
@@ -146,6 +150,7 @@ export function emptyBrandTenant(): BrandTenantInput {
     site_url: null,
     terms_url: "/terms",
     privacy_url: "/privacy",
+    survey_sample_pct: 50,
     is_active: true,
   };
 }
@@ -242,6 +247,7 @@ export function brandConfigToTenant(brand: BrandConfig): BrandTenantInput {
     site_url: brand.links.site ?? null,
     terms_url: brand.links.terms,
     privacy_url: brand.links.privacy,
+    survey_sample_pct: 50,
     is_active: true,
   };
 }

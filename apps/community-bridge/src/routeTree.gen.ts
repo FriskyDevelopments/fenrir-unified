@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccessRouteImport } from './routes/access'
 import { Route as ActivateRouteImport } from './routes/activate'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as BrandsRouteImport } from './routes/brands'
@@ -34,11 +35,17 @@ import { Route as GatesIndexRouteImport } from './routes/gates.index'
 import { Route as GatesIdRouteImport } from './routes/gates.$id'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as ApiInternalTelegramDestinationRouteImport } from './routes/api.internal.telegram-destination'
 import { Route as DiscordLinkedRoleCallbackRouteImport } from './routes/discord.linked-role.callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccessRoute = AccessRouteImport.update({
+  id: '/access',
+  path: '/access',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ActivateRoute = ActivateRouteImport.update({
@@ -165,6 +172,12 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiInternalTelegramDestinationRoute =
+  ApiInternalTelegramDestinationRouteImport.update({
+    id: '/api/internal/telegram-destination',
+    path: '/api/internal/telegram-destination',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const DiscordLinkedRoleCallbackRoute =
   DiscordLinkedRoleCallbackRouteImport.update({
     id: '/callback',
@@ -174,6 +187,7 @@ const DiscordLinkedRoleCallbackRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/access': typeof AccessRoute
   '/activate': typeof ActivateRoute
   '/admin': typeof AdminRoute
   '/brands': typeof BrandsRoute
@@ -198,10 +212,12 @@ export interface FileRoutesByFullPath {
   '/gates/': typeof GatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/internal/telegram-destination': typeof ApiInternalTelegramDestinationRoute
   '/discord/linked-role/callback': typeof DiscordLinkedRoleCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/access': typeof AccessRoute
   '/activate': typeof ActivateRoute
   '/admin': typeof AdminRoute
   '/brands': typeof BrandsRoute
@@ -226,11 +242,13 @@ export interface FileRoutesByTo {
   '/gates': typeof GatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/internal/telegram-destination': typeof ApiInternalTelegramDestinationRoute
   '/discord/linked-role/callback': typeof DiscordLinkedRoleCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/access': typeof AccessRoute
   '/activate': typeof ActivateRoute
   '/admin': typeof AdminRoute
   '/brands': typeof BrandsRoute
@@ -255,12 +273,14 @@ export interface FileRoutesById {
   '/gates/': typeof GatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/internal/telegram-destination': typeof ApiInternalTelegramDestinationRoute
   '/discord/linked-role/callback': typeof DiscordLinkedRoleCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/access'
     | '/activate'
     | '/admin'
     | '/brands'
@@ -285,10 +305,12 @@ export interface FileRouteTypes {
     | '/gates/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/internal/telegram-destination'
     | '/discord/linked-role/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/access'
     | '/activate'
     | '/admin'
     | '/brands'
@@ -313,10 +335,12 @@ export interface FileRouteTypes {
     | '/gates'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/internal/telegram-destination'
     | '/discord/linked-role/callback'
   id:
     | '__root__'
     | '/'
+    | '/access'
     | '/activate'
     | '/admin'
     | '/brands'
@@ -341,11 +365,13 @@ export interface FileRouteTypes {
     | '/gates/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/internal/telegram-destination'
     | '/discord/linked-role/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccessRoute: typeof AccessRoute
   ActivateRoute: typeof ActivateRoute
   AdminRoute: typeof AdminRoute
   BrandsRoute: typeof BrandsRoute
@@ -370,6 +396,7 @@ export interface RootRouteChildren {
   GatesIndexRoute: typeof GatesIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiInternalTelegramDestinationRoute: typeof ApiInternalTelegramDestinationRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -379,6 +406,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/access': {
+      id: '/access'
+      path: '/access'
+      fullPath: '/access'
+      preLoaderRoute: typeof AccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/activate': {
@@ -549,6 +583,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/internal/telegram-destination': {
+      id: '/api/internal/telegram-destination'
+      path: '/api/internal/telegram-destination'
+      fullPath: '/api/internal/telegram-destination'
+      preLoaderRoute: typeof ApiInternalTelegramDestinationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/discord/linked-role/callback': {
       id: '/discord/linked-role/callback'
       path: '/callback'
@@ -572,6 +613,7 @@ const DiscordLinkedRoleRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccessRoute: AccessRoute,
   ActivateRoute: ActivateRoute,
   AdminRoute: AdminRoute,
   BrandsRoute: BrandsRoute,
@@ -597,6 +639,7 @@ const rootRouteChildren: RootRouteChildren = {
   GatesIndexRoute: GatesIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiInternalTelegramDestinationRoute: ApiInternalTelegramDestinationRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

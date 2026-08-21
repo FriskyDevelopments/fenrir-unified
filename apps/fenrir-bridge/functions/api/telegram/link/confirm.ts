@@ -12,7 +12,9 @@
 
 import { noStoreJson } from "../../../_lib/responses";
 import { missingEnvResponse, type BillingEnv } from "../../../_lib/billing-env";
-import { consumeLinkCode } from "../../../_lib/account-links";
+import { consumeLinkCode, resolveSupabaseUserId, upsertAccountLink } from "../../../_lib/account-links";
+import { sendBillingEmail } from "../../../_lib/transactional-email";
+import { consumeTelegramAccountLinkCode, getTelegramIdentityLink } from "../../../_lib/telegram-identity";
 
 type ConfirmBody = {
   code?: string;
@@ -47,21 +49,83 @@ export const onRequestPost: PagesFunction<BillingEnv & { TELEGRAM_LINK_CONFIRM_S
     return noStoreJson({ ok: false, error: "missing_code_or_telegram_id" }, { status: 400 });
   }
 
-  const result = await consumeLinkCode(context.env, {
-    code: String(body.code),
-    telegramId: body.telegramId,
-    telegramUsername: body.telegramUsername ?? null,
-    telegramFirstName: body.telegramFirstName ?? null
-  });
+  const d1Result = context.env.DB ? await consumeTelegramAccountLinkCode(context.env, context.env.DB, String(body.code), {
+    telegramUserId: String(body.telegramId),
+    telegramChatId: String(body.telegramChatId ?? body.telegramId),
+    telegramUsername: body.telegramUsername ?? undefined,
+    telegramFirstName: body.telegramFirstName ?? undefined
+  }) : null;
+
+  let result: Awaited<ReturnType<typeof consumeLinkCode>>;
+  if (d1Result?.ok) {
+    const supabaseUserId = await resolveSupabaseUserId(context.env, {
+      email: d1Result.email,
+      friskyUserId: d1Result.friskyUserId,
+      telegramId: body.telegramId
+    });
+    if (supabaseUserId) {
+      await upsertAccountLink(context.env, {
+        supabaseUserId,
+        telegramId: body.telegramId,
+        telegramUsername: body.telegramUsername ?? null,
+        telegramFirstName: body.telegramFirstName ?? null,
+        friskyUserId: d1Result.friskyUserId,
+        friskyOrgId: d1Result.friskyOrgId,
+        email: d1Result.email
+      });
+    }
+    result = {
+      ok: true,
+      supabaseUserId: supabaseUserId ?? "",
+      friskyUserId: d1Result.friskyUserId,
+      friskyOrgId: d1Result.friskyOrgId,
+      email: d1Result.email
+    };
+  } else {
+    result = await consumeLinkCode(context.env, {
+      code: String(body.code),
+      telegramId: body.telegramId,
+      telegramUsername: body.telegramUsername ?? null,
+      telegramFirstName: body.telegramFirstName ?? null
+    });
+    if (!result.ok && context.env.DB) {
+      const existing = await getTelegramIdentityLink(context.env.DB, String(body.telegramId));
+      if (existing) {
+        result = {
+          ok: true,
+          supabaseUserId: await resolveSupabaseUserId(context.env, {
+            email: existing.email,
+            friskyUserId: existing.frisky_user_id,
+            telegramId: body.telegramId
+          }) ?? "",
+          friskyUserId: existing.frisky_user_id,
+          friskyOrgId: existing.frisky_org_id,
+          email: existing.email
+        };
+      }
+    }
+  }
 
   if (!result.ok) {
     const status = result.reason === "not_found" || result.reason === "expired" ? 409 : 503;
     return noStoreJson({ ok: false, error: result.reason }, { status });
   }
 
+  if (result.email) {
+    await sendBillingEmail(context.env, {
+      to: result.email,
+      subject: "MyFenrir · Telegram linked",
+      title: "Telegram linked securely",
+      body: "Your Telegram identity is now connected to your Frisky Dev account.",
+      status: "IDENTITY LINKED",
+      detail: `Telegram ID ${String(body.telegramId)} · You can now continue your MyFenrir community setup.`
+    }).catch((error) => console.error("telegram link confirmation email failed", error));
+  }
+
   return noStoreJson({
     ok: true,
     linked: true,
+    email: result.email,
     supabaseUserId: result.supabaseUserId,
     friskyUserId: result.friskyUserId,
     friskyOrgId: result.friskyOrgId

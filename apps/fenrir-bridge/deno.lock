@@ -1807,7 +1807,6 @@
         "npm:@types/react-dom@^19.2.3",
         "npm:@types/react@^19.2.7",
         "npm:@vitejs/plugin-react@^5.2.0",
-        "npm:altcha@^2.3.0",
         "npm:autoprefixer@^10.5.0",
         "npm:postcss@^8.5.14",
         "npm:posthog-js@^1.414.0",

@@ -34,6 +34,7 @@ if (typeof window !== "undefined") {
 document.documentElement.dataset.fenrirRelease = "supabase-auth-2026-08-07b";
 
 const isWowMvpRoute = window.location.pathname === "/wow" || window.location.pathname === "/visual-lab";
+if (isWowMvpRoute) document.documentElement.classList.add("fenrir-wow-shell");
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

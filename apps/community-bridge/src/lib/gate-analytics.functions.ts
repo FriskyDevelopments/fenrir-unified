@@ -62,7 +62,7 @@ function resolveVisitorId(): string {
  * uses that to keep PostHog in sync with the local panel.
  */
 export const recordGateView = createServerFn({ method: "POST" })
-  .inputValidator((data) =>
+  .validator((data) =>
     z
       .object({
         slug: z
@@ -113,7 +113,7 @@ export const recordGateView = createServerFn({ method: "POST" })
 /** Per-gate view stats for every gate the signed-in user owns. */
 export const getMyGateViewStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(() => undefined)
+  .validator(() => undefined)
   .handler(async ({ context }) => {
     const sql = neonSql();
 

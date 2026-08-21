@@ -23,8 +23,8 @@ import {
 import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan } from "./services/types";
 import { AuthProviderButton } from "./components/AuthProviderButton";
 import { AuthSurface } from "./components/AuthSurface";
-import { AltchaGate } from "./components/AltchaGate";
-import { communityBridgeDashboardUrl, communityBridgeUrlForLocale } from "./services/communityBridge";
+import { HumanVerificationGate } from "./components/HumanVerificationGate";
+import { communityBridgeDashboardUrl, communityBridgeGateUrl, communityBridgeUrlForLocale } from "./services/communityBridge";
 import { CommunityBridgeHandoffPanel } from "./routes/communityGate";
 import { knowledgeBaseLabel, knowledgeBaseUrl } from "./services/knowledgeBase";
 import { CinematicLanding } from "./components/CinematicLanding";
@@ -186,9 +186,9 @@ const uiCopy: Record<Locale, {
     friskyAccount: "Frisky Account",
     secondaryGate: "Secondary gate",
     routePrivateViaFenrir: "Route Zoom, Meet, Webex, or any room through Fenrir first.",
-    proCustomization: "Pro customization",
-    proCustomizationBodyTitle: "Starting at Pro, customers can add their logo and branded room visuals.",
-    proCustomizationBody: "Starter includes the clean Fenrir room gate. Pro and Operator unlock customer logo, custom room name styling, and a branded hero image on the secondary link.",
+    proCustomization: "The Pack customization",
+    proCustomizationBodyTitle: "With The Pack, customers can add their logo and branded room visuals.",
+    proCustomizationBody: "Free includes the clean Fenrir room gate. The Pack unlocks a customer logo, custom room-name styling, and a branded hero image on the secondary link.",
     telegramStatusCheck: "Telegram status check",
     linked: "linked",
     loginRequired: "login required",
@@ -286,8 +286,8 @@ const uiCopy: Record<Locale, {
     walkthroughStepsAdmin: ["Stable URL", "Rotate target", "Revoke leak", "Audit action"],
     walkthroughStepsLaunch: ["Customer clicks", "Fenrir explains", "Access unlocks", "Entry opens"],
     communityEmailPlaceholder: "you@community.com",
-    neonMagicBusy: "Creating Neon link...",
-    neonMagicButton: "Send Neon magic link",
+    neonMagicBusy: "Signing you in...",
+    neonMagicButton: "Continue to Sign On",
     neonMagicSuccessMessage: "Sign-in link sent. Check your inbox to continue into MyFenrir.",
     neonMagicDevLinkLabel: "Open dev auth link",
     fallbackPartnerLabel: "Fallback links",
@@ -311,7 +311,7 @@ const uiCopy: Record<Locale, {
     setupInputRoomSlug: "access-room",
     setupInputRoomTitle: "Zoom room name / client title",
     setupInputRoomTarget: "Private call URL",
-    setupInputRoomCover: "Pro logo / branded image URL",
+    setupInputRoomCover: "Logo / branded image URL",
     setupInputGroupEmail: "you@community.com",
     setupInputCommunityEmail: "you@community.com",
     setupInputCustomDomain: "customer.myfenrir.com",
@@ -322,9 +322,9 @@ const uiCopy: Record<Locale, {
     friskyAccount: "Cuenta Frisky",
     secondaryGate: "Segunda puerta",
     routePrivateViaFenrir: "Ruta el Zoom, Meet, Webex o cualquier sala por Fenrir primero.",
-    proCustomization: "Personalizacion Pro",
-    proCustomizationBodyTitle: "Desde Pro, los clientes pueden agregar logo y portada de sala personalizada.",
-    proCustomizationBody: "Starter incluye la puerta limpia de sala. Pro y Operator habilitan logo del cliente, estilo de nombre y hero branding en el enlace secundario.",
+    proCustomization: "Personalizacion The Pack",
+    proCustomizationBodyTitle: "Con The Pack, los clientes pueden agregar logo y portada de sala personalizada.",
+    proCustomizationBody: "Gratis incluye la puerta limpia de sala. The Pack habilita logo del cliente, estilo de nombre y hero branding en el enlace secundario.",
     telegramStatusCheck: "Estado de Telegram",
     linked: "vinculado",
     loginRequired: "requiere inicio de sesion",
@@ -411,7 +411,7 @@ const uiCopy: Record<Locale, {
     setupInputRoomSlug: "sala-acceso",
     setupInputRoomTitle: "Nombre de sala / cliente",
     setupInputRoomTarget: "URL de llamada privada",
-    setupInputRoomCover: "Logo Pro / URL de portada",
+    setupInputRoomCover: "Logo / URL de portada",
     setupInputGroupEmail: "tu@comunidad.com",
     setupInputCommunityEmail: "tu@comunidad.com",
     setupInputCustomDomain: "cliente.myfenrir.com",
@@ -448,8 +448,8 @@ const uiCopy: Record<Locale, {
     walkthroughStepsAdmin: ["URL estable", "Rotar destino", "Revocar fuga", "Acción de auditoría"],
     walkthroughStepsLaunch: ["Cliente hace clic", "Fenrir explica", "Acceso desbloqueado", "Entrada abierta"],
     communityEmailPlaceholder: "tu@comunidad.com",
-    neonMagicBusy: "Creando enlace Neon...",
-    neonMagicButton: "Enviar enlace mágico Neon",
+    neonMagicBusy: "Iniciando sesión...",
+    neonMagicButton: "Continuar al inicio de sesión",
     neonMagicSuccessMessage: "Enlace de autenticación Neon enviado. Revisa el correo y sigue el último paso de aprobación.",
     neonMagicDevLinkLabel: "Abrir enlace de prueba Neon",
     fallbackPartnerLabel: "Enlaces de respaldo"
@@ -458,9 +458,9 @@ const uiCopy: Record<Locale, {
     friskyAccount: "Compte Frisky",
     secondaryGate: "Passerelle secondaire",
     routePrivateViaFenrir: "Acheminer Zoom, Meet, Webex ou toute salle via Fenrir en premier.",
-    proCustomization: "Personnalisation Pro",
-    proCustomizationBodyTitle: "À partir de Pro, les clients peuvent ajouter logo et visuels personnalisés.",
-    proCustomizationBody: "Starter garde la passerelle Fenrir standard. Pro et Operator débloquent logo client, style de nom personnalisé et hero image sur le lien secondaire.",
+    proCustomization: "Personnalisation The Pack",
+    proCustomizationBodyTitle: "Avec The Pack, les clients peuvent ajouter logo et visuels personnalises.",
+    proCustomizationBody: "Gratuit garde la passerelle Fenrir standard. The Pack debloque logo client, style de nom personnalise et hero image sur le lien secondaire.",
     telegramStatusCheck: "Etat Telegram",
     linked: "lié",
     loginRequired: "connexion requise",
@@ -547,7 +547,7 @@ const uiCopy: Record<Locale, {
     setupInputRoomSlug: "acces-salle",
     setupInputRoomTitle: "Nom de salle / client",
     setupInputRoomTarget: "URL d'appel privée",
-    setupInputRoomCover: "Logo Pro / URL image de marque",
+    setupInputRoomCover: "Logo / URL image de marque",
     setupInputGroupEmail: "vous@communaute.com",
     setupInputCommunityEmail: "vous@communaute.com",
     setupInputCustomDomain: "client.myfenrir.com",
@@ -584,8 +584,8 @@ const uiCopy: Record<Locale, {
     walkthroughStepsAdmin: ["URL stable", "Tourner la cible", "Révoquer la fuite", "Action d'audit"],
     walkthroughStepsLaunch: ["Client clique", "Fenrir explique", "Déblocage d'accès", "Entrée ouverte"],
     communityEmailPlaceholder: "vous@communaute.com",
-    neonMagicBusy: "Création du lien Neon...",
-    neonMagicButton: "Envoyer le lien magique Neon",
+    neonMagicBusy: "Connexion...",
+    neonMagicButton: "Continuer vers la connexion",
     neonMagicSuccessMessage: "Lien d'authentification Neon envoyé. Vérifiez votre e-mail et suivez l'étape d'approbation.",
     neonMagicDevLinkLabel: "Ouvrir le lien développeur Neon",
     fallbackPartnerLabel: "Liens de secours"
@@ -594,9 +594,9 @@ const uiCopy: Record<Locale, {
     friskyAccount: "Frisky Konto",
     secondaryGate: "Sekundaere Tor",
     routePrivateViaFenrir: "Routen Sie Zoom, Meet, Webex oder jede Room erst über Fenrir.",
-    proCustomization: "Pro Anpassung",
-    proCustomizationBodyTitle: "Ab Pro koennen Kunden eigenes Logo und gebrandete Raumvisuals nutzen.",
-    proCustomizationBody: "Starter enthaelt den clean Fenrir Raum-Gate. Pro und Operator aktivieren Kundenlogo, benutzerdefinierten Raumnamenstil und Hero-Bild auf dem Sekundaerlink.",
+    proCustomization: "The-Pack-Anpassung",
+    proCustomizationBodyTitle: "Mit The Pack koennen Kunden ihr Logo und gebrandete Raumvisuals nutzen.",
+    proCustomizationBody: "Gratis enthaelt das klare Fenrir-Raum-Gate. The Pack aktiviert Kundenlogo, benutzerdefinierten Raumnamenstil und Hero-Bild auf dem Sekundaerlink.",
     telegramStatusCheck: "Telegram-Status",
     linked: "verknuepft",
     loginRequired: "anmeldung erforderlich",
@@ -683,7 +683,7 @@ const uiCopy: Record<Locale, {
     setupInputRoomSlug: "raum-zugang",
     setupInputRoomTitle: "Raumname / Kunde",
     setupInputRoomTarget: "Private Call URL",
-    setupInputRoomCover: "Pro Logo / Marken-Bild URL",
+    setupInputRoomCover: "Logo / Marken-Bild URL",
     setupInputGroupEmail: "du@gemeinschaft.com",
     setupInputCommunityEmail: "du@gemeinschaft.com",
     setupInputCustomDomain: "kunde.myfenrir.com",
@@ -720,8 +720,8 @@ const uiCopy: Record<Locale, {
     walkthroughStepsAdmin: ["Stabile URL", "Ziel rotieren", "Leckung widerrufen", "Audit-Aktion"],
     walkthroughStepsLaunch: ["Kunde klickt", "Fenrir erklärt", "Zugriff entsperrt", "Einstieg öffnet"],
     communityEmailPlaceholder: "du@gemeinschaft.com",
-    neonMagicBusy: "Neon-Link wird erstellt...",
-    neonMagicButton: "Neon-Magic-Link senden",
+    neonMagicBusy: "Anmeldung...",
+    neonMagicButton: "Weiter zur Anmeldung",
     neonMagicSuccessMessage: "Neon-Auth-Link gesendet. E-Mail prüfen und dem letzten Freigabeschritt folgen.",
     neonMagicDevLinkLabel: "Neon-Entwicklerlink öffnen",
     fallbackPartnerLabel: "Fallback-Links"
@@ -1033,14 +1033,6 @@ function dashboardPathFor(page: PageKey) {
   return page === "command" ? managedDashboardPath : `/${page}`;
 }
 
-function paidPlanFromProductLabel(label: string): PaidPlan | null {
-  const p = label.trim().toLowerCase();
-  if (p === "starter") return "starter";
-  if (p === "pro") return "pro";
-  if (p === "operator") return "operator";
-  return null;
-}
-
 export function App() {
   const path = window.location.pathname;
   const host = window.location.hostname.toLowerCase();
@@ -1076,7 +1068,6 @@ export function App() {
   const [serviceSubdomain, setServiceSubdomain] = useState(defaultServiceSubdomain);
   const [serviceMode, setServiceMode] = useState<"create" | "link" | null>(null);
   const [checkoutPlan, setCheckoutPlan] = useState<PaidPlan>("starter");
-  const [courtesyCode, setCourtesyCode] = useState("");
   const [personalLinks, setPersonalLinks] = useState<PersonalLink[]>([]);
   const [personalTitle, setPersonalTitle] = useState("");
   const [personalUrl, setPersonalUrl] = useState("");
@@ -1237,6 +1228,12 @@ export function App() {
   }, [auth?.authenticated, locale]);
 
   useEffect(() => {
+    // Replace the visitor-only prompt after authentication without overwriting
+    // a deliberate action, billing, or error notice.
+    if (auth?.authenticated && notice === c.initialNotice) setNotice(c.accountSub);
+  }, [auth?.authenticated, c.accountSub, c.initialNotice, notice]);
+
+  useEffect(() => {
     if (!state || !activationVisible) return undefined;
     const timer = window.setTimeout(() => setActivationVisible(false), 2100);
     return () => window.clearTimeout(timer);
@@ -1376,6 +1373,10 @@ export function App() {
   async function createBridge() {
     const domainId = selectedDomainRecord?.id;
     if (!domainId) return;
+    if (!chatInput.trim()) {
+      setNotice(ui.telegramReaddNeedChat);
+      return;
+    }
     const result = await bridgeService.create({
       domainId,
       slug: slugInput.trim() || ui.setupInputTelegramSlug,
@@ -1439,12 +1440,6 @@ export function App() {
     await refresh();
   }
 
-  async function checkTelegram() {
-    const result = await telegramService.checkPermissions(chatInput.trim());
-    setNotice(result.data.status === "ready" ? `${ui.readiness} ${ui.telegramStatusCheck.toLowerCase()}.` : "Missing Telegram permissions.");
-    await refresh();
-  }
-
   function startWizard(kind: "telegram" | "room" | "vault" | "domain" | "concierge") {
     if (kind === "telegram") {
       navigateActive("locks");
@@ -1500,17 +1495,6 @@ export function App() {
     );
   }
 
-  async function startStripeCheckout(plan: PaidPlan) {
-    setCheckoutPlan(plan);
-    navigateActive("billing");
-    try {
-      const { url } = await billingService.checkout(plan, courtesyCode);
-      window.location.assign(url);
-    } catch {
-      setNotice(copy[locale].checkoutErrorGeneric);
-    }
-  }
-
   async function startTelegramStars() {
     navigateActive("billing");
     try {
@@ -1554,31 +1538,11 @@ export function App() {
     }
   }
 
-  function onPaidPlanPickedFromPricing(planLabel: string) {
-    const key = paidPlanFromProductLabel(planLabel);
-    if (!key) {
-      setNotice(planLabel.trim().toLowerCase() === "free" ? copy[locale].billingFreeTier : copy[locale].billingPaidPlanOnly);
-      return;
-    }
-    setCheckoutPlan(key);
-    navigateActive("billing");
-    void startStripeCheckout(key);
-  }
-
   function navigateActive(page: PageKey) {
     setActive(page);
     const nextPath = dashboardPathFor(page);
     if (window.location.pathname !== nextPath) {
       window.history.pushState({}, "", nextPath);
-    }
-  }
-
-  async function openBillingPortal() {
-    try {
-      const { url } = await billingService.portal();
-      window.location.assign(url);
-    } catch {
-      setNotice(copy[locale].billingPortalNeedsCustomer);
     }
   }
 
@@ -1719,7 +1683,7 @@ export function App() {
               onChange={(event) => {
                 const next = event.target.value as Locale;
                 setLocale(next);
-                setNotice(copy[next].initialNotice);
+                setNotice(copy[next].accountSub);
               }}
               aria-label="Language"
             >
@@ -1728,7 +1692,7 @@ export function App() {
               ))}
             </select>
           <span className="status good">{state.user.authProvider} OAuth</span>
-          <span className="status amber">{state.org.plan}</span>
+          <span className="status amber">{planLabel(state.org.plan)}</span>
             <button className="ghost compact-button" onClick={signOut}>{c.signOut}</button>
           </div>
         </header>
@@ -1816,25 +1780,7 @@ export function App() {
         {show("command", "brands") && <CommunityBridgeHandoffPanel />}
 
         <div className="content-grid">
-          {show("command", "locks", "telegram") && <section className="panel wide">
-            <PanelTitle title={c.activeTelegramLocks} subtitle={c.activeTelegramLocksSub} />
-            <div className="form-row lock-form">
-              <select value={selectedDomain} onChange={(event) => setSelectedDomain(event.target.value)}>
-                <option value="" disabled>{c.chooseDomain}</option>
-                {state.domains.map((domain) => (
-                  <option key={domain.id} value={domain.id}>
-                    {domain.domain}
-                  </option>
-                ))}
-              </select>
-              <input value={slugInput} onChange={(event) => setSlugInput(event.target.value)} aria-label="Telegram lock slug" placeholder={ui.setupInputTelegramSlug} />
-              <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} aria-label="Telegram chat id" placeholder={ui.setupInputTelegramId} />
-              <input value={groupNameInput} onChange={(event) => setGroupNameInput(event.target.value)} aria-label="Telegram group name" placeholder={ui.setupInputGroupName} />
-              <input value={groupImageInput} onChange={(event) => setGroupImageInput(event.target.value)} aria-label="Telegram group image url" placeholder={ui.setupInputGroupPhoto} />
-              <button onClick={createBridge}>{c.createLock}</button>
-            </div>
-            <BridgeGallery bridges={state.bridges} invites={state.invites} onRotate={rotateBridge} onRevoke={revokeBridge} c={c} />
-          </section>}
+          {show("command", "locks", "telegram") && <CommunityBridgeHandoffPanel />}
 
           {show("command", "billing") && <section className="panel">
             <PanelTitle title={c.friskyAccount} subtitle={c.accountSub} />
@@ -1845,14 +1791,11 @@ export function App() {
             <KeyValue label={c.billingStatusLabel} value={billingStatus?.subscriptionStatus ?? c.billingStatusPlaceholder} />
             {billingStatus && (
               <p className="muted">
-                Limits: {billingStatus.limits.maxTelegramLocks ?? "∞"} locks · custom domain {billingStatus.limits.customDomainSupported ? "yes" : "no"}
+                Gates: 5 · linked community {billingStatus.limits.customDomainSupported ? "The Pack active" : "not active"}
                 {" · "}live rooms {billingStatus.limits.liveRoomsSupported ? "yes" : "no"}
               </p>
             )}
             <div className="row-actions">
-              <button type="button" className="ghost compact-button" onClick={() => void openBillingPortal()}>
-                {c.billingPortalButton}
-              </button>
               <button type="button" className="ghost compact-button" onClick={() => void registerPasskey()}>
                 {c.passkeyRegister}
               </button>
@@ -1867,9 +1810,6 @@ export function App() {
             telegram={serviceTelegram}
             subdomain={serviceSubdomain}
             mode={serviceMode}
-            checkoutPlan={checkoutPlan}
-            courtesyCode={courtesyCode}
-            onCourtesyCode={setCourtesyCode}
             onEmail={setServiceEmail}
             onOrg={setServiceOrg}
             onTelegram={setServiceTelegram}
@@ -1991,7 +1931,7 @@ export function App() {
               <input value={roomSlugInput} onChange={(event) => setRoomSlugInput(event.target.value)} aria-label="Live room slug" placeholder={ui.setupInputRoomSlug} />
               <input value={roomTitleInput} onChange={(event) => setRoomTitleInput(event.target.value)} aria-label="Live room title" placeholder={ui.setupInputRoomTitle} />
               <input value={roomTargetInput} onChange={(event) => setRoomTargetInput(event.target.value)} aria-label="Call target URL" placeholder={roomProviderPlaceholder(roomProviderInput)} />
-              <input value={roomCoverInput} onChange={(event) => setRoomCoverInput(event.target.value)} aria-label="Pro logo or room image URL" placeholder={ui.setupInputRoomCover} />
+              <input value={roomCoverInput} onChange={(event) => setRoomCoverInput(event.target.value)} aria-label="Logo or room image URL" placeholder={ui.setupInputRoomCover} />
               <button onClick={createLiveRoom}>{c.createPaidRoom}</button>
             </div>
             <div className="room-logo-actions" aria-label="Live room logo presets">
@@ -2054,17 +1994,8 @@ export function App() {
               </div>
             </div>
             <div className="form-column">
-              <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} aria-label="Telegram permission chat id" />
-              <button onClick={checkTelegram}>{c.checkBotPermissions}</button>
-            </div>
-            <div className="checks">
-              {state.telegramChecks.map((check) => (
-                <div className="check" key={check.chatId}>
-                  <b>{check.chatId}</b>
-                  <span className={check.status === "ready" ? "status good" : "status danger"}>{check.status}</span>
-                  <small>admin: {check.botIsAdmin ? "yes" : "no"} · invite: {check.canInviteUsers ? "yes" : "no"}</small>
-                </div>
-              ))}
+              <small>Fenrir verifies group administrator access and invite permission from the bot itself. Choose the verified group in Community Bridge.</small>
+              <a className="button-link" href={communityBridgeDashboardUrl}>Open Community Bridge →</a>
             </div>
           </section>}
 
@@ -2099,7 +2030,6 @@ export function App() {
                   <strong>{price}</strong>
                   <small>{body}</small>
                   {plan !== "Free" ? <button onClick={() => void startTelegramStars()}>{c.starsCheckout}</button> : null}
-                  <button className="ghost" onClick={() => onPaidPlanPickedFromPricing(plan)}>{c.upgrade}</button>
                 </div>
               ))}
             </div>
@@ -2215,9 +2145,10 @@ function overlayAuthState(state: AppState, auth: AuthSession): AppState {
 function planLabel(plan: Plan) {
   const labels: Record<Plan, string> = {
     free: "Free",
-    starter: "Starter",
-    pro: "Pro",
-    operator: "Operator"
+    starter: "The Pack",
+    pro: "The Pack",
+    operator: "The Pack",
+    standard: "The Pack"
   };
   return labels[plan];
 }
@@ -2234,10 +2165,11 @@ function authProviderLabel(provider: string) {
 
 function planLockLimit(plan: Plan) {
   const limits: Record<Plan, string> = {
-    free: "1",
-    starter: "3",
-    pro: "10",
-    operator: "unlimited"
+    free: "5",
+    starter: "5",
+    pro: "5",
+    operator: "5",
+    standard: "5"
   };
   return limits[plan];
 }
@@ -2261,7 +2193,7 @@ function SessionLabels({
 }) {
   const activeLocks = state.bridges.filter((bridge) => bridge.status === "active").length;
   const backendLimit = billingStatus?.limits.maxTelegramLocks;
-  const lockLimit = backendLimit === null ? "unlimited" : backendLimit ?? planLockLimit(state.org.plan);
+  const lockLimit = backendLimit === null ? "5" : backendLimit ?? planLockLimit(state.org.plan);
   const labels = [
     [c.sessionRole, role === "owner" ? c.sessionOwner : role === "admin" ? c.sessionAdmin : "User"],
     [c.sessionPlan, planLabel(state.org.plan)],
@@ -2313,9 +2245,7 @@ function BetaPreviewControls({
         <option value="owner">Owner view</option>
       </select>
       <select value={plan} onChange={(event) => onPlan(event.target.value as PaidPlan)}>
-        <option value="starter">Starter preview</option>
-        <option value="pro">Pro preview</option>
-        <option value="operator">Operator preview</option>
+        <option value="operator">The Pack preview</option>
       </select>
       <small>Preview only. Billing entitlement still comes from the backend.</small>
     </section>
@@ -3239,24 +3169,11 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
               <span className="status amber">Safe preview</span>
             </div>
           ) : null}
-          <div className="community-gate-steps" aria-label="Community access steps">
-            <section>
-              <b>01</b>
-              <span>{gateText.stepIdentity}</span>
-              <small>{gateText.stepIdentityBody}</small>
-            </section>
-            <section>
-              <b>02</b>
-              <span>{gateText.stepInvite}</span>
-              <small>{gateText.stepInviteBody}</small>
-            </section>
-            <section>
-              <b>03</b>
-              <span>{gateText.stepSession}</span>
-              <small>{gateText.stepSessionBody}</small>
-            </section>
-          </div>
+
           {oauthError ? <small className="community-auth-message error" role="alert">{oauthError}</small> : null}
+          <a className="button-link community-oauth-button" href={communityBridgeGateUrl(slug, locale)}>
+            Continue to Community Bridge SSO
+          </a>
           {enabledOAuthProviders.length > 0 ? (
             <div className="community-oauth-providers" aria-label="Social sign-in">
               {enabledOAuthProviders.map((provider) => (
@@ -3279,7 +3196,7 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
               only method that cannot be locked out by a console misconfiguration. */}
           <form className="community-auth-form" onSubmit={requestLink}>
             <label>
-              <span>{c.serviceEmail}</span>
+              <span>Your email</span>
               <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required placeholder={ui.communityEmailPlaceholder} autoComplete="email" />
               <small>{gateText.emailHint}</small>
             </label>
@@ -3361,7 +3278,7 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
             </div>
 
             <div className="lovable-auth-actions">
-              <AltchaGate onVerified={onHumanVerified} />
+              <HumanVerificationGate onVerified={onHumanVerified} />
               {(["apple", "google", "microsoft"] as AuthProvider[]).map((provider) => (
                 <AuthProviderButton
                   key={provider}
@@ -3388,7 +3305,7 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
           By continuing you agree to our <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.
         </p>
         <div className="lovable-auth-secured">
-          <p>Secured · End-to-end encrypted</p>
+          <p>Secured · private access only</p>
           <a href="https://myfenrir.com" aria-label="Powered by MyFenrir">
             <img src="/fenrir-splash-icon.svg?v=20260813-login" alt="" />
             <span>Powered by MyFenrir</span>
@@ -3914,9 +3831,6 @@ function AccountServicePanel({
   telegram,
   subdomain,
   mode,
-  checkoutPlan,
-  courtesyCode,
-  onCourtesyCode,
   onEmail,
   onOrg,
   onTelegram,
@@ -3930,9 +3844,6 @@ function AccountServicePanel({
   telegram: string;
   subdomain: string;
   mode: "create" | "link" | null;
-  checkoutPlan: PaidPlan;
-  courtesyCode: string;
-  onCourtesyCode: (value: string) => void;
   onEmail: (value: string) => void;
   onOrg: (value: string) => void;
   onTelegram: (value: string) => void;
@@ -3961,15 +3872,11 @@ function AccountServicePanel({
             <span>{c.serviceDomain}</span>
             <input value={subdomain} onChange={(event) => onSubdomain(event.target.value)} />
           </label>
-          <label>
-            <span>Admin courtesy code (optional)</span>
-            <input value={courtesyCode} onChange={(event) => onCourtesyCode(event.target.value)} placeholder="One-use code" autoComplete="off" />
-          </label>
         </div>
 
         <div className="stripe-mvp-card">
           <span className="status amber">{c.stripeMode}</span>
-          <h3>{checkoutPlan.charAt(0).toUpperCase() + checkoutPlan.slice(1)}</h3>
+          <h3>Activate MyFenrir</h3>
           <p>{c.checkoutReady}</p>
           <div className="stars-bridge">
             <span className="status good">{c.starsMode}</span>

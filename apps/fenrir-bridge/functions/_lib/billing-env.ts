@@ -14,6 +14,8 @@ export type BillingEnv = AuthEnv & {
   STRIPE_PRO_PRICE_ID?: string;
   STRIPE_OPERATOR_PRICE_ID?: string;
   STRIPE_COURTESY_COUPON_ID?: string;
+  /** Card billing is deliberately opt-in while Telegram Stars is the launch rail. */
+  CARD_BILLING_ENABLED?: string;
   FENRIR_COURTESY_CODE?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_PROD_BOT_TOKEN?: string;
@@ -42,8 +44,8 @@ export type BillingEnv = AuthEnv & {
   PUBLIC_AUTH_URL?: string;
   /** Comma-separated list of allowed redirect URIs for authentication. */
   ALLOWED_REDIRECT_URIS?: string;
-  /** Optional dedicated ALTCHA secret. SESSION_SECRET is used with domain separation when absent. */
-  ALTCHA_HMAC_SECRET?: string;
+  /** Optional dedicated secret for native Frisky human challenges. SESSION_SECRET is used when absent. */
+  HUMAN_VERIFICATION_HMAC_SECRET?: string;
 };
 
 export function requireEnv(value: string | undefined, name: string): string {
@@ -59,6 +61,26 @@ export function missingEnvResponse(name: string) {
       detail: `${name} is not set in the server environment.`
     },
     { status: 503 }
+  );
+}
+
+/**
+ * Card checkout must never become live merely because a Stripe key was bound
+ * for another Fenrir workflow.  Requiring an explicit flag keeps the launch
+ * promise (Telegram Stars first) true until the full card journey is tested.
+ */
+export function isCardBillingEnabled(env: BillingEnv) {
+  return env.CARD_BILLING_ENABLED?.trim().toLowerCase() === "true";
+}
+
+export function cardBillingNotLiveResponse() {
+  return Response.json(
+    {
+      ok: false,
+      error: "card_billing_not_live",
+      detail: "Telegram Stars is the current MyFenrir payment path."
+    },
+    { status: 409 }
   );
 }
 
