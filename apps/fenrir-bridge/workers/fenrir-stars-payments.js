@@ -444,7 +444,7 @@ const FENRIR_BOT_BRIEF = [
   "Custom domains are not active. Do not provide TXT or CNAME records.",
   "PLANS (two tiers only):",
   "Free ($0): 5 gates to build and test, plus a managed MyFenrir Gate URL. Linking a community requires The Pack.",
-  "The Pack ($15/month PER LINKED COMMUNITY): multi-admin workflows and audit logs. Three linked communities is $45/month.",
+  "The Pack ($15/month): multi-admin workflows and audit logs.",
   "Never say 'unlimited Locks'. The Pack is $15/month; never describe any allowance as unlimited.",
   "There is no Starter or Pro tier. Do not mention Starter, Pro, or Operator — those are retired.",
   "Communities are adults only.",
@@ -1574,7 +1574,7 @@ export function modularMenuText(text, entitlement) {
       "Agrega Fenrir como admin con permiso para crear invitaciones. Tú aceptas a cada persona antes de que reciba una invitación.",
       "",
       "3 · Elige tu plan cuando lo necesites",
-      "Gratis incluye 5 gates para armar y probar. Enlazar una comunidad requiere The Pack: US$15/mes por comunidad enlazada, con multi-admin y auditoría.",
+      "Gratis incluye 5 gates para armar y probar. Enlazar una comunidad requiere The Pack: US$15/mes, con multi-admin y auditoría.",
       "",
       "Puedes crear tu primer Gate sin pagar ni configurar DNS.",
       "",
@@ -1688,7 +1688,7 @@ function fallbackMind(text, entitlement) {
     if (spanishIntent(text)) {
       return entitlement?.status === "active"
         ? `Fenrir Protocol esta activo.\n\nAcceso: activo\nStars: ${entitlement.stars_amount}\nModo: Telegram Stars`
-        : "Fenrir Protocol todavia no esta activo.\n\n$15/mes por comunidad enlazada.\nTarjeta y cripto en MyFenrir → Upgrade. /subscribe abre la caja de Telegram Stars (⭐1,150).";
+        : "Fenrir Protocol todavia no esta activo.\n\n$15/mes.\nTarjeta y cripto en MyFenrir → Upgrade. /subscribe abre la caja de Telegram Stars (⭐1,150).";
     }
     return entitlement?.status === "active"
       ? `Fenrir Protocol is active.\n\nAccess: unlocked\nStars: ${entitlement.stars_amount}\nMode: Telegram Stars`
@@ -1704,7 +1704,7 @@ function fallbackMind(text, entitlement) {
         "5 gates para armar y probar.",
         "Enlazar una comunidad requiere The Pack.",
         "",
-        "The Pack · $15/mes por comunidad enlazada",
+        "The Pack · $15/mes",
         "Tres comunidades = $45/mes.",
         "Multi-admin y registros de auditoría.",
         "",
@@ -1741,7 +1741,7 @@ function fallbackMind(text, entitlement) {
       return [
         "MYFENRIR | Pago",
         "",
-        "The Pack cuesta $15/mes por comunidad enlazada.",
+        "The Pack cuesta $15/mes.",
         "",
         "1. Tarjeta (Apple Pay / Google Pay) — $15",
         "2. Telegram Stars — ⭐1,150",
@@ -1778,7 +1778,7 @@ function fallbackMind(text, entitlement) {
         "5. Crea el slug del bridge.",
         "6. Comparte el link estable.",
         "",
-        "Gratis te da 5 gates para probar. Enlazar una comunidad requiere The Pack ($15/mes por comunidad)."
+        "Gratis te da 5 gates para probar. Enlazar una comunidad requiere The Pack ($15/mes)."
       ].join("\n");
     }
     return [
