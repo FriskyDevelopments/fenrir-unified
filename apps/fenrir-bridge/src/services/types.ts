@@ -1,4 +1,6 @@
-export type Plan = "free" | "starter" | "pro" | "operator";
+// "standard" is the persisted entitlement key for The Pack. Keep the old
+// keys readable for historical rows, but never surface them as products.
+export type Plan = "free" | "starter" | "pro" | "operator" | "standard";
 export type DomainStatus = "pending" | "verified" | "failed";
 export type DnsProvider = "cloudflare" | "external";
 export type CertificateStatus = "not_requested" | "dns_pending" | "issuing" | "active" | "failed";

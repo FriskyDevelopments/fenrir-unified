@@ -48,6 +48,11 @@ export function dashboardPathFor(page: PageKey) {
 
 export function paidPlanFromProductLabel(label: string): PaidPlan | null {
   const p = label.trim().toLowerCase();
+  // Legacy dashboard records still use the old internal keys.  The public
+  // product has one paid plan, The Pack; map its label to the legacy paid key
+  // only for backwards-compatible preview state.  Real purchase goes through
+  // the Telegram Stars handoff, never the old card-plan endpoint.
+  if (p === "the pack") return "operator";
   if (p === "starter") return "starter";
   if (p === "pro") return "pro";
   if (p === "operator") return "operator";
