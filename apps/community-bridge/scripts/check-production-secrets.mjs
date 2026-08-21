@@ -21,6 +21,10 @@ const required = [
   "SUPABASE_URL",
   "SUPABASE_PUBLISHABLE_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
+  // Required by the bot-only /connect ingress. Without the paired binding on
+  // both Workers, Telegram can verify permissions but the group never reaches
+  // the owner's selector.
+  "COMMUNITY_BRIDGE_DESTINATION_SYNC_SECRET",
 ];
 
 let output;
