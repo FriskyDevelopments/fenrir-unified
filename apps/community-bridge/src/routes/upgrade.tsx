@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
 import { ArrowLeft, Activity, LockKeyhole, ShieldCheck } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { PackRails } from "@/components/billing/pack-rails";
+import { CosmicField } from "@/components/billing/cosmic-field";
 
 /**
  * /upgrade — the OPERATOR checkout.
@@ -19,62 +19,35 @@ import { PackRails } from "@/components/billing/pack-rails";
  * BILLING_SURFACE_NOTES.md for the full map and why the move matters.
  */
 
-const LOCALES = ["es", "en"] as const;
-type Locale = (typeof LOCALES)[number];
-
-function normalizeLocale(value: string | null | undefined): Locale {
-  const normalized = (value ?? "").slice(0, 2).toLowerCase();
-  return normalized === "en" ? "en" : "es";
-}
-
+/**
+ * Copy as keys, not loose literals, so a translation layer can be added later
+ * without touching the markup. English is the base and the only set shipped
+ * today. `community-bridge` has no i18n system yet; when one lands, follow
+ * apps/fenrir-bridge/src/i18n.ts rather than inventing another.
+ */
 const COPY = {
-  es: {
-    back: "Tus gates",
-    eyebrow: "Consola del operador",
-    title: "Tu puerta no se cae.",
-    lede: "The Pack es la capa de admisión de la comunidad que administras: reglas de entrada, registro de quién entró y una dirección que sigue respondiendo cuando tú no estás mirando.",
-    sectionEyebrow: "Qué compras",
-    sectionTitle: "Tres cosas que dejan de ser tu problema.",
-    caps: [
-      {
-        title: "Una dirección administrada",
-        body: "Cada Gate recibe una URL MyFenrir gestionada. Sin DNS, sin certificados, sin una noche arreglando un dominio caído.",
-      },
-      {
-        title: "Admisión con criterio",
-        body: "Defines las reglas de entrada que tu comunidad necesita y se aplican igual a las tres de la mañana que a las tres de la tarde.",
-      },
-      {
-        title: "Registro y reportes",
-        body: "Vistas del Gate, tendencia de siete días, referrers y visitantes únicos por día, listos para sincronizar con tu proyecto de PostHog.",
-      },
-    ],
-    footNote: "El cobro es por comunidad enlazada. Si administras dos, son dos.",
-  },
-  en: {
-    back: "Your gates",
-    eyebrow: "Operator console",
-    title: "The door holds.",
-    lede: "The Pack is the admission layer for the community you run: entry rules, a record of who came through, and an address that keeps answering when you are not watching.",
-    sectionEyebrow: "What you are buying",
-    sectionTitle: "Three things that stop being your problem.",
-    caps: [
-      {
-        title: "A managed address",
-        body: "Every Gate gets a managed MyFenrir URL. No DNS, no certificates, no evening spent fixing a domain that went down.",
-      },
-      {
-        title: "Admission with judgement",
-        body: "You set the entry rules your community needs and they apply the same at three in the morning as at three in the afternoon.",
-      },
-      {
-        title: "Record and reports",
-        body: "Gate views, seven-day trend, referrers and unique daily visitors, ready to sync with your PostHog project.",
-      },
-    ],
-    footNote: "Billing is per linked community. Run two, pay for two.",
-  },
-} satisfies Record<Locale, unknown>;
+  back: "Your gates",
+  eyebrow: "Operator console",
+  title: "The door holds.",
+  lede: "The Pack is the admission layer for the community you run: entry rules, a record of who came through, and an address that keeps answering when you are not watching.",
+  sectionEyebrow: "What you are buying",
+  sectionTitle: "Three things that stop being your problem.",
+  caps: [
+    {
+      title: "A managed address",
+      body: "Every Gate gets a managed MyFenrir URL. No DNS, no certificates, no evening spent fixing a domain that went down.",
+    },
+    {
+      title: "Admission with judgement",
+      body: "You set the entry rules your community needs and they apply the same at three in the morning as at three in the afternoon.",
+    },
+    {
+      title: "Record and reports",
+      body: "Gate views, seven-day trend, referrers and unique daily visitors, ready to sync with your PostHog project.",
+    },
+  ],
+  footNote: "Billing is per linked community. Run two, pay for two.",
+} as const;
 
 const CAP_ICONS = [ShieldCheck, LockKeyhole, Activity] as const;
 
@@ -83,14 +56,7 @@ export const Route = createFileRoute("/upgrade")({ ssr: false, component: Upgrad
 function UpgradePage() {
   // Honour the OS "reduce motion" setting: everything below mounts static.
   const reduce = useReducedMotion();
-  const [locale, setLocale] = useState<Locale>("es");
-  const t = COPY[locale];
-
-  useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("lang");
-    const stored = window.localStorage.getItem("myfenrir_locale");
-    setLocale(normalizeLocale(requested ?? stored ?? navigator.language));
-  }, []);
+  const t = COPY;
 
   return (
     <main
@@ -109,18 +75,36 @@ function UpgradePage() {
         color: "#ECEEFF",
       }}
     >
-      {/* Ground. One very slow indigo drift, 34s — slower than a reading pass,
-          so it never competes with the price for attention. It exists to keep a
-          large dark field from looking dead, nothing more. */}
+      {/* Cosmic ground — star field, nebula and the occasional comet, with
+          pointer parallax. Fenrir is a wolf out of a night sky; the substrate
+          says so. See cosmic-field.tsx for why each layer is allowed to move. */}
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <CosmicField className="absolute inset-0 h-full w-full" />
+        {/* The real FriskyDev sigil as a watermark, masked so the artwork is
+            never redrawn. It breathes on a 26s cycle — slow enough to register
+            as presence rather than animation. */}
         <motion.div
-          className="absolute inset-[-30%]"
+          className="absolute -right-[12%] top-1/2 hidden h-[62vmin] w-[62vmin] -translate-y-1/2 lg:block"
+          style={{
+            backgroundImage:
+              "linear-gradient(160deg, rgba(183,255,42,0.09), rgba(139,124,255,0.05))",
+            WebkitMaskImage: "url(/brand/friskydev-sigil-solid.svg)",
+            maskImage: "url(/brand/friskydev-sigil-solid.svg)",
+            WebkitMaskSize: "contain",
+            maskSize: "contain",
+            WebkitMaskRepeat: "no-repeat",
+            maskRepeat: "no-repeat",
+          }}
+          animate={reduce ? undefined : { opacity: [0.55, 0.95, 0.55], scale: [1, 1.02, 1] }}
+          transition={reduce ? undefined : { duration: 26, repeat: Infinity, ease: "easeInOut" }}
+        />
+        {/* Vignette: keeps the star field from crowding the copy edges. */}
+        <div
+          className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(34% 30% at 22% 20%, rgba(139,124,255,0.16), transparent 62%), radial-gradient(30% 28% at 80% 76%, rgba(183,255,42,0.07), transparent 62%)",
+              "radial-gradient(120% 90% at 50% 45%, transparent 40%, rgba(8,11,22,0.72) 100%)",
           }}
-          animate={reduce ? undefined : { rotate: [0, 5, 0], scale: [1, 1.04, 1] }}
-          transition={reduce ? undefined : { duration: 34, repeat: Infinity, ease: "easeInOut" }}
         />
       </div>
 
