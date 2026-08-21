@@ -75,7 +75,7 @@ function toReview(row: Record<string, unknown>): ModerationReview {
 /** La cola. Por defecto lo pendiente, que es lo único accionable. */
 export const listModerationReviews = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z
       .object({
         status: z.enum(["pending", "approved", "rejected"]).default("pending"),
@@ -115,7 +115,7 @@ export const countPendingReviews = createServerFn({ method: "GET" })
  */
 export const decideModerationReview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z
       .object({
         id: z.string().uuid(),
@@ -147,7 +147,7 @@ export const decideModerationReview = createServerFn({ method: "POST" })
  */
 export const enqueueModerationReview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z
       .object({
         community_id: z.string().trim().min(1).max(60),

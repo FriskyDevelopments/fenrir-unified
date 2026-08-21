@@ -6,7 +6,6 @@ import type { Session, User } from "@supabase/supabase-js";
  * opened and reviewed without signing in. It never touches the backend — any
  * server-backed list simply comes back empty.
  */
-const KEY = "fenrir_demo_mode";
 const LINK_KEY = "fenrir_demo_telegram_linked";
 const CODE_KEY = "fenrir_demo_link_code";
 
@@ -41,26 +40,25 @@ export interface DemoLinkCode {
 
 export function isDemoMode(): boolean {
   if (typeof window === "undefined") return false;
-  if (new URLSearchParams(window.location.search).has("demo")) return true;
-  try {
-    return window.localStorage.getItem(KEY) === "1";
-  } catch {
-    return false;
-  }
+  // Demo access must be explicit for the current URL. Persisting it in local
+  // storage made real public Gates adopt a mock owner session after a preview.
+  return new URLSearchParams(window.location.search).has("demo");
 }
 
 export function setDemoMode(on: boolean): void {
   if (typeof window === "undefined") return;
-  try {
-    if (on) window.localStorage.setItem(KEY, "1");
-    else {
-      window.localStorage.removeItem(KEY);
+  const url = new URL(window.location.href);
+  if (on) url.searchParams.set("demo", "1");
+  else {
+    url.searchParams.delete("demo");
+    try {
       window.localStorage.removeItem(LINK_KEY);
       window.localStorage.removeItem(CODE_KEY);
+    } catch {
+      /* storage unavailable — demo mode is still off */
     }
-  } catch {
-    /* storage unavailable — demo mode stays off */
   }
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 /** Whether the simulated Telegram link has been completed in this browser. */

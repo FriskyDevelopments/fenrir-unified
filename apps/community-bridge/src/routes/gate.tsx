@@ -108,6 +108,10 @@ function NewGatePage() {
   }, [loading, session, fetchQuota, navigate]);
 
   const onSave = async () => {
+    if (!config.headline.trim()) {
+      toast.error("Give this Gate a name so it can appear in the bot selector.");
+      return;
+    }
     if (!SLUG_PATTERN.test(config.slug)) {
       toast.error("Pick a gate address of 3–40 lowercase letters, numbers or dashes.");
       return;
@@ -124,7 +128,7 @@ function NewGatePage() {
     setSaving(true);
     try {
       const saved = await persist({
-        data: { ...config, brand_id: brand.id, community_id: brand.community.id },
+        data: { ...config, headline: config.headline.trim(), brand_id: brand.id, community_id: null },
       });
       toast.success("Gate address reserved — setup required");
       setCreatedGate({ id: saved.id, slug: saved.slug });
@@ -165,8 +169,8 @@ function NewGatePage() {
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             We reserved <span className="font-medium text-foreground">/{createdGate.slug}</span> for
-            your community. It will become live after membership and the protected Telegram group
-            are confirmed.
+            this Gate. It will become live after Fenrir verifies your protected Telegram group and
+            you choose it from the My Gates dashboard.
           </p>
           <div className="mt-6 rounded-xl border border-border bg-card/60 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -186,8 +190,9 @@ function NewGatePage() {
                   Set up Fenrir in your Telegram group
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Connect the gate to the group it will protect, then test the complete member
-                  journey.
+                  Fenrir, not a typed browser field, verifies your eligible Telegram groups. Run
+                  <code className="mx-1 rounded bg-background px-1.5 py-0.5 font-mono text-xs">/connect</code>
+                  inside the group you want to protect.
                 </p>
               </div>
             </div>
@@ -195,17 +200,13 @@ function NewGatePage() {
               <li className="flex gap-3">
                 <span className="font-semibold text-primary">1.</span>
                 <span>
-                  Open <strong>@{TELEGRAM_BOT_USERNAME}</strong> in a private chat and send{" "}
-                  <code className="rounded bg-background px-1.5 py-0.5 font-mono text-xs">
-                    /link
-                  </code>
-                  . Fenrir will enable the MyFenrir Mini App button and guide you through secure
-                  account linking.
+                  Add <strong>@{TELEGRAM_BOT_USERNAME}</strong> to the protected group, make it an
+                  admin and allow <strong>Invite Users</strong>.
                 </span>
               </li>
               <li className="flex gap-3">
                 <span className="font-semibold text-primary">2.</span>
-                <span>Add Fenrir to the Telegram group connected to this gate.</span>
+                <span>Inside that group, an admin sends <code className="rounded bg-background px-1.5 py-0.5 font-mono text-xs">/connect</code>. Fenrir verifies the group and adds it to your dashboard.</span>
               </li>
               <li className="flex gap-3">
                 <span className="font-semibold text-primary">3.</span>
@@ -217,8 +218,8 @@ function NewGatePage() {
               <li className="flex gap-3">
                 <span className="font-semibold text-primary">4.</span>
                 <span>
-                  Return to MyFenrir and confirm membership, group mapping and bot permissions. Only
-                  then will the gate be ready for a member test.
+                  Return to <strong>My Gates</strong> and select the verified group for this Gate.
+                  Only then will it be ready for a member test.
                 </span>
               </li>
             </ol>
@@ -316,11 +317,20 @@ function NewGatePage() {
 
         <OnboardingMotionGuide />
 
+        <Card variant="muted" className="mb-5 p-5 sm:p-6">
+          <p className="text-sm font-semibold text-foreground">Telegram group comes next</p>
+          <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-muted-foreground">
+            Publish the Gate first. In the protected Telegram group, an admin sends
+            <code className="mx-1 rounded bg-background px-1.5 py-0.5 font-mono text-xs">/connect</code>.
+            Then select that verified group from My Gates. The Gate stays pending until Fenrir
+            confirms administrator access and Invite Users permission.
+          </p>
+        </Card>
+
         <GateForm
           config={config}
           onChange={setConfig}
           slugStatus={slugStatus}
-          communityLabel={brand.community.label}
         />
       </main>
     </div>

@@ -38,7 +38,7 @@ const inputSchema = z.object({
 
 export const moderateUpload = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => inputSchema.parse(data))
+  .validator((data) => inputSchema.parse(data))
   .handler(async ({ data }) => {
     const key = process.env["MODERATION_API_KEY"];
     if (!key) {

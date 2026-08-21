@@ -11,6 +11,7 @@ const healthPayload = (request: Request) => ({
   }
 });
 
+/** Public liveness only; payment configuration belongs behind operator auth. */
 export async function onRequestGet(context: any) {
   return noStoreJson(healthPayload(context.request));
 }

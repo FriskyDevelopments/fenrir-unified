@@ -71,7 +71,7 @@ export const listUsersWithRoles = createServerFn({ method: "GET" })
 
 export const adminUpdateUserRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z.object({ target: z.string().uuid(), role: appRoleSchema }).parse(data),
   )
   .handler(async ({ context, data }) => {
@@ -83,7 +83,7 @@ export const adminUpdateUserRole = createServerFn({ method: "POST" })
 
 export const adminSetUserTelegramId = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z
       .object({ target: z.string().uuid(), telegramId: z.number().nullable() })
       .parse(data),
@@ -96,7 +96,7 @@ export const adminSetUserTelegramId = createServerFn({ method: "POST" })
 
 export const redeemTelegramLinkCode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ code: z.string().min(1).max(20) }).parse(data))
+  .validator((data) => z.object({ code: z.string().min(1).max(20) }).parse(data))
   .handler(async ({ context, data }) => {
     const { data: result, error } = await adminRpc("server_redeem_telegram_link_code", {
         _caller: context.userId,

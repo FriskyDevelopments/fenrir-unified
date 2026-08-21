@@ -40,6 +40,21 @@ export async function onRequest(context: any) {
       return noStoreJson({ verified: false, error: "verification_unavailable" }, { status: 503 });
     }
   }
+  if (url.pathname === "/api/verification/grant" && context.request.method === "POST") {
+    const body = await context.request.json().catch(() => null) as { grant?: unknown; context?: unknown } | null;
+    if (typeof body?.grant !== "string" || typeof body.context !== "string") {
+      return noStoreJson({ verified: false, error: "verification_grant_invalid" }, { status: 400 });
+    }
+    const response = await fetch("https://friskydev-human-verification.hrgrrtks2p.workers.dev/api/grant/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ grant: body.grant, context: body.context, audience: url.origin }),
+    }).catch(() => null);
+    if (!response?.ok) return noStoreJson({ verified: false, error: "verification_grant_rejected" }, { status: 400 });
+    const result = await response.json().catch(() => null) as { verified?: boolean; method?: string } | null;
+    if (!result?.verified) return noStoreJson({ verified: false, error: "verification_grant_rejected" }, { status: 400 });
+    return noStoreJson({ verified: true, method: result.method });
+  }
   return noStoreJson(
     {
       ok: false,

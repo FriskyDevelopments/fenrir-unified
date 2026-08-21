@@ -37,3 +37,9 @@ export function communityBridgeUrlForLocale(locale: string) {
   target.searchParams.set("lang", locale);
   return communityBridgeSsoUrl(target.toString());
 }
+
+export function communityBridgeGateUrl(slug: string, locale?: string) {
+  const target = new URL(`/g/${encodeURIComponent(slug)}`, "https://communities.myfenrir.com");
+  if (locale) target.searchParams.set("lang", locale);
+  return communityBridgeSsoUrl(target.toString());
+}

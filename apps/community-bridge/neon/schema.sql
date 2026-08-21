@@ -67,6 +67,34 @@ create table if not exists cb_gate_views (
 );
 create index if not exists cb_gate_views_gate_time_idx on cb_gate_views (gate_id, viewed_at);
 
+-- Community access is deliberately separate from moderation. A Gate visitor can
+-- request entry; the Gate owner can grant, deny, revoke, and audit that decision
+-- without storing Telegram invite URLs or copying identity records.
+create table if not exists cb_gate_access_requests (
+  id uuid primary key default gen_random_uuid(),
+  gate_id uuid not null references cb_gate_configs (id) on delete cascade,
+  owner_id uuid not null,
+  community_id text not null,
+  applicant_id uuid not null,
+  telegram_user_id bigint not null,
+  applicant_email text,
+  applicant_name text,
+  status text not null default 'pending'
+    check (status in ('pending', 'granted', 'denied', 'revoked')),
+  requested_at timestamptz not null default now(),
+  decided_at timestamptz,
+  decided_by uuid,
+  decision_note text,
+  last_invited_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (gate_id, applicant_id)
+);
+create index if not exists cb_gate_access_requests_owner_queue_idx
+  on cb_gate_access_requests (owner_id, status, requested_at);
+create index if not exists cb_gate_access_requests_applicant_idx
+  on cb_gate_access_requests (applicant_id, status, updated_at desc);
+
 create table if not exists cb_brand_tenants (
   id uuid primary key default gen_random_uuid(),
   brand_id text not null unique,

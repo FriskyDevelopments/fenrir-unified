@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "vitest";
 
 import { createAltchaChallenge, verifyAltchaPayload } from "../_lib/altcha.ts";
@@ -12,8 +13,9 @@ function encodePayload(value: unknown) {
 
 async function solve(challenge: Awaited<ReturnType<typeof createAltchaChallenge>>) {
   for (let number = 0; number <= challenge.maxnumber; number += 1) {
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${challenge.salt}${number}`));
-    const hex = Buffer.from(digest).toString("hex");
+    // The browser widget uses Web Crypto. Node's synchronous hashing keeps this
+    // exhaustive test deterministic even when a challenge lands near maxnumber.
+    const hex = createHash("sha256").update(`${challenge.salt}${number}`).digest("hex");
     if (hex === challenge.challenge) return encodePayload({ ...challenge, number });
   }
   throw new Error("test challenge was not solvable");

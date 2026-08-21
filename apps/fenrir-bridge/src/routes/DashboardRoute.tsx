@@ -20,7 +20,7 @@ import {
   type TelegramIdentityLinkPayload
 } from "../services/api";
 import type { AppState, FriskyBridge, FriskyDomain, FriskyLiveRoom, LiveRoomProvider, Plan } from "../services/types";
-import { communityBridgeDashboardUrl } from "../services/communityBridge";
+import { communityBridgeDashboardUrl, communityBridgeUrlForLocale } from "../services/communityBridge";
 import { uiCopy, type UiCopy } from "../app/uiCopy";
 import {
   addDomainTag,
@@ -765,7 +765,7 @@ export function DashboardRoute() {
             roomProvider={roomProviderInput}
             onDomain={() => navigateActive("domains")}
             onRoom={() => navigateActive("rooms")}
-            onCommunity={() => window.location.assign(communityBridgeDashboardUrl)}
+            onCommunity={() => window.location.assign(communityBridgeUrlForLocale(locale))}
           />
         )}
 

@@ -47,4 +47,9 @@ altcha-widget { display: block; width: 100%; --altcha-color-border: rgb(255 255 
 .verification-success span { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid rgb(34 199 168 / .35); border-radius: 50%; background: rgb(34 199 168 / .08); color: var(--hv); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 420px) { .human-verification { padding: 9px; } .rune-sequence span, .rune-answer span, .rune-choices button { width: 30px; height: 30px; } .verification-switches { gap: 4px; } .verification-switches button { font-size: .53rem; } }
+
+.canonical-verification { width: 100%; overflow: hidden; border: 1px solid rgb(214 177 91 / .28); border-radius: 22px; background: #10141e; box-shadow: 0 18px 52px rgb(0 0 0 / .24); }
+.canonical-verification iframe { display: block; width: 100%; min-height: 360px; border: 0; background: #10141e; transition: height .24s ease; }
+.canonical-verification.is-verified { padding: 14px; }
+.canonical-verification__note { margin: 0; padding: 10px 14px; border-top: 1px solid rgb(255 255 255 / .08); color: rgb(225 240 236 / .72); font-size: .72rem; text-align: center; }
 @media (prefers-reduced-motion: reduce) { .rune-choices button { transition: none; } }

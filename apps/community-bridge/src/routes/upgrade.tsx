@@ -1,212 +1,253 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  ArrowUpRight,
-  Check,
-  Crown,
-  Globe2,
-  LockKeyhole,
-  UsersRound,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, Activity, LockKeyhole, ShieldCheck } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { Button } from "@/components/ui/button";
 import { PackRails } from "@/components/billing/pack-rails";
 
-const capabilities = [
-  {
-    icon: Globe2,
-    title: "A home that is ready",
-    body: "Every Gate receives a managed MyFenrir URL, ready to share without DNS setup.",
+/**
+ * /upgrade — the OPERATOR checkout.
+ *
+ * Audience: the person who administers a community and pays $14.99/month per
+ * linked community. NOT the member arriving at a Gate. Nothing here sells
+ * belonging; it sells control, reliability, and a door that does not fall over.
+ *
+ * SURFACE NOTE (diagnosis, not a change): this route currently ships from the
+ * same app and the same host as the member Gate (`communities.myfenrir.com`,
+ * see src/config/brands.ts). It is written to be liftable to the operator's own
+ * domain — it declares its own colour tokens instead of inheriting the Gate
+ * theme, and it deliberately does not load telegram-web-app.js. See
+ * BILLING_SURFACE_NOTES.md for the full map and why the move matters.
+ */
+
+const LOCALES = ["es", "en"] as const;
+type Locale = (typeof LOCALES)[number];
+
+function normalizeLocale(value: string | null | undefined): Locale {
+  const normalized = (value ?? "").slice(0, 2).toLowerCase();
+  return normalized === "en" ? "en" : "es";
+}
+
+const COPY = {
+  es: {
+    back: "Tus gates",
+    eyebrow: "Consola del operador",
+    title: "Tu puerta no se cae.",
+    lede: "The Pack es la capa de admisión de la comunidad que administras: reglas de entrada, registro de quién entró y una dirección que sigue respondiendo cuando tú no estás mirando.",
+    sectionEyebrow: "Qué compras",
+    sectionTitle: "Tres cosas que dejan de ser tu problema.",
+    caps: [
+      {
+        title: "Una dirección administrada",
+        body: "Cada Gate recibe una URL MyFenrir gestionada. Sin DNS, sin certificados, sin una noche arreglando un dominio caído.",
+      },
+      {
+        title: "Admisión con criterio",
+        body: "Defines las reglas de entrada que tu comunidad necesita y se aplican igual a las tres de la mañana que a las tres de la tarde.",
+      },
+      {
+        title: "Registro y reportes",
+        body: "Vistas del Gate, tendencia de siete días, referrers y visitantes únicos por día, listos para sincronizar con tu proyecto de PostHog.",
+      },
+    ],
+    footNote: "El cobro es por comunidad enlazada. Si administras dos, son dos.",
   },
-  {
-    icon: LockKeyhole,
-    title: "Admission with context",
-    body: "Build access rules around the standards your community actually needs.",
+  en: {
+    back: "Your gates",
+    eyebrow: "Operator console",
+    title: "The door holds.",
+    lede: "The Pack is the admission layer for the community you run: entry rules, a record of who came through, and an address that keeps answering when you are not watching.",
+    sectionEyebrow: "What you are buying",
+    sectionTitle: "Three things that stop being your problem.",
+    caps: [
+      {
+        title: "A managed address",
+        body: "Every Gate gets a managed MyFenrir URL. No DNS, no certificates, no evening spent fixing a domain that went down.",
+      },
+      {
+        title: "Admission with judgement",
+        body: "You set the entry rules your community needs and they apply the same at three in the morning as at three in the afternoon.",
+      },
+      {
+        title: "Record and reports",
+        body: "Gate views, seven-day trend, referrers and unique daily visitors, ready to sync with your PostHog project.",
+      },
+    ],
+    footNote: "Billing is per linked community. Run two, pay for two.",
   },
-  {
-    icon: UsersRound,
-    title: "Gate Reports · PostHog-ready",
-    body: "See Gate views, seven-day trends, referrers, and unique daily visitors, ready to sync with your PostHog project.",
-  },
-] as const;
+} satisfies Record<Locale, unknown>;
+
+const CAP_ICONS = [ShieldCheck, LockKeyhole, Activity] as const;
 
 export const Route = createFileRoute("/upgrade")({ ssr: false, component: UpgradePage });
 
 function UpgradePage() {
-  // Honor the OS "reduce motion" setting: all looping/background motion turns
-  // off and entrances mount static for anyone who asks for it.
+  // Honour the OS "reduce motion" setting: everything below mounts static.
   const reduce = useReducedMotion();
+  const [locale, setLocale] = useState<Locale>("es");
+  const t = COPY[locale];
+
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("lang");
+    const stored = window.localStorage.getItem("myfenrir_locale");
+    setLocale(normalizeLocale(requested ?? stored ?? navigator.language));
+  }, []);
 
   return (
-    <main className="min-h-dvh overflow-hidden bg-background px-5 py-8 sm:px-8 sm:py-12">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-background"
-      >
-        {/* Slow aurora: on-brand navy with controlled red + green light. */}
+    <main
+      className="min-h-dvh px-5 py-8 sm:px-8 sm:py-12"
+      style={{
+        // Own tokens. Nothing here reads the member-Gate theme, so the page can
+        // move to the operator's domain without a re-skin.
+        ["--fd-midnight" as string]: "#080B16",
+        ["--fd-surface" as string]: "#0B0E1A",
+        ["--fd-indigo" as string]: "#161C3D",
+        ["--fd-lime" as string]: "#b7ff2a",
+        ["--fd-violet" as string]: "#8B7CFF",
+        ["--fd-ice" as string]: "#ECEEFF",
+        ["--fd-muted" as string]: "#9AA0C7",
+        background: "#080B16",
+        color: "#ECEEFF",
+      }}
+    >
+      {/* Ground. One very slow indigo drift, 34s — slower than a reading pass,
+          so it never competes with the price for attention. It exists to keep a
+          large dark field from looking dead, nothing more. */}
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <motion.div
-          className="absolute inset-[-25%] opacity-80 [background:radial-gradient(38%_34%_at_20%_25%,hsl(var(--primary)/0.18),transparent_60%),radial-gradient(36%_32%_at_82%_74%,rgba(16,185,129,0.14),transparent_60%),radial-gradient(46%_40%_at_62%_8%,rgba(16,185,129,0.05),transparent_65%)]"
-          animate={reduce ? undefined : { rotate: [0, 7, 0], scale: [1, 1.06, 1] }}
-          transition={reduce ? undefined : { duration: 28, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute -left-24 top-16 h-96 w-96 rounded-full bg-primary/20 blur-[110px]"
-          animate={reduce ? undefined : { x: [0, 54, 0], y: [0, 24, 0], opacity: [0.3, 0.6, 0.3] }}
-          transition={reduce ? undefined : { duration: 13, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute -right-24 bottom-0 h-96 w-96 rounded-full bg-emerald-500/15 blur-[120px]"
-          animate={reduce ? undefined : { x: [0, -42, 0], y: [0, -30, 0], opacity: [0.22, 0.5, 0.22] }}
-          transition={reduce ? undefined : { duration: 16, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute inset-[-30%]"
+          style={{
+            background:
+              "radial-gradient(34% 30% at 22% 20%, rgba(139,124,255,0.16), transparent 62%), radial-gradient(30% 28% at 80% 76%, rgba(183,255,42,0.07), transparent 62%)",
+          }}
+          animate={reduce ? undefined : { rotate: [0, 5, 0], scale: [1, 1.04, 1] }}
+          transition={reduce ? undefined : { duration: 34, repeat: Infinity, ease: "easeInOut" }}
         />
       </div>
+
       <div className="mx-auto max-w-6xl">
         <Link
           to="/gates"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-flex items-center gap-1 text-sm transition-colors"
+          style={{ color: "var(--fd-muted)" }}
         >
-          <ArrowLeft className="h-4 w-4" /> Your gates
+          <ArrowLeft className="h-4 w-4" /> {t.back}
         </Link>
 
-        <section className="grid gap-10 pb-12 pt-14 lg:grid-cols-[1.2fr_0.8fr] lg:items-end lg:pb-20">
+        <section className="grid gap-10 pb-12 pt-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pb-20">
           <motion.div
-            initial={reduce ? false : { opacity: 0, y: 20 }}
+            initial={reduce ? false : { opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
-              <Crown className="h-3.5 w-3.5" /> Community Bridge / Pack
+            {/* Vendor lockup: the real sigil as an <img>, and the wordmark set
+                as type. NOTE: no clean FriskyDev wordmark file exists on disk —
+                only raster brand sheets — so the name is typeset rather than
+                faked as vector art. Spelling per frisky-brand-registry.md. */}
+            <div className="flex items-center gap-2.5">
+              <img
+                src="/brand/friskydev-sigil-lime.svg"
+                alt="Frisky Developments"
+                draggable={false}
+                className="h-6 w-6"
+              />
+              <span
+                className="text-[11px] font-semibold uppercase tracking-[0.24em]"
+                style={{ color: "var(--fd-muted)" }}
+              >
+                Frisky Developments
+              </span>
             </div>
-            <h1 className="mt-6 max-w-3xl text-5xl font-semibold leading-[0.95] tracking-[-0.055em] sm:text-6xl lg:text-7xl">
-              Grow the world around your Gates.
+
+            <p
+              className="mt-8 text-[11px] font-semibold uppercase tracking-[0.22em]"
+              style={{ color: "var(--fd-lime)" }}
+            >
+              {t.eyebrow}
+            </p>
+            <h1
+              className="mt-4 max-w-2xl text-5xl font-semibold leading-[0.95] tracking-[-0.055em] sm:text-6xl lg:text-7xl"
+              style={{ color: "var(--fd-ice)" }}
+            >
+              {t.title}
             </h1>
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              You already have entrances. Pack turns them into a coherent community system—branded,
-              protected, and ready to evolve with your people.
+            <p
+              className="mt-6 max-w-xl text-base leading-relaxed sm:text-lg"
+              style={{ color: "var(--fd-muted)" }}
+            >
+              {t.lede}
             </p>
           </motion.div>
+
           <motion.aside
-            initial={reduce ? false : { opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: reduce ? 0 : 0.12, duration: 0.48 }}
-            className="relative overflow-hidden rounded-3xl border border-primary/35 bg-card/70 p-6 shadow-[0_28px_100px_-50px_hsl(var(--primary))] backdrop-blur"
+            id="pack-rails"
+            className="scroll-mt-24"
+            initial={reduce ? false : { opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: reduce ? 0 : 0.1, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div
-              aria-hidden="true"
-              className="absolute -right-8 -top-8 h-32 w-32 rounded-full border border-primary/30"
-            />
-            <h2 className="text-3xl font-semibold tracking-tight">Make your Gates a Pack.</h2>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Activate The Pack for multi-admin workflows and audit logs.
-            </p>
-            <div id="pack-rails" className="mt-6 scroll-mt-24">
-              <PackRails />
-            </div>
+            <PackRails />
           </motion.aside>
         </section>
 
-        <section className="border-t border-border/70 py-10 sm:py-14">
-          <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                What changes
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-                One layer above the Gate.
-              </h2>
-            </div>
-            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-              The Gate stays yours. Pack adds the connective tissue around it.
+        <section className="border-t py-12 sm:py-16" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+          <div className="mb-9 max-w-2xl">
+            <p
+              className="text-[11px] font-semibold uppercase tracking-[0.22em]"
+              style={{ color: "var(--fd-lime)" }}
+            >
+              {t.sectionEyebrow}
             </p>
+            <h2
+              className="mt-3 text-2xl font-semibold tracking-[-0.03em] sm:text-3xl"
+              style={{ color: "var(--fd-ice)" }}
+            >
+              {t.sectionTitle}
+            </h2>
           </div>
-          <div className="grid gap-px overflow-hidden rounded-3xl border border-border/70 bg-border/70 md:grid-cols-3">
-            {capabilities.map((capability, index) => {
-              const Icon = capability.icon;
+
+          <div className="grid gap-3 md:grid-cols-3">
+            {t.caps.map((cap, index) => {
+              const Icon = CAP_ICONS[index] ?? ShieldCheck;
               return (
                 <motion.article
-                  key={capability.title}
-                  initial={{ opacity: 0, y: 14 }}
+                  key={cap.title}
+                  /* Entrance only, staggered left to right, so the three read as
+                     a sequence rather than appearing as a block. No hover
+                     zoom — these are statements, not buttons. */
+                  initial={reduce ? false : { opacity: 0, y: 14 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.25 }}
-                  transition={{ delay: index * 0.08 }}
-                  className="bg-card/85 p-6 sm:p-7"
+                  viewport={{ once: true, amount: 0.3 }}
+                  transition={{ delay: reduce ? 0 : index * 0.08, duration: 0.42 }}
+                  className="rounded-3xl border p-6 sm:p-7"
+                  style={{
+                    borderColor: "rgba(255,255,255,0.08)",
+                    background: "rgba(22,28,61,0.35)",
+                  }}
                 >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <span
+                    className="flex h-11 w-11 items-center justify-center rounded-2xl"
+                    style={{ background: "rgba(183,255,42,0.10)", color: "var(--fd-lime)" }}
+                  >
                     <Icon className="h-5 w-5" />
                   </span>
-                  <h3 className="mt-7 text-lg font-semibold">{capability.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    {capability.body}
+                  <h3 className="mt-7 text-lg font-semibold" style={{ color: "var(--fd-ice)" }}>
+                    {cap.title}
+                  </h3>
+                  <p
+                    className="mt-2 text-sm leading-relaxed"
+                    style={{ color: "var(--fd-muted)" }}
+                  >
+                    {cap.body}
                   </p>
                 </motion.article>
               );
             })}
           </div>
-        </section>
 
-        <section className="mb-6 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-          <motion.div
-            initial={{ opacity: 0, x: -12 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            className="rounded-3xl border border-border/70 bg-card/65 p-7"
-          >
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              Pack signal
-            </p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight">
-              No new Gate. No duplicate setup.
-            </h2>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Pack starts from the community you already built and changes only the layer above it.
-            </p>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, x: 12 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            className="grid gap-3 rounded-3xl border border-primary/25 bg-card/65 p-5 sm:grid-cols-3"
-          >
-            {["Keep your address", "Connect your members", "Control access"].map((item, index) => (
-              <motion.div
-                key={item}
-                initial={reduce ? false : { opacity: 0, y: 14 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.4 }}
-                transition={{ delay: reduce ? 0 : index * 0.1, duration: 0.4 }}
-                whileHover={reduce ? undefined : { y: -5, scale: 1.015 }}
-                className="group rounded-2xl border border-border/70 bg-background/60 p-4 shadow-[0_10px_28px_-22px_black] transition-colors hover:border-primary/50"
-              >
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
-                  0{index + 1}
-                </span>
-                <p className="mt-6 text-sm font-medium">{item}</p>
-                <Check className="mt-3 h-4 w-4 text-primary opacity-60 transition-opacity group-hover:opacity-100" />
-              </motion.div>
-            ))}
-          </motion.div>
+          <p className="mt-8 text-sm" style={{ color: "var(--fd-muted)" }}>
+            {t.footNote}
+          </p>
         </section>
-
-        <motion.section
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="mb-6 flex flex-col justify-between gap-5 rounded-3xl border border-primary/25 bg-primary/10 p-7 sm:flex-row sm:items-center sm:p-9"
-        >
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              Ready when you are
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-              Activate The Pack and create your first Gate.
-            </h2>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="fenrir">
-              <a href="#pack-rails">Choose how you pay · $14.99/month</a>
-            </Button>
-          </div>
-        </motion.section>
       </div>
     </main>
   );

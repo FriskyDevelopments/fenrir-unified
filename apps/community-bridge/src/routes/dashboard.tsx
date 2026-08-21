@@ -8,16 +8,23 @@ import {
   Activity,
   ArrowRight,
   ArrowUpRight,
+  BarChart3,
   Bot,
+  CheckCircle2,
   CircleDashed,
+  Clock3,
   Crown,
   Fingerprint,
   Eye,
   LogOut,
+  Plus,
   Radio,
   RefreshCw,
+  Send,
   Shield,
+  ShieldCheck,
   Sparkles,
+  UsersRound,
   Waypoints,
 } from "lucide-react";
 import { motion, useReducedMotion, useScroll, useSpring } from "motion/react";
@@ -27,6 +34,10 @@ import { useBrand } from "@/config/brand-context";
 import { listMyGates, type GateRecord } from "@/lib/gate.functions";
 import { getPreset } from "@/lib/gate-presets";
 import { getMyGateViewStats, type GateViewStats } from "@/lib/gate-analytics.functions";
+import {
+  listModerationReviews,
+  type ModerationReview,
+} from "@/lib/moderation.functions";
 
 export const Route = createFileRoute("/dashboard")({
   ssr: false,
@@ -54,11 +65,12 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function DashboardPage() {
-  const { session, loading, roleLoading, telegramId, isStaff, signOut } = useAuth();
+  const { session, loading, roleLoading, telegramId, isStaff, isOwner, signOut } = useAuth();
   const navigate = useNavigate();
   const brand = useBrand();
   const fetchGates = useServerFn(listMyGates);
   const fetchGateStats = useServerFn(getMyGateViewStats);
+  const fetchPendingReviews = useServerFn(listModerationReviews);
   const [demo, setDemo] = useState(false);
   const [gateCount, setGateCount] = useState<number | null>(null);
   const [gateRecords, setGateRecords] = useState<GateRecord[]>([]);
@@ -66,6 +78,9 @@ function DashboardPage() {
   const [gatesLoading, setGatesLoading] = useState(true);
   const [gateLoadError, setGateLoadError] = useState(false);
   const [statsLoadError, setStatsLoadError] = useState(false);
+  const [pendingReviews, setPendingReviews] = useState<ModerationReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsLoadError, setReviewsLoadError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const reduceMotion = useReducedMotion();
   const { scrollYProgress } = useScroll();
@@ -123,8 +138,41 @@ function DashboardPage() {
     };
   }, [loading, session, fetchGates, fetchGateStats, loadAttempt]);
 
+  useEffect(() => {
+    if (loading || !session) return;
+    if (!isStaff) {
+      setPendingReviews([]);
+      setReviewsLoading(false);
+      setReviewsLoadError(false);
+      return;
+    }
+
+    let active = true;
+    setReviewsLoading(true);
+    setReviewsLoadError(false);
+    void fetchPendingReviews({ data: { status: "pending", limit: 5 } })
+      .then((rows) => {
+        if (active) setPendingReviews(rows);
+      })
+      .catch(() => {
+        if (active) setReviewsLoadError(true);
+      })
+      .finally(() => {
+        if (active) setReviewsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [loading, session, isStaff, fetchPendingReviews]);
+
   const totalViews = gateStats.reduce((sum, item) => sum + item.total, 0);
   const recentViews = gateStats.reduce((sum, item) => sum + item.last7, 0);
+
+  // "Complete" is decided by the real Neon lookup, never guessed: an owner who
+  // has linked Telegram AND has at least one Gate is done with setup — show the
+  // success state and next actions instead of any onboarding/setup prompt.
+  const hasGates = (gateCount ?? 0) > 0;
+  const isComplete = Boolean(telegramId) && hasGates && !gatesLoading && !gateLoadError;
 
   if (loading || roleLoading || !session) {
     return (
@@ -211,6 +259,12 @@ function DashboardPage() {
                 <span className="hidden sm:inline">My </span>Gates
               </Link>
             </Button>
+
+            {isOwner && (
+              <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
+                <Link to="/access">Access</Link>
+              </Button>
+            )}
 
             {isStaff && (
               <>
@@ -450,6 +504,191 @@ function DashboardPage() {
             </div>
           </div>
         </motion.section>
+
+        {isComplete ? (
+          <motion.section
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mt-6 overflow-hidden rounded-[2rem] border border-emerald-400/30 bg-emerald-400/[0.06] p-6 sm:p-8"
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-2xl border border-emerald-400/30 bg-emerald-400/10 text-emerald-300">
+                <CheckCircle2 className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-300">
+                  You&apos;re all set
+                </p>
+                <h2 className="text-xl font-semibold tracking-[-0.03em]">
+                  Your community is live and running.
+                </h2>
+              </div>
+            </div>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Pack is active, your Gates are published, and your Fenrir address is ready — no setup
+              left. Here is what you can do next.
+            </p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                {
+                  to: "/gate" as const,
+                  icon: Plus,
+                  title: "Create another Gate",
+                  body: "Add a new entrance to your community.",
+                },
+                {
+                  to: "/brands" as const,
+                  icon: UsersRound,
+                  title: "Link another group",
+                  body: "Bring a second community into your Pack.",
+                },
+                {
+                  to: "/gates" as const,
+                  icon: BarChart3,
+                  title: "View reports",
+                  body: "Views, 7-day trends and unique visitors.",
+                },
+                {
+                  to: "/gates" as const,
+                  icon: Send,
+                  title: "Invite members",
+                  body: "Share a Gate link or QR to bring people in.",
+                },
+                ...(isOwner
+                  ? [{
+                    to: "/access" as const,
+                    icon: Shield,
+                    title: "Accept access requests",
+                    body: "Approve people before Fenrir issues their private invite.",
+                  }]
+                  : []),
+              ].map((action) => {
+                const Icon = action.icon;
+                return (
+                  <Link
+                    key={action.title}
+                    to={action.to}
+                    className="group rounded-2xl border border-border/70 bg-card/50 p-4 transition hover:border-emerald-400/50 hover:bg-emerald-400/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                  >
+                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-emerald-400/15 group-hover:text-emerald-300">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <p className="mt-3 flex items-center text-sm font-semibold">
+                      {action.title}
+                      <ArrowUpRight className="ml-1 h-3.5 w-3.5 opacity-0 transition group-hover:opacity-100" />
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      {action.body}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          </motion.section>
+        ) : null}
+
+        {isStaff ? (
+          <motion.section
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.15 }}
+            transition={{ duration: 0.5 }}
+            className="mt-6 overflow-hidden rounded-[2rem] border border-border/70 bg-card/45"
+          >
+            <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border/60 p-6 sm:p-8">
+              <div>
+                <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-emerald-300">
+                  Trust desk / live decisions
+                </p>
+                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] sm:text-3xl">
+                  Acceptance needs a human when signal is unclear.
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                  This is the real review queue: only items the classifier could not safely decide.
+                  Each decision is attributable and preserved in the audit trail.
+                </p>
+              </div>
+              <Button asChild variant="outline">
+                <Link to="/moderation">
+                  Open decision desk <ArrowUpRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+
+            {reviewsLoading ? (
+              <div className="grid gap-px bg-border/60 sm:grid-cols-3">
+                {[0, 1, 2].map((item) => (
+                  <div key={item} className="min-h-28 animate-pulse bg-card p-6">
+                    <div className="h-3 w-20 rounded-full bg-muted" />
+                    <div className="mt-5 h-4 w-3/4 rounded-full bg-muted/70" />
+                    <div className="mt-3 h-2 w-1/2 rounded-full bg-muted/50" />
+                  </div>
+                ))}
+              </div>
+            ) : reviewsLoadError ? (
+              <div className="p-6 sm:p-8">
+                <p className="text-sm font-medium">The decision desk is temporarily unavailable.</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  No review was changed. Open the desk to retry the secure queue connection.
+                </p>
+              </div>
+            ) : pendingReviews.length === 0 ? (
+              <div className="flex flex-wrap items-center gap-4 p-6 sm:p-8">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl border border-emerald-400/25 bg-emerald-400/10 text-emerald-300">
+                  <ShieldCheck className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold">Nothing waiting for acceptance.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Automated checks resolved every current item without escalating it to your team.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[650px] text-left">
+                  <thead className="border-b border-border/60 bg-muted/20 font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
+                    <tr>
+                      <th className="px-6 py-4 font-medium sm:px-8">Decision signal</th>
+                      <th className="px-6 py-4 font-medium">Subject</th>
+                      <th className="px-6 py-4 font-medium">Safety read</th>
+                      <th className="px-6 py-4 font-medium sm:px-8">Waiting</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {pendingReviews.map((review) => (
+                      <tr key={review.id} className="transition hover:bg-muted/25">
+                        <td className="px-6 py-4 sm:px-8">
+                          <span className="inline-flex rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-[10px] font-semibold text-amber-200">
+                            {review.reason.replaceAll("_", " ")}
+                          </span>
+                        </td>
+                        <td className="max-w-72 px-6 py-4">
+                          <p className="truncate font-mono text-xs text-foreground" title={review.subject_ref}>
+                            {review.subject_ref}
+                          </p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">{review.subject_kind}</p>
+                        </td>
+                        <td className="px-6 py-4 text-xs text-muted-foreground">
+                          <span>Apparent age: {review.apparent_age ?? "—"}</span>
+                          <span className="mx-2 text-border">·</span>
+                          <span>Explicit: {review.explicit === null ? "—" : review.explicit ? "yes" : "no"}</span>
+                        </td>
+                        <td className="px-6 py-4 text-xs text-muted-foreground sm:px-8">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Clock3 className="h-3.5 w-3.5" />
+                            {new Date(review.created_at).toLocaleString()}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </motion.section>
+        ) : null}
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[1.15fr_.85fr] xl:grid-cols-[1.35fr_.65fr]">
           <motion.div

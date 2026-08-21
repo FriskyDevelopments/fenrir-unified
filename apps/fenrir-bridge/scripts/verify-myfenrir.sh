@@ -47,12 +47,16 @@ for base in "${HOSTS[@]}"; do
     echo "OK   ${base}/api/auth/supabase-session"
   fi
 
-  direct_oauth_response="$(curl -sS -i -L --max-time 20 "${base}/api/auth/callback/apple" || printf '\nHTTP/1.1 000')"
+  direct_oauth_response="$(curl -sS -i --max-time 20 "${base}/api/auth/callback/apple" || printf '\nHTTP/1.1 000')"
   if [[ "$direct_oauth_response" != *"HTTP/1.1 302"* && "$direct_oauth_response" != *"HTTP/2 302"* ]] || [[ "$direct_oauth_response" != *"auth_error=missing_code"* ]]; then
-    echo "FAIL ${base}/api/auth/callback/apple expected 302 redirect to missing_code (Apple OAuth is enabled)"
-    FAIL=1
+    if [[ "$direct_oauth_response" == *" 410 "* && "$direct_oauth_response" == *'"error":"direct_oauth_disabled"'* ]]; then
+      echo "OK   ${base}/api/auth/callback/apple intentionally retired; Supabase is the OAuth broker"
+    else
+      echo "FAIL ${base}/api/auth/callback/apple expected retired direct-OAuth 410 JSON or an enabled-provider 302"
+      FAIL=1
+    fi
   else
-    echo "OK   ${base}/api/auth/callback/apple"
+    echo "OK   ${base}/api/auth/callback/apple direct provider enabled"
   fi
 
   readiness_response="$(curl -sS -L --max-time 20 -w $'\n%{http_code}' "${base}/api/readiness" || printf '\n000')"

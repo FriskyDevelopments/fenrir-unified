@@ -384,6 +384,14 @@ select:focus {
   object-fit: contain;
 }
 
+.lovable-auth-name {
+  margin-bottom: 10px;
+  color: #d6b15b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .26em;
+}
+
 .lovable-auth-brand h1 {
   margin: 0;
   color: #e2e8f0;
@@ -570,6 +578,38 @@ code {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+.fenrir-wow-shell body {
+  margin: 0;
+  background: #090d13;
+}
+
+.fenrir-wow-shell .boot {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: #e9eef8;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(236, 79, 79, .18), transparent 22%),
+    radial-gradient(circle at 75% 18%, rgba(83, 209, 175, .12), transparent 20%),
+    #090d13;
+  font: 600 11px/1 "JetBrains Mono", ui-monospace, monospace;
+}
+
+.fenrir-wow-shell .boot::before {
+  content: "";
+  position: absolute;
+  width: 180px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(233, 238, 248, .16);
+  border-radius: 50%;
+  box-shadow: 0 0 0 22px rgba(233, 238, 248, .025), 0 0 80px rgba(236, 79, 79, .22);
+  animation: fenrir-boot-orbit 1.2s ease-in-out infinite alternate;
+}
+
+.fenrir-wow-shell .boot { letter-spacing: .16em; }
+
+@keyframes fenrir-boot-orbit { to { transform: scale(1.14) rotate(18deg); opacity: .55; } }
 
 .auth-page {
   position: relative;

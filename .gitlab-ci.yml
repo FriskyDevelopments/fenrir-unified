@@ -186,7 +186,7 @@ community-bridge:deploy:quality:
       echo "canonical=$canon (must not be localhost)"
       case "$code" in 2*|3*) : ;; *) echo "unexpected status"; exit 1 ;; esac
 
-# community-bridge -> PROD Worker `community-bridge`. CONFIGURED BUT OFF:
+# community-bridge -> production custom-domain Worker. CONFIGURED BUT OFF:
 # manual + main only. Requires PROD_TELEGRAM_BOT_USERNAME as a Masked+Protected
 # CI variable — deliberately NOT hardcoded (the prod bot handle was not
 # derivable from the repo). Refuses to build prod with a dev-bot fallback.
@@ -208,8 +208,7 @@ community-bridge:deploy:
         exit 1
       fi
     - npm ci || npm install
-    - VITE_SITE_URL="$VITE_SITE_URL" VITE_TELEGRAM_BOT_USERNAME="$PROD_TELEGRAM_BOT_USERNAME" npx vite build
-    - npx wrangler deploy --config .output/server/wrangler.json --name community-bridge
+    - VITE_TELEGRAM_BOT_USERNAME="$PROD_TELEGRAM_BOT_USERNAME" bash scripts/deploy-production.sh
     - |
       url="https://communities.myfenrir.com/"
       code="$(curl -s -o /dev/null -w '%{http_code}' "$url" || echo ERR)"

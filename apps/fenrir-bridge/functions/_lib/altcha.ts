@@ -74,7 +74,7 @@ function decodePayload(payload: string): AltchaPayload | null {
     if (
       parsed.algorithm !== algorithm ||
       typeof parsed.challenge !== "string" ||
-      typeof parsed.maxnumber !== "number" ||
+      (parsed.maxnumber !== undefined && typeof parsed.maxnumber !== "number") ||
       typeof parsed.number !== "number" ||
       typeof parsed.salt !== "string" ||
       typeof parsed.signature !== "string"
@@ -87,7 +87,10 @@ function decodePayload(payload: string): AltchaPayload | null {
 
 export async function verifyAltchaPayload(payload: string, env: BillingEnv, now = Date.now()) {
   const parsed = decodePayload(payload);
-  if (!parsed || parsed.maxnumber !== maxNumber || !Number.isInteger(parsed.number)) return false;
+  // The ALTCHA widget does not echo `maxnumber` in its solution payload, so we
+  // must not require it. Security is unchanged: the proof-of-work hash, the
+  // HMAC signature, expiry, and the 0..maxNumber bound below are all enforced.
+  if (!parsed || (parsed.maxnumber !== undefined && parsed.maxnumber !== maxNumber) || !Number.isInteger(parsed.number)) return false;
   if (parsed.number < 0 || parsed.number > maxNumber) return false;
 
   const expires = Number(new URLSearchParams(parsed.salt.split("?", 2)[1] || "").get("expires"));

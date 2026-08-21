@@ -100,6 +100,9 @@ function ActivatePage() {
 
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [checkingLink, setCheckingLink] = useState(false);
+  const [linkStarted, setLinkStarted] = useState(false);
+  const [linkCheckMessage, setLinkCheckMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [linked, setLinked] = useState(false);
   const [demo, setDemo] = useState(false);
@@ -136,6 +139,20 @@ function ActivatePage() {
     if (prefill) setCode(issued.code);
     logDemoEvent("link", "Fresh linking code issued", `code ${issued.code} · valid 15 min`);
     return issued;
+  }
+
+  async function checkTelegramLink() {
+    if (checkingLink) return;
+    setCheckingLink(true);
+    setLinkCheckMessage(null);
+    try {
+      await refreshRole();
+      // `telegramId` is supplied by the shared auth context and updates on the
+      // next render. The redirect effect above handles the successful state.
+      setLinkCheckMessage("Still waiting for Telegram. If you just pressed Start, give it a moment and check again.");
+    } finally {
+      setCheckingLink(false);
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -272,19 +289,47 @@ function ActivatePage() {
             <div className="text-sm">
               <p className="font-medium text-foreground">Secure Telegram linking</p>
               <ol className="mt-2 space-y-1.5 text-muted-foreground">
-                <li>1. Continue through your signed-in MyFenrir session.</li>
-                <li>2. Telegram opens with a private, single-use link.</li>
-                <li>3. Confirm with the bot to finish.</li>
+              <li>1. Open a private, single-use Telegram link.</li>
+              <li>2. Press Start in the MyFenrir bot.</li>
+              <li>3. Return here and confirm the connection.</li>
               </ol>
             </div>
           </div>
         </Card>
         <Button asChild variant="fenrir" size="lg" className="mt-5 w-full">
-          <a href={MYFENRIR_LINK_URL}>
+          <a
+            href={MYFENRIR_LINK_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            onClick={() => {
+              setLinkStarted(true);
+              setLinkCheckMessage(null);
+            }}
+          >
             Continue securely
-            <ArrowRight />
+            <ExternalLink />
           </a>
         </Button>
+        {linkStarted ? (
+          <div className="mt-4 rounded-xl border border-primary/25 bg-primary/[.06] p-4">
+            <p className="text-sm font-medium text-foreground">Finish in Telegram, then come right back.</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              A link is valid for 15 minutes and works once. Use the newly opened Telegram tab, not an older message in your bot history.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3 w-full"
+              disabled={checkingLink}
+              onClick={() => void checkTelegramLink()}
+            >
+              {checkingLink ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+              {checkingLink ? "Checking Telegram…" : "I linked Telegram — check status"}
+            </Button>
+            {linkCheckMessage ? <p className="mt-2 text-xs text-muted-foreground" role="status">{linkCheckMessage}</p> : null}
+          </div>
+        ) : null}
       </AuthLayout>
     );
   }
