@@ -48,9 +48,20 @@ export function limitsForPlan(plan: BillingPlanKey): PlanLimits {
         multiAdminWorkflows: false,
         auditLogScope: "standard"
       };
-    // The Pack (US$15/mo rail): "unlimited Telegram Locks, multi-admin
-    // workflows, audit logs, and custom domain support" — per FENRIR_STARS_DESCRIPTION
-    // in wrangler.fenrir-stars.toml. Same entitlement surface as operator.
+    // The Pack ($14.99/mo por comunidad enlazada): locks sin tope numérico,
+    // flujos multi-admin, audit logs y dominio propio — per FENRIR_STARS_DESCRIPTION
+    // in wrangler.fenrir-stars.toml. Same entitlement surface as `operator`.
+    //
+    // `maxTelegramLocks: null` significa "sin tope numérico en este plan", NO
+    // una promesa de cantidad. La copy nunca lo describe como una cifra sin
+    // límite: con precio por comunidad enlazada esa promesa es falsa y es
+    // reembolso seguro. La guardia canónica está en
+    // workers/fenrir-stars-payments.js.
+    //
+    // `operator` se conserva aquí a propósito: es un plan RETIRADO de la oferta
+    // que sigue existiendo en cuentas y registros antiguos. Se apaga la venta,
+    // no el dato: quitar el case dejaría esas cuentas cayendo a `free` y
+    // perdiendo derechos que sí pagaron.
     case "standard":
     case "operator":
       return {
