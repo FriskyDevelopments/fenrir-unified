@@ -134,19 +134,36 @@ const COPY = {
  * Un comprador que lee eso no piensa "sesión caducada": piensa que el sitio
  * está roto y se va. Aquí no se muestra ninguna excepción.
  *
- * La lista de abajo es la de mensajes que el comprador SÍ puede accionar —
- * escritos para una persona, no volcados por el servidor—. Cualquier otra cosa
- * cae al texto genérico. Ampliar la lista es deliberado: si un mensaje nuevo
- * merece llegar al cliente, se añade a mano tras leerlo.
+ * ESTO ES UNA LISTA BLANCA, NO UNA NEGRA, y la diferencia es la que sostiene
+ * la garantía. Una lista negra sólo bloquea lo que alguien se acordó de
+ * prohibir: el día que llegue un error nuevo con un id interno, una ruta o un
+ * fragmento de SQL, pasaría entero a la pantalla porque nadie lo previó. Aquí
+ * el criterio es el contrario — un mensaje del servidor llega al comprador
+ * ÚNICAMENTE si coincide con una fila de la tabla. Lo que no reconocemos no se
+ * enseña, sin excepción y sin necesidad de haberlo anticipado.
+ *
+ * Cada fila decide además QUÉ se muestra: con `text` se reescribe para una
+ * persona; omitirlo deja pasar el original, y sólo se omite cuando ese texto ya
+ * está escrito para el comprador y él puede accionarlo. Añadir una fila es un
+ * acto deliberado: obliga a leer el mensaje del servidor y decidir que merece
+ * salir a pantalla.
  */
-const ACTIONABLE = ["email address on file", "Sign in again", "not configured"] as const;
+const ALLOWED: ReadonlyArray<{ match: string; text?: string }> = [
+  // Falta de sesión: no es un error, es un paso previo. Se dice como tal.
+  { match: "Unauthorized", text: COPY.signInToPay },
+  { match: "authorization header", text: COPY.signInToPay },
+  { match: "Invalid token", text: COPY.signInToPay },
+  // Ya escritos para el comprador y accionables por él: pasan tal cual.
+  { match: "email address on file" },
+  { match: "Sign in again" },
+];
 
 function humanError(cause: unknown, fallback: string): string {
   const raw = cause instanceof Error ? cause.message : "";
-  // Falta de sesión: no es un error, es un paso previo. Se dice como tal.
-  if (/unauthorized|authorization header|invalid token/i.test(raw)) return COPY.signInToPay;
-  if (ACTIONABLE.some((fragment) => raw.includes(fragment))) return raw;
-  return fallback;
+  const allowed = ALLOWED.find((entry) => raw.includes(entry.match));
+  // Sin coincidencia explícita no sale nada del servidor. Nunca.
+  if (!allowed) return fallback;
+  return allowed.text ?? raw;
 }
 
 /**

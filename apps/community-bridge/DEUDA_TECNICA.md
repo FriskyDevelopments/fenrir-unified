@@ -119,6 +119,58 @@ incluiría.
 
 ---
 
+## 5. Sin confirmar que tarjeta y cripto COBREN de verdad
+
+**Severidad: alta — bloquea ingresos. Diagnóstico a medias por falta de acceso.**
+
+Se arregló que la pantalla **pregunte** por los rieles de pago. **No** está
+confirmado que respondan que sí.
+
+**Lo que sí quedó probado.** El error rojo `Unauthorized: No authorization
+header provided` que salía en la tarjeta de pago venía de
+`src/integrations/supabase/auth-middleware.ts:58` —única aparición de esa
+cadena en todo el repo—, no del worker de facturación. `getFoundersBillingOptions`
+llevaba `requireSupabaseAuth` aunque manda `{}` al worker, sin ningún dato de
+usuario, así que un visitante sin sesión en `/upgrade` reventaba al montar la
+tarjeta. Como las opciones nunca resolvían, tarjeta y cripto quedaban en
+"being set up" aunque estuvieran vivas. Un fallo, tres síntomas. Middleware
+retirado sólo de ese sondeo; los tres server fns que sí cobran lo conservan.
+
+**Lo que NO se pudo verificar.** Si `COMMUNITY_BRIDGE_BILLING_SECRET` tiene el
+mismo valor en sus tres referencias:
+
+- `apps/fenrir-bridge/workers/fenrir-stars-payments.js:22` — lo consume
+- `apps/community-bridge/src/lib/founders-billing.functions.ts:6` — lo envía
+- `apps/community-bridge/src/lib/gate.functions.ts:138`
+
+Los secretos de Cloudflare son de **sólo escritura**: no se pueden leer por API
+ni por `wrangler`, y en la sesión no había `CLOUDFLARE_API_TOKEN` ni
+`OP_SERVICE_ACCOUNT_TOKEN`. **No verificado**, ni a favor ni en contra.
+
+**Cómo continuar cuando haya token — sin exponer valores.** El bearer es entre
+servicios propios: sirve cualquier valor mientras sea idéntico en los tres
+sitios. Para comparar sin leerlo, rotarlo a un valor nuevo en los tres a la vez
+es más barato y seguro que intentar auditar el actual.
+
+Y hay una prueba de extremo a extremo que no necesita ningún secreto: abrir
+`/upgrade` **sin sesión** y mirar los rieles.
+
+- Tarjeta y cripto **activas** → el secreto coincide y el sondeo funciona. Cerrado.
+- Siguen apagadas → el worker está devolviendo `{"ok":false,"error":"unauthorized"}`
+  (minúscula, una palabra — `fenrir-stars-payments.js:207, 266, 316`) y entonces
+  **sí** es el secreto. Esa respuesta ya no llega cruda a pantalla: cae al texto
+  genérico a propósito, porque el comprador no puede arreglarla.
+
+Para ver cuál de los dos es, mirar los logs del worker: es el único sitio donde
+la distinción queda registrada. El sondeo fallido se registra en el cliente con
+`console.error("[billing] options probe failed", cause)`.
+
+**Ojo con el falso negativo:** que la pantalla ya no muestre el error rojo **no**
+significa que el cobro funcione. Sólo significa que la pregunta se hace y que el
+fallo, si lo hay, se cuenta de forma humana.
+
+---
+
 ## Resueltos en este ciclo (para que no se reabran)
 
 - **`context.user.email` → `applicantEmail(context.claims)`** en
