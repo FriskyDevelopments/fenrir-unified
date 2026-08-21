@@ -171,6 +171,72 @@ fallo, si lo hay, se cuenta de forma humana.
 
 ---
 
+## 6. Los dos espacios de nombres de slug — decisión tomada de hecho, no por acuerdo
+
+**Severidad: media. Congelado a propósito; no reabrir sin leer esto entero.**
+
+Hay dos vocabularios para nombrar una comunidad y durante meses nadie los casó:
+
+- El bot y el gatekeeper usan **`community_slug`** (`myfenrir-core`,
+  `thebadboi-gooning-club`), desde KV `community:*` y `COMMUNITY_SLUG`.
+- La página pública usa **`cb_gate_configs.slug`**, que elige el admin.
+
+`community_id` no los une: 5 de las 6 filas de `cb_gate_configs` dicen `fenrir`.
+El síntoma medido: `/g/frisky`, `/g/frs`, `/g/goonbros`, `/g/sluty-gooners` y
+`/g/tree` devuelven 200, mientras `/g/myfenrir-core` y
+`/g/thebadboi-gooning-club` dan 404.
+
+**La decisión ya está tomada en el código, no en una reunión.** El comando
+`/gate` del gatekeeper (`fenrir-gatekeeper/worker/src/index.ts`, bloque
+`--- /gate`) dice, textual:
+
+> It is also the point where the two slug namespaces stop drifting. The bot and
+> the Gatekeeper address a community by `community_slug`; the public page reads
+> `cb_gate_configs.slug`. Every Gate created here writes both from one value, so
+> the link the operator receives is the link that resolves.
+
+Es decir: **para los Gates creados desde `/gate`, el problema no existe.** Se
+escriben los dos nombres desde un único valor. Lo que queda son las filas
+**anteriores** a ese comando.
+
+**Impacto medido en su momento** (para no volver a contarlo):
+
+| Medida | Valor |
+|---|---|
+| Filas en `cb_gate_configs` | 6 |
+| Filas en `fenrir_gate_communities` | 16 |
+| Slugs que ya coinciden entre ambas | **1** (`goonbros`) |
+| Vistas totales, histórico completo | **17** |
+| Hosts referrer distintos | **1** |
+
+Ojo con esa cifra: `visitor_key` es `${visitorId}:${utcDayKey()}`, así que son
+**17 visitante-días**, no 17 personas. El número real de humanos es ≤17 y
+probablemente 2 o 3 probando durante diez días. No hay audiencia distribuida
+que romper.
+
+Además, 6 de las 16 filas de comunidades (`goo`, `goon`, `goonb`, `goonbr`,
+`goonbro`, `goonbros`) se crearon **en 3 segundos** el 2026-08-03: un autosave
+por pulsación de tecla. Cualquier plan tiene que contar con esa basura.
+
+**Las tres opciones, si alguien decide reabrirlo:**
+
+1. **Migrar `cb_gate_configs.slug` a `community_slug`.** Toca 5 de 6 filas,
+   rompe 13 de 17 enlaces. Reversa: ya existe
+   `cb_gate_configs_backup_20260816`; añadir `slug_legacy` + redirect 301.
+   Riesgo: `myfenrir-core` no existe en `fenrir_gate_communities`.
+2. **Tabla de mapeo.** Toca 0 filas, rompe 0 enlaces. Coste: una indirección
+   permanente y dos fuentes de verdad que pueden divergir — el mismo tipo de
+   deuda que causó esto.
+3. **Un solo campo.** Toca las 6 filas y las 16 de comunidades. Reversa la más
+   cara. Es la única que elimina la clase de bug de raíz.
+
+**Recomendación de quien lo midió:** no tocarlo hoy. Con `/gate` escribiendo
+ambos nombres, el sangrado está detenido y sólo queda limpiar el histórico —
+que son 6 filas y ~17 visitante-días. Abrir este frente durante el go-live
+compra riesgo sin comprar valor.
+
+---
+
 ## Resueltos en este ciclo (para que no se reabran)
 
 - **`context.user.email` → `applicantEmail(context.claims)`** en
