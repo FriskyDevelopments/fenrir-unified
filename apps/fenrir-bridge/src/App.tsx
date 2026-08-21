@@ -1228,6 +1228,12 @@ export function App() {
   }, [auth?.authenticated, locale]);
 
   useEffect(() => {
+    // Replace the visitor-only prompt after authentication without overwriting
+    // a deliberate action, billing, or error notice.
+    if (auth?.authenticated && notice === c.initialNotice) setNotice(c.accountSub);
+  }, [auth?.authenticated, c.accountSub, c.initialNotice, notice]);
+
+  useEffect(() => {
     if (!state || !activationVisible) return undefined;
     const timer = window.setTimeout(() => setActivationVisible(false), 2100);
     return () => window.clearTimeout(timer);
@@ -1683,7 +1689,7 @@ export function App() {
               onChange={(event) => {
                 const next = event.target.value as Locale;
                 setLocale(next);
-                setNotice(copy[next].initialNotice);
+                setNotice(copy[next].accountSub);
               }}
               aria-label="Language"
             >
