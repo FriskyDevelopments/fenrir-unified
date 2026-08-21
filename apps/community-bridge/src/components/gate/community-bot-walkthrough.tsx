@@ -103,8 +103,6 @@ export function CommunityBotWalkthrough({
 }: Props) {
   const [telegramPreviewOpen, setTelegramPreviewOpen] = useState(false);
   const [telegramPreviewStep, setTelegramPreviewStep] = useState(0);
-  const [miniAppClosed, setMiniAppClosed] = useState(false);
-  const [phoneTime, setPhoneTime] = useState("--:--");
   const [selectedCommunityId, setSelectedCommunityId] = useState(communityId);
   const visibleMappings =
     owner && mappings.length > 0
@@ -133,43 +131,13 @@ export function CommunityBotWalkthrough({
   ];
 
   useEffect(() => {
-    const updatePhoneTime = () => {
-      setPhoneTime(
-        new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(
-          new Date(),
-        ),
-      );
-    };
-    updatePhoneTime();
-    const timer = window.setInterval(updatePhoneTime, 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
     if (!telegramPreviewOpen) return;
     const firstPending = stepComplete.findIndex((complete) => !complete);
     setTelegramPreviewStep(firstPending === -1 ? 3 : firstPending);
   }, [telegramPreviewOpen, telegramLinked, mappingVerified]);
 
-  function confirmMiniAppClose() {
-    setMiniAppClosed(true);
-    const webApp = (
-      window as Window & {
-        Telegram?: {
-          WebApp?: {
-            close?: () => void;
-            HapticFeedback?: { notificationOccurred?: (type: "success") => void };
-          };
-        };
-      }
-    ).Telegram?.WebApp;
-    webApp?.HapticFeedback?.notificationOccurred?.("success");
-    if (webApp?.close) window.setTimeout(() => webApp.close?.(), 900);
-  }
-
   function selectTelegramPreviewStep(index: number) {
     setTelegramPreviewStep(index);
-    setMiniAppClosed(false);
   }
   return (
     <Card className="relative mb-8 overflow-hidden border-primary/30 bg-[radial-gradient(circle_at_15%_0%,hsl(var(--primary)/0.18),transparent_30%),linear-gradient(135deg,hsl(var(--card)/0.96),hsl(var(--background)/0.9))] p-0">
@@ -375,36 +343,16 @@ export function CommunityBotWalkthrough({
                 Telegram owner journey
               </p>
               <h3 className="mt-2 text-xl font-semibold tracking-tight">
-                See what Fenrir will show.
+                Continue the real Telegram setup.
               </h3>
               <p className="mt-2 max-w-xl text-xs leading-relaxed text-muted-foreground">
-                This preview mirrors the private bot conversation. Select a stage to inspect the
-                account, group and mapping details before opening Telegram.
+                Choose the next step, then open the actual MyFenrir bot. Completion status comes
+                from your linked identity and verified destination — never from a mock screen.
               </p>
             </div>
 
-            <div
-              className="mx-auto w-full max-w-[292px] rounded-[2.7rem] border-[7px] border-[#272b2a] bg-black p-1.5 shadow-[0_28px_80px_-28px_rgba(0,0,0,0.95)]"
-              aria-label="Interactive iPhone Telegram preview"
-            >
-              <div className="relative min-h-[500px] overflow-hidden rounded-[2.1rem] bg-[#0e171c]">
-                <div className="absolute left-1/2 top-2 z-10 h-6 w-24 -translate-x-1/2 rounded-full bg-black" />
-                <div className="flex items-center justify-between px-6 pb-2 pt-3 text-[9px] font-semibold text-white/85">
-                  <span>{phoneTime}</span>
-                  <span>5G&nbsp;&nbsp;●</span>
-                </div>
-                <div className="flex items-center gap-3 border-b border-white/10 bg-[#17242b] px-4 py-3">
-                  <span className="text-lg text-[#61a8de]">‹</span>
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-[#ff334e] to-[#611827] text-base">
-                    🐺
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold text-white">MyFenrir Bot</p>
-                    <p className="text-[9px] text-[#73b6e6]">bot · secure connection</p>
-                  </div>
-                  <span className="text-lg text-white/55">•••</span>
-                </div>
-                <div className="grid grid-cols-5 gap-1 border-b border-white/10 bg-[#101c22] px-2 py-2" role="tablist" aria-label="Telegram preview steps">
+            <div className="w-full rounded-2xl border border-border/70 bg-background/60 p-3 shadow-[0_20px_60px_-32px_rgba(0,0,0,.8)]">
+              <div className="grid grid-cols-5 gap-1" role="tablist" aria-label="Telegram setup steps">
                   {telegramPreviewSteps.map((item, index) => (
                     <button
                       key={item.label}
@@ -412,12 +360,12 @@ export function CommunityBotWalkthrough({
                       role="tab"
                       aria-selected={telegramPreviewStep === index}
                       onClick={() => selectTelegramPreviewStep(index)}
-                      className={`group relative overflow-hidden rounded-lg border px-1 py-2 text-center transition duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#73b6e6] ${telegramPreviewStep === index ? "border-[#61a8de]/70 bg-[#246b94] text-white shadow-[0_0_18px_rgba(97,168,222,.32)]" : "border-white/10 bg-white/[.03] text-white/45 hover:border-[#61a8de]/40 hover:text-white/80"}`}
+                      className={`group relative overflow-hidden rounded-lg border px-1 py-2 text-center transition duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${telegramPreviewStep === index ? "border-primary/70 bg-primary/15 text-foreground shadow-[0_0_18px_hsl(var(--primary)/.2)]" : "border-border/60 bg-card/50 text-muted-foreground hover:border-primary/40 hover:text-foreground"}`}
                     >
-                      {telegramPreviewStep === index ? <span className="absolute inset-0 animate-pulse bg-gradient-to-r from-transparent via-white/10 to-transparent" /> : null}
-                      <span className="relative block text-[6px] font-black uppercase tracking-[0.12em] text-[#9bc9e8]">Step {index + 1}</span>
+                      {telegramPreviewStep === index ? <span className="absolute inset-0 animate-pulse bg-gradient-to-r from-transparent via-primary/10 to-transparent" /> : null}
+                      <span className="relative block text-[6px] font-black uppercase tracking-[0.12em] text-primary">Step {index + 1}</span>
                       <span className="relative mt-0.5 block text-[7px] font-bold uppercase tracking-[0.08em]">{item.label}</span>
-                      <span className={`relative mt-1 block text-[6px] font-black uppercase tracking-[0.1em] ${stepComplete[index] ? "text-emerald-300" : telegramPreviewStep === index ? "animate-bounce text-white" : "text-amber-300"}`}>
+                      <span className={`relative mt-1 block text-[6px] font-black uppercase tracking-[0.1em] ${stepComplete[index] ? "text-emerald-400" : telegramPreviewStep === index ? "animate-bounce text-foreground" : "text-amber-400"}`}>
                         {stepComplete[index]
                           ? "✓ Complete"
                           : telegramPreviewStep === index
@@ -427,8 +375,7 @@ export function CommunityBotWalkthrough({
                     </button>
                   ))}
                 </div>
-                <div className="space-y-3 px-3 py-5">
-                  <p className="text-center text-[9px] text-white/38">Today</p>
+              <div className="space-y-3 pt-4">
                   <AnimatePresence mode="wait">
                   <motion.div
                     key={telegramPreviewStep}
@@ -436,21 +383,12 @@ export function CommunityBotWalkthrough({
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 1.08, filter: "blur(7px)" }}
                     transition={{ type: "spring", stiffness: 340, damping: 24 }}
-                    className={`max-w-[88%] rounded-2xl rounded-tl-md p-3 text-[11px] leading-relaxed text-white/88 shadow-sm ${telegramPreviewStep === 4 ? "border border-emerald-400/25 bg-gradient-to-br from-emerald-400/15 to-[#18282f]" : "bg-[#18282f]"}`}
+                    className={`rounded-2xl p-4 text-[11px] leading-relaxed text-foreground shadow-sm ${telegramPreviewStep === 4 ? "border border-emerald-400/25 bg-emerald-400/10" : "border border-border/60 bg-card/70"}`}
                   >
-                    <motion.div
-                      aria-hidden="true"
-                      initial={{ scale: 0, opacity: 0.9 }}
-                      animate={{ scale: 1, opacity: 0 }}
-                      transition={{ duration: 0.55, ease: "easeOut" }}
-                      className="pointer-events-none absolute left-6 top-3 h-16 w-16 rounded-full border-2 border-[#61a8de]/70 bg-[#61a8de]/20 shadow-[0_0_38px_rgba(97,168,222,.55)]"
-                    />
-                    <p className="font-semibold text-white">
-                      🐺 MyFenrir · Step {telegramPreviewStep + 1} of 5
-                    </p>
-                    <p className="mt-1 font-semibold text-[#9bc9e8]">{telegramPreviewSteps[telegramPreviewStep].title}</p>
+                    <p className="font-semibold">MyFenrir Bot · Step {telegramPreviewStep + 1} of 5</p>
+                    <p className="mt-1 font-semibold text-primary">{telegramPreviewSteps[telegramPreviewStep].title}</p>
                     <p className="mt-2">{telegramPreviewSteps[telegramPreviewStep].message}</p>
-                    <p className="mt-2 text-[10px] text-white/55">
+                      <p className="mt-2 text-[10px] text-muted-foreground">
                       {telegramPreviewSteps[telegramPreviewStep].detail}
                     </p>
                     {telegramPreviewStep === 1 ? (
@@ -466,12 +404,12 @@ export function CommunityBotWalkthrough({
                       </p>
                     ) : null}
                     {telegramPreviewStep === 4 ? (
-                      <div className="mt-3 rounded-xl border border-emerald-400/20 bg-black/20 p-3">
+                      <div className="mt-3 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3">
                         <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-400/15 text-base text-emerald-300">
                           ✓
                         </span>
                         <p className="mt-3 font-semibold text-emerald-200">ACCESS CONFIRMED</p>
-                        <p className="mt-1 font-mono text-[9px] uppercase tracking-[.12em] text-white/45">
+                        <p className="mt-1 font-mono text-[9px] uppercase tracking-[.12em] text-muted-foreground">
                           Identity · rules · membership · destination
                         </p>
                       </div>
@@ -482,52 +420,12 @@ export function CommunityBotWalkthrough({
                     href={telegramStepLinks[telegramPreviewStep]}
                     target="_blank"
                     rel="noreferrer"
-                    className="block w-full rounded-xl border border-[#61a8de]/40 bg-[#246b94]/25 px-3 py-2.5 text-center text-[10px] font-semibold text-[#d7edff] transition hover:border-[#73b6e6] hover:bg-[#246b94]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#73b6e6]"
+                    className="block w-full rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5 text-center text-[10px] font-semibold text-primary transition hover:border-primary/70 hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                   >
                     {telegramLaunchLabels[telegramPreviewStep]} ↗
                   </a>
-                  {miniAppClosed ? (
-                    <div
-                      role="status"
-                      aria-live="polite"
-                      className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-3 text-center"
-                    >
-                      <p className="text-[10px] font-semibold text-emerald-200">
-                        Mini App closed safely
-                      </p>
-                      <p className="mt-1 text-[9px] text-white/48">
-                        Return to Telegram to use your private access.
-                      </p>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        telegramPreviewStep === 4
-                          ? confirmMiniAppClose()
-                          : setTelegramPreviewStep((step) =>
-                              Math.min(step + 1, telegramPreviewSteps.length - 1),
-                            )
-                      }
-                      className={`w-full rounded-xl px-3 py-2.5 text-[10px] font-semibold text-white transition ${telegramPreviewStep === 4 ? "bg-emerald-600 hover:bg-emerald-500" : "bg-[#246b94] hover:bg-[#2d7ca9]"}`}
-                    >
-                      {telegramPreviewStep === 0
-                        ? "Link FriskyDev ID with Telegram"
-                        : telegramPreviewStep === 1
-                          ? "Continue to group setup"
-                          : telegramPreviewStep === 2
-                            ? "Continue to mapping"
-                            : telegramPreviewStep === 3
-                              ? "Confirm access"
-                              : "Close Mini App"}
-                    </button>
-                  )}
-                </div>
-                <div className="absolute inset-x-3 bottom-3 flex items-center gap-2 rounded-full border border-white/10 bg-[#17242b] px-4 py-2.5 text-[10px] text-white/38">
-                  Message <span className="ml-auto text-[#61a8de]">➤</span>
                 </div>
               </div>
-            </div>
           </motion.div>
         ) : null}
       </div>
