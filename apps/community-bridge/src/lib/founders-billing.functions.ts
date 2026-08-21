@@ -12,21 +12,38 @@ async function billingRequest(path: string, body: Record<string, string>) {
   });
   const result = (await response.json().catch(() => null)) as Record<string, unknown> | null;
   if (!response.ok || result?.["ok"] !== true) {
-    throw new Error(typeof result?.["error"] === "string" ? result["error"] : "Billing service unavailable");
+    throw new Error(
+      typeof result?.["error"] === "string" ? result["error"] : "Billing service unavailable",
+    );
   }
   return result;
 }
 
-export const getFoundersBillingOptions = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    const result = await billingRequest("/api/internal/billing-options", {});
-    return {
-      stripe: result["stripe"] === true,
-      nowpayments: result["nowpayments"] === true,
-      stars: result["stars"] === true,
-    };
-  });
+/**
+ * Qué rieles de pago están configurados. Es un hecho GLOBAL del sistema, no
+ * del visitante: la petición al worker manda `{}` — cero datos de usuario.
+ *
+ * Iba con `requireSupabaseAuth` y ahí estaba el bug de producción. Un visitante
+ * sin sesión que abría /upgrade disparaba este sondeo al montar la tarjeta, el
+ * middleware no encontraba cabecera `Authorization` y lanzaba
+ * `Unauthorized: No authorization header provided`. Ese texto salía en rojo
+ * dentro de la tarjeta de pago, y como las opciones nunca resolvían, tarjeta y
+ * cripto quedaban en "being set up" aunque estuvieran perfectamente vivas.
+ * Un solo fallo, tres síntomas.
+ *
+ * Preguntar qué rieles existen no requiere identidad. Cobrar sí, y por eso
+ * `createFoundersStripeCheckout`, `createFoundersNowPaymentsCheckout` y
+ * `confirmFoundersStripeCheckout` CONSERVAN el middleware: esos sí llevan
+ * userId y email al worker.
+ */
+export const getFoundersBillingOptions = createServerFn({ method: "GET" }).handler(async () => {
+  const result = await billingRequest("/api/internal/billing-options", {});
+  return {
+    stripe: result["stripe"] === true,
+    nowpayments: result["nowpayments"] === true,
+    stars: result["stars"] === true,
+  };
+});
 
 /**
  * Identity for the billing worker. It validates userId and orgId as UUIDs and
@@ -49,9 +66,13 @@ export const getFoundersBillingOptions = createServerFn({ method: "GET" })
  */
 function billingIdentity(context: { userId: string; claims: Record<string, unknown> }) {
   const userId = String(context.userId ?? "").trim();
-  const email = String((context.claims as { email?: unknown })?.email ?? "").trim().toLowerCase();
-  if (!/^[0-9a-f-]{36}$/i.test(userId)) throw new Error("Your session is missing a valid account id. Sign in again.");
-  if (!email.includes("@")) throw new Error("Your account has no email address on file. Add one before paying by card.");
+  const email = String((context.claims as { email?: unknown })?.email ?? "")
+    .trim()
+    .toLowerCase();
+  if (!/^[0-9a-f-]{36}$/i.test(userId))
+    throw new Error("Your session is missing a valid account id. Sign in again.");
+  if (!email.includes("@"))
+    throw new Error("Your account has no email address on file. Add one before paying by card.");
   return { userId, orgId: userId, email };
 }
 
@@ -66,7 +87,10 @@ export const createFoundersStripeCheckout = createServerFn({ method: "POST" })
     z
       .object({
         billingPeriod: z.enum(["monthly", "annual"]).default("monthly"),
-        refCode: z.string().regex(/^[A-Za-z0-9]{6,16}$/).optional(),
+        refCode: z
+          .string()
+          .regex(/^[A-Za-z0-9]{6,16}$/)
+          .optional(),
       })
       .parse(data),
   )
@@ -102,7 +126,9 @@ export const createFoundersNowPaymentsCheckout = createServerFn({ method: "POST"
 /** Called on return from Stripe with ?stripe=success&session_id=… */
 export const confirmFoundersStripeCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data) => z.object({ sessionId: z.string().regex(/^cs_(?:test_|live_)?[A-Za-z0-9]+$/) }).parse(data))
+  .validator((data) =>
+    z.object({ sessionId: z.string().regex(/^cs_(?:test_|live_)?[A-Za-z0-9]+$/) }).parse(data),
+  )
   .handler(async ({ data, context }) => {
     const { userId, orgId } = billingIdentity(context);
     const result = await billingRequest("/api/internal/founders-confirm", {

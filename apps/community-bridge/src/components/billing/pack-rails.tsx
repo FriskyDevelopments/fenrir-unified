@@ -123,8 +123,31 @@ const COPY = {
   failed: "That rail did not respond. Try another.",
   noOptions: "Could not read payment options.",
   noConfirm: "Payment could not be confirmed yet.",
+  signInToPay: "Sign in first — then this rail can charge your account.",
 } as const;
 
+/**
+ * Nada crudo del backend llega a la tarjeta de pago.
+ *
+ * En producción se vio `Unauthorized: No authorization header provided` en
+ * rojo, dentro de la tarjeta, en el instante exacto en que alguien iba a pagar.
+ * Un comprador que lee eso no piensa "sesión caducada": piensa que el sitio
+ * está roto y se va. Aquí no se muestra ninguna excepción.
+ *
+ * La lista de abajo es la de mensajes que el comprador SÍ puede accionar —
+ * escritos para una persona, no volcados por el servidor—. Cualquier otra cosa
+ * cae al texto genérico. Ampliar la lista es deliberado: si un mensaje nuevo
+ * merece llegar al cliente, se añade a mano tras leerlo.
+ */
+const ACTIONABLE = ["email address on file", "Sign in again", "not configured"] as const;
+
+function humanError(cause: unknown, fallback: string): string {
+  const raw = cause instanceof Error ? cause.message : "";
+  // Falta de sesión: no es un error, es un paso previo. Se dice como tal.
+  if (/unauthorized|authorization header|invalid token/i.test(raw)) return COPY.signInToPay;
+  if (ACTIONABLE.some((fragment) => raw.includes(fragment))) return raw;
+  return fallback;
+}
 
 /**
  * Local palette. Fenrir brandbook substrate (midnight / indigo / ice / muted)
@@ -161,8 +184,11 @@ export function PackRails() {
       .then((result) => alive && setOptions(result))
       .catch((cause: unknown) => {
         if (!alive) return;
+        // El sondeo es informativo: el comprador no puede accionar su fallo,
+        // así que los rieles quedan como no disponibles y no se pinta error.
+        // Antes esto volcaba la excepción del backend dentro de la tarjeta.
+        console.error("[billing] options probe failed", cause);
         setOptions({ stripe: false, nowpayments: false, stars: true });
-        setError(cause instanceof Error ? cause.message : t.noOptions);
       });
     return () => {
       alive = false;
@@ -179,9 +205,7 @@ export function PackRails() {
     if (!sessionId) return;
     confirmFoundersStripeCheckout({ data: { sessionId } })
       .then((result) => setConfirmed(result.status))
-      .catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : t.noConfirm),
-      );
+      .catch((cause: unknown) => setError(humanError(cause, t.noConfirm)));
   }, [t.noConfirm]);
 
   const go = useCallback(
@@ -201,7 +225,7 @@ export function PackRails() {
         }
         window.location.href = "https://t.me/Myfenrir_bot?start=fenrir_stars";
       } catch (cause: unknown) {
-        setError(cause instanceof Error ? cause.message : t.failed);
+        setError(humanError(cause, t.failed));
         setBusy(null);
       }
     },
@@ -242,8 +266,7 @@ export function PackRails() {
           style={{
             background:
               "conic-gradient(from 0deg, transparent 0deg, rgba(139,124,255,0.55) 42deg, rgba(183,255,42,0.9) 74deg, rgba(79,215,224,0.5) 104deg, transparent 150deg, transparent 360deg)",
-            WebkitMask:
-              "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+            WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
             WebkitMaskComposite: "xor",
             maskComposite: "exclude",
             padding: 1,
@@ -276,70 +299,70 @@ export function PackRails() {
           />
         ) : null}
 
-      {/* ── Vendor handshake ─────────────────────────────────────────────────
+        {/* ── Vendor handshake ─────────────────────────────────────────────────
           Motion 1 — SIGIL IGNITION. The real FriskyDev sigil (public/brand/
           friskydev-sigil-solid.svg, used as a CSS mask so the artwork is never
           redrawn) takes a single sweep of lime light left to right on mount.
           Reason: it establishes who is charging the operator before they read
           a price. Fires once, never loops. */}
-      <header className="flex items-center gap-3">
-        <motion.span
-          aria-hidden="true"
-          className="relative block h-9 w-9 shrink-0"
-          initial={reduce ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
+        <header className="flex items-center gap-3">
           <motion.span
-            className="absolute inset-0 block"
-            style={{
-              // Rests lime — the sweep is a white highlight travelling across
-              // the mark, not a colour change. The sigil is always FriskyDev
-              // green once it settles.
-              backgroundImage:
-                "linear-gradient(115deg, var(--fd-lime) 0%, var(--fd-lime) 30%, var(--fd-ice) 46%, var(--fd-violet) 58%, var(--fd-lime) 74%, var(--fd-lime) 100%)",
-              backgroundSize: "300% 100%",
-              WebkitMaskImage: "url(/brand/friskydev-sigil-solid.svg)",
-              maskImage: "url(/brand/friskydev-sigil-solid.svg)",
-              WebkitMaskSize: "contain",
-              maskSize: "contain",
-              WebkitMaskRepeat: "no-repeat",
-              maskRepeat: "no-repeat",
-              WebkitMaskPosition: "center",
-              maskPosition: "center",
-            }}
-            initial={reduce ? false : { backgroundPosition: "100% 0%" }}
-            animate={{ backgroundPosition: "0% 0%" }}
-            transition={reduce ? undefined : { duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-          />
-        </motion.span>
-        <div className="min-w-0">
-          <p
-            className="truncate text-[11px] font-semibold uppercase tracking-[0.22em]"
-            style={{ color: "var(--fd-muted)" }}
+            aria-hidden="true"
+            className="relative block h-9 w-9 shrink-0"
+            initial={reduce ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
           >
-            {t.vendor}
-          </p>
-          <p className="truncate text-sm font-semibold" style={{ color: "var(--fd-ice)" }}>
-            {t.product}
-          </p>
-        </div>
-        {/* The Fenrir mark, real raster from the brand folder, as the product
+            <motion.span
+              className="absolute inset-0 block"
+              style={{
+                // Rests lime — the sweep is a white highlight travelling across
+                // the mark, not a colour change. The sigil is always FriskyDev
+                // green once it settles.
+                backgroundImage:
+                  "linear-gradient(115deg, var(--fd-lime) 0%, var(--fd-lime) 30%, var(--fd-ice) 46%, var(--fd-violet) 58%, var(--fd-lime) 74%, var(--fd-lime) 100%)",
+                backgroundSize: "300% 100%",
+                WebkitMaskImage: "url(/brand/friskydev-sigil-solid.svg)",
+                maskImage: "url(/brand/friskydev-sigil-solid.svg)",
+                WebkitMaskSize: "contain",
+                maskSize: "contain",
+                WebkitMaskRepeat: "no-repeat",
+                maskRepeat: "no-repeat",
+                WebkitMaskPosition: "center",
+                maskPosition: "center",
+              }}
+              initial={reduce ? false : { backgroundPosition: "100% 0%" }}
+              animate={{ backgroundPosition: "0% 0%" }}
+              transition={reduce ? undefined : { duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+            />
+          </motion.span>
+          <div className="min-w-0">
+            <p
+              className="truncate text-[11px] font-semibold uppercase tracking-[0.22em]"
+              style={{ color: "var(--fd-muted)" }}
+            >
+              {t.vendor}
+            </p>
+            <p className="truncate text-sm font-semibold" style={{ color: "var(--fd-ice)" }}>
+              {t.product}
+            </p>
+          </div>
+          {/* The Fenrir mark, real raster from the brand folder, as the product
             seal. Static: it is a mark of provenance, not an effect. */}
-        <img
-          src="/brand/fenrir-mark-256.png"
-          alt=""
-          aria-hidden="true"
-          draggable={false}
-          className="ml-auto h-10 w-10 shrink-0 rounded-xl ring-1 ring-white/10"
-        />
-      </header>
+          <img
+            src="/brand/fenrir-mark-256.png"
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            className="ml-auto h-10 w-10 shrink-0 rounded-xl ring-1 ring-white/10"
+          />
+        </header>
 
-      <p className="mt-4 text-sm leading-relaxed" style={{ color: "var(--fd-muted)" }}>
-        {t.lede}
-      </p>
+        <p className="mt-4 text-sm leading-relaxed" style={{ color: "var(--fd-muted)" }}>
+          {t.lede}
+        </p>
 
-      {/* ── Price ────────────────────────────────────────────────────────────
+        {/* ── Price ────────────────────────────────────────────────────────────
           Motion 2 — PRICE WEIGHT. The amount rises into place with a small
           overshoot and settles; the qualifier ("per linked community") fades in
           one beat AFTER the number lands. Reason: the price is the single most
@@ -347,187 +370,185 @@ export function PackRails() {
           actually read "per community" instead of skimming past it. That gap is
           the refund-prevention move, not decoration. Re-fires on period change
           because the number genuinely changed. */}
-      <div className="mt-6 flex flex-wrap items-end gap-x-3 gap-y-1">
-        <motion.p
-          key={period}
-          className="font-semibold leading-none tracking-[-0.055em]"
-          style={{ color: "var(--fd-ice)", fontSize: "clamp(2.75rem, 9vw, 3.75rem)" }}
-          initial={reduce ? false : { opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={reduce ? undefined : SPRING}
-        >
-          <span style={{ color: "var(--fd-lime)" }}>$</span>
-          {price.amount}
-        </motion.p>
-        <motion.p
-          key={`${period}-suffix`}
-          className="pb-1.5 text-sm font-medium"
-          style={{ color: "var(--fd-muted)" }}
-          initial={reduce ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={reduce ? undefined : { delay: 0.34, duration: 0.32 }}
-        >
-          {annual ? t.perAnnual : t.per}
-        </motion.p>
-      </div>
+        <div className="mt-6 flex flex-wrap items-end gap-x-3 gap-y-1">
+          <motion.p
+            key={period}
+            className="font-semibold leading-none tracking-[-0.055em]"
+            style={{ color: "var(--fd-ice)", fontSize: "clamp(2.75rem, 9vw, 3.75rem)" }}
+            initial={reduce ? false : { opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={reduce ? undefined : SPRING}
+          >
+            <span style={{ color: "var(--fd-lime)" }}>$</span>
+            {price.amount}
+          </motion.p>
+          <motion.p
+            key={`${period}-suffix`}
+            className="pb-1.5 text-sm font-medium"
+            style={{ color: "var(--fd-muted)" }}
+            initial={reduce ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={reduce ? undefined : { delay: 0.34, duration: 0.32 }}
+          >
+            {annual ? t.perAnnual : t.per}
+          </motion.p>
+        </div>
 
-      {/* ── Period toggle ────────────────────────────────────────────────────
+        {/* ── Period toggle ────────────────────────────────────────────────────
           Motion 6 — SHARED PILL. The selected pill physically slides between
           the two options via a shared layoutId rather than cross-fading.
           Reason: the slide says "one thing moved", which is what a billing
           period is — the same purchase on a different clock. A cross-fade would
           read as two separate products. */}
-      <div
-        role="tablist"
-        aria-label={t.product}
-        className="mt-5 inline-flex rounded-full border border-white/10 p-1"
-        style={{ background: "rgba(8,11,22,0.6)" }}
-      >
-        {(["monthly", "annual"] as const).map((value) => {
-          const selected = period === value;
-          return (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => setPeriod(value)}
-              className="relative rounded-full px-4 py-1.5 text-xs font-semibold transition-colors"
-              style={{ color: selected ? "var(--fd-midnight)" : "var(--fd-muted)" }}
-            >
-              {selected ? (
-                <motion.span
-                  layoutId="fd-period-pill"
-                  className="absolute inset-0 rounded-full"
-                  style={{ background: "var(--fd-lime)" }}
-                  transition={reduce ? { duration: 0 } : SPRING}
-                />
-              ) : null}
-              <span className="relative">{value === "monthly" ? t.monthly : t.annual}</span>
-            </button>
-          );
-        })}
-      </div>
-      {annual ? (
-        <motion.p
-          className="mt-2 text-xs font-medium"
-          style={{ color: "var(--fd-lime)" }}
-          initial={reduce ? false : { opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={reduce ? undefined : { duration: 0.24 }}
+        <div
+          role="tablist"
+          aria-label={t.product}
+          className="mt-5 inline-flex rounded-full border border-white/10 p-1"
+          style={{ background: "rgba(8,11,22,0.6)" }}
         >
-          {t.savingNote}
-        </motion.p>
-      ) : null}
+          {(["monthly", "annual"] as const).map((value) => {
+            const selected = period === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setPeriod(value)}
+                className="relative rounded-full px-4 py-1.5 text-xs font-semibold transition-colors"
+                style={{ color: selected ? "var(--fd-midnight)" : "var(--fd-muted)" }}
+              >
+                {selected ? (
+                  <motion.span
+                    layoutId="fd-period-pill"
+                    className="absolute inset-0 rounded-full"
+                    style={{ background: "var(--fd-lime)" }}
+                    transition={reduce ? { duration: 0 } : SPRING}
+                  />
+                ) : null}
+                <span className="relative">{value === "monthly" ? t.monthly : t.annual}</span>
+              </button>
+            );
+          })}
+        </div>
+        {annual ? (
+          <motion.p
+            className="mt-2 text-xs font-medium"
+            style={{ color: "var(--fd-lime)" }}
+            initial={reduce ? false : { opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={reduce ? undefined : { duration: 0.24 }}
+          >
+            {t.savingNote}
+          </motion.p>
+        ) : null}
 
-      {confirmed ? (
-        <p
-          className="mt-5 rounded-xl border px-4 py-3 text-sm"
-          style={{
-            borderColor: "rgba(183,255,42,0.35)",
-            background: "rgba(183,255,42,0.08)",
-            color: "var(--fd-lime)",
-          }}
-        >
-          {t.active}
-        </p>
-      ) : null}
+        {confirmed ? (
+          <p
+            className="mt-5 rounded-xl border px-4 py-3 text-sm"
+            style={{
+              borderColor: "rgba(183,255,42,0.35)",
+              background: "rgba(183,255,42,0.08)",
+              color: "var(--fd-lime)",
+            }}
+          >
+            {t.active}
+          </p>
+        ) : null}
 
-      {/* ── Rails ────────────────────────────────────────────────────────────
+        {/* ── Rails ────────────────────────────────────────────────────────────
           Motion 3 — CARD LEAD-IN. Card enters at 0ms, Stars at +90ms, crypto at
           +180ms, each on a 10px rise. Reason: the stagger IS the hierarchy. The
           eye lands on card before it knows the other two exist, which is
           exactly the order of preference. Nothing else encodes that. */}
-      <div className="mt-6 space-y-2.5">
-        <RailButton
-          index={0}
-          reduce={reduce}
-          primary
-          accent="var(--fd-lime)"
-          icon={<CreditCard className="h-4 w-4" />}
-          label={`${t.card} · $${price.amount}`}
-          note={t.cardNote}
-          busy={busy === "card"}
-          dimmed={busy !== null && busy !== "card"}
-          loading={loading}
-          available={options?.stripe ?? false}
-          unavailableNote={t.cardOff}
-          checkingNote={t.checking}
-          onClick={() => void go("card")}
-        />
+        <div className="mt-6 space-y-2.5">
+          <RailButton
+            index={0}
+            reduce={reduce}
+            primary
+            accent="var(--fd-lime)"
+            icon={<CreditCard className="h-4 w-4" />}
+            label={`${t.card} · $${price.amount}`}
+            note={t.cardNote}
+            busy={busy === "card"}
+            dimmed={busy !== null && busy !== "card"}
+            loading={loading}
+            available={options?.stripe ?? false}
+            unavailableNote={t.cardOff}
+            checkingNote={t.checking}
+            onClick={() => void go("card")}
+          />
 
-        {/* Methods riding the card rail. They enter after the rail itself
+          {/* Methods riding the card rail. They enter after the rail itself
             (+240ms) so the button is read first and these register as its
             contents, not as four more choices competing with it. */}
-        <motion.ul
-          className="flex flex-wrap justify-center gap-1.5 pt-0.5"
-          initial={reduce ? false : { opacity: 0 }}
-          animate={{ opacity: loading || !(options?.stripe ?? false) ? 0.45 : 1 }}
-          transition={reduce ? undefined : { delay: 0.24, duration: 0.4 }}
-        >
-          {CARD_METHODS.map((method) => (
-            <li
-              key={method.id}
-              className="rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide"
-              style={{
-                borderColor: "rgba(255,255,255,0.10)",
-                background: "rgba(22,28,61,0.45)",
-                color: "var(--fd-muted)",
-              }}
-            >
-              {method.label}
-              {"region" in method ? (
-                <span style={{ opacity: 0.6 }}> · {method.region}</span>
-              ) : null}
-            </li>
-          ))}
-        </motion.ul>
+          <motion.ul
+            className="flex flex-wrap justify-center gap-1.5 pt-0.5"
+            initial={reduce ? false : { opacity: 0 }}
+            animate={{ opacity: loading || !(options?.stripe ?? false) ? 0.45 : 1 }}
+            transition={reduce ? undefined : { delay: 0.24, duration: 0.4 }}
+          >
+            {CARD_METHODS.map((method) => (
+              <li
+                key={method.id}
+                className="rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide"
+                style={{
+                  borderColor: "rgba(255,255,255,0.10)",
+                  background: "rgba(22,28,61,0.45)",
+                  color: "var(--fd-muted)",
+                }}
+              >
+                {method.label}
+                {"region" in method ? (
+                  <span style={{ opacity: 0.6 }}> · {method.region}</span>
+                ) : null}
+              </li>
+            ))}
+          </motion.ul>
 
-        <RailButton
-          index={1}
-          reduce={reduce}
-          accent="var(--fd-violet)"
-          icon={<span aria-hidden="true">⭐</span>}
-          label={
-            annual ? t.stars : `${t.stars} · ${PRICE.monthly.stars}`
-          }
-          note={t.starsNote}
-          busy={busy === "stars"}
-          dimmed={busy !== null && busy !== "stars"}
-          loading={loading}
-          available={!annual && (options?.stars ?? true)}
-          unavailableNote={annual ? t.starsAnnual : t.starsOff}
-          checkingNote={t.checking}
-          onClick={() => void go("stars")}
-        />
+          <RailButton
+            index={1}
+            reduce={reduce}
+            accent="var(--fd-violet)"
+            icon={<span aria-hidden="true">⭐</span>}
+            label={annual ? t.stars : `${t.stars} · ${PRICE.monthly.stars}`}
+            note={t.starsNote}
+            busy={busy === "stars"}
+            dimmed={busy !== null && busy !== "stars"}
+            loading={loading}
+            available={!annual && (options?.stars ?? true)}
+            unavailableNote={annual ? t.starsAnnual : t.starsOff}
+            checkingNote={t.checking}
+            onClick={() => void go("stars")}
+          />
 
-        <RailButton
-          index={2}
-          reduce={reduce}
-          accent="var(--fd-cyan)"
-          icon={<Bitcoin className="h-4 w-4" />}
-          label={`${t.crypto} · $${price.amount}`}
-          note={t.cryptoNote}
-          busy={busy === "crypto"}
-          dimmed={busy !== null && busy !== "crypto"}
-          loading={loading}
-          available={!annual && (options?.nowpayments ?? false)}
-          unavailableNote={annual ? t.cryptoAnnual : t.cryptoOff}
-          checkingNote={t.checking}
-          onClick={() => void go("crypto")}
-        />
-      </div>
+          <RailButton
+            index={2}
+            reduce={reduce}
+            accent="var(--fd-cyan)"
+            icon={<Bitcoin className="h-4 w-4" />}
+            label={`${t.crypto} · $${price.amount}`}
+            note={t.cryptoNote}
+            busy={busy === "crypto"}
+            dimmed={busy !== null && busy !== "crypto"}
+            loading={loading}
+            available={!annual && (options?.nowpayments ?? false)}
+            unavailableNote={annual ? t.cryptoAnnual : t.cryptoOff}
+            checkingNote={t.checking}
+            onClick={() => void go("crypto")}
+          />
+        </div>
 
-      {error ? (
-        <p role="alert" className="mt-3 text-xs leading-relaxed text-red-300">
-          {error}
-        </p>
-      ) : null}
+        {error ? (
+          <p role="alert" className="mt-3 text-xs leading-relaxed text-red-300">
+            {error}
+          </p>
+        ) : null}
 
-      <footer className="mt-5 space-y-1 text-center">
-        <p className="text-xs leading-relaxed" style={{ color: "var(--fd-muted)" }}>
-          {t.footer}
-        </p>
+        <footer className="mt-5 space-y-1 text-center">
+          <p className="text-xs leading-relaxed" style={{ color: "var(--fd-muted)" }}>
+            {t.footer}
+          </p>
           <p
             className="text-[11px] leading-relaxed"
             style={{ color: "var(--fd-muted)", opacity: 0.75 }}
