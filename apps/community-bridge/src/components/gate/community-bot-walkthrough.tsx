@@ -27,7 +27,7 @@ const steps = [
   {
     icon: Sparkles,
     title: "Create its Gates",
-    body: "Free includes one Gate. The Pack unlocks unlimited Gates across your communities.",
+    body: "Free gives you five Gates to build with. The Pack lets you link a Gate to a live community, billed per linked community.",
   },
   {
     icon: ShieldCheck,

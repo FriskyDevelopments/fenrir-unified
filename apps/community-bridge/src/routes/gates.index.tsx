@@ -26,7 +26,10 @@ import {
   type GateRecord,
   type VerifiedTelegramDestination,
 } from "@/lib/gate.functions";
-import { gateQuota, type GateQuota } from "@/lib/gate-limits";
+import { FREE_GATE_LIMIT, gateQuota, type GateQuota } from "@/lib/gate-limits";
+// Única fuente de la copy de precios y rieles. No duplicar cifras aquí: si esta
+// pantalla vuelve a escribir su propio precio, vuelve a divergir de /upgrade.
+import { PackRails } from "@/components/billing/pack-rails";
 import { getMyGateViewStats, type GateViewStats } from "@/lib/gate-analytics.functions";
 import { getPreset } from "@/lib/gate-presets";
 import { isDemoMode } from "@/config/demo-mode";
@@ -215,8 +218,15 @@ function MyGatesPage() {
             </p>
             {quota && (
               <p className="mt-3 text-xs font-medium text-muted-foreground">
-                {quota.used} of {quota.limit === Number.MAX_SAFE_INTEGER ? "∞" : quota.limit} gates used
-                {` · ${quota.profileType === "free" ? "Free: 1 Gate" : "The Pack: unlimited Gates"}`}
+                {/* El "∞" prometía un cupo sin techo: PACK_GATE_LIMIT es finito
+                    e igual al de Free. El eje que se paga son las comunidades
+                    enlazadas, no el número de Gates. */}
+                {quota.used} of {quota.limit} gates used
+                {` · ${
+                  quota.profileType === "free"
+                    ? `Free: ${FREE_GATE_LIMIT} Gates`
+                    : "The Pack · billed per linked community"
+                }`}
                 {!quota.canCreate && " · Profile limit reached"}
               </p>
             )}
@@ -279,7 +289,7 @@ function MyGatesPage() {
               animate={{ scale: [0.85, 1.15, 0.85], opacity: [0.35, 0.8, 0.35] }}
               transition={{ duration: 5, repeat: Infinity }}
             />
-            <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div className="relative grid gap-6">
               <div>
                 <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-300">
                   <Crown className="h-4 w-4" /> Pack Ascension available
@@ -287,12 +297,17 @@ function MyGatesPage() {
                 <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
                   Your Gate is awake. Give it a whole pack.
                 </h2>
+                {/* Lo que The Pack compra de verdad: enlazar un Gate a una
+                    comunidad viva. NO más Gates — PACK_GATE_LIMIT es igual a
+                    FREE_GATE_LIMIT. Prometer un cupo sin techo con precio por
+                    comunidad era una promesa que el producto no cumple. */}
                 <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/60">
-                  Free includes one Gate. Activate The Pack for unlimited Gates, multi-admin
-                  workflows, and Bot OS control.
+                  Free gives you {FREE_GATE_LIMIT} Gates to build and test with. The Pack does not
+                  add more Gates — it lets you link a Gate to a live community, billed per linked
+                  community, and unlocks multi-admin workflows and Bot OS control.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2 font-mono text-[10px] uppercase tracking-[0.16em]">
-                  {["The Pack · unlimited Gates", "Gate Reports · PostHog-ready"].map(
+                  {["The Pack · linked communities", "Gate Reports · PostHog-ready"].map(
                     (feature) => (
                       <span
                         key={feature}
@@ -304,26 +319,11 @@ function MyGatesPage() {
                   )}
                 </div>
               </div>
-              <div className="grid gap-2">
-                <Button
-                  asChild
-                  size="lg"
-                  className="group min-w-56 border border-[#8078ff]/70 bg-gradient-to-r from-[#635bff] to-violet-600 font-bold text-white shadow-[0_0_38px_rgba(99,91,255,0.34)] hover:from-[#756eff] hover:to-violet-500"
-                >
-                  <Link to="/upgrade">
-                    ⭐ Activate The Pack · 1,150 Stars
-                    <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" size="sm">
-                  <a href="https://t.me/Myfenrir_bot?start=fenrir_stars">
-                    Open the official Stars payment box
-                  </a>
-                </Button>
-                <p className="text-center font-mono text-[9px] uppercase tracking-[0.14em] text-white/40">
-                  Telegram Stars · The only live payment rail
-                </p>
-              </div>
+              {/* Los tres rieles vienen de pack-rails.tsx, la misma pieza que
+                  monta /upgrade: tarjeta primero, Stars segundo, cripto tercero,
+                  y un solo precio. Montarla —en vez de reescribir la copy aquí—
+                  es lo que impide que /gates y /upgrade vuelvan a divergir. */}
+              <PackRails />
             </div>
           </motion.section>
         ) : null}
