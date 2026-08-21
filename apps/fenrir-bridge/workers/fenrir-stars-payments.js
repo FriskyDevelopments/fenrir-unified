@@ -82,6 +82,7 @@ async function stripeRequest(env, path, params) {
 // price_1U45nI… ($19.99) exist on the same product but are NOT the price.
 const LIVE_FOUNDERS_MONTHLY_PRICE = "price_1U45nNLxUF54S071oRPYXOec";
 const LIVE_FOUNDERS_ANNUAL_PRICE = "price_1U4bO5LxUF54S071qvkmFT0V";
+const NOWPAYMENTS_PACK_PRICE_USD = 14.99;
 export function foundersPriceId(env, billingPeriod) {
   return billingPeriod === "annual"
     ? normalizeText(env?.STRIPE_PACK_ANNUAL_PRICE_ID) || LIVE_FOUNDERS_ANNUAL_PRICE
@@ -215,7 +216,7 @@ async function handleFoundersNowPaymentsCheckout(request, env) {
     method: "POST",
     headers: { "x-api-key": apiKey, "content-type": "application/json" },
     body: JSON.stringify({
-      price_amount: 14.99,
+      price_amount: NOWPAYMENTS_PACK_PRICE_USD,
       price_currency: "usd",
       order_id: orderId,
       order_description: "The Pack · MyFenrir · $14.99/month",
@@ -240,7 +241,7 @@ async function handleNowPaymentsIpn(request, env) {
   if (
     !match ||
     normalizeText(body.price_currency).toLowerCase() !== "usd" ||
-    Math.abs(Number(body.price_amount) - 15) > 0.000001
+    Number(body.price_amount) !== NOWPAYMENTS_PACK_PRICE_USD
   ) {
     return json({ ok: false, error: "invalid_order" }, { status: 400 });
   }
