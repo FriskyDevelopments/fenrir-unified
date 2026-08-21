@@ -4,9 +4,20 @@ import { join } from "node:path";
 
 const root = new URL("..", import.meta.url).pathname;
 
+/*
+ * Cada entrada es [archivo | [archivos...], texto]. Con una lista, basta con
+ * que el texto esté en UNO de ellos.
+ *
+ * Por qué existe la lista: la copy del Gate se movió de la isla local
+ * `GATE_COPY` de la ruta a `src/i18n/gate.ts`, para que haya una sola fuente
+ * por dominio. La aserción NO se debilita —el texto sigue siendo obligatorio—;
+ * lo único que deja de asumirse es en qué archivo vive. La capa que de verdad
+ * blinda esto contra regresiones es la del bundle construido, más abajo, que
+ * es independiente de la ubicación y no se ha tocado.
+ */
 const requiredSource = [
-  ["src/routes/g.$slug.tsx", "Proceed to SSO"],
-  ["src/routes/g.$slug.tsx", "Continue Gate"],
+  [["src/routes/g.$slug.tsx", "src/i18n/gate.ts"], "Proceed to SSO"],
+  [["src/routes/g.$slug.tsx", "src/i18n/gate.ts"], "Continue Gate"],
   ["src/routes/g.$slug.tsx", "community-sso"],
   ["src/lib/access.functions.ts", "Gate security:"],
   ["src/lib/access.functions.ts", "decision_note"],
@@ -32,9 +43,10 @@ function fail(message) {
   process.exitCode = 1;
 }
 
-for (const [file, needle] of requiredSource) {
-  const text = read(file);
-  if (!text.includes(needle)) fail(`${file} is missing required contract text: ${needle}`);
+for (const [where, needle] of requiredSource) {
+  const files = Array.isArray(where) ? where : [where];
+  const found = files.some((file) => read(file).includes(needle));
+  if (!found) fail(`${files.join(" / ")} is missing required contract text: ${needle}`);
 }
 
 for (const [file, needle] of forbiddenSource) {
