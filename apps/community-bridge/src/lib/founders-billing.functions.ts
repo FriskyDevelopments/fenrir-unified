@@ -31,9 +31,21 @@ export const getFoundersBillingOptions = createServerFn({ method: "GET" })
 /**
  * Identity for the billing worker. It validates userId and orgId as UUIDs and
  * binds the Stripe session to both, so a session bought by one account can
- * never be confirmed by another. There is no separate org entity yet: the
- * Supabase user is the org, which is what isValidFoundersStripeSession already
- * assumes (client_reference_id === orgId === userId).
+ * never be confirmed by another.
+ *
+ * ⚠️ ASSUMPTION, NOT A VERIFIED FACT — orgId === userId.
+ *
+ * This was decided here, not read from a spec. There is no organization entity
+ * in this codebase today, and the worker's own contract test asserts the case
+ * where they are equal (`isValidFoundersStripeSession(session, userId, userId)`
+ * with `client_reference_id === orgId === userId`). So collapsing them is
+ * consistent with everything that exists right now.
+ *
+ * It is still a guess, and it is baked into live billing. The day MyFenrir
+ * grows real organizations — a team paying once for several members — this line
+ * silently binds every subscription to an individual instead of the org, and
+ * `handleFoundersConfirm` will reject anyone but the buyer. Whoever adds orgs
+ * must revisit this function first.
  */
 function billingIdentity(context: { userId: string; claims: Record<string, unknown> }) {
   const userId = String(context.userId ?? "").trim();
