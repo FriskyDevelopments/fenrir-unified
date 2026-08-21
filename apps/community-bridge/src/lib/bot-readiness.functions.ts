@@ -16,7 +16,7 @@ export type CommunityBotReadiness = {
 };
 
 export const getBotCommunitiesReadiness = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ communityIds: z.array(communityId).max(20) }).parse(data))
+  .validator((data) => z.object({ communityIds: z.array(communityId).max(20) }).parse(data))
   .handler(async ({ data }) => {
     const ids = [...new Set(data.communityIds)];
     return Promise.all(

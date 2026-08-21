@@ -1,121 +1,103 @@
-import "altcha";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./human-verification.css";
 
-type Mode = "altcha" | "slider" | "puzzle";
-type Challenge = { token: string; risk: string; target?: number; sequence?: string[]; choices?: string[] };
+const verifierOrigin = "https://friskydev-human-verification.hrgrrtks2p.workers.dev";
 
-const copy = {
-  title: "MyFenrir verification",
-  intro: "Complete a brief security check.",
-  checking: "Preparing secure verification…",
-  slider: "Signal Slider",
-  sliderInstruction: "Move the marker to the indicated position.",
-  puzzle: "Rune sequence",
-  puzzleInstruction: "Repeat the signal in the same order.",
-  altcha: "Use automatic verification",
-  verified: "Verified. You may continue.",
-  failed: "Verification did not match. Try another method.",
+// The human-verification pass used to live only in React state, so any full-page
+// navigation in the sign-on round-trip (OAuth redirect, magic-link consume, a
+// plain reload) remounted this component and re-showed the captcha — an endless
+// "solve it again" loop even though the verify itself succeeded. We now persist
+// the confirmed pass in a short-lived, first-party cookie and rehydrate from it
+// on mount so a solved gate stays solved across reloads/redirects.
+const passCookieName = "fenrir_human_verified";
+const passTtlSeconds = 15 * 60;
+
+function passCookieDomainAttr() {
+  const host = window.location.hostname;
+  // Scope to all first-party MyFenrir subdomains so the pass survives an
+  // apex<->www / community redirect during sign-on. On preview/other hosts
+  // (e.g. *.pages.dev) fall back to a host-only cookie.
+  return host === "myfenrir.com" || host.endsWith(".myfenrir.com") ? "; Domain=.myfenrir.com" : "";
+}
+
+function hasVerificationPass() {
+  return document.cookie.split(";").some((entry) => entry.trim().startsWith(`${passCookieName}=1`));
+}
+
+function persistVerificationPass() {
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${passCookieName}=1; Max-Age=${passTtlSeconds}; Path=/; SameSite=Lax${secure}${passCookieDomainAttr()}`;
+}
+
+type VerificationMessage = {
+  type?: string;
+  verified?: boolean;
+  grant?: string;
+  context?: string;
+  height?: number;
 };
 
-/** ALTCHA is the primary check; the custom methods remain explicit fallbacks. */
+/** Embed the canonical FriskyDev verifier and consume its signed grant. */
 export function AltchaGate({ onVerified }: { onVerified: (verified: boolean) => void }) {
-  const widgetRef = useRef<HTMLElement | null>(null);
-  const verifiedRef = useRef(false);
-  const [mode, setMode] = useState<Mode>("altcha");
-  const [challenge, setChallenge] = useState<Challenge | null>(null);
-  const [slider, setSlider] = useState(0);
-  const [answer, setAnswer] = useState<string[]>([]);
-  const [note, setNote] = useState(copy.checking);
-  const [verified, setVerified] = useState(false);
+  const context = useMemo(() => crypto.randomUUID().replaceAll("-", ""), []);
+  const [height, setHeight] = useState(510);
+  const [verified, setVerified] = useState<boolean>(() => hasVerificationPass());
+  const [note, setNote] = useState<string | null>(null);
+  const notifiedRef = useRef(false);
+  const source = `${verifierOrigin}/?${new URLSearchParams({
+    audience: window.location.origin,
+    context,
+    embed: "miniapp",
+  }).toString()}`;
 
-  async function submit(current: Mode, payload: Record<string, unknown>) {
-    const response = await fetch("/api/verification/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: current, ...payload }),
-    });
-    const body = await response.json().catch(() => null) as { grant?: string } | null;
-    if (!response.ok || !body?.grant) throw new Error("verification_failed");
-    verifiedRef.current = true;
+  const markVerified = (persist: boolean) => {
+    if (persist) persistVerificationPass();
     setVerified(true);
-    setNote(copy.verified);
-    onVerified(true);
-  }
-
-  async function loadChallenge(next: "slider" | "puzzle") {
-    setMode(next);
-    setChallenge(null);
-    setAnswer([]);
-    setSlider(0);
-    setNote(next === "puzzle" ? copy.intro : copy.sliderInstruction);
-    try {
-      const response = await fetch(`/api/verification/challenge?mode=${next}`, { cache: "no-store" });
-      if (!response.ok) throw new Error("challenge_unavailable");
-      setChallenge(await response.json() as Challenge);
-    } catch {
-      setNote(copy.failed);
+    setNote(null);
+    if (!notifiedRef.current) {
+      notifiedRef.current = true;
+      onVerified(true);
     }
-  }
+  };
+
+  // Rehydrate a still-valid pass so a reload/redirect during sign-on does not
+  // re-prompt the captcha (this is what broke the loop).
+  useEffect(() => {
+    if (hasVerificationPass()) markVerified(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
-    if (mode !== "altcha" || !widgetRef.current) return;
-    const widget = widgetRef.current;
-    const state = (event: Event) => {
-      if (verifiedRef.current) return;
-      const detail = (event as CustomEvent<{ state?: string; payload?: string }>).detail;
-      if (detail?.payload) void submit("altcha", { payload: detail.payload }).catch(() => { if (!verifiedRef.current) setNote("Automatic verification failed. Retry or choose a fallback."); });
-      else if (detail?.state === "error") { if (!verifiedRef.current) setNote("Automatic verification is unavailable. Choose a fallback below."); }
+    const receive = async (event: MessageEvent<VerificationMessage>) => {
+      if (event.origin !== verifierOrigin || event.data?.context !== context) return;
+      if (event.data.type === "friskydev-human-verification-resize" && Number.isFinite(event.data.height)) {
+        setHeight(Math.max(360, Math.min(680, Number(event.data.height))));
+        return;
+      }
+      if (event.data.type !== "friskydev-human-verification" || !event.data.verified || !event.data.grant) return;
+      setNote("Confirming signed verification…");
+      const response = await fetch("/api/verification/grant", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ grant: event.data.grant, context }),
+      }).catch(() => null);
+      if (!response?.ok) {
+        setNote("The signed verification could not be confirmed. Please retry.");
+        return;
+      }
+      markVerified(true);
     };
-    widget.addEventListener("statechange", state);
-    widget.addEventListener("verified", state);
-    return () => { widget.removeEventListener("statechange", state); widget.removeEventListener("verified", state); };
-  }, [mode]);
+    window.addEventListener("message", receive);
+    return () => window.removeEventListener("message", receive);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context, onVerified]);
 
-  async function submitSlider() {
-    if (!challenge) return;
-    try { await submit("slider", { token: challenge.token, value: slider }); }
-    catch { setNote(copy.failed); void loadChallenge("puzzle"); }
-  }
-
-  async function chooseRune(rune: string) {
-    if (!challenge?.sequence) return;
-    const next = [...answer, rune].slice(0, challenge.sequence.length);
-    setAnswer(next);
-    if (next.length === challenge.sequence.length) {
-      try { await submit("puzzle", { token: challenge.token, answer: next }); }
-      catch { setAnswer([]); setNote(copy.failed); void loadChallenge("slider"); }
-    }
-  }
-
-  const style = { "--hv": "#22c7a8" } as CSSProperties;
-  return <section className={`human-verification human-verification--fenrir ${verified ? "is-verified" : ""}`} style={style} aria-label={copy.title}>
-    <header>
-      <img src="/fenrir-splash-icon.svg?v=20260813-face-verification" alt="" />
-      <div><b>{copy.title}</b><small>{note}</small></div>
-      <span>{challenge?.risk || "adaptive"}</span>
-    </header>
-
-    {!verified && mode === "puzzle" && challenge?.sequence ? <div className="rune-puzzle">
-      <p className="verification-method">SECURITY SEQUENCE · ORDER MATTERS</p>
-      <div className="rune-sequence">{challenge.sequence.map((rune, i) => <span key={`${rune}-${i}`}>{rune}</span>)}</div>
-      <div className="rune-answer">{challenge.sequence.map((_, i) => <span key={i}>{answer[i] || "·"}</span>)}</div>
-      <div className="rune-choices">{challenge.choices?.map((rune) => <button type="button" key={rune} onClick={() => void chooseRune(rune)}>{rune}</button>)}</div>
-      <div className="verification-switches"><button type="button" onClick={() => void loadChallenge("slider")}>{copy.slider}</button><button type="button" onClick={() => { setMode("altcha"); setNote("Automatic verification is available if needed."); }}>{copy.altcha}</button></div>
-    </div> : null}
-
-    {!verified && mode === "slider" && challenge?.target != null ? <div className="wolf-slider">
-      <b className="signal-slider__name">{copy.slider}</b>
-      <p className="verification-method">{copy.sliderInstruction}</p>
-      <div className="wolf-slider__track"><i style={{ left: `${challenge.target}%` }} /><span style={{ width: `${slider}%` }} /></div>
-      <label><span className="sr-only">{copy.sliderInstruction}</span><input type="range" min="0" max="100" value={slider} onChange={(event) => setSlider(Number(event.target.value))} onPointerUp={() => void submitSlider()} onKeyUp={(event) => { if (event.key === "Enter") void submitSlider(); }} /></label>
-      <div className="verification-switches"><button type="button" onClick={() => void loadChallenge("puzzle")}>{copy.puzzle}</button><button type="button" onClick={() => { setMode("altcha"); setNote("Automatic verification is available if needed."); }}>{copy.altcha}</button></div>
-    </div> : null}
-
-    {!verified && mode === "altcha" ? <div className="altcha-shell">
-      <altcha-widget ref={widgetRef as never} challengeurl="/api/verification/challenge?mode=altcha" hidefooter hidelogo {...({ configuration: '{"hideFooter":true,"hideLogo":true}' } as Record<string, string>)} />
-      <div className="verification-switches verification-switches--altcha"><button type="button" onClick={() => void loadChallenge("puzzle")}>{copy.puzzle}</button><button type="button" onClick={() => void loadChallenge("slider")}>{copy.slider}</button></div>
-    </div> : null}
-    {verified ? <div className="verification-success"><span>✓</span>{copy.verified}</div> : null}
-  </section>;
+  return (
+    <section className={`canonical-verification ${verified ? "is-verified" : ""}`} aria-label="Canonical FriskyDev human verification">
+      {verified ? <div className="verification-success"><span>✓</span>Verified. You may continue.</div> : (
+        <iframe title="FriskyDev human verification" src={source} style={{ height }} referrerPolicy="no-referrer" />
+      )}
+      {note ? <p className="canonical-verification__note" role="status">{note}</p> : null}
+    </section>
+  );
 }

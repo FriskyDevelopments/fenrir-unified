@@ -7,7 +7,7 @@ export default {
     // the Pages build as an implementation detail.
     if (incoming.pathname === "/gate/app" || incoming.pathname === "/gate/miniapp" || incoming.pathname === "/api/verification/canonical-grant") {
       target.protocol = "https:";
-      target.hostname = "a8b9da92.fenrir-bridge.pages.dev";
+      target.hostname = "fenrir-bridge.pages.dev";
       target.pathname = incoming.pathname === "/api/verification/canonical-grant" ? incoming.pathname : "/gate/app";
       const routed = new Request(target.toString(), request);
       routed.headers.set("x-fenrir-gate-route", "myfenrir.com/gate/miniapp");

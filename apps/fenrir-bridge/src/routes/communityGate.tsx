@@ -16,7 +16,7 @@ import {
 } from "../services/communityAuth";
 import type { UiCopy } from "../app/uiCopy";
 import { vercelPreviewWithoutApi } from "../app/shared";
-import { communityBridgeDashboardUrl } from "../services/communityBridge";
+import { communityBridgeDashboardUrl, communityBridgeGateUrl } from "../services/communityBridge";
 import { PanelTitle } from "./routeCommon";
 import { CommunityAuthProposalPanel } from "./dashboardPanels";
 
@@ -726,6 +726,9 @@ export function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
             <p>{gateText.body}</p>
           </div>
           <CommunityAuthProposalPanel proposal={proposal} locale={locale} />
+          <a className="button-link community-oauth-button" href={communityBridgeGateUrl(slug, locale)}>
+            Continue to Community Bridge SSO
+          </a>
           {vercelPreviewWithoutApi ? (
             <div className="auth-disclosure community-preview-warning" role="status">
               <div>

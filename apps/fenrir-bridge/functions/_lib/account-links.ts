@@ -232,7 +232,7 @@ export async function consumeLinkCode(
   env: BillingEnv,
   input: { code: string; telegramId: string | number; telegramUsername?: string | null; telegramFirstName?: string | null }
 ): Promise<
-  | { ok: true; supabaseUserId: string; friskyUserId: string | null; friskyOrgId: string | null }
+  | { ok: true; supabaseUserId: string; friskyUserId: string | null; friskyOrgId: string | null; email: string | null }
   | { ok: false; reason: "not_configured" | "not_found" | "expired" | "write_failed" }
 > {
   if (!accountLinksConfigured(env)) return { ok: false, reason: "not_configured" };
@@ -278,7 +278,8 @@ export async function consumeLinkCode(
     ok: true,
     supabaseUserId: pending.supabase_user_id,
     friskyUserId: pending.frisky_user_id,
-    friskyOrgId: pending.frisky_org_id
+    friskyOrgId: pending.frisky_org_id,
+    email: pending.email
   };
 }
 

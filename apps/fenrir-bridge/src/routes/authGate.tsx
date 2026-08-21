@@ -10,6 +10,11 @@ import { managedDashboardPath, twoFactorHelpLinks } from "../app/shared";
 import { BrandSignature } from "./routeCommon";
 import { AltchaGate } from "../components/AltchaGate";
 
+function postLoginDestination() {
+  const requested = new URLSearchParams(window.location.search).get("next");
+  return requested?.startsWith("/") && !requested.startsWith("//") ? requested : managedDashboardPath;
+}
+
 export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
   const theme = brandThemes.fenrir;
   const [passkeyNote, setPasskeyNote] = useState<string | null>(() => authErrorMessage());
@@ -19,7 +24,7 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
     if (!verified) return;
     setPasskeyNote(null);
     void authService.me().then((result) => {
-      if (result.data.authenticated) window.location.assign(managedDashboardPath);
+      if (result.data.authenticated) window.location.assign(postLoginDestination());
     });
   }, []);
 
@@ -32,7 +37,7 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
       const { startAuthentication } = await import("@simplewebauthn/browser");
       const assertion = await startAuthentication({ optionsJSON });
       await webauthnService.loginVerify(assertion);
-      window.location.assign(managedDashboardPath);
+      window.location.assign(postLoginDestination());
     } catch {
       setPasskeyNote(c.passkeyError);
     }

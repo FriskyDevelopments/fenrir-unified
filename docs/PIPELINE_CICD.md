@@ -14,14 +14,14 @@ deploys. No manual wrangler steps for Quality; prod stays manual until approved.
 | Branch     | Environment | Trigger              | Surfaces |
 |------------|-------------|----------------------|----------|
 | `quality`  | Quality     | **auto** on push     | fenrir-bridge (Pages preview `--branch quality`) + community-bridge (`community-bridge-quality`) |
-| `main`     | prod        | **manual** (button)  | fenrir-bridge (Pages `--branch main`) + community-bridge (`community-bridge`) |
+| `main`     | prod        | **manual** (button)  | fenrir-bridge (Pages `--branch main`) + Community Bridge production Worker |
 
 ## Surfaces
 
 | App | Cloudflare product | Prod | Quality | Build → deploy |
 |-----|--------------------|------|---------|----------------|
 | `apps/fenrir-bridge` | **Pages** project `fenrir-bridge` | www/auth/myfenrir.com | `quality.fenrir-bridge.pages.dev` (preview branch) | `vite build` → `wrangler pages deploy dist --project-name fenrir-bridge --branch <main\|quality>` |
-| `apps/community-bridge` | **Worker** | `community-bridge` @ communities.myfenrir.com | `community-bridge-quality` @ quality.communities.myfenrir.com | `vite build` (Nitro) → `wrangler deploy --config .output/server/wrangler.json --name <worker>` |
+| `apps/community-bridge` | **Worker** | `frisky-developments-llc-fenrir-unified-fenrir-unified-apps-community-bridge` @ communities.myfenrir.com | `community-bridge-quality` @ quality.communities.myfenrir.com | `scripts/deploy-production.sh` (prod) or `scripts/deploy-quality.sh` |
 
 Quality for `fenrir-bridge` is a Pages **preview** deployment — the production
 alias only moves on `--branch main`, so Quality can never overwrite prod.
@@ -72,7 +72,7 @@ pipeline and clicking **Run** on the job. Prod stays dormant until you do.
 ## Rollback
 
 - **fenrir-bridge (Pages):** `wrangler pages deployment list --project-name fenrir-bridge` → find the last good deploy → in the Pages dashboard "Rollback to this deployment", or re-deploy a known-good commit with `--branch main`. Quality preview rollbacks are harmless (preview only).
-- **community-bridge (Worker):** `wrangler deployments list --name community-bridge` → `wrangler rollback [<version-id>] --name community-bridge`. Same with `--name community-bridge-quality` for Quality.
+- **Community Bridge (Worker):** `wrangler deployments list --name frisky-developments-llc-fenrir-unified-fenrir-unified-apps-community-bridge` → `wrangler rollback [<version-id>] --name frisky-developments-llc-fenrir-unified-fenrir-unified-apps-community-bridge`. Same with `--name community-bridge-quality` for Quality.
 - **Pipeline itself:** revert the offending commit on `main`; the deploy is manual so nothing re-ships until you click Run.
 - All rollbacks: prefix with `CLOUDFLARE_ACCOUNT_ID=e2a7eccb24c4836847fd14d08c499bd0` and (locally) `env -u CLOUDFLARE_API_TOKEN` to use OAuth.
 

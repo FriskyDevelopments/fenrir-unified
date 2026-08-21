@@ -3,12 +3,37 @@ const decoder = new TextDecoder();
 const lifetime = 5 * 60;
 const glyphs = ["moon", "paw", "spark", "eye", "bolt", "diamond", "flame", "orbit", "wolf", "star"];
 const allowedAudiences = new Set([
-  "https://friskydev-human-verification.zainxantoine.workers.dev",
+  // NOTE: "https://friskydev-human-verification.zainxantoine.workers.dev" was removed
+  // 2026-08-17 — it is the workers.dev subdomain of the OTHER Cloudflare account, left
+  // over from before the account move. The live verifier is on *.hrgrrtks2p.workers.dev,
+  // so this entry granted nothing legitimate and widened the trust boundary for free.
+  // Do NOT add *.hrgrrtks2p.workers.dev here: that account holds 71 unrelated Workers,
+  // any of which could then mint verification grants. Serve staging from the already
+  // allowed https://quality.communities.myfenrir.com instead.
   "https://quality.communities.myfenrir.com",
   "https://www.myfenrir.com",
   "https://authentik.friskydev.com",
   "https://authentik.tailab8146.ts.net:9443",
 ]);
+
+// The gate embeds this verifier with `audience = window.location.origin`, and the
+// same MyFenrir gate is legitimately served from several first-party origins:
+// the apex (myfenrir.com), www, community subdomains, and the fenrir-bridge Pages
+// project (its production alias plus per-deploy preview hostnames). Requiring an
+// exact match against the static Set above rejected every origin except
+// https://www.myfenrir.com, which failed challenge issuance for all three
+// methods (altcha / puzzle / slider). Accept the explicit Set plus any HTTPS
+// first-party MyFenrir or fenrir-bridge.pages.dev origin.
+const isAllowedAudience = (audience) => {
+  if (allowedAudiences.has(audience)) return true;
+  try {
+    const { protocol, hostname } = new URL(audience);
+    if (protocol !== "https:") return false;
+    if (hostname === "myfenrir.com" || hostname.endsWith(".myfenrir.com")) return true;
+    if (hostname === "fenrir-bridge.pages.dev" || hostname.endsWith(".fenrir-bridge.pages.dev")) return true;
+  } catch { /* not a valid absolute URL */ }
+  return false;
+};
 
 const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), {
   status,
@@ -69,7 +94,7 @@ function randomInt(min, max) {
 function verificationBinding(url) {
   const audience = url.searchParams.get("audience") || "";
   const context = url.searchParams.get("context") || "";
-  if (!allowedAudiences.has(audience) || !/^[A-Za-z0-9_-]{32,128}$/.test(context)) return null;
+  if (!isAllowedAudience(audience) || !/^[A-Za-z0-9_-]{32,128}$/.test(context)) return null;
   return { audience, context };
 }
 
@@ -108,7 +133,7 @@ async function verifyAltcha(value, secret) {
     const saltParams = new URLSearchParams(parsed.salt.split("?", 2)[1] || "");
     const expires = Number(saltParams.get("expires"));
     const binding = { audience: saltParams.get("audience") || "", context: saltParams.get("context") || "" };
-    if (!allowedAudiences.has(binding.audience) || !/^[A-Za-z0-9_-]{32,128}$/.test(binding.context)) return null;
+    if (!isAllowedAudience(binding.audience) || !/^[A-Za-z0-9_-]{32,128}$/.test(binding.context)) return null;
     if (parsed.algorithm !== "SHA-256" || !Number.isInteger(parsed.number)) return null;
     if (parsed.number < 0 || parsed.number > 120000 || expires * 1000 < Date.now()) return null;
     if (!equal(parsed.challenge, await sha256(`${parsed.salt}${parsed.number}`))) return null;
@@ -126,6 +151,11 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const secret = env.VERIFICATION_SECRET;
+
+    if (url.pathname === "/health") {
+      return json({ status: "ok", service: "friskydev-human-verification", secret: Boolean(secret) });
+    }
+
     if (!secret && url.pathname.startsWith("/api/")) return json({ error: "verification_unavailable" }, 503);
 
     if (request.method === "GET" && url.pathname === "/api/altcha/challenge") {
@@ -149,7 +179,7 @@ export default {
       const verified = Boolean(grant
         && grant.audience === input.audience
         && grant.context === input.context
-        && allowedAudiences.has(grant.audience));
+        && isAllowedAudience(grant.audience));
       return json({ verified, method: verified ? grant.method : undefined }, verified ? 200 : 400);
     }
 

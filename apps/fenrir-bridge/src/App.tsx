@@ -24,7 +24,7 @@ import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, Frisky
 import { AuthProviderButton } from "./components/AuthProviderButton";
 import { AuthSurface } from "./components/AuthSurface";
 import { AltchaGate } from "./components/AltchaGate";
-import { communityBridgeDashboardUrl, communityBridgeUrlForLocale } from "./services/communityBridge";
+import { communityBridgeDashboardUrl, communityBridgeGateUrl, communityBridgeUrlForLocale } from "./services/communityBridge";
 import { CommunityBridgeHandoffPanel } from "./routes/communityGate";
 import { knowledgeBaseLabel, knowledgeBaseUrl } from "./services/knowledgeBase";
 import { CinematicLanding } from "./components/CinematicLanding";
@@ -286,8 +286,8 @@ const uiCopy: Record<Locale, {
     walkthroughStepsAdmin: ["Stable URL", "Rotate target", "Revoke leak", "Audit action"],
     walkthroughStepsLaunch: ["Customer clicks", "Fenrir explains", "Access unlocks", "Entry opens"],
     communityEmailPlaceholder: "you@community.com",
-    neonMagicBusy: "Creating Neon link...",
-    neonMagicButton: "Send Neon magic link",
+    neonMagicBusy: "Signing you in...",
+    neonMagicButton: "Continue to Sign On",
     neonMagicSuccessMessage: "Sign-in link sent. Check your inbox to continue into MyFenrir.",
     neonMagicDevLinkLabel: "Open dev auth link",
     fallbackPartnerLabel: "Fallback links",
@@ -448,8 +448,8 @@ const uiCopy: Record<Locale, {
     walkthroughStepsAdmin: ["URL estable", "Rotar destino", "Revocar fuga", "Acción de auditoría"],
     walkthroughStepsLaunch: ["Cliente hace clic", "Fenrir explica", "Acceso desbloqueado", "Entrada abierta"],
     communityEmailPlaceholder: "tu@comunidad.com",
-    neonMagicBusy: "Creando enlace Neon...",
-    neonMagicButton: "Enviar enlace mágico Neon",
+    neonMagicBusy: "Iniciando sesión...",
+    neonMagicButton: "Continuar al inicio de sesión",
     neonMagicSuccessMessage: "Enlace de autenticación Neon enviado. Revisa el correo y sigue el último paso de aprobación.",
     neonMagicDevLinkLabel: "Abrir enlace de prueba Neon",
     fallbackPartnerLabel: "Enlaces de respaldo"
@@ -584,8 +584,8 @@ const uiCopy: Record<Locale, {
     walkthroughStepsAdmin: ["URL stable", "Tourner la cible", "Révoquer la fuite", "Action d'audit"],
     walkthroughStepsLaunch: ["Client clique", "Fenrir explique", "Déblocage d'accès", "Entrée ouverte"],
     communityEmailPlaceholder: "vous@communaute.com",
-    neonMagicBusy: "Création du lien Neon...",
-    neonMagicButton: "Envoyer le lien magique Neon",
+    neonMagicBusy: "Connexion...",
+    neonMagicButton: "Continuer vers la connexion",
     neonMagicSuccessMessage: "Lien d'authentification Neon envoyé. Vérifiez votre e-mail et suivez l'étape d'approbation.",
     neonMagicDevLinkLabel: "Ouvrir le lien développeur Neon",
     fallbackPartnerLabel: "Liens de secours"
@@ -720,8 +720,8 @@ const uiCopy: Record<Locale, {
     walkthroughStepsAdmin: ["Stabile URL", "Ziel rotieren", "Leckung widerrufen", "Audit-Aktion"],
     walkthroughStepsLaunch: ["Kunde klickt", "Fenrir erklärt", "Zugriff entsperrt", "Einstieg öffnet"],
     communityEmailPlaceholder: "du@gemeinschaft.com",
-    neonMagicBusy: "Neon-Link wird erstellt...",
-    neonMagicButton: "Neon-Magic-Link senden",
+    neonMagicBusy: "Anmeldung...",
+    neonMagicButton: "Weiter zur Anmeldung",
     neonMagicSuccessMessage: "Neon-Auth-Link gesendet. E-Mail prüfen und dem letzten Freigabeschritt folgen.",
     neonMagicDevLinkLabel: "Neon-Entwicklerlink öffnen",
     fallbackPartnerLabel: "Fallback-Links"
@@ -1033,14 +1033,6 @@ function dashboardPathFor(page: PageKey) {
   return page === "command" ? managedDashboardPath : `/${page}`;
 }
 
-function paidPlanFromProductLabel(label: string): PaidPlan | null {
-  const p = label.trim().toLowerCase();
-  if (p === "starter") return "starter";
-  if (p === "pro") return "pro";
-  if (p === "operator") return "operator";
-  return null;
-}
-
 export function App() {
   const path = window.location.pathname;
   const host = window.location.hostname.toLowerCase();
@@ -1076,7 +1068,6 @@ export function App() {
   const [serviceSubdomain, setServiceSubdomain] = useState(defaultServiceSubdomain);
   const [serviceMode, setServiceMode] = useState<"create" | "link" | null>(null);
   const [checkoutPlan, setCheckoutPlan] = useState<PaidPlan>("starter");
-  const [courtesyCode, setCourtesyCode] = useState("");
   const [personalLinks, setPersonalLinks] = useState<PersonalLink[]>([]);
   const [personalTitle, setPersonalTitle] = useState("");
   const [personalUrl, setPersonalUrl] = useState("");
@@ -1500,17 +1491,6 @@ export function App() {
     );
   }
 
-  async function startStripeCheckout(plan: PaidPlan) {
-    setCheckoutPlan(plan);
-    navigateActive("billing");
-    try {
-      const { url } = await billingService.checkout(plan, courtesyCode);
-      window.location.assign(url);
-    } catch {
-      setNotice(copy[locale].checkoutErrorGeneric);
-    }
-  }
-
   async function startTelegramStars() {
     navigateActive("billing");
     try {
@@ -1554,31 +1534,11 @@ export function App() {
     }
   }
 
-  function onPaidPlanPickedFromPricing(planLabel: string) {
-    const key = paidPlanFromProductLabel(planLabel);
-    if (!key) {
-      setNotice(planLabel.trim().toLowerCase() === "free" ? copy[locale].billingFreeTier : copy[locale].billingPaidPlanOnly);
-      return;
-    }
-    setCheckoutPlan(key);
-    navigateActive("billing");
-    void startStripeCheckout(key);
-  }
-
   function navigateActive(page: PageKey) {
     setActive(page);
     const nextPath = dashboardPathFor(page);
     if (window.location.pathname !== nextPath) {
       window.history.pushState({}, "", nextPath);
-    }
-  }
-
-  async function openBillingPortal() {
-    try {
-      const { url } = await billingService.portal();
-      window.location.assign(url);
-    } catch {
-      setNotice(copy[locale].billingPortalNeedsCustomer);
     }
   }
 
@@ -1850,9 +1810,6 @@ export function App() {
               </p>
             )}
             <div className="row-actions">
-              <button type="button" className="ghost compact-button" onClick={() => void openBillingPortal()}>
-                {c.billingPortalButton}
-              </button>
               <button type="button" className="ghost compact-button" onClick={() => void registerPasskey()}>
                 {c.passkeyRegister}
               </button>
@@ -1867,9 +1824,6 @@ export function App() {
             telegram={serviceTelegram}
             subdomain={serviceSubdomain}
             mode={serviceMode}
-            checkoutPlan={checkoutPlan}
-            courtesyCode={courtesyCode}
-            onCourtesyCode={setCourtesyCode}
             onEmail={setServiceEmail}
             onOrg={setServiceOrg}
             onTelegram={setServiceTelegram}
@@ -2099,7 +2053,6 @@ export function App() {
                   <strong>{price}</strong>
                   <small>{body}</small>
                   {plan !== "Free" ? <button onClick={() => void startTelegramStars()}>{c.starsCheckout}</button> : null}
-                  <button className="ghost" onClick={() => onPaidPlanPickedFromPricing(plan)}>{c.upgrade}</button>
                 </div>
               ))}
             </div>
@@ -3239,24 +3192,11 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
               <span className="status amber">Safe preview</span>
             </div>
           ) : null}
-          <div className="community-gate-steps" aria-label="Community access steps">
-            <section>
-              <b>01</b>
-              <span>{gateText.stepIdentity}</span>
-              <small>{gateText.stepIdentityBody}</small>
-            </section>
-            <section>
-              <b>02</b>
-              <span>{gateText.stepInvite}</span>
-              <small>{gateText.stepInviteBody}</small>
-            </section>
-            <section>
-              <b>03</b>
-              <span>{gateText.stepSession}</span>
-              <small>{gateText.stepSessionBody}</small>
-            </section>
-          </div>
+
           {oauthError ? <small className="community-auth-message error" role="alert">{oauthError}</small> : null}
+          <a className="button-link community-oauth-button" href={communityBridgeGateUrl(slug, locale)}>
+            Continue to Community Bridge SSO
+          </a>
           {enabledOAuthProviders.length > 0 ? (
             <div className="community-oauth-providers" aria-label="Social sign-in">
               {enabledOAuthProviders.map((provider) => (
@@ -3279,7 +3219,7 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
               only method that cannot be locked out by a console misconfiguration. */}
           <form className="community-auth-form" onSubmit={requestLink}>
             <label>
-              <span>{c.serviceEmail}</span>
+              <span>Your email</span>
               <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required placeholder={ui.communityEmailPlaceholder} autoComplete="email" />
               <small>{gateText.emailHint}</small>
             </label>
@@ -3914,9 +3854,6 @@ function AccountServicePanel({
   telegram,
   subdomain,
   mode,
-  checkoutPlan,
-  courtesyCode,
-  onCourtesyCode,
   onEmail,
   onOrg,
   onTelegram,
@@ -3930,9 +3867,6 @@ function AccountServicePanel({
   telegram: string;
   subdomain: string;
   mode: "create" | "link" | null;
-  checkoutPlan: PaidPlan;
-  courtesyCode: string;
-  onCourtesyCode: (value: string) => void;
   onEmail: (value: string) => void;
   onOrg: (value: string) => void;
   onTelegram: (value: string) => void;
@@ -3961,15 +3895,11 @@ function AccountServicePanel({
             <span>{c.serviceDomain}</span>
             <input value={subdomain} onChange={(event) => onSubdomain(event.target.value)} />
           </label>
-          <label>
-            <span>Admin courtesy code (optional)</span>
-            <input value={courtesyCode} onChange={(event) => onCourtesyCode(event.target.value)} placeholder="One-use code" autoComplete="off" />
-          </label>
         </div>
 
         <div className="stripe-mvp-card">
           <span className="status amber">{c.stripeMode}</span>
-          <h3>{checkoutPlan.charAt(0).toUpperCase() + checkoutPlan.slice(1)}</h3>
+          <h3>Activate MyFenrir</h3>
           <p>{c.checkoutReady}</p>
           <div className="stars-bridge">
             <span className="status good">{c.starsMode}</span>

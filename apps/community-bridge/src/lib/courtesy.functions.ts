@@ -50,7 +50,7 @@ export const listCourtesies = createServerFn({ method: "GET" })
 
 export const grantCourtesy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z.object({ telegramUserId: z.string().regex(/^\d{5,20}$/), duration: z.enum(["30d", "90d", "6m"]) }).parse(data),
   )
   .handler(async ({ context, data }) => {
@@ -64,7 +64,7 @@ export const grantCourtesy = createServerFn({ method: "POST" })
 
 export const revokeCourtesy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ telegramUserId: z.string().regex(/^\d{5,20}$/) }).parse(data))
+  .validator((data) => z.object({ telegramUserId: z.string().regex(/^\d{5,20}$/) }).parse(data))
   .handler(async ({ context, data }) => {
     await requireOwner(context.userId);
     await gatekeeperRequest(`/api/owner/courtesies?telegramUserId=${encodeURIComponent(data.telegramUserId)}`, {

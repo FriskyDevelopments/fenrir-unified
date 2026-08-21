@@ -48,10 +48,7 @@
         letter-spacing: 0;
       }
 
-      .partner-perk-banner strong {
-        color: #ffffff;
-        text-transform: uppercase;
-      }
+      .partner-perk-banner strong { color: #ffffff; text-transform: uppercase; }
 
       .partner-perk-banner .perk-badge {
         flex: 0 0 auto;
@@ -72,21 +69,20 @@
         box-shadow: none;
       }
 
-      @media (max-width: 640px) {
-        .partner-perk-banner {
-          padding: 9px 12px;
-        }
+      .fenrir-wow-shell .partner-perk-banner { display: none; }
 
-        .partner-perk-banner a {
-          flex-wrap: wrap;
-          gap: 6px 8px;
-          font-size: 12px;
-          text-align: center;
-        }
+      @media (max-width: 640px) {
+        .partner-perk-banner { padding: 9px 12px; }
+        .partner-perk-banner a { flex-wrap: wrap; gap: 6px 8px; font-size: 12px; text-align: center; }
       }
     </style>
   </head>
   <body>
+    <script>
+      if (location.pathname === "/wow" || location.pathname === "/visual-lab") {
+        document.documentElement.classList.add("fenrir-wow-shell");
+      }
+    </script>
     <div class="partner-perk-banner" role="region" aria-label="Lovable invite promotion">
       <a href="https://lovable.dev/invite/U9MXM38" target="_blank" rel="noopener noreferrer">
         <span class="perk-badge">Frisky Dev perk</span>

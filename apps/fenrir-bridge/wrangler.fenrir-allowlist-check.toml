@@ -7,5 +7,7 @@ compatibility_date = "2026-05-08"
 
 routes = [
   { pattern = "myfenrir.com/api/internal/community/allowlist-check", zone_name = "myfenrir.com" },
-  { pattern = "www.myfenrir.com/api/internal/community/allowlist-check", zone_name = "myfenrir.com" }
+  { pattern = "www.myfenrir.com/api/internal/community/allowlist-check", zone_name = "myfenrir.com" },
+  { pattern = "myfenrir.com/api/internal/community/gate-create", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/api/internal/community/gate-create", zone_name = "myfenrir.com" }
 ]

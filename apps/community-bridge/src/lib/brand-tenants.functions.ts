@@ -120,7 +120,7 @@ export const listBrandTenants = createServerFn({ method: "GET" })
 /** Create or replace a tenant, keyed by brand id. Staff-only (gate explícito). */
 export const saveBrandTenant = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     brandTenantSchema.extend({ id: z.string().uuid().optional() }).parse(data),
   )
   .handler(async ({ context, data }) => {
@@ -153,6 +153,7 @@ export const saveBrandTenant = createServerFn({ method: "POST" })
             activate_submit_label = ${f.activate_submit_label}, activate_success_headline = ${f.activate_success_headline},
             after_login_path = ${f.after_login_path}, oauth_return_path = ${f.oauth_return_path},
             site_url = ${f.site_url}, terms_url = ${f.terms_url}, privacy_url = ${f.privacy_url},
+            survey_sample_pct = ${f.survey_sample_pct},
             is_active = ${f.is_active}, updated_at = now()
           where id = ${id}
           returning *
@@ -184,7 +185,7 @@ export const saveBrandTenant = createServerFn({ method: "POST" })
           login_forgot_label, login_terminal_header, login_terminal_lines,
           activate_headline, activate_subheadline, activate_steps_title, activate_bot_label,
           activate_submit_label, activate_success_headline, after_login_path, oauth_return_path,
-          site_url, terms_url, privacy_url, is_active, created_by
+          site_url, terms_url, privacy_url, survey_sample_pct, is_active, created_by
         ) values (
           ${f.brand_id}, ${f.name}, ${f.tagline},
           ${JSON.stringify(f.hostnames)}::jsonb, ${JSON.stringify(f.providers)}::jsonb, ${JSON.stringify(f.theme)}::jsonb,
@@ -194,7 +195,7 @@ export const saveBrandTenant = createServerFn({ method: "POST" })
           ${f.login_forgot_label}, ${f.login_terminal_header}, ${JSON.stringify(f.login_terminal_lines)}::jsonb,
           ${f.activate_headline}, ${f.activate_subheadline}, ${f.activate_steps_title}, ${f.activate_bot_label},
           ${f.activate_submit_label}, ${f.activate_success_headline}, ${f.after_login_path}, ${f.oauth_return_path},
-          ${f.site_url}, ${f.terms_url}, ${f.privacy_url}, ${f.is_active}, ${context.userId}
+          ${f.site_url}, ${f.terms_url}, ${f.privacy_url}, ${f.survey_sample_pct}, ${f.is_active}, ${context.userId}
         )
         returning *
       `) as Array<Record<string, unknown>>;
@@ -215,7 +216,7 @@ export const saveBrandTenant = createServerFn({ method: "POST" })
 
 export const deleteBrandTenant = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ id: z.string().uuid() }).parse(data))
+  .validator((data) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ context, data }) => {
     await assertStaff(context as unknown as AuthedContext);
     const sql = neonSql();
@@ -252,7 +253,7 @@ const auditFiltersSchema = z.object({
 /** Staff-only audit trail, newest first. Optional filters apply server-side. */
 export const listBrandTenantAudit = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => auditFiltersSchema.parse(data))
+  .validator((data) => auditFiltersSchema.parse(data))
   .handler(async ({ context, data }) => {
     await assertStaff(context as unknown as AuthedContext, NOT_STAFF_AUDIT);
     const sql = neonSql();

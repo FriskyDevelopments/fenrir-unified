@@ -1,23 +1,26 @@
-import { useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { getBrandPreset, type MascotKey } from "@frisky/gate-brand";
 import { communityBridgeDashboardUrl } from "../services/communityBridge";
 import "./wow-mvp.css";
 
 type PresetId = "fenrir-dark" | "lore-neon" | "aurora-mint";
+type IconName = "paw" | "ghost" | "wave";
+type LabPreset = { name: string; tagline: string; accent: string; accent2: string; atmosphere: string; icon: IconName };
 
-const presets: Record<PresetId, { name: string; tagline: string; accent: string; atmosphere: string; icon: "paw" | "ghost" | "wave" }> = {
-  "fenrir-dark": {
-    name: "Fenrir dark", tagline: "Deep navy with ember red", accent: "oklch(0.637 0.208 25.3)", icon: "paw",
-    atmosphere: "radial-gradient(ellipse 65% 50% at 50% 0%, oklch(0.637 0.208 25.3 / 30%), transparent 70%), radial-gradient(ellipse 55% 45% at 90% 100%, oklch(0.723 0.192 149.6 / 20%), transparent 72%), linear-gradient(180deg, oklch(0.19 0.035 262), oklch(0.149 0.017 259.9))"
-  },
-  "lore-neon": {
-    name: "LORE neon", tagline: "Electric, high-contrast glow", accent: "oklch(0.70 0.21 320)", icon: "ghost",
-    atmosphere: "radial-gradient(ellipse 70% 55% at 50% 0%, oklch(0.62 0.24 320 / 45%), transparent 70%), radial-gradient(ellipse 60% 50% at 15% 100%, oklch(0.70 0.19 200 / 38%), transparent 72%), linear-gradient(180deg, oklch(0.17 0.05 285), oklch(0.12 0.03 275))"
-  },
-  "aurora-mint": {
-    name: "Aurora mint", tagline: "Cool teal, fresh and calm", accent: "oklch(0.76 0.15 170)", icon: "wave",
-    atmosphere: "radial-gradient(ellipse 75% 55% at 20% 0%, oklch(0.75 0.16 170 / 38%), transparent 70%), radial-gradient(ellipse 60% 50% at 85% 90%, oklch(0.66 0.15 235 / 34%), transparent 72%), linear-gradient(180deg, oklch(0.18 0.03 200), oklch(0.13 0.02 210))"
-  }
-};
+// SOURCE OF TRUTH: @frisky/gate-brand (packages/gate-brand), which mirrors
+// Community Bridge's GATE_PRESETS verbatim. Accent / accent2 / atmosphere /
+// mascot are pulled from there so this visual lab can NEVER drift from the real
+// gate. Only the lab's own short display copy (tagline) is defined locally.
+const LAB_ORDER: PresetId[] = ["fenrir-dark", "lore-neon", "aurora-mint"];
+const MASCOT_ICON: Record<MascotKey, IconName> = { wolf: "paw", ghost: "ghost", wave: "wave", shield: "paw", flame: "paw", sparkle: "ghost", crown: "wave" };
+const LAB_TAGLINE: Record<PresetId, string> = { "fenrir-dark": "Deep navy with ember red", "lore-neon": "Electric, high-contrast glow", "aurora-mint": "Cool teal, fresh and calm" };
+
+const presets = Object.fromEntries(
+  LAB_ORDER.map((id): [PresetId, LabPreset] => {
+    const b = getBrandPreset(id);
+    return [id, { name: b.name, tagline: LAB_TAGLINE[id], accent: b.accent, accent2: b.accent2 ?? b.accent, atmosphere: b.atmosphere, icon: MASCOT_ICON[b.mascot] }];
+  })
+) as Record<PresetId, LabPreset>;
 
 function LineIcon({ name }: { name: "shield" | "sparkle" | "bolt" | "paw" | "ghost" | "wave" | "arrow" }) {
   const paths = {
@@ -56,13 +59,21 @@ export function WowMvpRoute() {
   const [preset, setPreset] = useState<PresetId>("fenrir-dark");
   const [gateName, setGateName] = useState("The Night Pack");
   const [pulse, setPulse] = useState(0);
+  const worldRef = useRef<HTMLElement>(null);
   const currentPreset = presets[preset];
-  const worldStyle = { "--cb-accent": currentPreset.accent } as CSSProperties;
+  const worldStyle = { "--cb-accent": currentPreset.accent, "--cb-accent-2": currentPreset.accent2 } as CSSProperties;
+
+  function followPointer(event: PointerEvent<HTMLElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    worldRef.current?.style.setProperty("--cb-pointer-x", `${((event.clientX - bounds.left) / bounds.width) * 100}%`);
+    worldRef.current?.style.setProperty("--cb-pointer-y", `${((event.clientY - bounds.top) / bounds.height) * 100}%`);
+  }
 
   return (
-    <main className={`cb-wow cb-wow--${preset}`} style={worldStyle}>
+    <main ref={worldRef} className={`cb-wow cb-wow--${preset}`} style={worldStyle} onPointerMove={followPointer}>
       <div className="cb-world" aria-hidden="true" key={preset} style={{ background: currentPreset.atmosphere }} />
       <div className="cb-wow__cosmic" aria-hidden="true" />
+      <div className="cb-wow__pointer-light" aria-hidden="true" />
       <header className="cb-header">
         <a href="/" aria-label="MyFenrir home"><BrandLockup compact /></a>
         <div><span>Visual lab</span><a href={communityBridgeDashboardUrl}>Create a real gate <LineIcon name="arrow" /></a></div>
@@ -76,13 +87,15 @@ export function WowMvpRoute() {
           <div className="cb-hero__actions"><a className="cb-primary" href="#gate-studio">Design your gate <LineIcon name="arrow" /></a><a className="cb-secondary" href={communityBridgeDashboardUrl}>Open Community Bridge</a></div>
         </div>
         <div className="cb-hero__live">
-          <div className="cb-hero__gate" style={{ background: currentPreset.atmosphere }}>
+          <div className="cb-hero__gate" key={preset} style={{ background: currentPreset.atmosphere }}>
             <div className="cb-hero__gate-glow" />
+            <div className="cb-hero__radar" aria-hidden="true"><i /><i /><i /><b /></div>
             <BrandLockup />
             <div className="cb-gate__mascot" style={{ color: currentPreset.accent, boxShadow: `0 0 42px -7px ${currentPreset.accent}`, background: `color-mix(in oklab, ${currentPreset.accent} 14%, transparent)` }}><LineIcon name={currentPreset.icon} /></div>
             <h2>{gateName}</h2><p>{currentPreset.tagline}</p>
             <span>LIVE GATE / {currentPreset.name.toUpperCase()}</span>
           </div>
+          <div className="cb-hero__signal" aria-hidden="true"><span>GATE SIGNAL</span><b>01 <i /></b><small>AUTHORISED ATMOSPHERE</small></div>
           <div className="cb-hero__preset-rail" aria-label="Change the world">
             {(Object.keys(presets) as PresetId[]).map((id) => <button key={id} type="button" aria-label={`Preview ${presets[id].name}`} aria-pressed={preset === id} onClick={() => setPreset(id)}><i style={{ background: presets[id].atmosphere }} /><span>{presets[id].name}</span></button>)}
           </div>
