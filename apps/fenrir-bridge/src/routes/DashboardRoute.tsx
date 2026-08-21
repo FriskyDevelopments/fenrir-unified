@@ -48,7 +48,7 @@ import {
   type PersonalLink,
   type VaultLink
 } from "../app/shared";
-import { activePageFromLocation, dashboardPathFor, isAuthCallbackPath, paidPlanFromProductLabel } from "../app/routing";
+import { activePageFromLocation, dashboardPathFor, isAuthCallbackPath } from "../app/routing";
 import { CommunityBridgeHandoffPanel, CommunityNeonGateRoute } from "./communityGate";
 import { FriskyBotOsRoute, FriskyGhostRoute, GoRoutePage, ProtocolActivated, PublicBridgeRoute, PublicRoomRoute } from "./publicRoutes";
 import { AuthGate } from "./authGate";
@@ -76,6 +76,7 @@ import {
   Metric,
   overlayAuthState,
   PanelTitle,
+  planLabel,
   ProductionReadinessPanel,
   ProtocolLivingSystem,
   ProviderBadge,
@@ -564,14 +565,13 @@ export function DashboardRoute() {
   }
 
   function onPaidPlanPickedFromPricing(planLabel: string) {
-    const key = paidPlanFromProductLabel(planLabel);
-    if (!key) {
-      setNotice(planLabel.trim().toLowerCase() === "free" ? copy[locale].billingFreeTier : copy[locale].billingPaidPlanOnly);
+    if (planLabel.trim().toLowerCase() === "free") {
+      setNotice(copy[locale].billingFreeTier);
       return;
     }
-    setCheckoutPlan(key);
-    navigateActive("billing");
-    void startStripeCheckout(key);
+    // The Pack has a single authoritative checkout path: Telegram Stars. The
+    // legacy card-plan keys are retained only to display old records safely.
+    void startTelegramStars();
   }
 
   function navigateActive(page: PageKey) {
@@ -736,7 +736,7 @@ export function DashboardRoute() {
               ))}
             </select>
           <span className="status good">{state.user.authProvider} OAuth</span>
-          <span className="status amber">{state.org.plan}</span>
+          <span className="status amber">{planLabel(state.org.plan)}</span>
             <button className="ghost compact-button" onClick={signOut}>{c.signOut}</button>
           </div>
         </header>
@@ -853,7 +853,7 @@ export function DashboardRoute() {
             <KeyValue label={c.billingStatusLabel} value={billingStatus?.subscriptionStatus ?? c.billingStatusPlaceholder} />
             {billingStatus && (
               <p className="muted">
-                Limits: {billingStatus.limits.maxTelegramLocks ?? "∞"} locks · custom domain {billingStatus.limits.customDomainSupported ? "yes" : "no"}
+                Gates: 5 · linked community {billingStatus.limits.customDomainSupported ? "The Pack active" : "not active"}
                 {" · "}live rooms {billingStatus.limits.liveRoomsSupported ? "yes" : "no"}
               </p>
             )}
@@ -997,7 +997,7 @@ export function DashboardRoute() {
               <input value={roomSlugInput} onChange={(event) => setRoomSlugInput(event.target.value)} aria-label="Live room slug" placeholder={ui.setupInputRoomSlug} />
               <input value={roomTitleInput} onChange={(event) => setRoomTitleInput(event.target.value)} aria-label="Live room title" placeholder={ui.setupInputRoomTitle} />
               <input value={roomTargetInput} onChange={(event) => setRoomTargetInput(event.target.value)} aria-label="Call target URL" placeholder={roomProviderPlaceholder(roomProviderInput)} />
-              <input value={roomCoverInput} onChange={(event) => setRoomCoverInput(event.target.value)} aria-label="Pro logo or room image URL" placeholder={ui.setupInputRoomCover} />
+              <input value={roomCoverInput} onChange={(event) => setRoomCoverInput(event.target.value)} aria-label="Logo or room image URL" placeholder={ui.setupInputRoomCover} />
               <button onClick={createLiveRoom}>{c.createPaidRoom}</button>
             </div>
             <div className="room-logo-actions" aria-label="Live room logo presets">

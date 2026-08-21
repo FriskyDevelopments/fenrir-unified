@@ -49,7 +49,7 @@ function GatePreview({ presetId, name }: { presetId: PresetId; name: string }) {
         <div className="cb-gate__mascot" style={{ color: preset.accent, boxShadow: `0 0 40px -8px ${preset.accent}`, background: `color-mix(in oklab, ${preset.accent} 14%, transparent)` }}><LineIcon name={preset.icon} /></div>
         <div><h3>{name.trim() || "Members only"}</h3><p>Sign in to continue to the community portal.</p></div>
         <button type="button" style={{ background: `color-mix(in oklab, ${preset.accent} 85%, black)`, boxShadow: `0 0 40px -10px ${preset.accent}` }}>Continue with single sign-on</button>
-        <small>SECURED · END-TO-END ENCRYPTED</small>
+        <small>SECURED · PRIVATE ACCESS ONLY</small>
       </div>
     </div>
   );

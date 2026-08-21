@@ -55,9 +55,10 @@ export function overlayAuthState(state: AppState, auth: AuthSession): AppState {
 export function planLabel(plan: Plan) {
   const labels: Record<Plan, string> = {
     free: "Free",
-    starter: "Starter",
-    pro: "Pro",
-    operator: "Operator"
+    starter: "The Pack",
+    pro: "The Pack",
+    operator: "The Pack",
+    standard: "The Pack"
   };
   return labels[plan];
 }
@@ -74,10 +75,11 @@ export function authProviderLabel(provider: string) {
 
 export function planLockLimit(plan: Plan) {
   const limits: Record<Plan, string> = {
-    free: "1",
-    starter: "3",
-    pro: "10",
-    operator: "unlimited"
+    free: "5",
+    starter: "5",
+    pro: "5",
+    operator: "5",
+    standard: "5"
   };
   return limits[plan];
 }
@@ -101,7 +103,7 @@ export function SessionLabels({
 }) {
   const activeLocks = state.bridges.filter((bridge) => bridge.status === "active").length;
   const backendLimit = billingStatus?.limits.maxTelegramLocks;
-  const lockLimit = backendLimit === null ? "unlimited" : backendLimit ?? planLockLimit(state.org.plan);
+  const lockLimit = backendLimit === null ? "5" : backendLimit ?? planLockLimit(state.org.plan);
   const labels = [
     [c.sessionRole, role === "owner" ? c.sessionOwner : role === "admin" ? c.sessionAdmin : "User"],
     [c.sessionPlan, planLabel(state.org.plan)],
@@ -153,9 +155,7 @@ export function BetaPreviewControls({
         <option value="owner">Owner view</option>
       </select>
       <select value={plan} onChange={(event) => onPlan(event.target.value as PaidPlan)}>
-        <option value="starter">Starter preview</option>
-        <option value="pro">Pro preview</option>
-        <option value="operator">Operator preview</option>
+        <option value="operator">The Pack preview</option>
       </select>
       <small>Preview only. Billing entitlement still comes from the backend.</small>
     </section>

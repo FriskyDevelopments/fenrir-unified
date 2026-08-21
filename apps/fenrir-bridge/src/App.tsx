@@ -186,9 +186,9 @@ const uiCopy: Record<Locale, {
     friskyAccount: "Frisky Account",
     secondaryGate: "Secondary gate",
     routePrivateViaFenrir: "Route Zoom, Meet, Webex, or any room through Fenrir first.",
-    proCustomization: "Pro customization",
-    proCustomizationBodyTitle: "Starting at Pro, customers can add their logo and branded room visuals.",
-    proCustomizationBody: "Starter includes the clean Fenrir room gate. Pro and Operator unlock customer logo, custom room name styling, and a branded hero image on the secondary link.",
+    proCustomization: "The Pack customization",
+    proCustomizationBodyTitle: "With The Pack, customers can add their logo and branded room visuals.",
+    proCustomizationBody: "Free includes the clean Fenrir room gate. The Pack unlocks a customer logo, custom room-name styling, and a branded hero image on the secondary link.",
     telegramStatusCheck: "Telegram status check",
     linked: "linked",
     loginRequired: "login required",
@@ -311,7 +311,7 @@ const uiCopy: Record<Locale, {
     setupInputRoomSlug: "access-room",
     setupInputRoomTitle: "Zoom room name / client title",
     setupInputRoomTarget: "Private call URL",
-    setupInputRoomCover: "Pro logo / branded image URL",
+    setupInputRoomCover: "Logo / branded image URL",
     setupInputGroupEmail: "you@community.com",
     setupInputCommunityEmail: "you@community.com",
     setupInputCustomDomain: "customer.myfenrir.com",
@@ -322,9 +322,9 @@ const uiCopy: Record<Locale, {
     friskyAccount: "Cuenta Frisky",
     secondaryGate: "Segunda puerta",
     routePrivateViaFenrir: "Ruta el Zoom, Meet, Webex o cualquier sala por Fenrir primero.",
-    proCustomization: "Personalizacion Pro",
-    proCustomizationBodyTitle: "Desde Pro, los clientes pueden agregar logo y portada de sala personalizada.",
-    proCustomizationBody: "Starter incluye la puerta limpia de sala. Pro y Operator habilitan logo del cliente, estilo de nombre y hero branding en el enlace secundario.",
+    proCustomization: "Personalizacion The Pack",
+    proCustomizationBodyTitle: "Con The Pack, los clientes pueden agregar logo y portada de sala personalizada.",
+    proCustomizationBody: "Gratis incluye la puerta limpia de sala. The Pack habilita logo del cliente, estilo de nombre y hero branding en el enlace secundario.",
     telegramStatusCheck: "Estado de Telegram",
     linked: "vinculado",
     loginRequired: "requiere inicio de sesion",
@@ -411,7 +411,7 @@ const uiCopy: Record<Locale, {
     setupInputRoomSlug: "sala-acceso",
     setupInputRoomTitle: "Nombre de sala / cliente",
     setupInputRoomTarget: "URL de llamada privada",
-    setupInputRoomCover: "Logo Pro / URL de portada",
+    setupInputRoomCover: "Logo / URL de portada",
     setupInputGroupEmail: "tu@comunidad.com",
     setupInputCommunityEmail: "tu@comunidad.com",
     setupInputCustomDomain: "cliente.myfenrir.com",
@@ -458,9 +458,9 @@ const uiCopy: Record<Locale, {
     friskyAccount: "Compte Frisky",
     secondaryGate: "Passerelle secondaire",
     routePrivateViaFenrir: "Acheminer Zoom, Meet, Webex ou toute salle via Fenrir en premier.",
-    proCustomization: "Personnalisation Pro",
-    proCustomizationBodyTitle: "À partir de Pro, les clients peuvent ajouter logo et visuels personnalisés.",
-    proCustomizationBody: "Starter garde la passerelle Fenrir standard. Pro et Operator débloquent logo client, style de nom personnalisé et hero image sur le lien secondaire.",
+    proCustomization: "Personnalisation The Pack",
+    proCustomizationBodyTitle: "Avec The Pack, les clients peuvent ajouter logo et visuels personnalises.",
+    proCustomizationBody: "Gratuit garde la passerelle Fenrir standard. The Pack debloque logo client, style de nom personnalise et hero image sur le lien secondaire.",
     telegramStatusCheck: "Etat Telegram",
     linked: "lié",
     loginRequired: "connexion requise",
@@ -547,7 +547,7 @@ const uiCopy: Record<Locale, {
     setupInputRoomSlug: "acces-salle",
     setupInputRoomTitle: "Nom de salle / client",
     setupInputRoomTarget: "URL d'appel privée",
-    setupInputRoomCover: "Logo Pro / URL image de marque",
+    setupInputRoomCover: "Logo / URL image de marque",
     setupInputGroupEmail: "vous@communaute.com",
     setupInputCommunityEmail: "vous@communaute.com",
     setupInputCustomDomain: "client.myfenrir.com",
@@ -594,9 +594,9 @@ const uiCopy: Record<Locale, {
     friskyAccount: "Frisky Konto",
     secondaryGate: "Sekundaere Tor",
     routePrivateViaFenrir: "Routen Sie Zoom, Meet, Webex oder jede Room erst über Fenrir.",
-    proCustomization: "Pro Anpassung",
-    proCustomizationBodyTitle: "Ab Pro koennen Kunden eigenes Logo und gebrandete Raumvisuals nutzen.",
-    proCustomizationBody: "Starter enthaelt den clean Fenrir Raum-Gate. Pro und Operator aktivieren Kundenlogo, benutzerdefinierten Raumnamenstil und Hero-Bild auf dem Sekundaerlink.",
+    proCustomization: "The-Pack-Anpassung",
+    proCustomizationBodyTitle: "Mit The Pack koennen Kunden ihr Logo und gebrandete Raumvisuals nutzen.",
+    proCustomizationBody: "Gratis enthaelt das klare Fenrir-Raum-Gate. The Pack aktiviert Kundenlogo, benutzerdefinierten Raumnamenstil und Hero-Bild auf dem Sekundaerlink.",
     telegramStatusCheck: "Telegram-Status",
     linked: "verknuepft",
     loginRequired: "anmeldung erforderlich",
@@ -683,7 +683,7 @@ const uiCopy: Record<Locale, {
     setupInputRoomSlug: "raum-zugang",
     setupInputRoomTitle: "Raumname / Kunde",
     setupInputRoomTarget: "Private Call URL",
-    setupInputRoomCover: "Pro Logo / Marken-Bild URL",
+    setupInputRoomCover: "Logo / Marken-Bild URL",
     setupInputGroupEmail: "du@gemeinschaft.com",
     setupInputCommunityEmail: "du@gemeinschaft.com",
     setupInputCustomDomain: "kunde.myfenrir.com",
@@ -1692,7 +1692,7 @@ export function App() {
               ))}
             </select>
           <span className="status good">{state.user.authProvider} OAuth</span>
-          <span className="status amber">{state.org.plan}</span>
+          <span className="status amber">{planLabel(state.org.plan)}</span>
             <button className="ghost compact-button" onClick={signOut}>{c.signOut}</button>
           </div>
         </header>
@@ -1809,7 +1809,7 @@ export function App() {
             <KeyValue label={c.billingStatusLabel} value={billingStatus?.subscriptionStatus ?? c.billingStatusPlaceholder} />
             {billingStatus && (
               <p className="muted">
-                Limits: {billingStatus.limits.maxTelegramLocks ?? "∞"} locks · custom domain {billingStatus.limits.customDomainSupported ? "yes" : "no"}
+                Gates: 5 · linked community {billingStatus.limits.customDomainSupported ? "The Pack active" : "not active"}
                 {" · "}live rooms {billingStatus.limits.liveRoomsSupported ? "yes" : "no"}
               </p>
             )}
@@ -1949,7 +1949,7 @@ export function App() {
               <input value={roomSlugInput} onChange={(event) => setRoomSlugInput(event.target.value)} aria-label="Live room slug" placeholder={ui.setupInputRoomSlug} />
               <input value={roomTitleInput} onChange={(event) => setRoomTitleInput(event.target.value)} aria-label="Live room title" placeholder={ui.setupInputRoomTitle} />
               <input value={roomTargetInput} onChange={(event) => setRoomTargetInput(event.target.value)} aria-label="Call target URL" placeholder={roomProviderPlaceholder(roomProviderInput)} />
-              <input value={roomCoverInput} onChange={(event) => setRoomCoverInput(event.target.value)} aria-label="Pro logo or room image URL" placeholder={ui.setupInputRoomCover} />
+              <input value={roomCoverInput} onChange={(event) => setRoomCoverInput(event.target.value)} aria-label="Logo or room image URL" placeholder={ui.setupInputRoomCover} />
               <button onClick={createLiveRoom}>{c.createPaidRoom}</button>
             </div>
             <div className="room-logo-actions" aria-label="Live room logo presets">
@@ -2172,9 +2172,10 @@ function overlayAuthState(state: AppState, auth: AuthSession): AppState {
 function planLabel(plan: Plan) {
   const labels: Record<Plan, string> = {
     free: "Free",
-    starter: "Starter",
-    pro: "Pro",
-    operator: "Operator"
+    starter: "The Pack",
+    pro: "The Pack",
+    operator: "The Pack",
+    standard: "The Pack"
   };
   return labels[plan];
 }
@@ -2191,10 +2192,11 @@ function authProviderLabel(provider: string) {
 
 function planLockLimit(plan: Plan) {
   const limits: Record<Plan, string> = {
-    free: "1",
-    starter: "3",
-    pro: "10",
-    operator: "unlimited"
+    free: "5",
+    starter: "5",
+    pro: "5",
+    operator: "5",
+    standard: "5"
   };
   return limits[plan];
 }
@@ -2218,7 +2220,7 @@ function SessionLabels({
 }) {
   const activeLocks = state.bridges.filter((bridge) => bridge.status === "active").length;
   const backendLimit = billingStatus?.limits.maxTelegramLocks;
-  const lockLimit = backendLimit === null ? "unlimited" : backendLimit ?? planLockLimit(state.org.plan);
+  const lockLimit = backendLimit === null ? "5" : backendLimit ?? planLockLimit(state.org.plan);
   const labels = [
     [c.sessionRole, role === "owner" ? c.sessionOwner : role === "admin" ? c.sessionAdmin : "User"],
     [c.sessionPlan, planLabel(state.org.plan)],
@@ -2270,9 +2272,7 @@ function BetaPreviewControls({
         <option value="owner">Owner view</option>
       </select>
       <select value={plan} onChange={(event) => onPlan(event.target.value as PaidPlan)}>
-        <option value="starter">Starter preview</option>
-        <option value="pro">Pro preview</option>
-        <option value="operator">Operator preview</option>
+        <option value="operator">The Pack preview</option>
       </select>
       <small>Preview only. Billing entitlement still comes from the backend.</small>
     </section>
@@ -3332,7 +3332,7 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
           By continuing you agree to our <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.
         </p>
         <div className="lovable-auth-secured">
-          <p>Secured · End-to-end encrypted</p>
+          <p>Secured · private access only</p>
           <a href="https://myfenrir.com" aria-label="Powered by MyFenrir">
             <img src="/fenrir-splash-icon.svg?v=20260813-login" alt="" />
             <span>Powered by MyFenrir</span>
