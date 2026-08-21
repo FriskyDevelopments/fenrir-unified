@@ -382,7 +382,9 @@ export function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
       title: "Payment Box",
       status: "Stars first",
       body: "Opens the official Telegram Stars payment box and waits for backend entitlement truth.",
-      actions: ["/subscribe", "Pro", "Operator"]
+      // Última aparición de planes retirados en la superficie. El canon deja
+      // dos ofertas: Free ($0) y The Pack ($14.99/mes por comunidad enlazada).
+      actions: ["/subscribe", "Free", "The Pack"]
     },
     {
       code: "MOD 04",
