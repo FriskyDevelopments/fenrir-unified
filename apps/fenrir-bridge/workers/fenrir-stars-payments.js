@@ -83,6 +83,19 @@ async function stripeRequest(env, path, params) {
 const LIVE_FOUNDERS_MONTHLY_PRICE = "price_1U45nNLxUF54S071oRPYXOec";
 const LIVE_FOUNDERS_ANNUAL_PRICE = "price_1U4bO5LxUF54S071qvkmFT0V";
 const NOWPAYMENTS_PACK_PRICE_USD = 14.99;
+
+/**
+ * Crypto ladder. Crypto is the only rail that can carry more than two periods:
+ * each payment is a one-shot invoice, so there is no subscription clock.
+ * The invoice amount AND the granted duration both come from this table — the
+ * IPN must never infer one from the other.
+ */
+const NOWPAYMENTS_LADDER = {
+  monthly: { amount: 14.99, days: 30, label: "1 month" },
+  quarter: { amount: 39.99, days: 91, label: "3 months" },
+  half: { amount: 74.99, days: 182, label: "6 months" },
+  annual: { amount: 149.0, days: 365, label: "1 year" }
+};
 export function foundersPriceId(env, billingPeriod) {
   return billingPeriod === "annual"
     ? normalizeText(env?.STRIPE_PACK_ANNUAL_PRICE_ID) || LIVE_FOUNDERS_ANNUAL_PRICE
@@ -211,15 +224,18 @@ async function handleFoundersNowPaymentsCheckout(request, env) {
   const body = await request.json().catch(() => null);
   const userId = normalizeText(body?.userId);
   if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ ok: false, error: "invalid_identity" }, { status: 400 });
-  const orderId = `mf-${userId}-${Date.now()}`;
+  const period = NOWPAYMENTS_LADDER[normalizeText(body?.billingPeriod)] ? normalizeText(body.billingPeriod) : "monthly";
+  const tier = NOWPAYMENTS_LADDER[period];
+  // El periodo viaja en el order_id porque el IPN es la única fuente que lo verá.
+  const orderId = `mf-${userId}-${period}-${Date.now()}`;
   const response = await fetch("https://api.nowpayments.io/v1/invoice", {
     method: "POST",
     headers: { "x-api-key": apiKey, "content-type": "application/json" },
     body: JSON.stringify({
-      price_amount: NOWPAYMENTS_PACK_PRICE_USD,
+      price_amount: tier.amount,
       price_currency: "usd",
       order_id: orderId,
-      order_description: "The Pack · MyFenrir · $14.99/month",
+      order_description: `The Pack · MyFenrir · ${tier.label} · $${tier.amount.toFixed(2)}`,
       ipn_callback_url: "https://fenrir-stars-payments.hrgrrtks2p.workers.dev/api/nowpayments/ipn",
       success_url: "https://communities.myfenrir.com/upgrade?nowpayments=processing",
       cancel_url: "https://communities.myfenrir.com/upgrade?nowpayments=cancel",
@@ -237,15 +253,21 @@ async function handleNowPaymentsIpn(request, env) {
   const body = await request.json().catch(() => null);
   if (!body || !(await verifyNowPaymentsIpn(request, env, body))) return json({ ok: false, error: "invalid_signature" }, { status: 401 });
   if (!new Set(["finished", "confirmed"]).has(normalizeText(body.payment_status).toLowerCase())) return json({ ok: true, activated: false });
-  const match = /^mf-([0-9a-f-]{36})-\d+$/i.exec(normalizeText(body.order_id));
+  // El segmento de periodo es opcional: las facturas viejas (`mf-<uuid>-<ts>`) son mensuales.
+  const match = /^mf-([0-9a-f-]{36})-(?:(monthly|quarter|half|annual)-)?\d+$/i.exec(normalizeText(body.order_id));
+  const period = match ? (match[2] || "monthly").toLowerCase() : null;
+  const tier = period ? NOWPAYMENTS_LADDER[period] : null;
   if (
     !match ||
+    !tier ||
     normalizeText(body.price_currency).toLowerCase() !== "usd" ||
-    Number(body.price_amount) !== NOWPAYMENTS_PACK_PRICE_USD
+    Number(body.price_amount) !== tier.amount
   ) {
     return json({ ok: false, error: "invalid_order" }, { status: 400 });
   }
   const userId = match[1];
+  // Sin esto el acceso de cripto no vencía nunca: se pagaba un mes y quedaba de por vida.
+  const periodEnd = new Date(Date.now() + tier.days * 86400000).toISOString();
   const paymentId = normalizeText(String(body.payment_id || body.invoice_id || ""));
   if (!paymentId) return json({ ok: false, error: "missing_payment_id" }, { status: 400 });
   const ts = nowIso();
@@ -253,13 +275,14 @@ async function handleNowPaymentsIpn(request, env) {
     `INSERT INTO billing_subscriptions (
       stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
       current_period_end, cancel_at_period_end, created_at, updated_at
-    ) VALUES (?, ?, ?, 'standard', 'active', NULL, 0, ?, ?)
+    ) VALUES (?, ?, ?, 'standard', 'active', ?, 0, ?, ?)
     ON CONFLICT(stripe_subscription_id) DO UPDATE SET
       frisky_org_id = excluded.frisky_org_id,
       plan = 'standard',
       status = 'active',
+      current_period_end = excluded.current_period_end,
       updated_at = excluded.updated_at`
-  ).bind(`nowpayments:${paymentId}`, userId, `nowpayments_${paymentId}`, ts, ts).run();
+  ).bind(`nowpayments:${paymentId}`, userId, `nowpayments_${paymentId}`, periodEnd, ts, ts).run();
   return json({ ok: true, activated: true });
 }
 

@@ -114,10 +114,19 @@ export const createFoundersStripeCheckout = createServerFn({ method: "POST" })
  */
 export const createFoundersNowPaymentsCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator(() => undefined)
-  .handler(async ({ context }) => {
+  .validator(
+    z.object({
+      // Crypto is the only rail that can carry more than two periods: each payment
+      // is a one-shot invoice, so there is no subscription clock to respect.
+      billingPeriod: z.enum(["monthly", "quarter", "half", "annual"]).default("monthly"),
+    }),
+  )
+  .handler(async ({ context, data }) => {
     const { userId } = billingIdentity(context);
-    const result = await billingRequest("/api/internal/founders-nowpayments-checkout", { userId });
+    const result = await billingRequest("/api/internal/founders-nowpayments-checkout", {
+      userId,
+      billingPeriod: data.billingPeriod,
+    });
     const url = typeof result["url"] === "string" ? result["url"] : "";
     if (!url) throw new Error("NOWPayments did not return an invoice URL. Try again in a moment.");
     return { url };
