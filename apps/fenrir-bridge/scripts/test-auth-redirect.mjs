@@ -1,12 +1,13 @@
-// Guard: MyFenrir sign-in is Supabase Auth only. WorkOS is banned from this
-// repo (same treatment as Vercel). This script fails the build if the login
-// flow stops going through Supabase, or if any WorkOS wiring sneaks back in.
+// Guard: new MyFenrir sign-ins use only runtime-advertised direct OAuth
+// providers. Existing Supabase callback/session support stays in place for
+// legacy sessions. WorkOS is banned from this repo (same treatment as Vercel).
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = new URL("..", import.meta.url).pathname;
 const apiSource = readFileSync(join(root, "src/services/api.ts"), "utf8");
+const providersSource = readFileSync(join(root, "functions/api/auth/providers.ts"), "utf8");
 const supabaseAuthSource = readFileSync(join(root, "src/services/supabaseAuth.ts"), "utf8");
 const appSource = readFileSync(join(root, "src/App.tsx"), "utf8");
 const routingSource = readFileSync(join(root, "src/app/routing.ts"), "utf8");
@@ -26,9 +27,15 @@ function workosMatches() {
 const offenders = workosMatches();
 const checks = [
   {
-    name: "auth service routes social login through Supabase signInWithOAuth",
-    pass: apiSource.includes("signInWithSupabase(provider)") &&
-      supabaseAuthSource.includes("signInWithOAuth")
+    name: "new social login uses only runtime-advertised direct OAuth providers",
+    pass: apiSource.includes('/api/auth/login/${provider}') &&
+      apiSource.includes('>("/api/auth/providers")') &&
+      !apiSource.includes("signInWithSupabase(provider)") &&
+      providersSource.includes("isDirectOAuthAvailable(provider, context.env)")
+  },
+  {
+    name: "legacy Supabase callback support remains available for existing sessions",
+    pass: supabaseAuthSource.includes("signInWithOAuth")
   },
   {
     name: `no WorkOS reference exists anywhere in the app (banned)${offenders ? ` — found in: ${offenders.replaceAll("\n", ", ")}` : ""}`,

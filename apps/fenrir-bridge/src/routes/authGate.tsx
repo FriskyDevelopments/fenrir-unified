@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Copy, Locale } from "../i18n";
 import { authService, webauthnService } from "../services/api";
 import { friskyClientAuthEngine, type AuthProvider } from "../services/authGateway";
@@ -19,6 +19,18 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
   const theme = brandThemes.fenrir;
   const [passkeyNote, setPasskeyNote] = useState<string | null>(() => authErrorMessage());
   const [humanVerified, setHumanVerified] = useState(false);
+  const [enabledProviders, setEnabledProviders] = useState<AuthProvider[] | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void friskyClientAuthEngine
+      .enabledProviders()
+      .then((providers) => active && setEnabledProviders(providers))
+      .catch(() => active && setEnabledProviders([]));
+    return () => {
+      active = false;
+    };
+  }, []);
   const onHumanVerified = useCallback((verified: boolean) => {
     setHumanVerified(verified);
     if (!verified) return;
@@ -64,9 +76,19 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
           </h2>
           <HumanVerificationGate onVerified={onHumanVerified} />
           <div className="auth-actions">
-            <AuthProviderButton provider="apple" label={c.continueApple} disabled={!humanVerified} onClick={() => void signInWithProvider("apple")} />
-            <AuthProviderButton provider="google" label={c.continueGoogle} disabled={!humanVerified} onClick={() => void signInWithProvider("google")} />
-            <AuthProviderButton provider="microsoft" label={c.continueMicrosoft} disabled={!humanVerified} onClick={() => void signInWithProvider("microsoft")} />
+            {enabledProviders?.map((provider) => (
+              <AuthProviderButton
+                key={provider}
+                provider={provider}
+                label={providerLabel(provider, c)}
+                disabled={!humanVerified}
+                onClick={() => void signInWithProvider(provider)}
+              />
+            ))}
+            {enabledProviders === null ? <small className="muted">Checking available sign-in…</small> : null}
+            {enabledProviders?.length === 0 ? (
+              <small className="muted">No OAuth provider is available right now. Existing passkeys remain available.</small>
+            ) : null}
           </div>
           <div className="auth-passkey-row">
             <button type="button" className="secondary" disabled={!humanVerified} onClick={() => void signInWithPasskey()}>
@@ -109,6 +131,12 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
         </GlowCard>
     </AuthSurface>
   );
+}
+
+function providerLabel(provider: AuthProvider, c: Copy) {
+  if (provider === "apple") return c.continueApple;
+  if (provider === "google") return c.continueGoogle;
+  return c.continueMicrosoft;
 }
 
 function authErrorMessage() {
