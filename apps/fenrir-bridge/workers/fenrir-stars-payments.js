@@ -11,6 +11,26 @@ const starsPrice = (env) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1150;
 };
 
+/**
+ * The least anyone has ever legitimately paid for The Pack in Stars.
+ *
+ * 250, not 1150. The Stars rail really did charge ⭐250 in July 2026
+ * (FENRIR_STARS_PRICE = "250", see wrangler.fenrir-stars.toml at b08955d), and
+ * three members paid it. Setting this floor to today's list price would revoke
+ * people who paid exactly what was asked of them — a price rise must never
+ * reach backwards.
+ *
+ * This is NOT the price gate. New payments are held to the current catalogue
+ * price by isValidStarsPayment, which is what makes the 89 stale ⭐250 orders
+ * sitting in telegram_stars_orders unpayable. This constant only decides whether
+ * an entitlement row that ALREADY exists is credible enough to grant access, and
+ * ⭐5 — a hand-made TEST5STARSONLY0001 payload — is not, because it was never a
+ * price anyone was charged.
+ *
+ * Raise it only after confirming no live member paid less.
+ */
+const STARS_MIN_GRANT_AMOUNT = 250;
+
 const botUsername = (env) => (env.FENRIR_TELEGRAM_BOT_USERNAME || "").replace(/^@/, "").trim();
 
 const botToken = (env, channel) => {
@@ -58,14 +78,31 @@ export function isValidFoundersStripeSession(session, userId, orgId) {
   );
 }
 
-export function isValidStarsPayment(payment, order, telegramUserId) {
+/**
+ * `expectedAmount` is the CATALOG price, and it is not optional in practice.
+ *
+ * This used to compare the payment only against `order.amount`, which is
+ * self-referential: it proves the buyer paid what the order asked for, never
+ * that the order asked for the right thing. Any order row carrying a low amount
+ * — a hand-made test row, or a stale row minted under an older price — stayed
+ * payable and bought the full Pack. A 5-Star order (about ten cents) unlocked
+ * the same access as 1,150.
+ *
+ * Both checks are kept: the payment must match its own order AND that order
+ * must carry the current list price. The crypto IPN has always validated
+ * against its ladder this way; this rail simply never did.
+ */
+export function isValidStarsPayment(payment, order, telegramUserId, expectedAmount) {
+  const expected = Number(expectedAmount);
+  if (!Number.isFinite(expected) || expected <= 0) return false;
   return Boolean(
     payment?.invoice_payload?.startsWith("fenrir_stars:") &&
       order &&
       order.status === "pending" &&
       String(order.telegram_user_id) === String(telegramUserId) &&
       payment.currency === "XTR" &&
-      payment.total_amount === Number(order.amount)
+      payment.total_amount === Number(order.amount) &&
+      Number(order.amount) === expected
   );
 }
 
@@ -580,7 +617,12 @@ async function handleCommunityBillingStatus(request, env) {
     identityLink = link;
     const identityMatches =
       identityLink?.frisky_user_id === userId && identityLink?.frisky_org_id === userId;
-    if (entitlement?.status === "active" && identityMatches) {
+    // Same amount floor as applyStarsMembership. This is a third, independent
+    // path that mints a billing_subscriptions row from an entitlement, and it
+    // trusted `status` alone — so an underpaid entitlement row could be laundered
+    // into a paid subscription right here, bypassing the grant-time check.
+    const entitlementPaidEnough = Number(entitlement?.stars_amount) >= STARS_MIN_GRANT_AMOUNT;
+    if (entitlement?.status === "active" && identityMatches && entitlementPaidEnough) {
       const ts = nowIso();
       await env.DB.batch([
         env.DB.prepare(
@@ -744,6 +786,28 @@ async function applyStarsMembership(env, telegramUserId) {
     ).bind(String(telegramUserId)).first()
   ]);
   if (!link || !entitlement) return { applied: false, reason: "telegram_not_linked" };
+
+  // Second gate, independent of the first. isValidStarsPayment guards the door
+  // at payment time; this guards the grant itself, because an entitlement row
+  // can also arrive by hand — which is exactly how a 5-Star row ended up marked
+  // active and unlocking the full Pack. Access is a function of what was paid,
+  // so read the amount here instead of trusting `status`.
+  //
+  // The floor is a CONSTANT, not starsPrice(env). Raising the list price must
+  // never retroactively revoke someone who paid the price that was current when
+  // they bought. Lower this only if a genuinely cheaper tier is ever sold.
+  const paidStars = Number(entitlement.stars_amount);
+  if (!Number.isFinite(paidStars) || paidStars < STARS_MIN_GRANT_AMOUNT) {
+    console.error(
+      "stars_grant_refused_underpaid",
+      String(telegramUserId),
+      "paid",
+      String(entitlement.stars_amount),
+      "floor",
+      String(STARS_MIN_GRANT_AMOUNT)
+    );
+    return { applied: false, reason: "underpaid" };
+  }
 
   const plan = normalizeText(env.FENRIR_STARS_PLAN).toLowerCase() || "standard";
   const safePlan = plan === "pro" || plan === "operator" ? plan : "standard";
@@ -2443,14 +2507,27 @@ function fallbackMind(text, entitlement) {
   if (menuIntent(text)) return modularMenuText(text, entitlement);
 
   if (statusIntent(text)) {
+    // `status === 'active'` alone is not access. The grant paths now require the
+    // paid amount to clear STARS_MIN_GRANT_AMOUNT, and this line must agree with
+    // them — an entitlement row worth 5 Stars once reported "Access: unlocked"
+    // while being nowhere near the price of The Pack.
+    //
+    // `Stars:` is the amount PAID, read from the entitlement row. It has never
+    // been an account balance, and it must not be mistaken for one.
+    const paid = Number(entitlement?.stars_amount);
+    const unlocked = entitlement?.status === "active" && paid >= STARS_MIN_GRANT_AMOUNT;
     if (spanishIntent(text)) {
-      return entitlement?.status === "active"
-        ? `Fenrir Protocol esta activo.\n\nAcceso: activo\nStars: ${entitlement.stars_amount}\nModo: Telegram Stars`
-        : "Fenrir Protocol todavia no esta activo.\n\n$14.99/mes.\nTarjeta y cripto en MyFenrir → Upgrade. /subscribe abre la caja de Telegram Stars (⭐1,150).";
+      if (unlocked) return `Fenrir Protocol esta activo.\n\nAcceso: activo\nPagado: ⭐${paid}\nModo: Telegram Stars`;
+      if (entitlement?.status === "active") {
+        return `Fenrir Protocol todavia no esta activo.\n\nSe registro un pago de ⭐${paid}, por debajo de los ⭐1,150 que cuesta The Pack, asi que no desbloquea acceso.\n/subscribe abre la caja por el precio correcto.`;
+      }
+      return "Fenrir Protocol todavia no esta activo.\n\n$14.99/mes.\nTarjeta y cripto en MyFenrir → Upgrade. /subscribe abre la caja de Telegram Stars (⭐1,150).";
     }
-    return entitlement?.status === "active"
-      ? `Fenrir Protocol is active.\n\nAccess: unlocked\nStars: ${entitlement.stars_amount}\nMode: Telegram Stars`
-      : "Fenrir Protocol is not active yet.\n\n$14.99/month.\nCard and crypto in MyFenrir → Upgrade. /subscribe opens the Telegram Stars box (⭐1,150).";
+    if (unlocked) return `Fenrir Protocol is active.\n\nAccess: unlocked\nPaid: ⭐${paid}\nMode: Telegram Stars`;
+    if (entitlement?.status === "active") {
+      return `Fenrir Protocol is not active yet.\n\nA payment of ⭐${paid} is on record, below the ⭐1,150 The Pack costs, so it does not unlock access.\n/subscribe opens the box at the correct price.`;
+    }
+    return "Fenrir Protocol is not active yet.\n\n$14.99/month.\nCard and crypto in MyFenrir → Upgrade. /subscribe opens the Telegram Stars box (⭐1,150).";
   }
 
   if (pricingIntent(text)) {
@@ -2785,9 +2862,18 @@ async function handleTelegramWebhook(request, env, url) {
     const payment = message.successful_payment;
     const order = await getOrder(env, payment.invoice_payload);
     const telegramUserId = String(message.from?.id || message.chat.id);
-    const valid = isValidStarsPayment(payment, order, telegramUserId);
+    const valid = isValidStarsPayment(payment, order, telegramUserId, starsPrice(env));
     if (!valid) {
-      console.error("stars_payment_validation_failed", telegramUserId);
+      console.error(
+        "stars_payment_validation_failed",
+        telegramUserId,
+        "paid",
+        String(payment?.total_amount),
+        "order",
+        String(order?.amount),
+        "expected",
+        String(starsPrice(env))
+      );
       await telegramApi(env, channel, "sendMessage", {
         chat_id: message.chat.id,
         text: "This payment did not match an active MyFenrir invoice. Membership was not changed. Run /subscribe for a fresh invoice."
