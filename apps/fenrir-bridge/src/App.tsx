@@ -39,6 +39,20 @@ function postLoginDestination() {
   const requested = new URLSearchParams(window.location.search).get("next");
   return requested?.startsWith("/") && !requested.startsWith("//") ? requested : managedDashboardPath;
 }
+// The Community Gate parks a signed-out visitor here to authenticate and needs
+// them handed back to /api/auth/community-sso afterwards. `postLoginDestination`
+// only runs while still signed out, so after an OAuth round trip the visitor
+// arrives authenticated at /main?next=… and nobody reads it — which is exactly
+// where the Gate's "Proceed to SSO" used to die. Keep the allowlist to the one
+// endpoint that needs it: a same-origin GET redirect is not an open redirect,
+// but an unbounded list invites /main?next=/api/auth/logout links.
+const postAuthHandoffPaths = ["/api/auth/community-sso"];
+function postAuthHandoffTarget() {
+  const requested = new URLSearchParams(window.location.search).get("next");
+  if (!requested?.startsWith("/") || requested.startsWith("//")) return null;
+  const [pathname] = requested.split(/[?#]/, 1);
+  return postAuthHandoffPaths.includes(pathname) ? requested : null;
+}
 const telegramLoginBotUsername = (
   import.meta.env.VITE_FENRIR_TELEGRAM_BOT_USERNAME ??
   import.meta.env.VITE_MYFENRIR_TELEGRAM_BOT_USERNAME ??
@@ -1131,6 +1145,13 @@ export function App() {
     if (result.data.authenticated && window.location.pathname === "/api/telegram/link/start") {
       window.location.assign("/api/telegram/link/start");
       return;
+    }
+    if (result.data.authenticated) {
+      const handoff = postAuthHandoffTarget();
+      if (handoff) {
+        window.location.assign(handoff);
+        return;
+      }
     }
     if (result.data.authenticated && (isAuthCallbackPath(window.location.pathname) || window.location.hash.includes("access_token="))) {
       window.history.replaceState({}, "", managedDashboardPath);

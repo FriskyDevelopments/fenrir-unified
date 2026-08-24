@@ -137,10 +137,26 @@ async function hasPaidMembership(owner: boolean, context: GateAuthedContext): Pr
   if (owner) return true;
   const secret = process.env["COMMUNITY_BRIDGE_BILLING_SECRET"]?.trim();
   if (!secret) return false;
+  // Read the Telegram id from `account_links`, NOT `user_roles`.
+  //
+  // `user_roles.telegram_id` exists in the schema but is not the column the
+  // linking flow writes — it was null for every linked account in production,
+  // so this function sent `telegramUserId: null`. The billing Worker then had no
+  // Telegram identity to resolve, could not map the account to its Fenrir org
+  // id, found no subscription under the bare Supabase UUID, and returned
+  // paid:false. The operator saw "The Pack · active" in the bot and an upgrade
+  // demand on the web at the same time.
+  //
+  // `account_links` is the table the link flow actually writes and the one every
+  // other read in this app uses (isOwnerProfile above, use-auth.tsx,
+  // api.internal.telegram-destination.ts). Same filters as isOwnerProfile so the
+  // two never disagree about which Telegram account this profile owns.
   const { data } = await context.supabase
-    .from("user_roles")
+    .from("account_links")
     .select("telegram_id")
-    .eq("user_id", context.userId)
+    .eq("supabase_user_id", context.userId)
+    .eq("provider", "telegram")
+    .eq("status", "linked")
     .maybeSingle();
   const response = await fetch("https://fenrir-stars-payments.hrgrrtks2p.workers.dev/api/internal/community-billing-status", {
     method: "POST",
