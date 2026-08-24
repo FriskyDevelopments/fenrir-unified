@@ -379,8 +379,31 @@ async function handleCommunityBillingStatus(request, env) {
   const telegramUserId = normalizeText(body?.telegramUserId);
   if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ ok: false, error: "invalid_identity" }, { status: 400 });
 
+  // Org ids this caller may legitimately be billed under.
+  //
+  // `userId` alone is NOT enough. community-bridge sends the Supabase auth UUID
+  // and (see founders-billing.functions.ts) assumes orgId === userId. For any
+  // account created through the Fenrir identity rail that assumption is false:
+  // telegram_identity_links stores minted ids like
+  // `frisky_org_FRISKYUSRSUPABASE9_…`, and billing_subscriptions is keyed by
+  // THAT, not by the UUID.
+  //
+  // Result before this fix: two surfaces disagreed about the same entitlement.
+  // The bot read telegram_stars_entitlements by Telegram id and said
+  // "The Pack · active"; this endpoint looked for frisky_org_id = <UUID>, found
+  // nothing, returned paid:false → the web app demanded an upgrade the operator
+  // had already paid for. The `plan` column was never the problem: 'standard' IS
+  // The Pack (see functions/_lib/plan-catalog.ts) and no query filters on it.
+  //
+  // telegram_identity_links is the canonical map from Telegram identity to
+  // Fenrir org id — memberProfileText already resolves it this way. Trusting it
+  // here does not widen access: the caller already proved it owns this Telegram
+  // id server-side before calling, and this endpoint is behind the billing
+  // secret. We only ADD the linked org id; the UUID lookup still works for
+  // accounts where org id and UUID genuinely coincide.
+  let identityLink = null;
   if (/^\d{5,20}$/.test(telegramUserId)) {
-    const [entitlement, identityLink] = await Promise.all([
+    const [entitlement, link] = await Promise.all([
       getEntitlement(env, telegramUserId),
       env.DB.prepare(
         `SELECT frisky_user_id, frisky_org_id
@@ -389,6 +412,7 @@ async function handleCommunityBillingStatus(request, env) {
          LIMIT 1`
       ).bind(telegramUserId).first()
     ]);
+    identityLink = link;
     const identityMatches =
       identityLink?.frisky_user_id === userId && identityLink?.frisky_org_id === userId;
     if (entitlement?.status === "active" && identityMatches) {
@@ -410,12 +434,27 @@ async function handleCommunityBillingStatus(request, env) {
     }
   }
 
+  const orgIds = [userId];
+  const linkedOrgId = normalizeText(identityLink?.frisky_org_id);
+  if (linkedOrgId && !orgIds.includes(linkedOrgId)) orgIds.push(linkedOrgId);
+
+  // `current_period_end` is compared as TEXT, so both sides must be the same
+  // shape. Rows written by this Worker are ISO-8601 with a 'T' and a 'Z'; a row
+  // hand-patched in the console can end up as '2026-09-23 02:35:22' (SQLite
+  // datetime() style). A space sorts BEFORE 'T', so a same-day expiry in the
+  // patched shape compares as already expired. Comparing against the space
+  // variant too keeps a hand-patched row honest instead of silently dropping a
+  // day of paid access. Neither form is NULL, which is the rule that matters:
+  // an access check treats current_period_end IS NULL as active forever.
+  const now = nowIso();
+  const nowSqlite = now.replace("T", " ").slice(0, 19);
+  const placeholders = orgIds.map(() => "?").join(",");
   const subscription = await env.DB.prepare(
     `SELECT plan, status FROM billing_subscriptions
-     WHERE frisky_org_id = ? AND status IN ('active','trialing','past_due')
-       AND (current_period_end IS NULL OR current_period_end > ?)
+     WHERE frisky_org_id IN (${placeholders}) AND status IN ('active','trialing','past_due')
+       AND (current_period_end IS NULL OR current_period_end > ? OR current_period_end > ?)
      ORDER BY updated_at DESC LIMIT 1`
-  ).bind(userId, nowIso()).first();
+  ).bind(...orgIds, now, nowSqlite).first();
   return json({
     ok: true,
     paid: Boolean(subscription),
@@ -822,6 +861,11 @@ function isOwner(env, telegramUserId) {
 // 4. Rate limited per Telegram identity (the only redemption rail).
 // 5. Invalid / expired / already-used all collapse to one generic outcome.
 // 6. Every generation and redemption attempt is appended to courtesy_audit.
+// Windows an owner may grant. 182 is the canonical "6 months" — deliberately
+// the SAME number as NOWPAYMENTS_LADDER.half.days, so a courtesy 6-month grant
+// and a paid crypto 6-month grant land on identical date arithmetic. 180 stays
+// legal so callback_data already in flight keeps working (nada se borra).
+const COURTESY_DURATION_DAYS = [30, 90, 180, 182];
 const COURTESY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
 function generateCourtesyCode(length = 12) {
   const alphabet = COURTESY_ALPHABET;
@@ -934,6 +978,37 @@ async function redeemCourtesyCode(env, rawCode, telegramUserId, chatId) {
   ]);
   await appendCourtesyAudit(env, "redeem", telegramUserId, "user", codeHash, "telegram");
   return { ok: true, durationDays, courtesyUntil };
+}
+
+// Owner mint over HTTP. Identical rail, table and single-use guarantees as the
+// /panel button — this only removes the requirement to be sitting in Telegram
+// to mint one, so a code can be issued from an ops runbook.
+//
+// Gated by FENRIR_ADMIN_TOKEN, deliberately NOT the community-bridge billing
+// secret: minting free access is an owner action, not a billing-service one, so
+// a leaked billing secret must not be able to print free Packs.
+//
+// The plaintext is returned exactly once and never persisted — only its HMAC
+// lands in D1, same as the Telegram path. Redemption stays on Telegram /redeem,
+// which is where identity (telegram_identity_links) is actually proven.
+async function handleCourtesyGenerate(request, env) {
+  // COURTESY_MINT_TOKEN is the dedicated credential for this endpoint;
+  // FENRIR_ADMIN_TOKEN keeps working as the owner-wide fallback. Separate secret
+  // so mint rights can be rotated without touching anything else that trusts the
+  // admin token. If NEITHER is set the endpoint is inert — 401, never open.
+  const configured = normalizeText(env.COURTESY_MINT_TOKEN) || normalizeText(env.FENRIR_ADMIN_TOKEN);
+  const supplied = normalizeText(request.headers.get("authorization")).replace(/^Bearer\s+/i, "");
+  if (!configured || !supplied || configured !== supplied) {
+    return json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+  const body = await request.json().catch(() => null);
+  const days = Number(body?.durationDays);
+  if (!COURTESY_DURATION_DAYS.includes(days)) {
+    return json({ ok: false, error: "invalid_duration", allowed: COURTESY_DURATION_DAYS }, { status: 400 });
+  }
+  const actor = normalizeText(String(body?.createdBy || "")) || "owner_http";
+  const { code } = await createCourtesyCode(env, days, actor);
+  return json({ ok: true, code, durationDays: days, redeem: `/redeem ${code}` });
 }
 
 // ── Referral program (v1) ────────────────────────────────────────────────────
@@ -1201,7 +1276,7 @@ async function sendOwnerPanel(env, channel, message) {
       inline_keyboard: [[
         { text: "Courtesy · 30d", callback_data: "courtesy_gen:30" },
         { text: "90d", callback_data: "courtesy_gen:90" },
-        { text: "180d", callback_data: "courtesy_gen:180" }
+        { text: "6 months", callback_data: "courtesy_gen:182" }
       ]]
     }
   });
@@ -1647,6 +1722,20 @@ function menuIntent(text) {
   return /^\/(start|menu|help)\b/i.test(text) || /\b(menu|commands|modulos|módulos|ayuda|help)\b/i.test(text);
 }
 
+/**
+ * The Stars deep link fired by the /upgrade Stars rail
+ * (pack-rails.tsx → t.me/<bot>?start=fenrir_stars → "/start fenrir_stars").
+ *
+ * Exported so the routing ORDER can be asserted in a test. menuIntent() also
+ * matches this exact string — it swallows every `/start` regardless of payload —
+ * so whichever branch the webhook checks FIRST wins. When the Stars branch sat
+ * below menuIntent, the button answered with the Community control onboarding
+ * card and no invoice was ever sent. See the guard in the webhook handler.
+ */
+export function isStarsDeepLink(text) {
+  return /^\/start(?:@[A-Za-z0-9_]+)?\s+fenrir_stars\b/i.test(String(text || ""));
+}
+
 function commandForThisBot(text, command, env) {
   const match = text.match(new RegExp(`^/${command}(?:@([A-Za-z0-9_]+))?(?:\\s|$)`, "i"));
   if (!match) return false;
@@ -1709,8 +1798,15 @@ export function modularMenuText(text, entitlement) {
       "2 · Vincula y verifica tu grupo",
       "Agrega Fenrir como admin con permiso para crear invitaciones. Tú aceptas a cada persona antes de que reciba una invitación.",
       "",
-      "3 · Elige tu plan cuando lo necesites",
-      "Gratis incluye 5 gates para armar y probar. Enlazar una comunidad requiere The Pack: US$14.99/mes, con multi-admin y auditoría.",
+      // Paso 3 depende del derecho de acceso. Antes era texto fijo, así que a
+      // alguien con The Pack activo esta misma tarjeta le decía "Plan: The Pack
+      // · activo" arriba y "Enlazar una comunidad requiere The Pack" abajo: dos
+      // lecturas opuestas del mismo derecho, en el mismo mensaje. Quien ya pagó
+      // leía eso como que su pago no se aplicó.
+      active ? "3 · Tu plan ya cubre esto" : "3 · Elige tu plan cuando lo necesites",
+      active
+        ? "The Pack está activo en esta cuenta: ya puedes enlazar una comunidad, con multi-admin y auditoría. No hay nada más que pagar."
+        : "Gratis incluye 5 gates para armar y probar. Enlazar una comunidad requiere The Pack: US$14.99/mes, con multi-admin y auditoría.",
       "",
       "Puedes crear tu primer Gate sin pagar ni configurar DNS.",
       "",
@@ -1729,8 +1825,15 @@ export function modularMenuText(text, entitlement) {
     "2 · Link and verify your group",
     "Make Fenrir an admin with Invite Users. You approve each person before the bot creates their invite.",
     "",
-    "3 · Choose a plan when you need it",
-    "Free includes 5 gates to build and test. Linking a community requires The Pack: US$14.99/month, with multi-admin and audit logs.",
+    // Step 3 follows the entitlement. It used to be fixed copy, so this same
+    // card told an operator with The Pack active "Plan: The Pack · active" at
+    // the top and "Linking a community requires The Pack" at the bottom — two
+    // opposite readings of one right, in one message. Someone who had already
+    // paid read that as their payment never having applied.
+    active ? "3 · Your plan already covers this" : "3 · Choose a plan when you need it",
+    active
+      ? "The Pack is active on this account: you can link a community now, with multi-admin workflows and audit logs. There is nothing further to pay."
+      : "Free includes 5 gates to build and test. Linking a community requires The Pack: US$14.99/month, with multi-admin and audit logs.",
     "",
     "You can create your first Gate without paying or setting up DNS.",
     "",
@@ -2025,7 +2128,7 @@ async function handleTelegramWebhook(request, env, url) {
         return json({ ok: true });
       }
       const days = Number(query.data.split(":")[1]);
-      if (![30, 90, 180].includes(days)) {
+      if (!COURTESY_DURATION_DAYS.includes(days)) {
         await telegramApi(env, channel, "answerCallbackQuery", { callback_query_id: query.id, text: "Invalid duration." });
         return json({ ok: true });
       }
@@ -2230,6 +2333,27 @@ async function handleTelegramWebhook(request, env, url) {
       chat_id: message.chat.id,
       text: "Readiness check: your Gate can issue private invites only after the protected group is verified. In that group, make @Myfenrir_bot an admin with Invite Users and run /connect."
     });
+    return json({ ok: true });
+  }
+
+  // Stars deep link from the /upgrade Stars rail (pack-rails.tsx sends the
+  // operator to t.me/<bot>?start=fenrir_stars).
+  //
+  // This MUST stay here, with the other /start payloads, and ABOVE menuIntent().
+  // menuIntent() matches /^\/(start|menu|help)\b/ — it swallows EVERY /start,
+  // payload and all. While the only Stars branch lived further down (next to
+  // /subscribe), `/start fenrir_stars` never reached it: it hit the menu first
+  // and returned, so clicking "Pay with Telegram Stars" answered with the
+  // Community control onboarding card instead of opening the payment box.
+  // Every other deep link (account / discover / mapping / readiness / gate /
+  // link_ / gate_ / ref_) was already handled above menuIntent; this one was
+  // the single outlier. Do not move it below menuIntent again.
+  if (isStarsDeepLink(text)) {
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: message.chat.id,
+      text: "Fenrir Protocol payment box opening. Telegram Stars handles the transaction; Fenrir verifies access after payment."
+    });
+    await sendStarsInvoice(env, channel, message);
     return json({ ok: true });
   }
 
@@ -2517,6 +2641,10 @@ export default {
     if (url.pathname === "/api/internal/founders-confirm" && request.method === "POST") {
       try { return await handleFoundersConfirm(request, env); }
       catch (error) { console.error("founders_confirm_failed", String(error)); return json({ ok: false, error: "stripe_confirmation_failed" }, { status: 502 }); }
+    }
+    if (url.pathname === "/api/internal/courtesy/generate" && request.method === "POST") {
+      try { return await handleCourtesyGenerate(request, env); }
+      catch (error) { console.error("courtesy_generate_failed", String(error)); return json({ ok: false, error: "courtesy_generate_failed" }, { status: 500 }); }
     }
     if (url.pathname === "/api/internal/community-billing-status" && request.method === "POST") {
       try { return await handleCommunityBillingStatus(request, env); }
