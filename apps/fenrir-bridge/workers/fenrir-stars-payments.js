@@ -28,15 +28,30 @@ export function isValidFoundersStripeSession(session, userId, orgId) {
   const billingPeriod = session?.metadata?.billing_period;
   // Canon: $14.99/month = 1499 (confirmado por Francisco). No es 1500.
   const expectedAmount = billingPeriod === "annual" ? 14990 : 1499;
+
+  // Check the PRE-DISCOUNT total. `amount_total` is what was actually charged,
+  // so any promotion code makes it smaller than list price — and a 100%-off
+  // coupon makes it 0. Checkout has had `allow_promotion_codes: "true"` all
+  // along, so comparing amount_total meant a redeemed code produced a paid
+  // subscription that this validator rejected: money taken, access denied.
+  // `amount_subtotal` is the list price before discounts, which is what this
+  // guard was ever trying to assert — that the session bought The Pack at the
+  // canonical price, not some other price object on the same account.
+  const subtotal = Number(session?.amount_subtotal ?? session?.amount_total);
+
+  // A fully discounted subscription is never "paid": Stripe reports
+  // `no_payment_required` because there was nothing to charge.
+  const settled = session?.payment_status === "paid" || session?.payment_status === "no_payment_required";
+
   return Boolean(
-    session?.payment_status === "paid" &&
+    settled &&
       session?.mode === "subscription" &&
       session?.client_reference_id === orgId &&
       session?.metadata?.frisky_org_id === orgId &&
       session?.metadata?.frisky_user_id === userId &&
       session?.metadata?.plan === "standard" &&
       session?.currency === "usd" &&
-      session?.amount_total === expectedAmount &&
+      subtotal === expectedAmount &&
       session?.metadata?.offer === "founder_forever" &&
       (billingPeriod === "monthly" || billingPeriod === "annual") &&
       normalizeText(session?.subscription)
@@ -54,19 +69,36 @@ export function isValidStarsPayment(payment, order, telegramUserId) {
   );
 }
 
-async function stripeRequest(env, path, params) {
+/**
+ * `apiVersion` pins Stripe-Version for a single call.
+ *
+ * Without it every request inherits whatever version the ACCOUNT defaults to,
+ * which Stripe moves on its own schedule. That is how `POST /v1/promotion_codes`
+ * started rejecting `coupon` as an unknown parameter: the account had rolled
+ * forward to a version where the shape changed. Pinning the version for the
+ * calls whose request shape we hardcode makes them stop drifting.
+ */
+async function stripeRequest(env, path, params, apiVersion) {
   const key = normalizeText(env.STRIPE_SECRET_KEY);
   if (!key) throw new Error("stripe_not_configured");
   const response = await fetch(`https://api.stripe.com/v1${path}`, {
     method: params ? "POST" : "GET",
     headers: {
       Authorization: `Bearer ${key}`,
+      ...(apiVersion ? { "Stripe-Version": apiVersion } : {}),
       ...(params ? { "content-type": "application/x-www-form-urlencoded" } : {})
     },
     body: params ? new URLSearchParams(params) : undefined
   });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(`stripe_${response.status}:${body?.error?.code || "request_failed"}`);
+  // Include Stripe's own `param` and `message`: a bare error code turns a
+  // one-line fix ("that parameter moved") into a guessing game.
+  if (!response.ok) {
+    const detail = [body?.error?.code || "request_failed", body?.error?.param, body?.error?.message]
+      .filter(Boolean)
+      .join(" | ");
+    throw new Error(`stripe_${response.status}:${detail}`);
+  }
   return body;
 }
 
@@ -159,6 +191,113 @@ async function verifyStripeSignature(env, payload, sigHeader) {
   return diff === 0;
 }
 
+/**
+ * The period end AS STRIPE REPORTS IT — never a date we invent.
+ *
+ * Stripe moved this field: it used to sit on the subscription, and on newer API
+ * versions it lives on each subscription item. Read both, because which one a
+ * webhook carries depends on the API version pinned to the account/endpoint,
+ * and guessing wrong silently yields no date — which is the perpetual-licence
+ * bug all over again.
+ */
+function stripeSubscriptionPeriodEnd(subscription) {
+  const candidates = [
+    subscription?.current_period_end,
+    ...(Array.isArray(subscription?.items?.data)
+      ? subscription.items.data.map((item) => item?.current_period_end)
+      : [])
+  ];
+  // Latest end across items: an item ending later still entitles the customer.
+  const seconds = candidates
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => b - a)[0];
+  if (seconds) return new Date(seconds * 1000).toISOString();
+
+  // Stripe always sends a period end for a live subscription, so reaching here
+  // means the payload shape changed again. Do NOT fall through to NULL: an
+  // access check reads NULL as active forever. Grant one billing interval and
+  // shout — the next invoice.payment_succeeded corrects it from Stripe's data.
+  const interval = normalizeText(subscription?.items?.data?.[0]?.plan?.interval) || "month";
+  const days = interval === "year" ? 366 : interval === "week" ? 8 : 31;
+  console.error("stripe_subscription_missing_period_end", normalizeText(subscription?.id), interval);
+  return new Date(Date.now() + days * 86400000).toISOString();
+}
+
+/**
+ * Write what Stripe says about a subscription.
+ *
+ * `current_period_end` is ALWAYS bound to a real date. The previous card rail
+ * inserted the literal NULL here, and because the entitlement check treats
+ * `current_period_end IS NULL` as active, every card subscriber held a
+ * perpetual licence that survived cancellation.
+ *
+ * Existing rows are updated by subscription id even without metadata — a
+ * renewal or cancellation must land on the row it belongs to. A row is only
+ * CREATED when the subscription carries the Pack metadata, so an unrelated
+ * subscription on the same Stripe account can never mint access here.
+ */
+async function upsertStripeSubscriptionRow(env, subscription, fallbackOrgId = "") {
+  const subscriptionId = normalizeText(subscription?.id);
+  if (!subscriptionId) return false;
+
+  const status = normalizeText(subscription?.status) || "active";
+  const periodEnd = stripeSubscriptionPeriodEnd(subscription);
+  const cancelAtPeriodEnd = subscription?.cancel_at_period_end ? 1 : 0;
+  const customerId =
+    normalizeText(typeof subscription?.customer === "string" ? subscription.customer : subscription?.customer?.id) ||
+    `stripe_${subscriptionId}`;
+  const ts = nowIso();
+
+  const existing = await env.DB
+    .prepare(`SELECT frisky_org_id FROM billing_subscriptions WHERE stripe_subscription_id = ? LIMIT 1`)
+    .bind(subscriptionId)
+    .first();
+
+  const orgId =
+    normalizeText(existing?.frisky_org_id) ||
+    normalizeText(subscription?.metadata?.frisky_org_id) ||
+    normalizeText(fallbackOrgId);
+
+  // No row yet and no Pack metadata to prove whose this is: ignore it rather
+  // than invent an owner.
+  if (!existing && (!orgId || normalizeText(subscription?.metadata?.plan) !== "standard")) return false;
+  if (!orgId) return false;
+
+  await env.DB.prepare(
+    `INSERT INTO billing_subscriptions (
+       stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
+       current_period_end, cancel_at_period_end, created_at, updated_at
+     ) VALUES (?, ?, ?, 'standard', ?, ?, ?, ?, ?)
+     ON CONFLICT(stripe_subscription_id) DO UPDATE SET
+       plan = 'standard',
+       status = excluded.status,
+       current_period_end = excluded.current_period_end,
+       cancel_at_period_end = excluded.cancel_at_period_end,
+       stripe_customer_id = excluded.stripe_customer_id,
+       updated_at = excluded.updated_at`
+  ).bind(subscriptionId, orgId, customerId, status, periodEnd, cancelAtPeriodEnd, ts, ts).run();
+  return true;
+}
+
+/** Fetch the subscription from Stripe so the period end is Stripe's, not ours. */
+async function fetchStripeSubscription(env, subscriptionId) {
+  const id = normalizeText(subscriptionId);
+  if (!id.startsWith("sub_")) return null;
+  try {
+    return await stripeRequest(env, `/subscriptions/${encodeURIComponent(id)}`);
+  } catch (error) {
+    console.error("stripe_subscription_fetch_failed", id, String(error));
+    return null;
+  }
+}
+
+/** The subscription id on an invoice, across old and new Stripe API shapes. */
+function invoiceSubscriptionId(invoice) {
+  const direct = typeof invoice?.subscription === "string" ? invoice.subscription : invoice?.subscription?.id;
+  return normalizeText(direct || invoice?.parent?.subscription_details?.subscription || "");
+}
+
 // Durable completion path (preferred). checkout.session.completed →
 // validate the session server-side → upsert billing_subscriptions active.
 // Idempotent via stripe_events + ON CONFLICT on the subscription id, so it is
@@ -183,29 +322,55 @@ async function handleStripeWebhook(request, env) {
     const userId = normalizeText(session?.metadata?.frisky_user_id);
     const orgId = normalizeText(session?.metadata?.frisky_org_id);
     if (isValidFoundersStripeSession(session, userId, orgId)) {
-      const ts = nowIso();
-      await env.DB.prepare(
-        `INSERT INTO billing_subscriptions (
-           stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
-           current_period_end, cancel_at_period_end, created_at, updated_at
-         ) VALUES (?, ?, ?, 'standard', 'active', NULL, 0, ?, ?)
-         ON CONFLICT(stripe_subscription_id) DO UPDATE SET
-           frisky_org_id = excluded.frisky_org_id,
-           plan = 'standard',
-           status = 'active',
-           updated_at = excluded.updated_at`
-      ).bind(
-        normalizeText(session.subscription),
-        orgId,
-        normalizeText(session.customer) || `checkout_${session.id}`,
-        ts,
-        ts
-      ).run();
+      // Read the subscription back from Stripe: the checkout session does not
+      // carry the billing period, and this row's expiry must be Stripe's own
+      // date. This insert used to bind the literal NULL, which the entitlement
+      // check reads as active forever.
+      const subscription = await fetchStripeSubscription(env, session.subscription);
+      if (subscription) {
+        await upsertStripeSubscriptionRow(env, subscription, orgId);
+      } else {
+        console.error("stripe_checkout_subscription_unreadable", normalizeText(session.id));
+      }
       // Referral attribution (Stripe/web rail): reward the referrer if this paid
       // checkout carried a ref_code. Idempotent + self-referral blocked.
       await recordStripeReferral(env, normalizeText(session?.metadata?.ref_code), orgId);
     }
   }
+
+  // Renewal clock. Without these the row froze at whatever the first checkout
+  // wrote: a renewed subscription expired anyway, and a cancelled one kept its
+  // access. Every one of them takes the date from Stripe's subscription object.
+  if (
+    event?.type === "customer.subscription.created" ||
+    event?.type === "customer.subscription.updated" ||
+    event?.type === "customer.subscription.deleted"
+  ) {
+    const subscription = event.data?.object;
+    if (event.type === "customer.subscription.deleted") {
+      // Do not delete the row — end it. `canceled` fails the entitlement check
+      // on its own, and the row stays as the record of what was sold.
+      await env.DB.prepare(
+        `UPDATE billing_subscriptions
+            SET status = 'canceled', updated_at = ?
+          WHERE stripe_subscription_id = ?`
+      ).bind(nowIso(), normalizeText(subscription?.id)).run();
+    } else {
+      await upsertStripeSubscriptionRow(env, subscription);
+    }
+  }
+
+  // The renewal that actually matters: money arrived, so the period moved.
+  // Re-read the subscription rather than trusting the invoice's own period,
+  // which describes the invoice line, not the subscription clock.
+  if (event?.type === "invoice.payment_succeeded" || event?.type === "invoice.paid") {
+    const subscriptionId = invoiceSubscriptionId(event.data?.object);
+    if (subscriptionId) {
+      const subscription = await fetchStripeSubscription(env, subscriptionId);
+      if (subscription) await upsertStripeSubscriptionRow(env, subscription);
+    }
+  }
+
   return json({ ok: true });
 }
 
@@ -357,19 +522,19 @@ async function handleFoundersConfirm(request, env) {
   const session = await stripeRequest(env, `/checkout/sessions/${encodeURIComponent(sessionId)}`);
   const valid = isValidFoundersStripeSession(session, userId, orgId);
   if (!valid) return json({ ok: false, error: "payment_not_confirmed" }, { status: 409 });
-  const ts = nowIso();
-  await env.DB.prepare(
-    `INSERT INTO billing_subscriptions (
-      stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
-      current_period_end, cancel_at_period_end, created_at, updated_at
-    ) VALUES (?, ?, ?, 'standard', 'active', NULL, 0, ?, ?)
-    ON CONFLICT(stripe_subscription_id) DO UPDATE SET
-      frisky_org_id = excluded.frisky_org_id,
-      plan = 'standard',
-      status = 'active',
-      updated_at = excluded.updated_at`
-  ).bind(normalizeText(session.subscription), orgId, normalizeText(session.customer) || `checkout_${session.id}`, ts, ts).run();
-  return json({ ok: true, plan: "standard", status: "active" });
+  // Confirm-on-return backup for the webhook. Same rule: the expiry is Stripe's
+  // date, read off the subscription. This used to bind NULL, which the
+  // entitlement check reads as access that never ends.
+  const subscription = await fetchStripeSubscription(env, session.subscription);
+  if (!subscription) return json({ ok: false, error: "subscription_unreadable" }, { status: 502 });
+  const written = await upsertStripeSubscriptionRow(env, subscription, orgId);
+  if (!written) return json({ ok: false, error: "subscription_not_recorded" }, { status: 502 });
+  return json({
+    ok: true,
+    plan: "standard",
+    status: normalizeText(subscription.status) || "active",
+    currentPeriodEnd: stripeSubscriptionPeriodEnd(subscription)
+  });
 }
 
 async function handleCommunityBillingStatus(request, env) {
@@ -535,7 +700,14 @@ async function telegramApi(env, channel, method, body) {
     body: JSON.stringify(body)
   });
   const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.ok) throw new Error(`telegram_api_failed:${method}`);
+  // Carry Telegram's own error_code and description. A bare
+  // `telegram_api_failed:sendInvoice` in the logs says something broke but not
+  // what, and the Telegram webhook swallows throws to avoid retry spam — so
+  // this string is often the only trace a failure leaves.
+  if (!response.ok || !data?.ok) {
+    const detail = [data?.error_code, data?.description].filter(Boolean).join(" ");
+    throw new Error(`telegram_api_failed:${method}${detail ? `:${detail}` : ""}`);
+  }
   return data;
 }
 
@@ -1009,6 +1181,250 @@ async function handleCourtesyGenerate(request, env) {
   const actor = normalizeText(String(body?.createdBy || "")) || "owner_http";
   const { code } = await createCourtesyCode(env, days, actor);
   return json({ ok: true, code, durationDays: days, redeem: `/redeem ${code}` });
+}
+
+/**
+ * Owner-gated Stripe billing operations.
+ *
+ * Exists so the live Stripe secret never has to leave the Worker. Everything
+ * here is done WITH the key the Worker already holds; nobody has to copy it into
+ * a shell, a runbook or a chat window to inspect billing or mint a coupon.
+ *
+ * Gated by COURTESY_MINT_TOKEN / FENRIR_ADMIN_TOKEN — the same owner credential
+ * as the courtesy mint, and deliberately not the billing-service secret.
+ */
+/**
+ * Pinned for the calls whose request shape is hardcoded here. The account's own
+ * default version moves on Stripe's schedule, which is what made
+ * POST /v1/promotion_codes start rejecting `coupon` as an unknown parameter.
+ */
+const STRIPE_OPS_API_VERSION = "2024-06-20";
+
+const STRIPE_REQUIRED_EVENTS = [
+  "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.payment_succeeded"
+];
+
+async function handleStripeOps(request, env) {
+  const configured = normalizeText(env.COURTESY_MINT_TOKEN) || normalizeText(env.FENRIR_ADMIN_TOKEN);
+  const supplied = normalizeText(request.headers.get("authorization")).replace(/^Bearer\s+/i, "");
+  if (!configured || !supplied || configured !== supplied) {
+    return json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+  const body = await request.json().catch(() => null);
+  const action = normalizeText(body?.action);
+
+  if (action === "inspect") {
+    const priceId = foundersPriceId(env, "monthly");
+    const price = await stripeRequest(env, `/prices/${encodeURIComponent(priceId)}`);
+    const product = await stripeRequest(env, `/products/${encodeURIComponent(normalizeText(price?.product))}`);
+    const endpoints = await stripeRequest(env, "/webhook_endpoints?limit=20");
+    return json({
+      ok: true,
+      price: {
+        id: price?.id,
+        active: price?.active,
+        unit_amount: price?.unit_amount,
+        currency: price?.currency,
+        recurring: price?.recurring?.interval,
+        product: price?.product
+      },
+      product: { id: product?.id, name: product?.name, active: product?.active },
+      webhooks: (endpoints?.data || []).map((endpoint) => ({
+        id: endpoint.id,
+        url: endpoint.url,
+        status: endpoint.status,
+        api_version: endpoint.api_version,
+        enabled_events: endpoint.enabled_events,
+        missing: STRIPE_REQUIRED_EVENTS.filter(
+          (name) => !(endpoint.enabled_events || []).includes(name) && !(endpoint.enabled_events || []).includes("*")
+        )
+      }))
+    });
+  }
+
+  // Subscribe our own endpoint to the renewal events. Without these the row
+  // freezes at the first checkout: renewals never extend it and cancellations
+  // never end it.
+  if (action === "ensure_events") {
+    const endpoints = await stripeRequest(env, "/webhook_endpoints?limit=20");
+    const target = (endpoints?.data || []).find((endpoint) =>
+      normalizeText(endpoint.url).includes("fenrir-stars-payments")
+    );
+    if (!target) return json({ ok: false, error: "webhook_endpoint_not_found" }, { status: 404 });
+    const merged = Array.from(new Set([...(target.enabled_events || []), ...STRIPE_REQUIRED_EVENTS]));
+    const params = { url: target.url };
+    merged.forEach((name, index) => {
+      params[`enabled_events[${index}]`] = name;
+    });
+    const updated = await stripeRequest(env, `/webhook_endpoints/${encodeURIComponent(target.id)}`, params);
+    return json({ ok: true, id: updated?.id, url: updated?.url, enabled_events: updated?.enabled_events });
+  }
+
+  // Coupon + promotion code for a 6-month comp on The Pack.
+  //
+  // percent_off 100 / duration repeating / duration_in_months 6 means Stripe
+  // itself stops discounting after the sixth invoice and starts charging — the
+  // subscription clock keeps running the whole time, so this grants six free
+  // months, not perpetual access. Scoped to the Pack product so the code cannot
+  // be applied to anything else on this account.
+  if (action === "create_promo") {
+    const code = normalizeText(body?.code).toUpperCase();
+    if (!/^[A-Z0-9]{4,24}$/.test(code)) {
+      return json({ ok: false, error: "invalid_code_format" }, { status: 400 });
+    }
+    const months = Number(body?.durationInMonths) || 6;
+    const maxRedemptions = Number(body?.maxRedemptions) || 1;
+
+    const priceId = foundersPriceId(env, "monthly");
+    const price = await stripeRequest(env, `/prices/${encodeURIComponent(priceId)}`);
+    const productId = normalizeText(price?.product);
+    if (!productId) return json({ ok: false, error: "pack_product_not_found" }, { status: 404 });
+
+    // Reuse an identical coupon instead of minting a second one. A failed
+    // promotion-code call used to leave an orphan coupon behind on every retry.
+    const existingCoupons = await stripeRequest(env, "/coupons?limit=100", null, STRIPE_OPS_API_VERSION);
+    const reusable = (existingCoupons?.data || []).find(
+      (candidate) =>
+        candidate?.valid &&
+        Number(candidate?.percent_off) === 100 &&
+        candidate?.duration === "repeating" &&
+        Number(candidate?.duration_in_months) === months &&
+        normalizeText(candidate?.metadata?.issued_by) === "fenrir-stars-payments" &&
+        (candidate?.applies_to?.products || []).includes(productId)
+    );
+
+    const coupon =
+      reusable ||
+      (await stripeRequest(
+        env,
+        "/coupons",
+        {
+          percent_off: "100",
+          duration: "repeating",
+          duration_in_months: String(months),
+          name: `The Pack · ${months} months comp`,
+          "applies_to[products][0]": productId,
+          "metadata[issued_by]": "fenrir-stars-payments",
+          "metadata[purpose]": "owner_comp"
+        },
+        STRIPE_OPS_API_VERSION
+      ));
+
+    const promo = await stripeRequest(
+      env,
+      "/promotion_codes",
+      {
+        coupon: normalizeText(coupon?.id),
+        code,
+        max_redemptions: String(maxRedemptions)
+      },
+      STRIPE_OPS_API_VERSION
+    );
+
+    return json({
+      ok: true,
+      code: promo?.code,
+      promotion_code_id: promo?.id,
+      coupon_id: coupon?.id,
+      percent_off: coupon?.percent_off,
+      duration: coupon?.duration,
+      duration_in_months: coupon?.duration_in_months,
+      applies_to_product: productId,
+      max_redemptions: promo?.max_redemptions,
+      active: promo?.active
+    });
+  }
+
+  // Reconcile D1 against Stripe. Stripe is the source of truth for the billing
+  // clock, so this walks the live subscriptions and re-writes each row through
+  // the same path the webhook uses.
+  //
+  // Two jobs: repair anything the old NULL-writing code left behind or dropped
+  // entirely, and prove the write path against real Stripe objects rather than
+  // a fixture. `dryRun` reports what it would do and touches nothing.
+  if (action === "resync") {
+    const dryRun = body?.dryRun !== false;
+    const list = await stripeRequest(env, "/subscriptions?status=all&limit=100");
+    const report = [];
+    for (const subscription of list?.data || []) {
+      const row = await env.DB
+        .prepare(`SELECT frisky_org_id, status, current_period_end FROM billing_subscriptions WHERE stripe_subscription_id = ? LIMIT 1`)
+        .bind(normalizeText(subscription.id))
+        .first();
+      const entry = {
+        id: subscription.id,
+        stripe_status: subscription.status,
+        stripe_period_end: stripeSubscriptionPeriodEnd(subscription),
+        metadata_org: normalizeText(subscription?.metadata?.frisky_org_id) || null,
+        metadata_plan: normalizeText(subscription?.metadata?.plan) || null,
+        row_exists: Boolean(row),
+        row_period_end: row?.current_period_end ?? null,
+        row_period_end_is_null: Boolean(row) && row.current_period_end === null
+      };
+      if (!dryRun) entry.written = await upsertStripeSubscriptionRow(env, subscription);
+      report.push(entry);
+    }
+    return json({ ok: true, dryRun, stripe_subscriptions: report.length, report });
+  }
+
+  // Stars dry run. `createInvoiceLink` takes the SAME invoice body as
+  // sendInvoice and returns the same validation errors, but produces a link
+  // instead of messaging anyone — so the exact production payload can be
+  // exercised against Telegram without a chat, a notification or a charge.
+  //
+  // Needed because a failing sendInvoice is invisible from outside: telegramApi
+  // throws, and the Telegram webhook swallows every throw to keep answering 200
+  // (otherwise Telegram retries and the bot spams). The raw Telegram response
+  // is returned verbatim here rather than summarised.
+  if (action === "stars_probe") {
+    const channel = normalizeText(body?.channel) === "dev" ? "dev" : "prod";
+    const token = botToken(env, channel);
+    if (!token) return json({ ok: false, error: "missing_telegram_token", channel }, { status: 503 });
+
+    const amount = starsPrice(env);
+    // A probe payload, never written to telegram_stars_orders — this creates no
+    // order because no one is paying it.
+    const probePayload = `fenrir_stars:probe:${crypto.randomUUID().replace(/-/g, "").slice(0, 18)}`;
+    const invoiceBody = starsInvoiceBody(env, probePayload, amount);
+
+    const call = async (payload) => {
+      const response = await fetch(`https://api.telegram.org/bot${token}/createInvoiceLink`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      return { http: response.status, body: await response.json().catch(() => null) };
+    };
+
+    const withSubscription = await call(invoiceBody);
+    // If the subscription form fails, try the one-shot form. Which of the two
+    // fails tells you whether the bot lacks Stars subscriptions specifically or
+    // Stars entirely — a distinction the error text alone does not give you.
+    const { subscription_period: _omit, ...oneShotBody } = invoiceBody;
+    const withoutSubscription = withSubscription.body?.ok ? null : await call(oneShotBody);
+
+    const me = await fetch(`https://api.telegram.org/bot${token}/getMe`)
+      .then((response) => response.json())
+      .catch(() => null);
+
+    return json({
+      ok: true,
+      channel,
+      bot: me?.result?.username || null,
+      amount,
+      currency: invoiceBody.currency,
+      payload_matches_ipn_regex: /^fenrir_stars:/.test(probePayload),
+      subscription_form: withSubscription,
+      one_shot_form: withoutSubscription
+    });
+  }
+
+  return json({ ok: false, error: "unknown_action" }, { status: 400 });
 }
 
 // ── Referral program (v1) ────────────────────────────────────────────────────
@@ -1672,18 +2088,22 @@ async function markPaid(env, payment, message, order) {
     .run();
 }
 
-async function sendStarsInvoice(env, channel, message) {
-  const amount = starsPrice(env);
-  const payload = await createOrder(env, String(message.from?.id || message.chat.id), String(message.chat.id), amount);
-  // Telegram Stars invoice canon: currency XTR, `provider_token` OMITTED (an
-  // empty string is not the same as absent — it previously returned
-  // PROVIDER_ACCOUNT_INVALID), exactly ONE entry in `prices`, and no
-  // shipping/address/phone/email/need_* /is_flexible fields.
-  // `subscription_period` is REQUIRED for a recurring Stars subscription:
-  // without it Telegram charges ONCE while we advertise "$14.99/month".
-  // 2592000 seconds (30 days) is the only value Telegram accepts.
-  await telegramApi(env, channel, "sendInvoice", {
-    chat_id: message.chat.id,
+/**
+ * The invoice body, in one place.
+ *
+ * Telegram Stars invoice canon: currency XTR, `provider_token` OMITTED (an
+ * empty string is not the same as absent — it previously returned
+ * PROVIDER_ACCOUNT_INVALID), exactly ONE entry in `prices`, and no
+ * shipping/address/phone/email/need_* /is_flexible fields.
+ * `subscription_period` is REQUIRED for a recurring Stars subscription:
+ * without it Telegram charges ONCE while we advertise "$14.99/month".
+ * 2592000 seconds (30 days) is the only value Telegram accepts.
+ *
+ * Shared with the ops probe so the diagnostic exercises the SAME body the bot
+ * sends — a probe that builds its own params proves nothing about production.
+ */
+function starsInvoiceBody(env, payload, amount) {
+  return {
     title: env.FENRIR_STARS_TITLE || "The Pack · MyFenrir",
     description:
       env.FENRIR_STARS_DESCRIPTION ||
@@ -1691,9 +2111,78 @@ async function sendStarsInvoice(env, channel, message) {
     payload,
     currency: "XTR",
     prices: [{ label: env.FENRIR_STARS_LABEL || "The Pack", amount }],
-    subscription_period: 2592000,
-    protect_content: true
+    subscription_period: 2592000
+  };
+}
+
+async function sendStarsInvoice(env, channel, message) {
+  const amount = starsPrice(env);
+  const payload = await createOrder(env, String(message.from?.id || message.chat.id), String(message.chat.id), amount);
+  await telegramApi(env, channel, "sendInvoice", {
+    chat_id: message.chat.id,
+    ...starsInvoiceBody(env, payload, amount)
+    // `protect_content` deliberately NOT sent. It was the only field here
+    // outside the documented Stars canon, it buys nothing on a payment box
+    // (there is no content to protect from forwarding), and it is the one
+    // parameter that differs between this call and the createInvoiceLink probe
+    // — which Telegram accepts with this exact body, subscription_period and
+    // all. Keep the body minimal; that rule already saved this invoice once
+    // (provider_token).
   });
+}
+
+/**
+ * Open the Stars payment box, and only claim it opened if it did.
+ *
+ * The old order was: promise first ("payment box opening…"), then attempt the
+ * invoice. telegramApi throws on a Telegram error and the webhook swallows every
+ * throw to keep returning 200 — so a failed sendInvoice left the operator
+ * staring at a promise that never happened, with nothing in the logs he could
+ * see. Invoice first; speak only about what actually occurred.
+ */
+async function openStarsCheckout(env, channel, message) {
+  const chatId = message?.chat?.id;
+  try {
+    await sendStarsInvoice(env, channel, message);
+    return true;
+  } catch (error) {
+    const reason = String(error);
+    console.error("stars_invoice_failed", reason, "chat", String(chatId), "type", String(message?.chat?.type));
+
+    // Fallback: an invoice LINK. createInvoiceLink takes the same body and has
+    // no chat_id, so it survives the cases sendInvoice does not — a group chat,
+    // or a chat where the bot may not post an invoice directly. Tapping the
+    // link opens the same Stars box. Verified working against this exact body.
+    try {
+      const amount = starsPrice(env);
+      const payload = await createOrder(env, String(message.from?.id || chatId), String(chatId), amount);
+      const link = await telegramApi(env, channel, "createInvoiceLink", starsInvoiceBody(env, payload, amount));
+      const url = normalizeText(link?.result);
+      if (url) {
+        await telegramApi(env, channel, "sendMessage", {
+          chat_id: chatId,
+          text: "The Pack · ⭐1,150 per month. Tap to open the Telegram Stars box.",
+          reply_markup: { inline_keyboard: [[{ text: "⭐ Pay with Telegram Stars", url }]] }
+        });
+        console.error("stars_invoice_link_fallback_used", reason);
+        return true;
+      }
+    } catch (fallbackError) {
+      console.error("stars_invoice_link_failed", String(fallbackError));
+    }
+
+    // Both forms failed. Say so plainly rather than promising a box.
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: chatId,
+      text: [
+        "The Telegram Stars box did not open.",
+        "",
+        "Nothing was charged. You can pay the same $14.99 by card or crypto in MyFenrir → Upgrade.",
+        "This has been logged for Fenrir to fix."
+      ].join("\n")
+    }).catch(() => {});
+    return false;
+  }
 }
 
 function paymentIntent(text) {
@@ -2349,11 +2838,7 @@ async function handleTelegramWebhook(request, env, url) {
   // link_ / gate_ / ref_) was already handled above menuIntent; this one was
   // the single outlier. Do not move it below menuIntent again.
   if (isStarsDeepLink(text)) {
-    await telegramApi(env, channel, "sendMessage", {
-      chat_id: message.chat.id,
-      text: "Fenrir Protocol payment box opening. Telegram Stars handles the transaction; Fenrir verifies access after payment."
-    });
-    await sendStarsInvoice(env, channel, message);
+    await openStarsCheckout(env, channel, message);
     return json({ ok: true });
   }
 
@@ -2520,12 +3005,8 @@ async function handleTelegramWebhook(request, env, url) {
     return json({ ok: true });
   }
 
-  if (/^\/subscribe\b/i.test(text) || /^\/unlock\b/i.test(text) || /^\/start\s+fenrir_stars\b/i.test(text) || paymentIntent(text)) {
-    await telegramApi(env, channel, "sendMessage", {
-      chat_id: message.chat.id,
-      text: "Fenrir Protocol payment box opening. Telegram Stars handles the transaction; Fenrir verifies access after payment."
-    });
-    await sendStarsInvoice(env, channel, message);
+  if (/^\/subscribe\b/i.test(text) || /^\/unlock\b/i.test(text) || isStarsDeepLink(text) || paymentIntent(text)) {
+    await openStarsCheckout(env, channel, message);
     return json({ ok: true });
   }
 
@@ -2641,6 +3122,10 @@ export default {
     if (url.pathname === "/api/internal/founders-confirm" && request.method === "POST") {
       try { return await handleFoundersConfirm(request, env); }
       catch (error) { console.error("founders_confirm_failed", String(error)); return json({ ok: false, error: "stripe_confirmation_failed" }, { status: 502 }); }
+    }
+    if (url.pathname === "/api/internal/stripe/ops" && request.method === "POST") {
+      try { return await handleStripeOps(request, env); }
+      catch (error) { console.error("stripe_ops_failed", String(error)); return json({ ok: false, error: "stripe_ops_failed", detail: String(error) }, { status: 502 }); }
     }
     if (url.pathname === "/api/internal/courtesy/generate" && request.method === "POST") {
       try { return await handleCourtesyGenerate(request, env); }
