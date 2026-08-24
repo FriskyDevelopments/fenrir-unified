@@ -1607,6 +1607,29 @@ async function handleStripeOps(request, env) {
     });
   }
 
+  // Every keyboard the bot can attach, rendered from the deployed code, so the
+  // buttons and their destinations can be checked without messaging anyone.
+  if (action === "keyboards") {
+    const fakeConnect = (reason) => connectResultReply(env, reason ? { ok: false, reason } : { ok: true });
+    return json({
+      ok: true,
+      bot: botUsername(env),
+      pay_rails: payRailsKeyboard(),
+      status: statusKeyboard(),
+      redeem: redeemKeyboard(env, "EXAMPLECODE12"),
+      connect: {
+        ok: fakeConnect(null),
+        bot_permissions_missing: fakeConnect("bot_permissions_missing"),
+        telegram_identity_not_linked: fakeConnect("telegram_identity_not_linked"),
+        sync_failed: fakeConnect("sync_failed"),
+        actor_not_admin: fakeConnect("actor_not_admin"),
+        not_a_group: fakeConnect("not_a_group"),
+        screening_blocked: fakeConnect("screening_blocked"),
+        sync_not_configured: fakeConnect("sync_not_configured")
+      }
+    });
+  }
+
   // What the bot would decide for a given Telegram id, without messaging them.
   // `pitch` is the whole question: does this person get sold to, or not.
   if (action === "bot_access") {
@@ -2438,7 +2461,17 @@ async function sendTelegramLinkStart(env, channel, message) {
   if (message.chat?.type && message.chat.type !== "private") {
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
-      text: "For security, send /link to me in a private chat."
+      text: "Linking happens in a private chat, for security.\n\nTap below and Fenrir will pick it up there.",
+      // A group button cannot open a private chat by itself — the deep link can.
+      ...(botUsername(env)
+        ? {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🔗 Link MyFenrir", url: `https://t.me/${botUsername(env)}?start=account` }]
+              ]
+            }
+          }
+        : {})
     });
     return;
   }
@@ -2631,6 +2664,127 @@ export function alreadyActiveText(access, spanish) {
     "",
     "Link a community from MyFenrir → My Gates, or run /status for the detail."
   ].join("\n");
+}
+
+/**
+ * Buttons for the moments that used to end in "now go type a command".
+ *
+ * Every one of these keeps its typed command working. The button is never the
+ * only way in — it is just the way that does not require remembering a word
+ * while you are in another window, halfway through something else.
+ *
+ * `/connect` is the worst of them: the operator has just left Telegram's admin
+ * screen, and the instruction to run a command is the last thing they read
+ * before the flow dies. A retry button costs one tap and no memory.
+ */
+function connectRetryKeyboard(env, { link = false } = {}) {
+  const user = botUsername(env);
+  const rows = [[{ text: "🔄 Try again", callback_data: "fenrir_connect" }]];
+  // Linking happens in a private chat with the bot; a group button cannot do it,
+  // so this deep-links there instead of naming a command.
+  if (link && user) {
+    rows.push([{ text: "🔗 Link MyFenrir", url: `https://t.me/${user}?start=account` }]);
+  }
+  return { inline_keyboard: rows };
+}
+
+/** One tap to redeem, instead of copying a code out of a message by hand. */
+function redeemKeyboard(env, code) {
+  const user = botUsername(env);
+  if (!user) return undefined;
+  return {
+    inline_keyboard: [[{ text: "🎟 Redeem this code", url: `https://t.me/${user}?start=redeem_${code}` }]]
+  };
+}
+
+/** `/start redeem_<CODE>` — the deep link behind that button. */
+export function redeemDeepLinkCode(text) {
+  const match = String(text || "").match(/^\/start(?:@[A-Za-z0-9_]+)?\s+redeem_([A-Za-z0-9]{8,16})\b/i);
+  return match ? match[1] : null;
+}
+
+/**
+ * The redemption outcome, worded once. Shared by the typed `/redeem <CODE>` and
+ * by the one-tap deep link, so the two can never drift apart.
+ *
+ * Invalid, expired and already-used still collapse into one generic sentence —
+ * that is deliberate anti-enumeration, not vagueness.
+ */
+export function courtesyRedeemReply(result) {
+  if (result?.ok) {
+    const until = new Date(result.courtesyUntil).toISOString().slice(0, 10);
+    return [
+      "🎁 Courtesy access activated — The Pack.",
+      "",
+      `Duration: ${result.durationDays} days`,
+      `Access through: ${until}`,
+      "Covers 1 linked community · multi-admin · audit logs."
+    ].join("\n");
+  }
+  if (result?.reason === "rate_limited") return "Too many attempts. Please wait a few minutes and try again.";
+  if (result?.reason === "not_linked") {
+    return "Redeem from a MyFenrir-linked Telegram account.\n\nLink Telegram first, then tap the code again.";
+  }
+  return "That code could not be redeemed. Check it and try again, or contact MyFenrir support.";
+}
+
+/** Only `not_linked` is something the person can act on from here. */
+function redeemFailureKeyboard(env, reason) {
+  const user = botUsername(env);
+  if (reason !== "not_linked" || !user) return undefined;
+  return { inline_keyboard: [[{ text: "🔗 Link MyFenrir", url: `https://t.me/${user}?start=account` }]] };
+}
+
+/** Where "run /status for the detail" used to send people. */
+function statusKeyboard() {
+  return { inline_keyboard: [[{ text: "📊 My access", callback_data: "fenrir_status" }]] };
+}
+
+/**
+ * One reply for a /connect outcome, whether it came from the command or from
+ * the bot being made admin. Both used to word the same failures differently and
+ * both ended in "type it again".
+ *
+ * Only the recoverable outcomes get a retry. Offering "try again" for something
+ * the user cannot fix — a missing server secret, a blocked screening — is worse
+ * than saying nothing: it invites them to tap forever.
+ */
+function connectResultReply(env, result) {
+  const reason = result?.ok ? "ok" : result?.reason;
+  const replies = {
+    ok: {
+      text: "✅ This group is verified.\n\nOpen MyFenrir → My Gates and choose it from the verified Telegram group selector."
+    },
+    actor_not_admin: {
+      text: "Only a Telegram group admin can verify this group.\n\nAsk an admin of this group to tap below."
+    },
+    telegram_identity_not_linked: {
+      text: "Your MyFenrir account is not linked to Telegram yet.\n\nLink it first, then come back here and tap Try again.",
+      reply_markup: connectRetryKeyboard(env, { link: true })
+    },
+    bot_permissions_missing: {
+      text: "Fenrir needs to be an admin here with Invite Users switched on.\n\nTurn it on in this group's admin settings, then tap below.",
+      reply_markup: connectRetryKeyboard(env)
+    },
+    not_a_group: {
+      text: "Run this inside the Telegram group you want Fenrir to protect — it does not work in a private chat."
+    },
+    screening_blocked: {
+      text: "Fenrir could not verify this group. Open MyFenrir to continue."
+    },
+    sync_not_configured: {
+      text: "Group verification is not configured yet. Please contact the MyFenrir team."
+    },
+    sync_failed: {
+      text: "Fenrir could not save this group just now. Nothing is lost — tap below to retry.",
+      reply_markup: connectRetryKeyboard(env)
+    }
+  };
+  const reply = replies[reason] || replies.sync_failed;
+  // actor_not_admin is recoverable by a DIFFERENT person, so it gets the button
+  // too — the admin who can act is usually reading the same group.
+  if (reason === "actor_not_admin") return { ...reply, reply_markup: connectRetryKeyboard(env) };
+  return reply;
 }
 
 async function sendPayRails(env, channel, message, spanish) {
@@ -2989,7 +3143,10 @@ async function handleTelegramWebhook(request, env, url) {
           "",
           "Single-use · shown once · store it securely.",
           "Redeem: `/redeem " + code + "`"
-        ].join("\n")
+        ].join("\n"),
+        // The owner usually mints a code to hand to someone else. Forwarding a
+        // message with a button beats asking them to retype a 12-character code.
+        reply_markup: redeemKeyboard(env, code)
       });
       return json({ ok: true });
     }
@@ -3020,6 +3177,21 @@ async function handleTelegramWebhook(request, env, url) {
       callback_query_id: query.id,
       text: "Fenrir module selected."
     });
+
+    // Retry /connect without retyping it. `from` is the person who tapped, so
+    // the admin check inside syncVerifiedTelegramDestination still judges the
+    // right actor — a non-admin tapping this is rejected exactly as before.
+    if (query.data === "fenrir_connect") {
+      const result = await syncVerifiedTelegramDestination(env, channel, {
+        chat: callbackMessage.chat,
+        from: query.from
+      });
+      await telegramApi(env, channel, "sendMessage", {
+        chat_id: callbackMessage.chat.id,
+        ...connectResultReply(env, result)
+      });
+      return json({ ok: true });
+    }
 
     if (query.data === "fenrir_subscribe") {
       // `from` MUST be the person who tapped, not query.message.from — on a
@@ -3091,7 +3263,10 @@ async function handleTelegramWebhook(request, env, url) {
       if (becameAdmin) {
         await telegramApi(env, channel, "sendMessage", {
           chat_id: membership.chat.id,
-          text: "Make Fenrir an admin and enable Invite Users, then run /connect again."
+          // The operator is one screen away from Telegram's permission toggles.
+          // Asking them to come back and type a command is where this flow died.
+          text: "Fenrir is an admin here but cannot invite yet.\n\nTurn on Invite Users in this group's admin settings, then tap below.",
+          reply_markup: connectRetryKeyboard(env)
         });
       }
       return json({ ok: true });
@@ -3099,18 +3274,9 @@ async function handleTelegramWebhook(request, env, url) {
     if (wasReady) return json({ ok: true });
 
     const result = await syncVerifiedTelegramDestination(env, channel, membership);
-    const autoReplies = {
-      ok: "✅ This group is verified. Open MyFenrir → My Gates and choose it from the verified Telegram group selector.",
-      actor_not_admin: "Only a Telegram group admin can verify this group.",
-      telegram_identity_not_linked:
-        "Link your MyFenrir account first in a private chat with /link, then run /connect here again.",
-      screening_blocked: "Fenrir could not verify this group. Open MyFenrir to continue.",
-      sync_not_configured: "Group verification is not configured yet. Please contact the MyFenrir team.",
-      sync_failed: "Fenrir could not save this group just now. Run /connect to retry."
-    };
     await telegramApi(env, channel, "sendMessage", {
       chat_id: membership.chat.id,
-      text: autoReplies[result.ok ? "ok" : result.reason] || autoReplies.sync_failed
+      ...connectResultReply(env, result)
     });
     return json({ ok: true });
   }
@@ -3216,6 +3382,21 @@ async function handleTelegramWebhook(request, env, url) {
     return json({ ok: true });
   }
 
+  // `/start redeem_<CODE>` — the button attached to a freshly minted courtesy
+  // code. Same rule as the Stars deep link: it MUST sit above menuIntent, which
+  // swallows every /start regardless of payload.
+  const deepLinkCode = redeemDeepLinkCode(text);
+  if (deepLinkCode) {
+    const telegramUserId = String(message.from?.id || message.chat.id);
+    const result = await redeemCourtesyCode(env, deepLinkCode, telegramUserId, String(message.chat.id));
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: message.chat.id,
+      text: courtesyRedeemReply(result),
+      ...(result.ok ? {} : { reply_markup: redeemFailureKeyboard(env, result.reason) })
+    });
+    return json({ ok: true });
+  }
+
   if (/^\/start(?:@[A-Za-z0-9_]+)?(?:\s+gate)?$/i.test(text)) {
     await sendIdentityWelcome(env, channel, message);
     return json({ ok: true });
@@ -3231,22 +3412,16 @@ async function handleTelegramWebhook(request, env, url) {
   // group into the owner's Community Bridge dashboard selector.
   if (commandForThisBot(text, "connect", env)) {
     const result = await syncVerifiedTelegramDestination(env, channel, message);
-    const replies = {
-      ok: "✅ This group is verified. Open MyFenrir → My Gates and choose it from the verified Telegram group selector.",
-      not_a_group: "Run /connect inside the Telegram group you want Fenrir to protect.",
-      actor_not_admin: "Only a Telegram group admin can verify this group.",
-      bot_permissions_missing: "Make Fenrir an admin and enable Invite Users, then run /connect again.",
-      telegram_identity_not_linked: "Link your MyFenrir account first in a private chat with /link, then run /connect here again.",
-      sync_not_configured: "Group verification is not configured yet. Please contact the MyFenrir team.",
-      // Ni se nombra a nadie ni se dice que haya alguien bloqueado: lo primero
-      // es una acusación pública, lo segundo convierte el grupo en una cacería.
-      // El motivo y los IDs quedan en el log interno y en la pantalla del dueño.
-      screening_blocked: "Fenrir could not verify this group. Open MyFenrir to continue.",
-      sync_failed: "Fenrir could not save this group just now. Please try again."
-    };
+    // Shared with the my_chat_member path. The two used to word the same
+    // failures differently, and both ended by naming a command to retype.
+    //
+    // screening_blocked still names nobody and never says someone was blocked:
+    // the first is a public accusation, the second turns the group into a
+    // manhunt. The reason and the ids stay in the internal log and on the
+    // owner's screen.
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
-      text: replies[result.ok ? "ok" : result.reason] || replies.sync_failed
+      ...connectResultReply(env, result)
     });
     return json({ ok: true });
   }
@@ -3352,25 +3527,13 @@ async function handleTelegramWebhook(request, env, url) {
     const supplied = text.replace(/^\/redeem(?:@[A-Za-z0-9_]+)?\s*/i, "").trim();
     const telegramUserId = String(message.from?.id || message.chat.id);
     const result = await redeemCourtesyCode(env, supplied, telegramUserId, String(message.chat.id));
-    let reply;
-    if (result.ok) {
-      const until = new Date(result.courtesyUntil).toISOString().slice(0, 10);
-      reply = [
-        "🎁 Courtesy access activated — The Pack.",
-        "",
-        `Duration: ${result.durationDays} days`,
-        `Access through: ${until}`,
-        "Covers 1 linked community · multi-admin · audit logs."
-      ].join("\n");
-    } else if (result.reason === "rate_limited") {
-      reply = "Too many attempts. Please wait a few minutes and try again.";
-    } else if (result.reason === "not_linked") {
-      reply = "Redeem from a MyFenrir-linked Telegram account. Open MyFenrir → Link Telegram, then run /redeem again.";
-    } else {
-      // Generic, identical for invalid / expired / already-used (anti-enumeration).
-      reply = "That code could not be redeemed. Check it and try again, or contact MyFenrir support.";
-    }
-    await telegramApi(env, channel, "sendMessage", { chat_id: message.chat.id, text: reply });
+    // Same wording as the one-tap deep link — one helper, so the two paths
+    // cannot drift.
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: message.chat.id,
+      text: courtesyRedeemReply(result),
+      ...(result.ok ? {} : { reply_markup: redeemFailureKeyboard(env, result.reason) })
+    });
     return json({ ok: true });
   }
 
@@ -3391,7 +3554,8 @@ async function handleTelegramWebhook(request, env, url) {
     if (alreadyIn) {
       await telegramApi(env, channel, "sendMessage", {
         chat_id: message.chat.id,
-        text: alreadyActiveText(entitlement, spanishIntent(text))
+        text: alreadyActiveText(entitlement, spanishIntent(text)),
+        reply_markup: statusKeyboard()
       });
       return json({ ok: true });
     }
@@ -3406,7 +3570,8 @@ async function handleTelegramWebhook(request, env, url) {
     if (alreadyIn) {
       await telegramApi(env, channel, "sendMessage", {
         chat_id: message.chat.id,
-        text: alreadyActiveText(entitlement, spanishIntent(text))
+        text: alreadyActiveText(entitlement, spanishIntent(text)),
+        reply_markup: statusKeyboard()
       });
       return json({ ok: true });
     }
