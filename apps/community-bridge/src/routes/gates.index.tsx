@@ -222,16 +222,10 @@ function MyGatesPage() {
             </p>
             {quota && (
               <p className="mt-3 text-xs font-medium text-muted-foreground">
-                {/* El "∞" prometía un cupo sin techo: PACK_GATE_LIMIT es finito
-                    e igual al de Free. El eje que se paga son las comunidades
-                    enlazadas, no el número de Gates. */}
-                {quota.used} of {quota.limit} gates used
-                {` · ${
-                  quota.profileType === "free"
-                    ? `Free: ${FREE_GATE_LIMIT} Gates`
-                    : "The Pack · billed per linked community"
-                }`}
-                {!quota.canCreate && " · Gate draft limit reached"}
+                {quota.used} of {quota.limit} Gate drafts used
+                {` · ${verifiedDestinations.length} verified Telegram ${verifiedDestinations.length === 1 ? "group" : "groups"}`}
+                {` · ${quota.profileType === "free" ? "Free workspace" : "The Pack workspace"}`}
+                {!quota.canCreate && " · Draft limit reached"}
               </p>
             )}
           </div>
