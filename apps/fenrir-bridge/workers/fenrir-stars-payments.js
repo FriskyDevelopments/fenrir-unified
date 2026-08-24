@@ -90,6 +90,17 @@ const NOWPAYMENTS_PACK_PRICE_USD = 14.99;
  * The invoice amount AND the granted duration both come from this table — the
  * IPN must never infer one from the other.
  */
+/**
+ * Telegram fija el periodo de suscripción en 30 días y no admite otro. Ése es
+ * el único vencimiento posible para el riel de Stars, y hay que escribirlo:
+ * la comprobación de acceso trata `current_period_end IS NULL` como ACTIVO,
+ * así que una fila sin fecha es acceso perpetuo.
+ */
+const STARS_PERIOD_DAYS = 30;
+function starsPeriodEnd() {
+  return new Date(Date.now() + STARS_PERIOD_DAYS * 86400000).toISOString();
+}
+
 const NOWPAYMENTS_LADDER = {
   monthly: { amount: 14.99, days: 30, label: "1 month" },
   quarter: { amount: 39.99, days: 91, label: "3 months" },
@@ -387,10 +398,11 @@ async function handleCommunityBillingStatus(request, env) {
           `INSERT INTO billing_subscriptions (
             stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
             current_period_end, cancel_at_period_end, created_at, updated_at
-          ) VALUES (?, ?, ?, 'standard', 'active', NULL, 0, ?, ?)
+          ) VALUES (?, ?, ?, 'standard', 'active', ?, 0, ?, ?)
           ON CONFLICT(stripe_subscription_id) DO UPDATE SET
-            frisky_org_id = excluded.frisky_org_id, status = 'active', plan = 'standard', updated_at = excluded.updated_at`
-        ).bind(`stars:${telegramUserId}`, userId, `stars_${telegramUserId}`, ts, ts),
+            frisky_org_id = excluded.frisky_org_id, status = 'active', plan = 'standard',
+            current_period_end = excluded.current_period_end, updated_at = excluded.updated_at`
+        ).bind(`stars:${telegramUserId}`, userId, `stars_${telegramUserId}`, starsPeriodEnd(), ts, ts),
         env.DB.prepare(
           `UPDATE telegram_stars_entitlements SET frisky_org_id = ?, frisky_user_id = ?, plan = 'standard', updated_at = ? WHERE telegram_user_id = ?`
         ).bind(userId, userId, ts, telegramUserId)
@@ -530,16 +542,16 @@ async function applyStarsMembership(env, telegramUserId) {
       `INSERT INTO billing_subscriptions (
         stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
         current_period_end, cancel_at_period_end, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'active', NULL, 0, ?, ?)
+      ) VALUES (?, ?, ?, ?, 'active', ?, 0, ?, ?)
       ON CONFLICT(stripe_subscription_id) DO UPDATE SET
         frisky_org_id = excluded.frisky_org_id,
         stripe_customer_id = excluded.stripe_customer_id,
         plan = excluded.plan,
         status = 'active',
-        current_period_end = NULL,
+        current_period_end = excluded.current_period_end,
         cancel_at_period_end = 0,
         updated_at = excluded.updated_at`
-    ).bind(`stars:${telegramUserId}`, link.frisky_org_id, `stars_${telegramUserId}`, safePlan, ts, ts),
+    ).bind(`stars:${telegramUserId}`, link.frisky_org_id, `stars_${telegramUserId}`, safePlan, starsPeriodEnd(), ts, ts),
     env.DB.prepare(
       `UPDATE telegram_stars_entitlements
        SET frisky_org_id = ?, frisky_user_id = ?, plan = ?, updated_at = ?
