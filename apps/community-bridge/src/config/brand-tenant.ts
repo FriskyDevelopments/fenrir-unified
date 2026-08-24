@@ -116,6 +116,7 @@ export interface BrandTenantRow extends BrandTenantInput {
 export const BRAND_TENANT_COLUMNS =
   "id, updated_at, brand_id, name, tagline, hostnames, providers, theme, logo_url, wordmark_url, community_id, community_label, gate_preset, terminal_command, login_headline, login_subheadline, login_signin_label, login_signup_label, login_forgot_label, login_terminal_header, login_terminal_lines, activate_headline, activate_subheadline, activate_steps_title, activate_bot_label, activate_submit_label, activate_success_headline, after_login_path, oauth_return_path, site_url, terms_url, privacy_url, survey_sample_pct, is_active";
 
+
 export function emptyBrandTenant(): BrandTenantInput {
   return {
     brand_id: "",

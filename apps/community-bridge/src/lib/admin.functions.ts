@@ -72,21 +72,6 @@ export const listUsersWithRoles = createServerFn({ method: "GET" })
 
 export const adminSetUserBlocked = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
-    z.object({ target: z.string().uuid(), blocked: z.boolean() }).parse(data),
-  )
-  .handler(async ({ context, data }) => {
-    const { privateRpc } = await import("@/integrations/supabase/client.server");
-    const { error } = await privateRpc("admin_set_user_blocked", {
-      _caller: context.userId,
-      _target: data.target,
-      _blocked: data.blocked,
-    });
-    if (error) throw adminError(error.message, error);
-  });
-
-export const adminUpdateUserRole = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z.object({ target: z.string().uuid(), role: appRoleSchema }).parse(data),
   )

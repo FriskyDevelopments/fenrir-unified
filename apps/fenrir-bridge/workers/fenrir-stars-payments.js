@@ -83,6 +83,30 @@ async function stripeRequest(env, path, params) {
 const LIVE_FOUNDERS_MONTHLY_PRICE = "price_1U45nNLxUF54S071oRPYXOec";
 const LIVE_FOUNDERS_ANNUAL_PRICE = "price_1U4bO5LxUF54S071qvkmFT0V";
 const NOWPAYMENTS_PACK_PRICE_USD = 14.99;
+
+/**
+ * Crypto ladder. Crypto is the only rail that can carry more than two periods:
+ * each payment is a one-shot invoice, so there is no subscription clock.
+ * The invoice amount AND the granted duration both come from this table — the
+ * IPN must never infer one from the other.
+ */
+/**
+ * Telegram fija el periodo de suscripción en 30 días y no admite otro. Ése es
+ * el único vencimiento posible para el riel de Stars, y hay que escribirlo:
+ * la comprobación de acceso trata `current_period_end IS NULL` como ACTIVO,
+ * así que una fila sin fecha es acceso perpetuo.
+ */
+const STARS_PERIOD_DAYS = 30;
+function starsPeriodEnd() {
+  return new Date(Date.now() + STARS_PERIOD_DAYS * 86400000).toISOString();
+}
+
+const NOWPAYMENTS_LADDER = {
+  monthly: { amount: 14.99, days: 30, label: "1 month" },
+  quarter: { amount: 39.99, days: 91, label: "3 months" },
+  half: { amount: 74.99, days: 182, label: "6 months" },
+  annual: { amount: 149.0, days: 365, label: "1 year" }
+};
 export function foundersPriceId(env, billingPeriod) {
   return billingPeriod === "annual"
     ? normalizeText(env?.STRIPE_PACK_ANNUAL_PRICE_ID) || LIVE_FOUNDERS_ANNUAL_PRICE
@@ -211,15 +235,18 @@ async function handleFoundersNowPaymentsCheckout(request, env) {
   const body = await request.json().catch(() => null);
   const userId = normalizeText(body?.userId);
   if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ ok: false, error: "invalid_identity" }, { status: 400 });
-  const orderId = `mf-${userId}-${Date.now()}`;
+  const period = NOWPAYMENTS_LADDER[normalizeText(body?.billingPeriod)] ? normalizeText(body.billingPeriod) : "monthly";
+  const tier = NOWPAYMENTS_LADDER[period];
+  // El periodo viaja en el order_id porque el IPN es la única fuente que lo verá.
+  const orderId = `mf-${userId}-${period}-${Date.now()}`;
   const response = await fetch("https://api.nowpayments.io/v1/invoice", {
     method: "POST",
     headers: { "x-api-key": apiKey, "content-type": "application/json" },
     body: JSON.stringify({
-      price_amount: NOWPAYMENTS_PACK_PRICE_USD,
+      price_amount: tier.amount,
       price_currency: "usd",
       order_id: orderId,
-      order_description: "The Pack · MyFenrir · $14.99/month",
+      order_description: `The Pack · MyFenrir · ${tier.label} · $${tier.amount.toFixed(2)}`,
       ipn_callback_url: "https://fenrir-stars-payments.hrgrrtks2p.workers.dev/api/nowpayments/ipn",
       success_url: "https://communities.myfenrir.com/upgrade?nowpayments=processing",
       cancel_url: "https://communities.myfenrir.com/upgrade?nowpayments=cancel",
@@ -237,15 +264,21 @@ async function handleNowPaymentsIpn(request, env) {
   const body = await request.json().catch(() => null);
   if (!body || !(await verifyNowPaymentsIpn(request, env, body))) return json({ ok: false, error: "invalid_signature" }, { status: 401 });
   if (!new Set(["finished", "confirmed"]).has(normalizeText(body.payment_status).toLowerCase())) return json({ ok: true, activated: false });
-  const match = /^mf-([0-9a-f-]{36})-\d+$/i.exec(normalizeText(body.order_id));
+  // El segmento de periodo es opcional: las facturas viejas (`mf-<uuid>-<ts>`) son mensuales.
+  const match = /^mf-([0-9a-f-]{36})-(?:(monthly|quarter|half|annual)-)?\d+$/i.exec(normalizeText(body.order_id));
+  const period = match ? (match[2] || "monthly").toLowerCase() : null;
+  const tier = period ? NOWPAYMENTS_LADDER[period] : null;
   if (
     !match ||
+    !tier ||
     normalizeText(body.price_currency).toLowerCase() !== "usd" ||
-    Number(body.price_amount) !== NOWPAYMENTS_PACK_PRICE_USD
+    Number(body.price_amount) !== tier.amount
   ) {
     return json({ ok: false, error: "invalid_order" }, { status: 400 });
   }
   const userId = match[1];
+  // Sin esto el acceso de cripto no vencía nunca: se pagaba un mes y quedaba de por vida.
+  const periodEnd = new Date(Date.now() + tier.days * 86400000).toISOString();
   const paymentId = normalizeText(String(body.payment_id || body.invoice_id || ""));
   if (!paymentId) return json({ ok: false, error: "missing_payment_id" }, { status: 400 });
   const ts = nowIso();
@@ -253,13 +286,14 @@ async function handleNowPaymentsIpn(request, env) {
     `INSERT INTO billing_subscriptions (
       stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
       current_period_end, cancel_at_period_end, created_at, updated_at
-    ) VALUES (?, ?, ?, 'standard', 'active', NULL, 0, ?, ?)
+    ) VALUES (?, ?, ?, 'standard', 'active', ?, 0, ?, ?)
     ON CONFLICT(stripe_subscription_id) DO UPDATE SET
       frisky_org_id = excluded.frisky_org_id,
       plan = 'standard',
       status = 'active',
+      current_period_end = excluded.current_period_end,
       updated_at = excluded.updated_at`
-  ).bind(`nowpayments:${paymentId}`, userId, `nowpayments_${paymentId}`, ts, ts).run();
+  ).bind(`nowpayments:${paymentId}`, userId, `nowpayments_${paymentId}`, periodEnd, ts, ts).run();
   return json({ ok: true, activated: true });
 }
 
@@ -364,10 +398,11 @@ async function handleCommunityBillingStatus(request, env) {
           `INSERT INTO billing_subscriptions (
             stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
             current_period_end, cancel_at_period_end, created_at, updated_at
-          ) VALUES (?, ?, ?, 'standard', 'active', NULL, 0, ?, ?)
+          ) VALUES (?, ?, ?, 'standard', 'active', ?, 0, ?, ?)
           ON CONFLICT(stripe_subscription_id) DO UPDATE SET
-            frisky_org_id = excluded.frisky_org_id, status = 'active', plan = 'standard', updated_at = excluded.updated_at`
-        ).bind(`stars:${telegramUserId}`, userId, `stars_${telegramUserId}`, ts, ts),
+            frisky_org_id = excluded.frisky_org_id, status = 'active', plan = 'standard',
+            current_period_end = excluded.current_period_end, updated_at = excluded.updated_at`
+        ).bind(`stars:${telegramUserId}`, userId, `stars_${telegramUserId}`, starsPeriodEnd(), ts, ts),
         env.DB.prepare(
           `UPDATE telegram_stars_entitlements SET frisky_org_id = ?, frisky_user_id = ?, plan = 'standard', updated_at = ? WHERE telegram_user_id = ?`
         ).bind(userId, userId, ts, telegramUserId)
@@ -507,16 +542,16 @@ async function applyStarsMembership(env, telegramUserId) {
       `INSERT INTO billing_subscriptions (
         stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
         current_period_end, cancel_at_period_end, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'active', NULL, 0, ?, ?)
+      ) VALUES (?, ?, ?, ?, 'active', ?, 0, ?, ?)
       ON CONFLICT(stripe_subscription_id) DO UPDATE SET
         frisky_org_id = excluded.frisky_org_id,
         stripe_customer_id = excluded.stripe_customer_id,
         plan = excluded.plan,
         status = 'active',
-        current_period_end = NULL,
+        current_period_end = excluded.current_period_end,
         cancel_at_period_end = 0,
         updated_at = excluded.updated_at`
-    ).bind(`stars:${telegramUserId}`, link.frisky_org_id, `stars_${telegramUserId}`, safePlan, ts, ts),
+    ).bind(`stars:${telegramUserId}`, link.frisky_org_id, `stars_${telegramUserId}`, safePlan, starsPeriodEnd(), ts, ts),
     env.DB.prepare(
       `UPDATE telegram_stars_entitlements
        SET frisky_org_id = ?, frisky_user_id = ?, plan = ?, updated_at = ?
@@ -1283,6 +1318,88 @@ export function telegramCommunityId(chatId) {
   return `telegram-${String(chatId).replace(/^-/, "")}`;
 }
 
+/**
+ * Gobierno del grupo: quién es el dueño y quiénes los admins, con permisos.
+ *
+ * `getChatAdministrators` lo da todo en UNA llamada. Se guarda para dos cosas:
+ * saber de quién es el grupo de verdad, y detectar más tarde que el dueño
+ * cambió — hoy sólo se comprobaba que quien escribe sea admin, y eso no dice
+ * nada de los demás.
+ *
+ * Nunca lanza. Si Telegram no responde, devuelve `null` y el alta sigue sin
+ * gobierno: registrar el grupo es más importante que adornarlo.
+ */
+async function mapGroupGovernance(env, channel, chatId) {
+  const res = await telegramApi(env, channel, "getChatAdministrators", { chat_id: chatId }).catch(() => null);
+  const list = res?.result;
+  if (!Array.isArray(list)) return null;
+  const admins = list.map((entry) => ({
+    telegramUserId: String(entry?.user?.id ?? ""),
+    status: entry?.status === "creator" ? "creator" : "administrator",
+    isBot: entry?.user?.is_bot === true,
+    // El dueño tiene todos los permisos implícitos; Telegram no siempre los
+    // incluye en su variante de ChatMember.
+    canInviteUsers: entry?.status === "creator" || entry?.can_invite_users === true,
+    canRestrictMembers: entry?.status === "creator" || entry?.can_restrict_members === true,
+    canPromoteMembers: entry?.status === "creator" || entry?.can_promote_members === true
+  })).filter((admin) => admin.telegramUserId);
+  if (admins.length === 0) return null;
+  const owner = admins.find((admin) => admin.status === "creator");
+  return {
+    ownerTelegramUserId: owner ? owner.telegramUserId : null,
+    admins: admins.slice(0, 100),
+    mappedAt: nowIso()
+  };
+}
+
+/**
+ * Cribado de los admins contra la lista de bloqueo.
+ *
+ * SE LLAMA APARTE Y DESPUÉS del alta, a propósito. Un timeout de un tercero no
+ * puede tumbar el registro de un grupo: si el proveedor tarda o cae, el estado
+ * queda `unavailable` y el destino se verifica igual. Sólo un `blocked` real
+ * —una respuesta afirmativa, no una ausencia de respuesta— retiene la
+ * verificación.
+ *
+ * Los bots del propio grupo se excluyen: no son personas y no se criban.
+ *
+ * NOTA DE ALCANCE: Didit es la fuente de verdad de bloqueos porque ya lo es
+ * para el KYC de activación; una tabla casera crearía dos listas que divergen.
+ * El puente concreto con su API todavía no está cableado — hasta entonces esto
+ * devuelve `pending` de forma explícita, que es la verdad, en vez de fingir un
+ * `clear` que nadie ha comprobado.
+ */
+async function screenGroupAdmins(env, governance) {
+  if (!governance) return { state: "pending", provider: "didit", reason: "governance_unavailable" };
+  const humans = governance.admins.filter((admin) => !admin.isBot).map((admin) => admin.telegramUserId);
+  if (humans.length === 0) return { state: "clear", provider: "didit", checkedAt: nowIso() };
+  const endpoint = normalizeText(env.DIDIT_BLOCKLIST_CHECK_URL);
+  const key = normalizeText(env.DIDIT_API_KEY);
+  if (!endpoint || !key) {
+    // Sin configurar no es "limpio": es "no comprobado". Se dice cuál de los dos.
+    return { state: "pending", provider: "didit", reason: "screening_not_configured" };
+  }
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ telegramUserIds: humans })
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok || !body) {
+      console.error("group_admin_screening_unavailable", response.status || 0);
+      return { state: "unavailable", provider: "didit", reason: "provider_error" };
+    }
+    const blocked = Array.isArray(body.blocked) ? body.blocked.map(String) : [];
+    return blocked.length > 0
+      ? { state: "blocked", provider: "didit", checkedAt: nowIso(), blockedTelegramUserIds: blocked }
+      : { state: "clear", provider: "didit", checkedAt: nowIso() };
+  } catch {
+    console.error("group_admin_screening_failed");
+    return { state: "unavailable", provider: "didit", reason: "request_failed" };
+  }
+}
+
 async function syncVerifiedTelegramDestination(env, channel, message) {
   const secret = normalizeText(env.COMMUNITY_BRIDGE_DESTINATION_SYNC_SECRET);
   if (!secret) return { ok: false, reason: "sync_not_configured" };
@@ -1308,6 +1425,17 @@ async function syncVerifiedTelegramDestination(env, channel, message) {
     return { ok: false, reason: "bot_permissions_missing" };
   }
 
+  // DOS TIEMPOS, en este orden y no al revés.
+  //
+  // 1) El gobierno del grupo se mapea antes del alta porque es una sola llamada
+  //    a Telegram —el mismo servicio con el que ya estamos hablando— y sin él
+  //    el cribado no sabría a quién cribar. Si falla, `null`: el alta sigue.
+  // 2) El cribado va DESPUÉS y contra un tercero. Nunca bloquea el alta por
+  //    indisponibilidad: sólo un `blocked` afirmativo retiene la verificación.
+  //    El servidor deriva el `status` del `screening`; aquí no se elige.
+  const governance = await mapGroupGovernance(env, channel, chat.id);
+  const screening = await screenGroupAdmins(env, governance);
+
   const destinationUrl =
     normalizeText(env.COMMUNITY_BRIDGE_DESTINATION_SYNC_URL) ||
     "https://communities.myfenrir.com/api/internal/telegram-destination";
@@ -1319,7 +1447,9 @@ async function syncVerifiedTelegramDestination(env, channel, message) {
       communityId: telegramCommunityId(chat.id),
       telegramChatId: String(chat.id),
       displayName: normalizeText(chat.title) || `Telegram group ${chat.id}`,
-      capabilities: { botAdmin: true, canInviteUsers: true }
+      capabilities: { botAdmin: true, canInviteUsers: true },
+      ...(governance ? { governance } : {}),
+      screening
     })
   }).catch(() => null);
   const body = response ? await response.json().catch(() => null) : null;
@@ -1327,7 +1457,12 @@ async function syncVerifiedTelegramDestination(env, channel, message) {
     console.error("telegram_destination_sync_failed", response?.status || 0, body?.error || "request_failed");
     return { ok: false, reason: body?.error || "sync_failed" };
   }
-  return { ok: true, communityId: telegramCommunityId(chat.id) };
+  // El detalle de quién está bloqueado va al log interno, jamás al chat.
+  if (screening.state === "blocked") {
+    console.error("group_admin_screening_blocked", telegramCommunityId(chat.id), (screening.blockedTelegramUserIds || []).join(","));
+    return { ok: false, reason: "screening_blocked" };
+  }
+  return { ok: true, communityId: telegramCommunityId(chat.id), screening: screening.state };
 }
 // Member profile: plan, access, and courtesy window if any. Resolves from the
 // Telegram identity link → billing_subscriptions (with expiry) and the Stars
@@ -1960,6 +2095,69 @@ async function handleTelegramWebhook(request, env, url) {
     return json({ ok: true });
   }
 
+  // ---------------------------------------------------------------------
+  // Alta automática del grupo: promover al bot ES la señal de registro.
+  //
+  // El gatekeeper —dueño del webhook— reenvía `my_chat_member` hasta aquí,
+  // porque `/connect` y `syncVerifiedTelegramDestination` viven en este worker.
+  // Sin este bloque el reenvío llegaba y moría: más abajo se lee
+  // `update.message`, que en un `my_chat_member` es `undefined`, así que el
+  // update caía al vacío sin ejecutar nada ni dejar rastro. La cadena existía
+  // entera menos su último eslabón.
+  //
+  // `my_chat_member` trae `chat` y `from` al mismo nivel que un `message`, así
+  // que se pasa tal cual a `syncVerifiedTelegramDestination`: `from` es quien
+  // promovió al bot, y sirve igual para resolver identidad.
+  // ---------------------------------------------------------------------
+  if (update.my_chat_member) {
+    const membership = update.my_chat_member;
+    const chatType = membership.chat?.type;
+    if (chatType !== "group" && chatType !== "supergroup") return json({ ok: true });
+
+    // Sólo la TRANSICIÓN a "puede invitar" dispara el alta. Sin esto, cada
+    // reentrega de Telegram volvería a escribir en el grupo. El owner tiene los
+    // permisos implícitos y Telegram no siempre los enumera.
+    const canInvite = (member) =>
+      member?.status === "creator" ||
+      member?.status === "owner" ||
+      (member?.status === "administrator" && member?.can_invite_users === true);
+    const wasReady = canInvite(membership.old_chat_member);
+    const isReady = canInvite(membership.new_chat_member);
+
+    if (!isReady) {
+      // Se hizo admin pero sin permiso de invitar: es el error más común y el
+      // operador no tiene forma de adivinarlo. Se avisa una sola vez, en la
+      // transición a administrator, no en cada reentrega.
+      const becameAdmin =
+        membership.new_chat_member?.status === "administrator" &&
+        membership.old_chat_member?.status !== "administrator";
+      if (becameAdmin) {
+        await telegramApi(env, channel, "sendMessage", {
+          chat_id: membership.chat.id,
+          text: "Make Fenrir an admin and enable Invite Users, then run /connect again."
+        });
+      }
+      return json({ ok: true });
+    }
+    if (wasReady) return json({ ok: true });
+
+    const result = await syncVerifiedTelegramDestination(env, channel, membership);
+    const autoReplies = {
+      ok: "✅ This group is verified. Open MyFenrir → My Gates and choose it from the verified Telegram group selector.",
+      actor_not_admin: "Only a Telegram group admin can verify this group.",
+      telegram_identity_not_linked:
+        "Link your MyFenrir account first in a private chat with /link, then run /connect here again.",
+      screening_blocked: "Fenrir could not verify this group. Open MyFenrir to continue.",
+      sync_not_configured: "Group verification is not configured yet. Please contact the MyFenrir team.",
+      sync_failed: "Fenrir could not save this group just now. Run /connect to retry."
+    };
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: membership.chat.id,
+      text: autoReplies[result.ok ? "ok" : result.reason] || autoReplies.sync_failed
+    });
+    return json({ ok: true });
+  }
+
   const message = update.message;
   if (message?.successful_payment) {
     const payment = message.successful_payment;
@@ -2057,6 +2255,10 @@ async function handleTelegramWebhook(request, env, url) {
       bot_permissions_missing: "Make Fenrir an admin and enable Invite Users, then run /connect again.",
       telegram_identity_not_linked: "Link your MyFenrir account first in a private chat with /link, then run /connect here again.",
       sync_not_configured: "Group verification is not configured yet. Please contact the MyFenrir team.",
+      // Ni se nombra a nadie ni se dice que haya alguien bloqueado: lo primero
+      // es una acusación pública, lo segundo convierte el grupo en una cacería.
+      // El motivo y los IDs quedan en el log interno y en la pantalla del dueño.
+      screening_blocked: "Fenrir could not verify this group. Open MyFenrir to continue.",
       sync_failed: "Fenrir could not save this group just now. Please try again."
     };
     await telegramApi(env, channel, "sendMessage", {

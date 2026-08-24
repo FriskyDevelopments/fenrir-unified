@@ -51,6 +51,21 @@ const PRICE = {
   annual: { amount: "149", stars: null },
 } as const;
 
+/**
+ * Crypto ladder. Card and Stars cannot ride it: Stripe carries two price objects
+ * and Telegram fixes the period at 30 days. Crypto can, because every crypto
+ * payment is a one-shot invoice — no recurring charge, no chargeback — so a
+ * longer period costs us less to carry and that saving is passed on.
+ */
+const CRYPTO_LADDER = [
+  { key: "monthly", label: "1 month", amount: "14.99" },
+  { key: "quarter", label: "3 months", amount: "39.99" },
+  { key: "half", label: "6 months", amount: "74.99" },
+  { key: "annual", label: "1 year", amount: "149.00" },
+] as const;
+
+type CryptoPeriod = (typeof CRYPTO_LADDER)[number]["key"];
+
 /** $14.99 x 12 = $179.88. $179.88 - $149 = $30.88. Say the money, not the percent. */
 const ANNUAL_SAVING = "$30.88";
 
@@ -112,7 +127,7 @@ const COPY = {
   starsAnnual: "Telegram fixes the period at 30 days. There is no annual Stars plan.",
   crypto: "Pay with crypto",
   cryptoNote: "NOWPayments shows its processing fee before you pay.",
-  cryptoAnnual: "The annual crypto invoice is not wired up yet.",
+  cryptoLadder: "Pay less by choosing a longer period.",
   cardOff: "Card payments are being set up.",
   starsOff: "The Telegram bot is offline.",
   cryptoOff: "Crypto payments are being set up.",
@@ -189,6 +204,7 @@ const SPRING: Transition = { type: "spring", stiffness: 420, damping: 32, mass: 
 export function PackRails() {
   const reduce = useReducedMotion();
   const [period, setPeriod] = useState<Period>("monthly");
+  const [cryptoPeriod, setCryptoPeriod] = useState<CryptoPeriod>("monthly");
   const [options, setOptions] = useState<Options | null>(null);
   const [busy, setBusy] = useState<Rail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -236,7 +252,7 @@ export function PackRails() {
           return;
         }
         if (rail === "crypto") {
-          const { url } = await createFoundersNowPaymentsCheckout();
+          const { url } = await createFoundersNowPaymentsCheckout({ data: { billingPeriod: cryptoPeriod } });
           window.location.href = url;
           return;
         }
@@ -246,8 +262,11 @@ export function PackRails() {
         setBusy(null);
       }
     },
-    [period, t.failed],
+    [period, cryptoPeriod, t.failed],
   );
+
+  const cryptoAmount =
+    CRYPTO_LADDER.find((tier) => tier.key === cryptoPeriod)?.amount ?? PRICE.monthly.amount;
 
   const loading = options === null;
   const annual = period === "annual";
@@ -539,18 +558,50 @@ export function PackRails() {
             onClick={() => void go("stars")}
           />
 
+          <div className="mt-1">
+            <div
+              role="radiogroup"
+              aria-label={t.cryptoLadder}
+              className="flex flex-wrap gap-1.5 rounded-xl border border-white/10 p-1.5"
+              style={{ background: "rgba(8,11,22,0.5)" }}
+            >
+              {CRYPTO_LADDER.map((tier) => {
+                const on = cryptoPeriod === tier.key;
+                return (
+                  <button
+                    key={tier.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => setCryptoPeriod(tier.key)}
+                    className="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
+                    style={{
+                      background: on ? "var(--fd-cyan)" : "transparent",
+                      color: on ? "var(--fd-midnight)" : "var(--fd-muted)",
+                    }}
+                  >
+                    {tier.label} · ${tier.amount}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-xs" style={{ color: "var(--fd-muted)" }}>
+              {t.cryptoLadder}
+            </p>
+          </div>
+
           <RailButton
             index={2}
             reduce={reduce}
             accent="var(--fd-cyan)"
             icon={<Bitcoin className="h-4 w-4" />}
-            label={`${t.crypto} · $${price.amount}`}
+            label={`${t.crypto} · $${cryptoAmount}`}
             note={t.cryptoNote}
             busy={busy === "crypto"}
             dimmed={busy !== null && busy !== "crypto"}
             loading={loading}
-            available={!annual && (options?.nowpayments ?? false)}
-            unavailableNote={annual ? t.cryptoAnnual : t.cryptoOff}
+            available={options?.nowpayments ?? false}
+            unavailableNote={t.cryptoOff}
             checkingNote={t.checking}
             onClick={() => void go("crypto")}
           />

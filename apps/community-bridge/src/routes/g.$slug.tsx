@@ -55,14 +55,11 @@ export const Route = createFileRoute("/g/$slug")({
       // el documento salía 500 sin Retry-After. Devolverlo como estado
       // conserva el 503 y las cabeceras. `notFound()` sigue propagándose.
       if (isGateUnavailableError(error)) {
-        // El status hay que fijarlo AQUÍ: el que pone getPublicGate lo pisa el
-        // render del documento (verificado: lanzando salía 500, devolviendo
-        // salía 200). El loader corre dentro del mismo contexto de petición y
-        // es el último punto donde el valor sobrevive. Sólo en servidor.
-        if (import.meta.env.SSR) {
-          const { setResponseStatus } = await import("@tanstack/react-start/server");
-          setResponseStatus(503, "Gate directory unavailable");
-        }
+        // getPublicGate, which is the server-only boundary, has already set
+        // Retry-After, Cache-Control and the private unavailable marker. The
+        // server entry translates that marker into the final 503. Keeping this
+        // route free of server imports lets Vite safely include it in the
+        // client route bundle as well.
         return { gateUnavailable: true } as const;
       }
       throw error;
