@@ -45,11 +45,16 @@ export const listUsersWithRoles = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const supabaseAdmin = await requireOwner(context.userId);
-    const [{ data: usersPage, error: usersError }, { data: roles, error: rolesError }] = await Promise.all([
-      supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 }),
-      supabaseAdmin.from("user_roles").select("user_id, role, telegram_id"),
-    ]);
-    if (usersError || rolesError) throw adminError(usersError?.message ?? rolesError?.message ?? "Could not load users", usersError ?? rolesError);
+    const [{ data: usersPage, error: usersError }, { data: roles, error: rolesError }] =
+      await Promise.all([
+        supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 }),
+        supabaseAdmin.from("user_roles").select("user_id, role, telegram_id, blocked_at"),
+      ]);
+    if (usersError || rolesError)
+      throw adminError(
+        usersError?.message ?? rolesError?.message ?? "Could not load users",
+        usersError ?? rolesError,
+      );
     const byUser = new Map((roles ?? []).map((row) => [row.user_id, row]));
     return (usersPage.users ?? []).map((user) => {
       const record = byUser.get(user.id);
@@ -58,6 +63,7 @@ export const listUsersWithRoles = createServerFn({ method: "GET" })
         email: user.email ?? "",
         role: user.id === context.userId ? "owner" : (record?.role ?? "user"),
         telegram_id: record?.telegram_id ?? null,
+        blocked_at: record?.blocked_at ?? null,
         created_at: user.created_at,
       };
     }) as {
@@ -72,26 +78,54 @@ export const listUsersWithRoles = createServerFn({ method: "GET" })
 
 export const adminSetUserBlocked = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data) =>
-    z.object({ target: z.string().uuid(), role: appRoleSchema }).parse(data),
-  )
+  .validator((data) => z.object({ target: z.string().uuid(), blocked: z.boolean() }).parse(data))
   .handler(async ({ context, data }) => {
     const supabaseAdmin = await requireOwner(context.userId);
-    if (data.target === context.userId && data.role !== "owner") throw adminError("The primary Owner cannot remove their own Owner role");
-    const { error } = await supabaseAdmin.from("user_roles").upsert({ user_id: data.target, role: data.role }, { onConflict: "user_id" });
+    if (data.target === context.userId)
+      throw adminError("The primary Owner cannot block their own account");
+    const { data: targetRole, error: targetError } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.target)
+      .maybeSingle();
+    if (targetError) throw adminError(targetError.message, targetError);
+    if (targetRole?.role === "owner") throw adminError("Owners cannot be blocked");
+    const { error } = await supabaseAdmin.from("user_roles").upsert(
+      {
+        user_id: data.target,
+        role: targetRole?.role ?? "user",
+        blocked_at: data.blocked ? new Date().toISOString() : null,
+      },
+      { onConflict: "user_id" },
+    );
+    if (error) throw adminError(error.message, error);
+  });
+
+export const adminUpdateUserRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => z.object({ target: z.string().uuid(), role: appRoleSchema }).parse(data))
+  .handler(async ({ context, data }) => {
+    const supabaseAdmin = await requireOwner(context.userId);
+    if (data.target === context.userId && data.role !== "owner") {
+      throw adminError("The primary Owner cannot remove their own Owner role");
+    }
+    const { error } = await supabaseAdmin
+      .from("user_roles")
+      .upsert({ user_id: data.target, role: data.role }, { onConflict: "user_id" });
     if (error) throw adminError(error.message, error);
   });
 
 export const adminSetUserTelegramId = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data) =>
-    z
-      .object({ target: z.string().uuid(), telegramId: z.number().nullable() })
-      .parse(data),
+    z.object({ target: z.string().uuid(), telegramId: z.number().nullable() }).parse(data),
   )
   .handler(async ({ context, data }) => {
     const supabaseAdmin = await requireOwner(context.userId);
-    const { error } = await supabaseAdmin.from("user_roles").update({ telegram_id: data.telegramId }).eq("user_id", data.target);
+    const { error } = await supabaseAdmin
+      .from("user_roles")
+      .update({ telegram_id: data.telegramId })
+      .eq("user_id", data.target);
     if (error) throw adminError(error.message, error);
   });
 
@@ -100,9 +134,9 @@ export const redeemTelegramLinkCode = createServerFn({ method: "POST" })
   .validator((data) => z.object({ code: z.string().min(1).max(20) }).parse(data))
   .handler(async ({ context, data }) => {
     const { data: result, error } = await adminRpc("server_redeem_telegram_link_code", {
-        _caller: context.userId,
-        _code: data.code,
-      });
+      _caller: context.userId,
+      _code: data.code,
+    });
     if (error) throw adminError(error.message, error);
     return result as boolean;
   });
