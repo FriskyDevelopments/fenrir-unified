@@ -1424,6 +1424,36 @@ async function handleStripeOps(request, env) {
     });
   }
 
+  // Read a real Checkout Session back, verbatim. Needed to see what Stripe
+  // actually built — in particular the currency and amounts, which Adaptive
+  // Pricing can convert away from the list price the validator expects.
+  if (action === "inspect_session") {
+    const sessionId = normalizeText(body?.sessionId);
+    if (!/^cs_(test_|live_)?[A-Za-z0-9]+$/.test(sessionId)) {
+      return json({ ok: false, error: "invalid_session" }, { status: 400 });
+    }
+    const s = await stripeRequest(env, `/checkout/sessions/${encodeURIComponent(sessionId)}`);
+    return json({
+      ok: true,
+      id: s?.id,
+      mode: s?.mode,
+      status: s?.status,
+      payment_status: s?.payment_status,
+      currency: s?.currency,
+      amount_subtotal: s?.amount_subtotal,
+      amount_total: s?.amount_total,
+      currency_conversion: s?.currency_conversion ?? null,
+      client_reference_id: s?.client_reference_id,
+      metadata: s?.metadata ?? null,
+      subscription: s?.subscription ?? null,
+      would_validate: isValidFoundersStripeSession(
+        s,
+        normalizeText(s?.metadata?.frisky_user_id),
+        normalizeText(s?.metadata?.frisky_org_id)
+      )
+    });
+  }
+
   return json({ ok: false, error: "unknown_action" }, { status: 400 });
 }
 
