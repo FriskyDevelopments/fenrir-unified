@@ -775,6 +775,84 @@ async function getEntitlement(env, telegramUserId) {
     .first();
 }
 
+/**
+ * One answer to "may this person use the product", for the whole bot.
+ *
+ * getEntitlement alone was never that answer. It reads ONE table —
+ * telegram_stars_entitlements — so the bot could only see access bought with
+ * Stars. Courtesy grants, crypto and card subscriptions all live in
+ * billing_subscriptions under a minted `frisky_org_*` id, and the bot never
+ * looked there. Anyone holding those was treated as a prospect and shown the
+ * upgrade pitch: the same two-identifier-spaces split that made the web app
+ * demand an upgrade from a paying member.
+ *
+ * The owner check comes FIRST and touches no payment row at all. An owner is an
+ * owner whether or not they ever paid, so this must not be reachable through a
+ * billing table — otherwise voiding a stale test payment turns the owner into a
+ * prospect, which is exactly what would have happened here.
+ *
+ * The shape stays entitlement-like (`status`, `stars_amount`) so every existing
+ * `entitlement?.status === "active"` caller keeps working unchanged.
+ */
+async function resolveBotAccess(env, telegramUserId) {
+  const id = String(telegramUserId || "");
+
+  if (isOwner(env, id)) {
+    return { status: "active", access_source: "owner", stars_amount: null, until: null };
+  }
+
+  const [entitlement, link] = await Promise.all([
+    getEntitlement(env, id),
+    env.DB.prepare(
+      `SELECT frisky_org_id FROM telegram_identity_links WHERE telegram_user_id = ? LIMIT 1`
+    ).bind(id).first()
+  ]);
+
+  // Stars: active AND actually paid enough. ⭐5 was 'active' and bought nothing.
+  const paid = Number(entitlement?.stars_amount);
+  if (entitlement?.status === "active" && paid >= STARS_MIN_GRANT_AMOUNT) {
+    return { ...entitlement, status: "active", access_source: "stars", stars_amount: paid, until: null };
+  }
+
+  // Every other rail — courtesy, crypto, card — via the identity link.
+  const orgId = normalizeText(link?.frisky_org_id);
+  if (orgId) {
+    const sub = await env.DB.prepare(
+      `SELECT stripe_subscription_id, plan, status, current_period_end
+         FROM billing_subscriptions
+        WHERE frisky_org_id = ? AND status IN ('active','trialing','past_due')
+        ORDER BY updated_at DESC LIMIT 1`
+    ).bind(orgId).first();
+
+    if (sub) {
+      // A row with no end date is NOT access. That is the perpetual-licence bug
+      // this codebase has already shipped twice; the bot will not be the third
+      // place that reads NULL as "forever".
+      if (!sub.current_period_end) {
+        console.error("bot_access_row_without_period_end", id, String(sub.stripe_subscription_id));
+      } else if (Date.parse(String(sub.current_period_end).replace(" ", "T")) > Date.now()) {
+        return {
+          ...(entitlement || {}),
+          status: "active",
+          access_source: "subscription",
+          stars_amount: Number.isFinite(paid) ? paid : null,
+          until: sub.current_period_end
+        };
+      }
+    }
+  }
+
+  // No access. Keep the entitlement fields so the status reply can still explain
+  // an underpaid payment sitting on the account.
+  return {
+    ...(entitlement || {}),
+    status: "inactive",
+    access_source: null,
+    stars_amount: Number.isFinite(paid) ? paid : null,
+    until: null
+  };
+}
+
 async function applyStarsMembership(env, telegramUserId) {
   const [link, entitlement] = await Promise.all([
     env.DB.prepare(
@@ -1515,6 +1593,36 @@ async function handleStripeOps(request, env) {
         normalizeText(s?.metadata?.frisky_user_id),
         normalizeText(s?.metadata?.frisky_org_id)
       )
+    });
+  }
+
+  // What the payment keyboard actually renders, straight from the deployed
+  // code. Lets the buttons and their destinations be checked without messaging
+  // anyone and without taking anyone's word for it.
+  if (action === "pay_rails") {
+    return json({
+      ok: true,
+      english: { text: payRailsText(false), reply_markup: payRailsKeyboard() },
+      spanish: { text: payRailsText(true), reply_markup: payRailsKeyboard() }
+    });
+  }
+
+  // What the bot would decide for a given Telegram id, without messaging them.
+  // `pitch` is the whole question: does this person get sold to, or not.
+  if (action === "bot_access") {
+    const id = normalizeText(String(body?.telegramUserId || ""));
+    if (!/^\d{5,20}$/.test(id)) return json({ ok: false, error: "invalid_telegram_id" }, { status: 400 });
+    const access = await resolveBotAccess(env, id);
+    const active = access?.status === "active";
+    return json({
+      ok: true,
+      telegramUserId: id,
+      status: access?.status ?? null,
+      access_source: access?.access_source ?? null,
+      stars_amount: access?.stars_amount ?? null,
+      until: access?.until ?? null,
+      pitch: !active,
+      reply: active ? alreadyActiveText(access, false) : payRailsText(false)
     });
   }
 
@@ -2424,6 +2532,115 @@ export function modularMenuText(text, entitlement) {
   ].join("\n");
 }
 
+/**
+ * The three rails as buttons.
+ *
+ * Asking someone to type “buy” before they may pay is friction invented for no
+ * reason: Telegram has inline keyboards precisely so a purchase is one tap.
+ * The typed commands still work — they are just never the only way in.
+ *
+ * Order is the price canon and not cosmetic: CARD FIRST, Stars second as the
+ * commodity rail, crypto third. Same list price on all three.
+ *
+ * Only Stars can complete inside Telegram — `fenrir_subscribe` opens the box in
+ * this chat. Card and crypto need the signed-in web session that holds the
+ * buyer's identity, so those buttons open Upgrade, which is where those rails
+ * live. `?rail=` is a hint for that page; nothing reads it yet.
+ */
+const UPGRADE_URL = "https://communities.myfenrir.com/upgrade";
+
+export function payRailsKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: "💳 Card · $14.99/month", url: `${UPGRADE_URL}?rail=card` }],
+      [{ text: "⭐ Telegram Stars · 1,150", callback_data: "fenrir_subscribe" }],
+      [{ text: "₿ Crypto · $14.99/month", url: `${UPGRADE_URL}?rail=crypto` }]
+    ]
+  };
+}
+
+/**
+ * Copy for the rails. Money, never percentages — a buyer cannot pay a
+ * percentage, and "+5%" is the kind of number people feel misled by later.
+ * NOWPayments' fee on $14.99 is about $0.75, and NOWPayments shows the exact
+ * figure on its own screen before anyone pays.
+ */
+export function payRailsText(spanish) {
+  if (spanish) {
+    return [
+      "The Pack · $14.99 al mes por comunidad enlazada.",
+      "",
+      "💳 Tarjeta — $14.99. Apple Pay y Google Pay incluidos.",
+      "⭐ Telegram Stars — ⭐1,150, el equivalente. Se cobra cada 30 días.",
+      "₿ Cripto — $14.99, el mismo precio. NOWPayments suma su comisión, unos $0.75, y te enseña la cifra exacta antes de que pagues.",
+      "",
+      "Elige abajo. Fenrir activa el acceso sólo cuando el pago está confirmado."
+    ].join("\n");
+  }
+  return [
+    "The Pack · $14.99 a month per linked community.",
+    "",
+    "💳 Card — $14.99. Apple Pay and Google Pay included.",
+    "⭐ Telegram Stars — ⭐1,150, the equivalent. Billed every 30 days.",
+    "₿ Crypto — $14.99, the same price. NOWPayments adds its processing fee, about $0.75, and shows you the exact figure before you pay.",
+    "",
+    "Pick one below. Fenrir activates access only once the payment is confirmed."
+  ].join("\n");
+}
+
+/**
+ * What to say to someone who already has access and asked to pay.
+ *
+ * Not a pitch and not a wall of features — what they can do with what they
+ * already hold. The source matters: an owner should never read a sentence about
+ * a subscription, and someone on courtesy should be told when it runs out
+ * rather than discovering it on the day.
+ */
+export function alreadyActiveText(access, spanish) {
+  const source = access?.access_source;
+  const until = access?.until ? String(access.until).slice(0, 10) : null;
+
+  if (spanish) {
+    if (source === "owner") {
+      return [
+        "Eres dueño de Fenrir. No hay nada que comprar.",
+        "",
+        "Tienes The Pack completo: comunidades enlazadas sin tope, multi-admin y auditoría.",
+        "/panel genera códigos de cortesía · /status revisa cualquier cuenta."
+      ].join("\n");
+    }
+    return [
+      "Ya tienes The Pack activo. No hace falta pagar de nuevo.",
+      ...(until ? ["", `Vigente hasta ${until}.`] : []),
+      "",
+      "Enlaza una comunidad desde MyFenrir → My Gates, o usa /status para ver el detalle."
+    ].join("\n");
+  }
+
+  if (source === "owner") {
+    return [
+      "You own Fenrir. There is nothing here for you to buy.",
+      "",
+      "You hold the full Pack: linked communities with no numeric cap, multi-admin workflows and audit logs.",
+      "/panel mints courtesy codes · /status checks any account."
+    ].join("\n");
+  }
+  return [
+    "The Pack is already active on this account. There is nothing to pay.",
+    ...(until ? ["", `Active through ${until}.`] : []),
+    "",
+    "Link a community from MyFenrir → My Gates, or run /status for the detail."
+  ].join("\n");
+}
+
+async function sendPayRails(env, channel, message, spanish) {
+  await telegramApi(env, channel, "sendMessage", {
+    chat_id: message.chat.id,
+    text: payRailsText(spanish),
+    reply_markup: payRailsKeyboard()
+  });
+}
+
 export function botMenuKeyboard(entitlement) {
   return [
     [
@@ -2514,17 +2731,49 @@ function fallbackMind(text, entitlement) {
     //
     // `Stars:` is the amount PAID, read from the entitlement row. It has never
     // been an account balance, and it must not be mistaken for one.
+    // `entitlement` is already resolved by resolveBotAccess: it knows about the
+    // owner allowlist and about courtesy / crypto / card rows, not only Stars.
+    // Report the source, because "active" via ownership and "active" via a Stars
+    // payment are different facts and a member can tell the difference.
     const paid = Number(entitlement?.stars_amount);
-    const unlocked = entitlement?.status === "active" && paid >= STARS_MIN_GRANT_AMOUNT;
+    const source = entitlement?.access_source;
+    const unlocked = entitlement?.status === "active";
+    const until = entitlement?.until ? String(entitlement.until).slice(0, 10) : null;
+    const via = {
+      owner: { en: "Ownership", es: "Propiedad" },
+      stars: { en: "Telegram Stars", es: "Telegram Stars" },
+      subscription: { en: "Subscription", es: "Suscripción" }
+    }[source] || { en: "—", es: "—" };
+    // An underpaid Stars payment on file, with no access from any other rail.
+    const underpaid = !unlocked && Number.isFinite(paid) && paid > 0;
+
     if (spanishIntent(text)) {
-      if (unlocked) return `Fenrir Protocol esta activo.\n\nAcceso: activo\nPagado: ⭐${paid}\nModo: Telegram Stars`;
-      if (entitlement?.status === "active") {
+      if (unlocked) {
+        return [
+          "Fenrir Protocol esta activo.",
+          "",
+          "Acceso: activo",
+          `Via: ${via.es}`,
+          ...(source === "stars" ? [`Pagado: ⭐${paid}`] : []),
+          ...(until ? [`Vigente hasta: ${until}`] : [])
+        ].join("\n");
+      }
+      if (underpaid) {
         return `Fenrir Protocol todavia no esta activo.\n\nSe registro un pago de ⭐${paid}, por debajo de los ⭐1,150 que cuesta The Pack, asi que no desbloquea acceso.\n/subscribe abre la caja por el precio correcto.`;
       }
       return "Fenrir Protocol todavia no esta activo.\n\n$14.99/mes.\nTarjeta y cripto en MyFenrir → Upgrade. /subscribe abre la caja de Telegram Stars (⭐1,150).";
     }
-    if (unlocked) return `Fenrir Protocol is active.\n\nAccess: unlocked\nPaid: ⭐${paid}\nMode: Telegram Stars`;
-    if (entitlement?.status === "active") {
+    if (unlocked) {
+      return [
+        "Fenrir Protocol is active.",
+        "",
+        "Access: unlocked",
+        `Via: ${via.en}`,
+        ...(source === "stars" ? [`Paid: ⭐${paid}`] : []),
+        ...(until ? [`Active through: ${until}`] : [])
+      ].join("\n");
+    }
+    if (underpaid) {
       return `Fenrir Protocol is not active yet.\n\nA payment of ⭐${paid} is on record, below the ⭐1,150 The Pack costs, so it does not unlock access.\n/subscribe opens the box at the correct price.`;
     }
     return "Fenrir Protocol is not active yet.\n\n$14.99/month.\nCard and crypto in MyFenrir → Upgrade. /subscribe opens the Telegram Stars box (⭐1,150).";
@@ -2624,9 +2873,9 @@ function fallbackMind(text, entitlement) {
       "5. Create a bridge slug.",
       "6. Share the stable public URL.",
       "",
-      "Free gives you 5 gates to test. Linking a community requires The Pack ($14.99/month).",
-      "",
-      "Say “buy” and I’ll show you the three ways to pay."
+      "Free gives you 5 gates to test. Linking a community requires The Pack ($14.99/month)."
+      // The three ways to pay arrive as buttons with this reply, not as a word
+      // the buyer has to guess and type.
     ].join("\n");
   }
 
@@ -2715,7 +2964,7 @@ async function handleTelegramWebhook(request, env, url) {
   if (update.callback_query) {
     const query = update.callback_query;
     const callbackMessage = query.message || { chat: { id: query.from.id }, from: query.from, text: "" };
-    const entitlement = await getEntitlement(env, query.from?.id || callbackMessage.chat.id);
+    const entitlement = await resolveBotAccess(env, query.from?.id || callbackMessage.chat.id);
 
     // Owner-only: generate a single-use courtesy code (30 / 90 / 180 days).
     if (typeof query.data === "string" && query.data.startsWith("courtesy_gen:")) {
@@ -2773,11 +3022,20 @@ async function handleTelegramWebhook(request, env, url) {
     });
 
     if (query.data === "fenrir_subscribe") {
-      await telegramApi(env, channel, "sendMessage", {
-        chat_id: callbackMessage.chat.id,
-        text: "Opening the Telegram Stars box — ⭐1,150 for The Pack, one linked community, billed monthly.\nPrefer card or crypto at the same $14.99? MyFenrir → Upgrade.\nFenrir activates access only after the payment is confirmed."
+      // `from` MUST be the person who tapped, not query.message.from — on a
+      // button attached to a bot message that is the BOT. createOrder would then
+      // stamp the order with the bot's id, and isValidStarsPayment compares the
+      // order's telegram_user_id against the real payer, so the payment would be
+      // rejected after the money moved.
+      //
+      // No "opening the box" line before the attempt either: openStarsCheckout
+      // speaks only about what actually happened, and falls back to an invoice
+      // link if sendInvoice fails.
+      await openStarsCheckout(env, channel, {
+        chat: callbackMessage.chat,
+        from: query.from,
+        text: ""
       });
-      await sendStarsInvoice(env, channel, callbackMessage);
       return json({ ok: true });
     }
 
@@ -2897,7 +3155,7 @@ async function handleTelegramWebhook(request, env, url) {
   const text = normalizeText(message?.text);
   if (!text) return json({ ok: true });
 
-  const entitlement = await getEntitlement(env, message.from?.id || message.chat.id);
+  const entitlement = await resolveBotAccess(env, message.from?.id || message.chat.id);
 
   const gateAccessToken = gateAccessTokenFromStart(text);
   if (gateAccessToken) {
@@ -3121,8 +3379,38 @@ async function handleTelegramWebhook(request, env, url) {
     return json({ ok: true });
   }
 
-  if (/^\/subscribe\b/i.test(text) || /^\/unlock\b/i.test(text) || isStarsDeepLink(text) || paymentIntent(text)) {
+  // Nobody who already has access gets sold to — not the owner, not a courtesy
+  // holder, not a paying member. Selling The Pack to the person who owns the
+  // product, or to someone already paying for it, is not a UX wrinkle: it means
+  // the bot could not see the access they hold.
+  const alreadyIn = entitlement?.status === "active";
+
+  // Explicit Stars intent — /subscribe, /unlock, or the Stars deep link — opens
+  // the Stars box directly. The buyer already chose the rail.
+  if (/^\/subscribe\b/i.test(text) || /^\/unlock\b/i.test(text) || isStarsDeepLink(text)) {
+    if (alreadyIn) {
+      await telegramApi(env, channel, "sendMessage", {
+        chat_id: message.chat.id,
+        text: alreadyActiveText(entitlement, spanishIntent(text))
+      });
+      return json({ ok: true });
+    }
     await openStarsCheckout(env, channel, message);
+    return json({ ok: true });
+  }
+
+  // Anything that merely means "I want to pay" gets the CHOICE, not one rail.
+  // This used to drop straight into the Stars box, which quietly made Stars the
+  // default and contradicted the canon that card comes first.
+  if (paymentIntent(text)) {
+    if (alreadyIn) {
+      await telegramApi(env, channel, "sendMessage", {
+        chat_id: message.chat.id,
+        text: alreadyActiveText(entitlement, spanishIntent(text))
+      });
+      return json({ ok: true });
+    }
+    await sendPayRails(env, channel, message, spanishIntent(text));
     return json({ ok: true });
   }
 
@@ -3130,7 +3418,11 @@ async function handleTelegramWebhook(request, env, url) {
     const answer = fallbackMind(text, entitlement);
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
-      text: answer
+      text: answer,
+      // The setup path ends at "linking a community requires The Pack". Ending
+      // there with no way to act on it is what produced the magic-word prompt
+      // this keyboard replaces.
+      ...(entitlement?.status === "active" ? {} : { reply_markup: payRailsKeyboard() })
     });
     return json({ ok: true });
   }
@@ -3139,7 +3431,10 @@ async function handleTelegramWebhook(request, env, url) {
     const answer = fallbackMind(text, entitlement);
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
-      text: answer
+      text: answer,
+      // Someone asking the price is the single most likely person to buy. Do
+      // not make them find the next step on their own.
+      ...(entitlement?.status === "active" ? {} : { reply_markup: payRailsKeyboard() })
     });
     return json({ ok: true });
   }

@@ -92,9 +92,15 @@ describe("every grant path checks the amount", () => {
   });
 
   it("guards what the bot reports as unlocked", () => {
+    // The amount check now lives upstream in resolveBotAccess, which is the one
+    // place the whole bot asks "may this person use the product".
+    const resolver = WORKER_SRC.slice(WORKER_SRC.indexOf("async function resolveBotAccess("));
+    expect(resolver.slice(0, 3000)).toContain("paid >= STARS_MIN_GRANT_AMOUNT");
+
     const fn = WORKER_SRC.slice(WORKER_SRC.indexOf("function fallbackMind("));
-    expect(fn.slice(0, 3000)).toContain("paid >= STARS_MIN_GRANT_AMOUNT");
     // "Stars:" was ambiguous with an account balance. It is the amount paid.
-    expect(fn.slice(0, 3000)).toContain("Paid: ⭐");
+    expect(fn.slice(0, 4000)).toContain("Paid: ⭐");
+    // And it is only shown when the access actually came from Stars.
+    expect(fn.slice(0, 4000)).toContain('source === "stars"');
   });
 });
