@@ -9,7 +9,7 @@ import {
 } from "../../shared/domain-search";
 import { copy } from "../i18n";
 import { addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
-import { completeSupabaseSession, hasSupabaseCallbackInLocation, isSupabaseAuthConfigured, signInWithSupabase, signOutSupabase } from "./supabaseAuth";
+import { completeSupabaseSession, hasSupabaseCallbackInLocation, signOutSupabase } from "./supabaseAuth";
 import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TrialPublic, TrialStatusPayload } from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
@@ -359,17 +359,19 @@ export const authService = {
     }
   },
   async login(provider: "google" | "microsoft" | "apple") {
-    // Supabase Auth is the restored login broker (the original working flow):
-    // signInWithOAuth against project yqevglppbhuoxxfsfnih, which holds the
-    // provider apps that accept its callback. Only if the bundle was built
-    // without Supabase config do we fall back to the direct per-provider stack.
-    // The banned broker is deliberately NOT in this path (1621d6a regression).
-    if (isSupabaseAuthConfigured()) {
-      await signInWithSupabase(provider);
-      return;
-    }
+    // New sign-ins use only the direct provider stack whose runtime credentials
+    // are advertised by /api/auth/providers. The Supabase project still accepts
+    // existing sessions and callbacks, but its social providers are not assumed
+    // to be enabled merely because its public URL/key exist.
     const returnTo = safeCurrentAuthReturnPath();
     window.location.assign(`${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
+  },
+  async enabledProviders() {
+    const result = await apiRequest<{
+      ok: true;
+      providers: Array<"google" | "microsoft" | "apple">;
+    }>("/api/auth/providers");
+    return result.providers;
   },
   async telegramLogin(payload: TelegramLoginPayload) {
     return apiRequest<{ ok: true; authenticated: true; user: AuthSession["user"]; org: AuthSession["org"] }>("/api/auth/telegram-session", {
