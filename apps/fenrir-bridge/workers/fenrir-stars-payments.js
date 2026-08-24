@@ -2083,6 +2083,69 @@ async function handleTelegramWebhook(request, env, url) {
     return json({ ok: true });
   }
 
+  // ---------------------------------------------------------------------
+  // Alta automática del grupo: promover al bot ES la señal de registro.
+  //
+  // El gatekeeper —dueño del webhook— reenvía `my_chat_member` hasta aquí,
+  // porque `/connect` y `syncVerifiedTelegramDestination` viven en este worker.
+  // Sin este bloque el reenvío llegaba y moría: más abajo se lee
+  // `update.message`, que en un `my_chat_member` es `undefined`, así que el
+  // update caía al vacío sin ejecutar nada ni dejar rastro. La cadena existía
+  // entera menos su último eslabón.
+  //
+  // `my_chat_member` trae `chat` y `from` al mismo nivel que un `message`, así
+  // que se pasa tal cual a `syncVerifiedTelegramDestination`: `from` es quien
+  // promovió al bot, y sirve igual para resolver identidad.
+  // ---------------------------------------------------------------------
+  if (update.my_chat_member) {
+    const membership = update.my_chat_member;
+    const chatType = membership.chat?.type;
+    if (chatType !== "group" && chatType !== "supergroup") return json({ ok: true });
+
+    // Sólo la TRANSICIÓN a "puede invitar" dispara el alta. Sin esto, cada
+    // reentrega de Telegram volvería a escribir en el grupo. El owner tiene los
+    // permisos implícitos y Telegram no siempre los enumera.
+    const canInvite = (member) =>
+      member?.status === "creator" ||
+      member?.status === "owner" ||
+      (member?.status === "administrator" && member?.can_invite_users === true);
+    const wasReady = canInvite(membership.old_chat_member);
+    const isReady = canInvite(membership.new_chat_member);
+
+    if (!isReady) {
+      // Se hizo admin pero sin permiso de invitar: es el error más común y el
+      // operador no tiene forma de adivinarlo. Se avisa una sola vez, en la
+      // transición a administrator, no en cada reentrega.
+      const becameAdmin =
+        membership.new_chat_member?.status === "administrator" &&
+        membership.old_chat_member?.status !== "administrator";
+      if (becameAdmin) {
+        await telegramApi(env, channel, "sendMessage", {
+          chat_id: membership.chat.id,
+          text: "Make Fenrir an admin and enable Invite Users, then run /connect again."
+        });
+      }
+      return json({ ok: true });
+    }
+    if (wasReady) return json({ ok: true });
+
+    const result = await syncVerifiedTelegramDestination(env, channel, membership);
+    const autoReplies = {
+      ok: "✅ This group is verified. Open MyFenrir → My Gates and choose it from the verified Telegram group selector.",
+      actor_not_admin: "Only a Telegram group admin can verify this group.",
+      telegram_identity_not_linked:
+        "Link your MyFenrir account first in a private chat with /link, then run /connect here again.",
+      screening_blocked: "Fenrir could not verify this group. Open MyFenrir to continue.",
+      sync_not_configured: "Group verification is not configured yet. Please contact the MyFenrir team.",
+      sync_failed: "Fenrir could not save this group just now. Run /connect to retry."
+    };
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: membership.chat.id,
+      text: autoReplies[result.ok ? "ok" : result.reason] || autoReplies.sync_failed
+    });
+    return json({ ok: true });
+  }
+
   const message = update.message;
   if (message?.successful_payment) {
     const payment = message.successful_payment;
