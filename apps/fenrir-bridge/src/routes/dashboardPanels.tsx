@@ -791,7 +791,9 @@ export function operatorReadinessBanner(
     return { text: c.operatorReadyForPaidUsers, tone: "good" };
   }
   const { auth, billing } = r;
-  if (!auth.googleConfigured || !auth.microsoftConfigured || !auth.appleConfigured) {
+  const hasPrimaryAuth =
+    auth.googleConfigured || auth.microsoftConfigured || auth.appleConfigured || auth.friskyAuthEnabled;
+  if (!hasPrimaryAuth) {
     return { text: c.operatorOAuthMissing, tone: "danger" };
   }
   if (!billing.d1Configured) {

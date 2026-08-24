@@ -63,13 +63,20 @@ export function computeReadiness(env: OAuthEnv): ReadinessSnapshot {
     neonConfigured: nonEmpty(env.NEON_DATABASE_URL)
   };
 
+  const hasPrimaryAuth =
+    auth.googleConfigured ||
+    auth.microsoftConfigured ||
+    auth.appleConfigured ||
+    auth.friskyAuthEnabled;
   const telegramPaidAccessReady =
     billing.telegramStarsConfigured &&
     billing.telegramWebhookSecretConfigured;
+  // For non-Stripe Telegram Stars + D1 go-live path, require:
+  // - at least one auth provider ("OAuth" in launch checklist),
+  // - D1 + Neon for app state + community gate,
+  // - Telegram Stars rail (bot + webhook).
   const readyForPaidUsers =
-    auth.googleConfigured &&
-    auth.microsoftConfigured &&
-    auth.appleConfigured &&
+    hasPrimaryAuth &&
     billing.d1Configured &&
     billing.neonConfigured &&
     telegramPaidAccessReady;
