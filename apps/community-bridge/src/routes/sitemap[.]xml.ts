@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
+import { getSiteUrl } from "@/config/site-url";
 
-const BASE_URL = "https://communities.myfenrir.com";
+const BASE_URL = getSiteUrl();
 
 interface SitemapEntry {
   path: string;

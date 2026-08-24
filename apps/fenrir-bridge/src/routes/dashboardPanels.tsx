@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import type { Copy, Locale } from "../i18n";
+import { copy, type Copy, type Locale } from "../i18n";
 import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, LiveRoomProvider, Plan } from "../services/types";
 import type { AuthSession, BillingStatusPayload, PaidPlan, ReadinessPayload, TelegramIdentityLinkPayload } from "../services/api";
 import type { CommunityAuthProposal } from "../services/communityAuth";
 import { brandThemes } from "../theme/brandThemes";
 import {
+  absoluteUrl,
   confettiPieces,
   defaultDomainTags,
   domainSearchCandidates,
   domainTagPresets,
   domainSearchTlds,
-  friskySignalDevRequestUrl,
   liveRoomProviders,
   lookupDomainDns,
+  openAnyUrl,
   openSafeUrl,
   providerLogoPresets,
   safeHttpUrl,
@@ -25,6 +26,7 @@ import {
   type VaultLink
 } from "../app/shared";
 import type { UiCopy } from "../app/uiCopy";
+import { knowledgeBaseUrl } from "../services/knowledgeBase";
 import { buildVaultLinks, createVaultShareUrl } from "./vaultRoutes";
 import { BrandSignature, bridgeGroupPhotoUrl, GroupAvatar, PanelTitle, providerLabel, ProviderBadge } from "./routeCommon";
 export { BrandSignature, bridgeGroupPhotoUrl, GroupAvatar, PanelTitle, providerLabel, ProviderBadge } from "./routeCommon";
@@ -53,9 +55,10 @@ export function overlayAuthState(state: AppState, auth: AuthSession): AppState {
 export function planLabel(plan: Plan) {
   const labels: Record<Plan, string> = {
     free: "Free",
-    starter: "Starter",
-    pro: "Pro",
-    operator: "Operator"
+    starter: "The Pack",
+    pro: "The Pack",
+    operator: "The Pack",
+    standard: "The Pack"
   };
   return labels[plan];
 }
@@ -72,10 +75,11 @@ export function authProviderLabel(provider: string) {
 
 export function planLockLimit(plan: Plan) {
   const limits: Record<Plan, string> = {
-    free: "1",
-    starter: "3",
-    pro: "10",
-    operator: "unlimited"
+    free: "5",
+    starter: "5",
+    pro: "5",
+    operator: "5",
+    standard: "5"
   };
   return limits[plan];
 }
@@ -95,11 +99,11 @@ export function SessionLabels({
   telegramIdentity: TelegramIdentityLinkPayload | null;
   onLinkTelegram: () => void;
   c: Copy;
-  ui: typeof uiCopy[Locale];
+  ui: UiCopy;
 }) {
   const activeLocks = state.bridges.filter((bridge) => bridge.status === "active").length;
   const backendLimit = billingStatus?.limits.maxTelegramLocks;
-  const lockLimit = backendLimit === null ? "unlimited" : backendLimit ?? planLockLimit(state.org.plan);
+  const lockLimit = backendLimit === null ? "5" : backendLimit ?? planLockLimit(state.org.plan);
   const labels = [
     [c.sessionRole, role === "owner" ? c.sessionOwner : role === "admin" ? c.sessionAdmin : "User"],
     [c.sessionPlan, planLabel(state.org.plan)],
@@ -151,9 +155,7 @@ export function BetaPreviewControls({
         <option value="owner">Owner view</option>
       </select>
       <select value={plan} onChange={(event) => onPlan(event.target.value as PaidPlan)}>
-        <option value="starter">Starter preview</option>
-        <option value="pro">Pro preview</option>
-        <option value="operator">Operator preview</option>
+        <option value="operator">The Pack preview</option>
       </select>
       <small>Preview only. Billing entitlement still comes from the backend.</small>
     </section>
@@ -533,6 +535,8 @@ export function AccountServicePanel({
   subdomain,
   mode,
   checkoutPlan,
+  courtesyCode,
+  onCourtesyCode,
   onEmail,
   onOrg,
   onTelegram,
@@ -547,6 +551,8 @@ export function AccountServicePanel({
   subdomain: string;
   mode: "create" | "link" | null;
   checkoutPlan: PaidPlan;
+  courtesyCode: string;
+  onCourtesyCode: (value: string) => void;
   onEmail: (value: string) => void;
   onOrg: (value: string) => void;
   onTelegram: (value: string) => void;
@@ -581,6 +587,11 @@ export function AccountServicePanel({
           <span className="status amber">{c.stripeMode}</span>
           <h3>{checkoutPlan.charAt(0).toUpperCase() + checkoutPlan.slice(1)}</h3>
           <p>{c.checkoutReady}</p>
+          <label className="courtesy-code-field">
+            <span>Courtesy code (optional)</span>
+            <input value={courtesyCode} onChange={(event) => onCourtesyCode(event.target.value.toUpperCase())} placeholder="MYFENRIR-COURTESY" autoComplete="off" />
+            <small>Single-use admin courtesy. Leave blank for normal checkout.</small>
+          </label>
           <div className="stars-bridge">
             <span className="status good">{c.starsMode}</span>
             <p>{c.starsCheckoutBody}</p>
@@ -767,7 +778,14 @@ export function LinkVaultPanel({
 export function FaqPanel({ c }: { c: Copy }) {
   return (
     <section className="panel wide faq-panel">
-      <PanelTitle title={c.faqTitle} subtitle={c.faqSub} />
+      <div className="faq-heading-row">
+        <PanelTitle title={c.faqTitle} subtitle={c.faqSub} />
+        <a className="faq-wiki-link" href={knowledgeBaseUrl}>
+          <span>31 FIELD GUIDES</span>
+          <b>Open the new Wiki</b>
+          <i aria-hidden="true">↗</i>
+        </a>
+      </div>
       <div className="faq-grid">
         {c.faqs.map((item, index) => (
           <details className="faq-item" key={item[0]} open={index < 2}>

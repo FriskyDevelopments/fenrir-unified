@@ -1,7 +1,6 @@
-import { useState } from "react";
-import { startAuthentication } from "@simplewebauthn/browser";
+import { useCallback, useState } from "react";
 import type { Copy, Locale } from "../i18n";
-import { webauthnService } from "../services/api";
+import { authService, webauthnService } from "../services/api";
 import { friskyClientAuthEngine, type AuthProvider } from "../services/authGateway";
 import { AuthProviderButton } from "../components/AuthProviderButton";
 import { AuthSurface } from "../components/AuthSurface";
@@ -9,18 +8,36 @@ import { GlowCard } from "../components/GlowCard";
 import { brandThemes } from "../theme/brandThemes";
 import { managedDashboardPath, twoFactorHelpLinks } from "../app/shared";
 import { BrandSignature } from "./routeCommon";
+import { HumanVerificationGate } from "../components/HumanVerificationGate";
+
+function postLoginDestination() {
+  const requested = new URLSearchParams(window.location.search).get("next");
+  return requested?.startsWith("/") && !requested.startsWith("//") ? requested : managedDashboardPath;
+}
 
 export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
   const theme = brandThemes.fenrir;
   const [passkeyNote, setPasskeyNote] = useState<string | null>(() => authErrorMessage());
+  const [humanVerified, setHumanVerified] = useState(false);
+  const onHumanVerified = useCallback((verified: boolean) => {
+    setHumanVerified(verified);
+    if (!verified) return;
+    setPasskeyNote(null);
+    void authService.me().then((result) => {
+      if (result.data.authenticated) window.location.assign(postLoginDestination());
+    });
+  }, []);
 
   async function signInWithPasskey() {
     setPasskeyNote(null);
     try {
       const { optionsJSON } = await webauthnService.loginOptions();
+      // Carga diferida: @simplewebauthn/browser sale del chunk inicial y sólo
+      // se descarga al usar el passkey para entrar.
+      const { startAuthentication } = await import("@simplewebauthn/browser");
       const assertion = await startAuthentication({ optionsJSON });
       await webauthnService.loginVerify(assertion);
-      window.location.assign(managedDashboardPath);
+      window.location.assign(postLoginDestination());
     } catch {
       setPasskeyNote(c.passkeyError);
     }
@@ -45,13 +62,14 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
           <h2 className="auth-enter-title" data-text={c.authTitle}>
             <span>{c.authTitle}</span>
           </h2>
+          <HumanVerificationGate onVerified={onHumanVerified} />
           <div className="auth-actions">
-            <AuthProviderButton provider="apple" label={c.continueApple} onClick={() => void signInWithProvider("apple")} />
-            <AuthProviderButton provider="google" label={c.continueGoogle} onClick={() => void signInWithProvider("google")} />
-            <AuthProviderButton provider="microsoft" label={c.continueMicrosoft} onClick={() => void signInWithProvider("microsoft")} />
+            <AuthProviderButton provider="apple" label={c.continueApple} disabled={!humanVerified} onClick={() => void signInWithProvider("apple")} />
+            <AuthProviderButton provider="google" label={c.continueGoogle} disabled={!humanVerified} onClick={() => void signInWithProvider("google")} />
+            <AuthProviderButton provider="microsoft" label={c.continueMicrosoft} disabled={!humanVerified} onClick={() => void signInWithProvider("microsoft")} />
           </div>
           <div className="auth-passkey-row">
-            <button type="button" className="secondary" onClick={() => void signInWithPasskey()}>
+            <button type="button" className="secondary" disabled={!humanVerified} onClick={() => void signInWithPasskey()}>
               {c.passkeySignIn}
             </button>
             {passkeyNote ? <small className="muted">{passkeyNote}</small> : null}
@@ -118,20 +136,11 @@ function authErrorMessage() {
     return `Could not read the Frisky login session after login. ${detail ? `(${detail})` : "Please retry from the sign-in screen."}`;
   }
   if (errorCode === "supabase_session_failed") {
+    if (detail === "human_verification_required") return null;
     return `Could not open a Fenrir admin session.${detail ? ` (${detail})` : ""}`;
-  }
-  if (errorCode === "workos_not_configured" || errorCode === "workos_login_init_failed") {
-    return "Sign-in is not fully configured yet. Please try again shortly or contact support.";
-  }
-  if (errorCode === "workos_state_invalid") {
-    return "Your sign-in attempt expired or could not be verified. Please start sign-in again.";
-  }
-  if (errorCode === "workos_exchange_failed" || errorCode === "workos_token_exchange_failed") {
-    return `Could not finish sign-in with the provider.${detail ? ` (${detail})` : " Please try again."}`;
   }
   if (errorCode === "missing_code") {
     return "The provider did not return a sign-in code. Please try again.";
   }
   return "Sign-in could not finish. Try another provider or refresh the page.";
 }
-

@@ -207,22 +207,8 @@ Questions to ask:
 - Is this for a free community, paid community, course, agency, or client?
 - Do you want to do setup yourself or have Frisky do it?
 
-If user has no domain:
-Recommend starting with a Fenrir subdomain tonight.
-
-If user has a domain:
-Explain that they can keep their registrar and use Cloudflare DNS for routing and SSL.
-
-Cloudflare DNS:
-TXT:
-Name: _fenrir
-Value: fenrir-verify=<token>
-Purpose: proves domain ownership
-
-CNAME:
-Name: join
-Value: bridge.myfenrir.com
-Purpose: routes the customer subdomain to Fenrir
+Use the managed Community Gate at communities.myfenrir.com. Customer custom
+domains are not currently offered, so do not provide TXT or CNAME instructions.
 
 Telegram bot:
 The Fenrir bot must be admin.
@@ -317,11 +303,11 @@ Control boundaries:
 Domain rule:
 Never reference fenrirprotocol.com as live infrastructure.
 Use myfenrir.com as the owned Fenrir domain.
-Canonical bridge target: bridge.myfenrir.com
+Canonical community entrypoint: communities.myfenrir.com
 
 DNS wizard:
-TXT  _fenrir  fenrir-verify=<token>
-CNAME  join  bridge.myfenrir.com
+Custom domains are disabled until Cloudflare Custom Hostnames is provisioned.
+Do not provide TXT or CNAME records.
 ```
 
 Required Cloudflare Worker bindings:

@@ -24,6 +24,7 @@ import {
   type BrandTenantRow,
 } from "@/config/brand-tenant";
 import { BRANDS } from "@/config/brands";
+import { getSiteUrl } from "@/config/site-url";
 import { useBrandRegistry } from "@/config/brand-context";
 import { publishBrandUpdate } from "@/config/brand-sync";
 import {
@@ -37,7 +38,7 @@ import { RedirectPathField } from "@/components/brand/redirect-path-field";
 
 import { rowToBrandConfig } from "@/config/brand-tenant";
 
-const CANONICAL = "https://communities.myfenrir.com/brands";
+const CANONICAL = `${getSiteUrl()}/brands`;
 
 export const Route = createFileRoute("/brands")({
   ssr: false,
@@ -337,7 +338,7 @@ function TenantForm({ draft, saving, onChange, onCancel, onSave }: TenantFormPro
           <Input
             value={draft.brand_id}
             onChange={(e) => set("brand_id", e.target.value)}
-            placeholder="casa-verde"
+            placeholder="lore-archive"
           />
         </Field>
         <Field label="Product name">
@@ -358,14 +359,14 @@ function TenantForm({ draft, saving, onChange, onCancel, onSave }: TenantFormPro
                   .filter(Boolean),
               )
             }
-            placeholder="casaverde.hostcasa.com"
+            placeholder="portal.lore.myfenrir.com"
           />
         </Field>
         <Field label="Community id (tenant isolation key)">
           <Input
             value={draft.community_id}
             onChange={(e) => set("community_id", e.target.value)}
-            placeholder="casa-verde"
+            placeholder="lore-archive"
           />
         </Field>
         <Field label="Community label">

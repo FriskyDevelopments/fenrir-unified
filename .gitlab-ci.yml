@@ -82,8 +82,6 @@ fenrir-cinema:install-and-build:
 #   CLOUDFLARE_API_TOKEN   - Cloudflare token scoped to Pages:Edit
 #   CLOUDFLARE_ACCOUNT_ID  - Cloudflare account id
 #   SESSION_SECRET         - Pages session signing secret
-#   WORKOS_CLIENT_ID       - WorkOS AuthKit client id
-#   WORKOS_API_KEY         - WorkOS API key (sk_...)
 #
 # Gated to main and manual: click "Run" on the pipeline to ship. To make merges
 # auto-deploy, change `when: manual` to `when: on_success`.
@@ -105,7 +103,7 @@ fenrir-bridge:deploy:
     # Push production secrets only when provided, so an unset var never clobbers
     # an existing value with an empty string.
     - |
-      for k in SESSION_SECRET WORKOS_CLIENT_ID WORKOS_API_KEY; do
+      for k in SESSION_SECRET; do
         v="$(eval printf '%s' "\${$k:-}")"
         if [ -n "$v" ]; then
           printf '%s' "$v" | $WRANGLER pages secret put "$k" --project-name fenrir-bridge
@@ -118,7 +116,100 @@ fenrir-bridge:deploy:
     # Verify production responds as expected.
     - |
       hz="$(curl -s -o /dev/null -w '%{http_code}' https://www.myfenrir.com/healthz || echo ERR)"
-      wo="$(curl -s -o /dev/null -w '%{http_code}' 'https://auth.myfenrir.com/api/auth/workos/login?provider=google' || echo ERR)"
-      echo "healthz=$hz (expect 200)  workos=$wo (expect 302)"
+      echo "healthz=$hz (expect 200)"
       test "$hz" = "200"
-      test "$wo" = "302"
+
+# =====================================================================
+# MyFenrir CI/CD — Quality (auto) + prod symmetry.  Added on ci/quality-pipeline.
+# Branch model:  main -> prod (manual),  quality -> Quality (auto on push).
+# Cloudflare account: e2a7eccb24c4836847fd14d08c499bd0  (NEVER f2ff2cc0).
+#
+# TOKEN SCOPE (read before enabling Quality):
+#   CLOUDFLARE_API_TOKEN is Masked+Protected, so GitLab exposes it only to
+#   pipelines running on PROTECTED branches. Mark `quality` as a Protected
+#   branch (Settings -> Repository -> Protected branches; allow your role to
+#   push/merge) so these jobs receive the token. Until then the rule
+#   `&& $CLOUDFLARE_API_TOKEN` is false and the jobs are SKIPPED — a fail-safe
+#   that prevents a half-configured deploy. Do NOT un-protect the token.
+# =====================================================================
+
+# fenrir-bridge -> Cloudflare Pages PREVIEW branch `quality`.
+# Isolated from production: the production alias only moves on `--branch main`.
+fenrir-bridge:deploy:quality:
+  stage: deploy
+  image: node:22
+  needs:
+    - fenrir-bridge:install-and-build
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "quality" && $CLOUDFLARE_API_TOKEN'
+      when: on_success
+  variables:
+    WRANGLER: "npx wrangler"
+    WRANGLER_SEND_METRICS: "false"
+    CLOUDFLARE_ACCOUNT_ID: "e2a7eccb24c4836847fd14d08c499bd0"
+  script:
+    - cd apps/fenrir-bridge
+    - npm ci
+    - npm run build
+    - $WRANGLER pages deploy dist --project-name fenrir-bridge --branch quality --commit-dirty=true
+    - |
+      # Verify the Quality preview surface responds (branch alias URL).
+      url="https://quality.fenrir-bridge.pages.dev/healthz"
+      hz="$(curl -s -o /dev/null -w '%{http_code}' "$url" || echo ERR)"
+      echo "quality healthz=$hz ($url) (expect 200)"
+      test "$hz" = "200"
+
+# community-bridge -> Worker `community-bridge-quality` via the repo's own
+# scripts/deploy-quality.sh (pins Quality VITE_SITE_URL + the DEV Telegram bot
+# and the explicit --name). The script reads CLOUDFLARE_API_TOKEN from the CI
+# env automatically; run locally it falls back to wrangler OAuth (same script).
+community-bridge:deploy:quality:
+  stage: deploy
+  image: node:22
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "quality" && $CLOUDFLARE_API_TOKEN'
+      when: on_success
+  variables:
+    WRANGLER_SEND_METRICS: "false"
+    CLOUDFLARE_ACCOUNT_ID: "e2a7eccb24c4836847fd14d08c499bd0"
+  script:
+    - cd apps/community-bridge
+    # Belt-and-suspenders: never let a project-wide prod bot var leak into Quality.
+    - unset VITE_TELEGRAM_BOT_USERNAME || true
+    - npm ci || npm install
+    - bash scripts/deploy-quality.sh
+    - |
+      url="https://quality.communities.myfenrir.com/"
+      code="$(curl -s -o /dev/null -w '%{http_code}' "$url" || echo ERR)"
+      echo "quality communities http=$code ($url)"
+      canon="$(curl -s "$url" | grep -o 'rel=\"canonical\" href=\"[^\"]*\"' | head -1)"
+      echo "canonical=$canon (must not be localhost)"
+      case "$code" in 2*|3*) : ;; *) echo "unexpected status"; exit 1 ;; esac
+
+# community-bridge -> production custom-domain Worker. CONFIGURED BUT OFF:
+# manual + main only. Requires PROD_TELEGRAM_BOT_USERNAME as a Masked+Protected
+# CI variable — deliberately NOT hardcoded (the prod bot handle was not
+# derivable from the repo). Refuses to build prod with a dev-bot fallback.
+community-bridge:deploy:
+  stage: deploy
+  image: node:22
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CLOUDFLARE_API_TOKEN'
+      when: manual
+  variables:
+    WRANGLER_SEND_METRICS: "false"
+    CLOUDFLARE_ACCOUNT_ID: "e2a7eccb24c4836847fd14d08c499bd0"
+    VITE_SITE_URL: "https://communities.myfenrir.com"
+  script:
+    - cd apps/community-bridge
+    - |
+      if [ -z "${PROD_TELEGRAM_BOT_USERNAME:-}" ]; then
+        echo "PROD_TELEGRAM_BOT_USERNAME not set — refusing to build prod with a dev-bot fallback."
+        exit 1
+      fi
+    - npm ci || npm install
+    - VITE_TELEGRAM_BOT_USERNAME="$PROD_TELEGRAM_BOT_USERNAME" bash scripts/deploy-production.sh
+    - |
+      url="https://communities.myfenrir.com/"
+      code="$(curl -s -o /dev/null -w '%{http_code}' "$url" || echo ERR)"
+      echo "prod communities http=$code"; case "$code" in 2*|3*) : ;; *) exit 1 ;; esac

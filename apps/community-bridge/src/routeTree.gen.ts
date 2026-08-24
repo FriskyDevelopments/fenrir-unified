@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccessRouteImport } from './routes/access'
 import { Route as ActivateRouteImport } from './routes/activate'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as BrandsRouteImport } from './routes/brands'
@@ -18,24 +19,33 @@ import { Route as DemoRouteImport } from './routes/demo'
 import { Route as GateRouteImport } from './routes/gate'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as McpRouteImport } from './routes/mcp'
-import { Route as NotEligibleRouteImport } from './routes/not-eligible'
-import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ModerationRouteImport } from './routes/moderation'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as TermsRouteImport } from './routes/terms'
+import { Route as StandardsRouteImport } from './routes/standards'
+import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as BlogTelegramRoleManagementGuideRouteImport } from './routes/blog.telegram-role-management-guide'
 import { Route as BrandAssetSplatRouteImport } from './routes/brand-asset.$'
+import { Route as DiscordInteractionsRouteImport } from './routes/discord.interactions'
+import { Route as DiscordLinkedRoleRouteImport } from './routes/discord.linked-role'
 import { Route as GSlugRouteImport } from './routes/g.$slug'
 import { Route as GateMediaSplatRouteImport } from './routes/gate-media.$'
 import { Route as GatesIndexRouteImport } from './routes/gates.index'
 import { Route as GatesIdRouteImport } from './routes/gates.$id'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as ApiInternalTelegramDestinationRouteImport } from './routes/api.internal.telegram-destination'
+import { Route as DiscordLinkedRoleCallbackRouteImport } from './routes/discord.linked-role.callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccessRoute = AccessRouteImport.update({
+  id: '/access',
+  path: '/access',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ActivateRoute = ActivateRouteImport.update({
@@ -78,14 +88,9 @@ const McpRoute = McpRouteImport.update({
   path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
-const NotEligibleRoute = NotEligibleRouteImport.update({
-  id: '/not-eligible',
-  path: '/not-eligible',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
+const ModerationRoute = ModerationRouteImport.update({
+  id: '/moderation',
+  path: '/moderation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -93,9 +98,14 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
+const StandardsRoute = StandardsRouteImport.update({
+  id: '/standards',
+  path: '/standards',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UpgradeRoute = UpgradeRouteImport.update({
+  id: '/upgrade',
+  path: '/upgrade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char91DotmcpChar93ListToolsRoute =
@@ -119,6 +129,16 @@ const BlogTelegramRoleManagementGuideRoute =
 const BrandAssetSplatRoute = BrandAssetSplatRouteImport.update({
   id: '/brand-asset/$',
   path: '/brand-asset/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DiscordInteractionsRoute = DiscordInteractionsRouteImport.update({
+  id: '/discord/interactions',
+  path: '/discord/interactions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DiscordLinkedRoleRoute = DiscordLinkedRoleRouteImport.update({
+  id: '/discord/linked-role',
+  path: '/discord/linked-role',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GSlugRoute = GSlugRouteImport.update({
@@ -152,9 +172,22 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiInternalTelegramDestinationRoute =
+  ApiInternalTelegramDestinationRouteImport.update({
+    id: '/api/internal/telegram-destination',
+    path: '/api/internal/telegram-destination',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DiscordLinkedRoleCallbackRoute =
+  DiscordLinkedRoleCallbackRouteImport.update({
+    id: '/callback',
+    path: '/callback',
+    getParentRoute: () => DiscordLinkedRoleRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/access': typeof AccessRoute
   '/activate': typeof ActivateRoute
   '/admin': typeof AdminRoute
   '/brands': typeof BrandsRoute
@@ -163,23 +196,28 @@ export interface FileRoutesByFullPath {
   '/gate': typeof GateRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
-  '/not-eligible': typeof NotEligibleRoute
-  '/privacy': typeof PrivacyRoute
+  '/moderation': typeof ModerationRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/terms': typeof TermsRoute
+  '/standards': typeof StandardsRoute
+  '/upgrade': typeof UpgradeRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/blog/telegram-role-management-guide': typeof BlogTelegramRoleManagementGuideRoute
   '/brand-asset/$': typeof BrandAssetSplatRoute
+  '/discord/interactions': typeof DiscordInteractionsRoute
+  '/discord/linked-role': typeof DiscordLinkedRoleRouteWithChildren
   '/g/$slug': typeof GSlugRoute
   '/gate-media/$': typeof GateMediaSplatRoute
   '/gates/$id': typeof GatesIdRoute
   '/gates/': typeof GatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/internal/telegram-destination': typeof ApiInternalTelegramDestinationRoute
+  '/discord/linked-role/callback': typeof DiscordLinkedRoleCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/access': typeof AccessRoute
   '/activate': typeof ActivateRoute
   '/admin': typeof AdminRoute
   '/brands': typeof BrandsRoute
@@ -188,24 +226,29 @@ export interface FileRoutesByTo {
   '/gate': typeof GateRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
-  '/not-eligible': typeof NotEligibleRoute
-  '/privacy': typeof PrivacyRoute
+  '/moderation': typeof ModerationRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/terms': typeof TermsRoute
+  '/standards': typeof StandardsRoute
+  '/upgrade': typeof UpgradeRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/blog/telegram-role-management-guide': typeof BlogTelegramRoleManagementGuideRoute
   '/brand-asset/$': typeof BrandAssetSplatRoute
+  '/discord/interactions': typeof DiscordInteractionsRoute
+  '/discord/linked-role': typeof DiscordLinkedRoleRouteWithChildren
   '/g/$slug': typeof GSlugRoute
   '/gate-media/$': typeof GateMediaSplatRoute
   '/gates/$id': typeof GatesIdRoute
   '/gates': typeof GatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/internal/telegram-destination': typeof ApiInternalTelegramDestinationRoute
+  '/discord/linked-role/callback': typeof DiscordLinkedRoleCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/access': typeof AccessRoute
   '/activate': typeof ActivateRoute
   '/admin': typeof AdminRoute
   '/brands': typeof BrandsRoute
@@ -214,25 +257,30 @@ export interface FileRoutesById {
   '/gate': typeof GateRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
-  '/not-eligible': typeof NotEligibleRoute
-  '/privacy': typeof PrivacyRoute
+  '/moderation': typeof ModerationRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/terms': typeof TermsRoute
+  '/standards': typeof StandardsRoute
+  '/upgrade': typeof UpgradeRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/blog/telegram-role-management-guide': typeof BlogTelegramRoleManagementGuideRoute
   '/brand-asset/$': typeof BrandAssetSplatRoute
+  '/discord/interactions': typeof DiscordInteractionsRoute
+  '/discord/linked-role': typeof DiscordLinkedRoleRouteWithChildren
   '/g/$slug': typeof GSlugRoute
   '/gate-media/$': typeof GateMediaSplatRoute
   '/gates/$id': typeof GatesIdRoute
   '/gates/': typeof GatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/internal/telegram-destination': typeof ApiInternalTelegramDestinationRoute
+  '/discord/linked-role/callback': typeof DiscordLinkedRoleCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/access'
     | '/activate'
     | '/admin'
     | '/brands'
@@ -241,23 +289,28 @@ export interface FileRouteTypes {
     | '/gate'
     | '/login'
     | '/mcp'
-    | '/not-eligible'
-    | '/privacy'
+    | '/moderation'
     | '/sitemap.xml'
-    | '/terms'
+    | '/standards'
+    | '/upgrade'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/blog/telegram-role-management-guide'
     | '/brand-asset/$'
+    | '/discord/interactions'
+    | '/discord/linked-role'
     | '/g/$slug'
     | '/gate-media/$'
     | '/gates/$id'
     | '/gates/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/internal/telegram-destination'
+    | '/discord/linked-role/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/access'
     | '/activate'
     | '/admin'
     | '/brands'
@@ -266,23 +319,28 @@ export interface FileRouteTypes {
     | '/gate'
     | '/login'
     | '/mcp'
-    | '/not-eligible'
-    | '/privacy'
+    | '/moderation'
     | '/sitemap.xml'
-    | '/terms'
+    | '/standards'
+    | '/upgrade'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/blog/telegram-role-management-guide'
     | '/brand-asset/$'
+    | '/discord/interactions'
+    | '/discord/linked-role'
     | '/g/$slug'
     | '/gate-media/$'
     | '/gates/$id'
     | '/gates'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/internal/telegram-destination'
+    | '/discord/linked-role/callback'
   id:
     | '__root__'
     | '/'
+    | '/access'
     | '/activate'
     | '/admin'
     | '/brands'
@@ -291,24 +349,29 @@ export interface FileRouteTypes {
     | '/gate'
     | '/login'
     | '/mcp'
-    | '/not-eligible'
-    | '/privacy'
+    | '/moderation'
     | '/sitemap.xml'
-    | '/terms'
+    | '/standards'
+    | '/upgrade'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/blog/telegram-role-management-guide'
     | '/brand-asset/$'
+    | '/discord/interactions'
+    | '/discord/linked-role'
     | '/g/$slug'
     | '/gate-media/$'
     | '/gates/$id'
     | '/gates/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/internal/telegram-destination'
+    | '/discord/linked-role/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccessRoute: typeof AccessRoute
   ActivateRoute: typeof ActivateRoute
   AdminRoute: typeof AdminRoute
   BrandsRoute: typeof BrandsRoute
@@ -317,20 +380,23 @@ export interface RootRouteChildren {
   GateRoute: typeof GateRoute
   LoginRoute: typeof LoginRoute
   McpRoute: typeof McpRoute
-  NotEligibleRoute: typeof NotEligibleRoute
-  PrivacyRoute: typeof PrivacyRoute
+  ModerationRoute: typeof ModerationRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
-  TermsRoute: typeof TermsRoute
+  StandardsRoute: typeof StandardsRoute
+  UpgradeRoute: typeof UpgradeRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   BlogTelegramRoleManagementGuideRoute: typeof BlogTelegramRoleManagementGuideRoute
   BrandAssetSplatRoute: typeof BrandAssetSplatRoute
+  DiscordInteractionsRoute: typeof DiscordInteractionsRoute
+  DiscordLinkedRoleRoute: typeof DiscordLinkedRoleRouteWithChildren
   GSlugRoute: typeof GSlugRoute
   GateMediaSplatRoute: typeof GateMediaSplatRoute
   GatesIdRoute: typeof GatesIdRoute
   GatesIndexRoute: typeof GatesIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiInternalTelegramDestinationRoute: typeof ApiInternalTelegramDestinationRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -340,6 +406,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/access': {
+      id: '/access'
+      path: '/access'
+      fullPath: '/access'
+      preLoaderRoute: typeof AccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/activate': {
@@ -398,18 +471,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/not-eligible': {
-      id: '/not-eligible'
-      path: '/not-eligible'
-      fullPath: '/not-eligible'
-      preLoaderRoute: typeof NotEligibleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
+    '/moderation': {
+      id: '/moderation'
+      path: '/moderation'
+      fullPath: '/moderation'
+      preLoaderRoute: typeof ModerationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -419,11 +485,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
+    '/standards': {
+      id: '/standards'
+      path: '/standards'
+      fullPath: '/standards'
+      preLoaderRoute: typeof StandardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/upgrade': {
+      id: '/upgrade'
+      path: '/upgrade'
+      fullPath: '/upgrade'
+      preLoaderRoute: typeof UpgradeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.mcp/list-tools': {
@@ -452,6 +525,20 @@ declare module '@tanstack/react-router' {
       path: '/brand-asset/$'
       fullPath: '/brand-asset/$'
       preLoaderRoute: typeof BrandAssetSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/discord/interactions': {
+      id: '/discord/interactions'
+      path: '/discord/interactions'
+      fullPath: '/discord/interactions'
+      preLoaderRoute: typeof DiscordInteractionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/discord/linked-role': {
+      id: '/discord/linked-role'
+      path: '/discord/linked-role'
+      fullPath: '/discord/linked-role'
+      preLoaderRoute: typeof DiscordLinkedRoleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/g/$slug': {
@@ -496,11 +583,37 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/internal/telegram-destination': {
+      id: '/api/internal/telegram-destination'
+      path: '/api/internal/telegram-destination'
+      fullPath: '/api/internal/telegram-destination'
+      preLoaderRoute: typeof ApiInternalTelegramDestinationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/discord/linked-role/callback': {
+      id: '/discord/linked-role/callback'
+      path: '/callback'
+      fullPath: '/discord/linked-role/callback'
+      preLoaderRoute: typeof DiscordLinkedRoleCallbackRouteImport
+      parentRoute: typeof DiscordLinkedRoleRoute
+    }
   }
 }
 
+interface DiscordLinkedRoleRouteChildren {
+  DiscordLinkedRoleCallbackRoute: typeof DiscordLinkedRoleCallbackRoute
+}
+
+const DiscordLinkedRoleRouteChildren: DiscordLinkedRoleRouteChildren = {
+  DiscordLinkedRoleCallbackRoute: DiscordLinkedRoleCallbackRoute,
+}
+
+const DiscordLinkedRoleRouteWithChildren =
+  DiscordLinkedRoleRoute._addFileChildren(DiscordLinkedRoleRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccessRoute: AccessRoute,
   ActivateRoute: ActivateRoute,
   AdminRoute: AdminRoute,
   BrandsRoute: BrandsRoute,
@@ -509,21 +622,24 @@ const rootRouteChildren: RootRouteChildren = {
   GateRoute: GateRoute,
   LoginRoute: LoginRoute,
   McpRoute: McpRoute,
-  NotEligibleRoute: NotEligibleRoute,
-  PrivacyRoute: PrivacyRoute,
+  ModerationRoute: ModerationRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
-  TermsRoute: TermsRoute,
+  StandardsRoute: StandardsRoute,
+  UpgradeRoute: UpgradeRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   BlogTelegramRoleManagementGuideRoute: BlogTelegramRoleManagementGuideRoute,
   BrandAssetSplatRoute: BrandAssetSplatRoute,
+  DiscordInteractionsRoute: DiscordInteractionsRoute,
+  DiscordLinkedRoleRoute: DiscordLinkedRoleRouteWithChildren,
   GSlugRoute: GSlugRoute,
   GateMediaSplatRoute: GateMediaSplatRoute,
   GatesIdRoute: GatesIdRoute,
   GatesIndexRoute: GatesIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiInternalTelegramDestinationRoute: ApiInternalTelegramDestinationRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

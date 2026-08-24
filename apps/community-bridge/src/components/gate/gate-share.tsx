@@ -10,12 +10,63 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { getSiteUrl } from "@/config/site-url";
 
 interface GateShareProps {
   slug: string;
   /** Preset accent colour, used to tint the control surface. */
   accent: string;
   className?: string;
+}
+
+const loadImage = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`Could not load ${src}`));
+    image.src = src;
+  });
+
+async function buildFenrirQr(url: string) {
+  const { toDataURL } = await import("qrcode");
+  const rawQr = await toDataURL(url, {
+    width: 640,
+    margin: 3,
+    errorCorrectionLevel: "H",
+    color: { dark: "#123A86", light: "#F2F7FF" },
+  });
+
+  const [qr, mark] = await Promise.all([loadImage(rawQr), loadImage("/fenrir-mark.svg")]);
+  const canvas = document.createElement("canvas");
+  canvas.width = 720;
+  canvas.height = 720;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas is unavailable");
+
+  const frame = context.createLinearGradient(0, 0, 720, 720);
+  frame.addColorStop(0, "#168BFF");
+  frame.addColorStop(0.52, "#614BFF");
+  frame.addColorStop(1, "#A855F7");
+  context.fillStyle = frame;
+  context.fillRect(0, 0, 720, 720);
+  context.fillStyle = "#07111F";
+  context.fillRect(12, 12, 696, 696);
+  context.drawImage(qr, 40, 40, 640, 640);
+
+  // Keep the mark compact and use high error correction so branded PNGs remain robust.
+  const plateSize = 88;
+  const plateX = (720 - plateSize) / 2;
+  const plateY = (720 - plateSize) / 2;
+  context.fillStyle = "#07111F";
+  context.beginPath();
+  context.roundRect(plateX, plateY, plateSize, plateSize, 24);
+  context.fill();
+  context.strokeStyle = "#8B5CF6";
+  context.lineWidth = 5;
+  context.stroke();
+  context.drawImage(mark, plateX + 10, plateY + 10, plateSize - 20, plateSize - 20);
+
+  return canvas.toDataURL("image/png");
 }
 
 /** Share controls for a public gate: copy the link, or show a scannable QR code. */
@@ -26,7 +77,8 @@ export function GateShare({ slug, accent, className }: GateShareProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    setUrl(`${window.location.origin}/g/${slug}`);
+    setUrl(`${getSiteUrl()}/g/${encodeURIComponent(slug)}`);
+    setQrDataUrl(null);
   }, [slug]);
 
   useEffect(() => {
@@ -34,13 +86,7 @@ export function GateShare({ slug, accent, className }: GateShareProps) {
     let active = true;
     void (async () => {
       try {
-        const { toDataURL } = await import("qrcode");
-        const png = await toDataURL(url, {
-          width: 640,
-          margin: 1,
-          errorCorrectionLevel: "M",
-          color: { dark: "#070b12", light: "#ffffff" },
-        });
+        const png = await buildFenrirQr(url);
         if (active) setQrDataUrl(png);
       } catch {
         if (active) toast.error("Could not build the QR code.");
@@ -84,18 +130,19 @@ export function GateShare({ slug, accent, className }: GateShareProps) {
             QR code
           </button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="overflow-hidden border-violet-400/25 bg-[#07111f] text-white shadow-[0_0_80px_rgba(99,102,241,0.28)] sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Scan to open this gate</DialogTitle>
             <DialogDescription className="break-all">{url}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-4">
-            <div className="flex h-56 w-56 items-center justify-center rounded-xl bg-white p-3">
+            <div className="relative flex h-64 w-64 items-center justify-center overflow-hidden rounded-[1.4rem] border border-violet-300/30 bg-[#07111f] p-2 shadow-[0_0_42px_rgba(22,139,255,0.25)]">
+              <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
               {qrDataUrl ? (
                 <img
                   src={qrDataUrl}
                   alt={`QR code linking to the ${slug} MyFenrir gate`}
-                  className="h-full w-full object-contain"
+                  className="h-full w-full rounded-2xl object-contain"
                 />
               ) : (
                 <span className="text-xs text-muted-foreground">Generating…</span>

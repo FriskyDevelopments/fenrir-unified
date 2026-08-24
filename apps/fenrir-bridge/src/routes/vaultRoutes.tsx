@@ -8,7 +8,7 @@ function absoluteVaultUrl(value: string) {
   return absoluteUrl(value);
 }
 
-function buildVaultLinks(
+export function buildVaultLinks(
   bridges: FriskyBridge[],
   rooms: FriskyLiveRoom[],
   personalLinks: PersonalLink[],
@@ -42,7 +42,7 @@ function buildVaultLinks(
   ].filter((link) => Boolean(absoluteVaultUrl(link.url)));
 }
 
-function createVaultShareUrl(links: VaultLink[]) {
+export function createVaultShareUrl(links: VaultLink[]) {
   const payload = encodeVaultLinks(links);
   return `${window.location.origin}/vault?v=${payload}`;
 }

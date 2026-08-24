@@ -1,0 +1,17 @@
+{
+  // NEW Quality-only boundary worker. Does not touch the shared prod proxy.
+  // Deploy: CLOUDFLARE_ACCOUNT_ID=e2a7eccb24c4836847fd14d08c499bd0 \
+  //   env -u CLOUDFLARE_API_TOKEN wrangler deploy \
+  //   -c tools/quality-boundary/wrangler.community-auth-proxy-quality.jsonc
+  //
+  // The routes only take effect AFTER communities-quality.myfenrir.com is bound
+  // (they override the custom-domain worker for these two auth paths only).
+  "name": "community-bridge-auth-proxy-quality",
+  "account_id": "e2a7eccb24c4836847fd14d08c499bd0",
+  "main": "community-auth-proxy-quality.mjs",
+  "compatibility_date": "2026-08-12",
+  "routes": [
+    { "pattern": "communities-quality.myfenrir.com/api/auth/me", "zone_name": "myfenrir.com" },
+    { "pattern": "communities-quality.myfenrir.com/api/auth/logout", "zone_name": "myfenrir.com" }
+  ]
+}

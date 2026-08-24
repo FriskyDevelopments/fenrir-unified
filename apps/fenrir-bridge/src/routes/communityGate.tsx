@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { copy, type Copy, type Locale } from "../i18n";
 import { AuthSurface } from "../components/AuthSurface";
 import { GlowCard } from "../components/GlowCard";
@@ -15,7 +15,27 @@ import {
   type DefaultAccessState
 } from "../services/communityAuth";
 import type { UiCopy } from "../app/uiCopy";
+import { vercelPreviewWithoutApi } from "../app/shared";
+import { communityBridgeDashboardUrl, communityBridgeGateUrl } from "../services/communityBridge";
 import { PanelTitle } from "./routeCommon";
+import { CommunityAuthProposalPanel } from "./dashboardPanels";
+
+function readableCommunityError(detail: unknown, fallback?: string) {
+  if (detail && typeof detail === "object" && "message" in detail && typeof detail.message === "string") return detail.message;
+  if (typeof detail === "string") return detail;
+  return fallback || "Community Gate is not ready yet.";
+}
+
+function communityBrandAdminErrorMessage(error: unknown) {
+  if (!(error instanceof CommunityBrandRequestError)) {
+    return "Network/API failure. The brand workspace could not be loaded.";
+  }
+  if (error.status === 401 || error.error === "authentication_required") return "Not signed in. Sign in to the Fenrir admin before customizing this Community Gate.";
+  if (error.status === 403 || error.error === "forbidden") return "Forbidden. Your account is not an owner or allowlisted admin for this Community Gate.";
+  if (error.status === 503 || error.error === "community_auth_not_configured") return readableCommunityError(error.detail, "Missing Community Gate config. Firebase Auth handles sign-in; Neon is only the gate data plane.");
+  if (error.error === "community_gate_schema_missing") return "Missing Neon schema. Apply the Community Gate schema before customizing this gate.";
+  return `Community Gate load failed: ${error.error || `HTTP ${error.status}`}.`;
+}
 
 function mergeNeonBrandTheme(base: typeof brandThemes.neonNexus, brand: CommunityBrandPayload | null) {
   if (!brand) return base;
@@ -140,6 +160,35 @@ const communityGateWalkthrough = [
     body: "Subscription unlocks branded gates, safer onboarding, isolated community records, review workflows, and a cleaner upgrade path for paid/private communities."
   }
 ] as const;
+
+/**
+ * The Community Bridge is its OWN product surface (apps/community-bridge,
+ * Neon-based, deployed apart at gate.myfenrir.com). The main MyFenrir
+ * dashboard only hands off to it — the embedded brand wizard was retired
+ * from this surface on purpose.
+ */
+export function CommunityBridgeHandoffPanel() {
+  return (
+    <section className="panel wide community-bridge-handoff" aria-label="Community Bridge">
+      <div className="panel-title">
+        <div>
+          <h3>Community Bridge</h3>
+          <p>Gates, branding, invites and member state live in their own app — Neon-backed, separate from this dashboard.</p>
+        </div>
+        <span className="status good">Separate surface</span>
+      </div>
+      <div className="community-bridge-handoff-body">
+        <p>
+          Start with the guided Community Bridge walkthrough and gate wizard, then manage everything from its dashboard.
+          Fenrir keeps the door; Neon keeps the member state.
+        </p>
+        <div className="community-bridge-handoff-actions">
+          <a className="button-link" href={communityBridgeDashboardUrl}>Open Community Bridge walkthrough →</a>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function CommunityBrandWizardPanel({ locale, onNotice }: { locale: Locale; onNotice: (message: string) => void }) {
   const [step, setStep] = useState<BrandWizardStep>("Address");
@@ -640,7 +689,7 @@ export function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmedEmail, slug })
+        body: JSON.stringify({ email: trimmedEmail, slug, locale })
       });
       const body = await response.json().catch(() => null) as { message?: string; devLink?: string; error?: string; detail?: string | { message?: string } } | null;
       if (!response.ok) throw new Error(readableCommunityError(body?.detail, body?.error));
@@ -677,6 +726,9 @@ export function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
             <p>{gateText.body}</p>
           </div>
           <CommunityAuthProposalPanel proposal={proposal} locale={locale} />
+          <a className="button-link community-oauth-button" href={communityBridgeGateUrl(slug, locale)}>
+            Continue to Community Bridge SSO
+          </a>
           {vercelPreviewWithoutApi ? (
             <div className="auth-disclosure community-preview-warning" role="status">
               <div>

@@ -28,13 +28,6 @@ const secretGroups = [
     ]
   },
   {
-    title: "WorkOS auth (primary login broker)",
-    fields: [
-      ["WORKOS_CLIENT_ID", "WorkOS AuthKit client ID (client_...)"],
-      ["WORKOS_API_KEY", "WorkOS API key (sk_...). Used server-side for the code exchange."]
-    ]
-  },
-  {
     title: "Supabase (optional profile store only)",
     fields: [
       ["SUPABASE_URL", "Server Supabase project URL (optional; profile upserts only)"],
@@ -44,6 +37,7 @@ const secretGroups = [
   {
     title: "Neon community gate",
     fields: [
+      ["NEON_API_KEY", "Neon management API key used to discover projects and obtain a runtime connection URI"],
       ["NEON_DATABASE_URL", "Runtime database URL only if Fenrir Community Gate needs direct DB access. Neon management uses OAuth connector."],
       ["FENRIR_COMMUNITY_AUTH_SECRET", "Community auth signing secret"]
     ]

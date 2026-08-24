@@ -2,7 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { getCookie, setCookie } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { neonSql } from "@/lib/neon.server";
 
+// Vistas de gates en Neon (cb_gate_views); la sesión sigue siendo Supabase.
 export interface GateViewStats {
   gate_id: string;
   total: number;
@@ -60,7 +62,7 @@ function resolveVisitorId(): string {
  * uses that to keep PostHog in sync with the local panel.
  */
 export const recordGateView = createServerFn({ method: "POST" })
-  .inputValidator((data) =>
+  .validator((data) =>
     z
       .object({
         slug: z
@@ -74,13 +76,12 @@ export const recordGateView = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sql = neonSql();
 
-    const { data: gate } = await supabaseAdmin
-      .from("gate_configs")
-      .select("id")
-      .eq("slug", data.slug)
-      .maybeSingle();
+    const gates = (await sql`
+      select id from cb_gate_configs where slug = ${data.slug} limit 1
+    `) as Array<{ id: string }>;
+    const gate = gates[0];
     if (!gate) return { ok: false as const, unique: false };
 
     let referrerHost: string | null = null;
@@ -94,44 +95,33 @@ export const recordGateView = createServerFn({ method: "POST" })
 
     const visitorKey = `${resolveVisitorId()}:${utcDayKey()}`;
 
-    // The partial unique index makes the second insert of the same
-    // (gate, visitor, day) a no-op instead of an inflated count.
-    const { data: inserted, error } = await supabaseAdmin
-      .from("gate_views")
-      .upsert(
-        { gate_id: gate.id, referrer_host: referrerHost, visitor_key: visitorKey },
-        { onConflict: "gate_id,visitor_key", ignoreDuplicates: true },
-      )
-      .select("id");
-
-    if (error) return { ok: false as const, unique: false };
-
-    return { ok: true as const, unique: (inserted ?? []).length > 0 };
+    try {
+      // on conflict do nothing: el segundo insert del mismo
+      // (gate, visitante, día) es un no-op, no un conteo inflado.
+      const inserted = (await sql`
+        insert into cb_gate_views (gate_id, referrer_host, visitor_key)
+        values (${gate.id}, ${referrerHost}, ${visitorKey})
+        on conflict (gate_id, visitor_key) do nothing
+        returning id
+      `) as Array<{ id: string }>;
+      return { ok: true as const, unique: inserted.length > 0 };
+    } catch {
+      return { ok: false as const, unique: false };
+    }
   });
 
 /** Per-gate view stats for every gate the signed-in user owns. */
 export const getMyGateViewStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
-    z
-      .object({
-        brand_id: z
-          .string()
-          .trim()
-          .toLowerCase()
-          .regex(/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/, "Invalid brand"),
-      })
-      .parse(data),
-  )
-  .handler(async ({ context, data }) => {
-    const { data: gates, error: gatesError } = await context.supabase
-      .from("gate_configs")
-      .select("id")
-      .eq("user_id", context.userId)
-      .eq("brand_id", data.brand_id);
-    if (gatesError) throw new Error(gatesError.message);
+  .validator(() => undefined)
+  .handler(async ({ context }) => {
+    const sql = neonSql();
 
-    const ids = (gates ?? []).map((g) => g.id as string);
+    const gates = (await sql`
+      select id from cb_gate_configs
+      where user_id = ${context.userId}
+    `) as Array<{ id: string }>;
+    const ids = gates.map((g) => g.id);
     if (ids.length === 0) return [] as GateViewStats[];
 
     const since = new Date();
@@ -139,28 +129,29 @@ export const getMyGateViewStats = createServerFn({ method: "GET" })
     since.setUTCHours(0, 0, 0, 0);
 
     const [recent, totals] = await Promise.all([
-      context.supabase
-        .from("gate_views")
-        .select("gate_id, viewed_at")
-        .in("gate_id", ids)
-        .gte("viewed_at", since.toISOString())
-        .limit(50000),
-      context.supabase.from("gate_views").select("gate_id").in("gate_id", ids).limit(50000),
+      sql`
+        select gate_id, viewed_at from cb_gate_views
+        where gate_id = any(${ids}::uuid[]) and viewed_at >= ${since.toISOString()}
+        limit 50000
+      ` as Promise<Array<{ gate_id: string; viewed_at: string | Date }>>,
+      sql`
+        select gate_id from cb_gate_views
+        where gate_id = any(${ids}::uuid[])
+        limit 50000
+      ` as Promise<Array<{ gate_id: string }>>,
     ]);
-    if (recent.error) throw new Error(recent.error.message);
-    if (totals.error) throw new Error(totals.error.message);
 
     const stats = new Map<string, GateViewStats>(
       ids.map((id) => [id, { gate_id: id, total: 0, last7: 0, daily: emptyDays() }]),
     );
 
-    for (const row of totals.data ?? []) {
-      const entry = stats.get(row.gate_id as string);
+    for (const row of totals) {
+      const entry = stats.get(row.gate_id);
       if (entry) entry.total += 1;
     }
 
-    for (const row of recent.data ?? []) {
-      const entry = stats.get(row.gate_id as string);
+    for (const row of recent) {
+      const entry = stats.get(row.gate_id);
       if (!entry) continue;
       const day = utcDay(row.viewed_at as string);
       const bucket = entry.daily.find((d) => d.date === day);

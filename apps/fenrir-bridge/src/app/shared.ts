@@ -3,7 +3,6 @@ import type { FriskyCommissionLink, FriskyDomain, LiveRoomProvider } from "../se
 export const confettiPieces = Array.from({ length: 28 }, (_, index) => index);
 export const pageKeys = ["command", "links", "domains", "dns", "locks", "rooms", "telegram", "revocations", "audit", "faq", "billing", "brands"] as const;
 export const legalRoutes = new Set(["/legal", "/terms", "/privacy", "/acceptable-use"]);
-export const friskySignalDevRequestUrl = "https://t.me/friskysignal";
 export const liveRoomProviders: Array<{ id: LiveRoomProvider; name: string; icon: string; brand: string; hint: string; placeholder: string }> = [
   {
     id: "zoom",

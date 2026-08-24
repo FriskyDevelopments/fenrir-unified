@@ -134,10 +134,17 @@ function parseVisionResponse(
   const appropriate = extractBool(upper, "APPROPRIATE");
   const entering = extractBool(upper, "ENTERING");
 
+  // The self-hosted moderation service answers with three states, not two:
+  // uncertainty is not a rejection, it goes to a human. Providers that only
+  // return the boolean fields simply never emit DECISION and keep the old
+  // two-state behaviour.
+  const needsReview = /DECISION:\s*REVIEW/.test(upper);
+
   return {
     personDetected,
     appropriate,
     entering,
+    needsReview,
     raw,
     model: response.model || model,
     latencyMs,

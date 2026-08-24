@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { copy, detectLocale, languageNames, locales, type Copy, type Locale } from "./i18n";
 import { aiOpsService, appService, authService, billingService, bridgeService, commerceService, domainService, liveRoomService, readinessService, telegramIdentityService, telegramService, webauthnService, type AuthSession, type BillingStatusPayload, type PaidPlan, type ReadinessPayload, type TelegramIdentityLinkPayload } from "./services/api";
 import { friskyClientAuthEngine, type AuthProvider } from "./services/authGateway";
@@ -24,6 +23,9 @@ import {
 import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyDomain, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan } from "./services/types";
 import { AuthProviderButton } from "./components/AuthProviderButton";
 import { AuthSurface } from "./components/AuthSurface";
+import { HumanVerificationGate } from "./components/HumanVerificationGate";
+import { communityBridgeDashboardUrl, communityBridgeGateUrl, communityBridgeUrlForLocale } from "./services/communityBridge";
+import { CommunityBridgeHandoffPanel } from "./routes/communityGate";
 import { knowledgeBaseLabel, knowledgeBaseUrl } from "./services/knowledgeBase";
 import { CinematicLanding } from "./components/CinematicLanding";
 import { GlowCard } from "./components/GlowCard";
@@ -33,6 +35,10 @@ import { brandThemes, themeClassName, themeCssVars } from "./theme/brandThemes";
 const defaultServiceOrg = (import.meta.env.VITE_DEFAULT_SERVICE_ORG ?? "Frisky Dev Workspace").trim();
 const defaultServiceSubdomain = (import.meta.env.VITE_DEFAULT_SERVICE_SUBDOMAIN ?? "vip.myfenrir.com").trim();
 const managedDashboardPath = "/main";
+function postLoginDestination() {
+  const requested = new URLSearchParams(window.location.search).get("next");
+  return requested?.startsWith("/") && !requested.startsWith("//") ? requested : managedDashboardPath;
+}
 const telegramLoginBotUsername = (
   import.meta.env.VITE_FENRIR_TELEGRAM_BOT_USERNAME ??
   import.meta.env.VITE_MYFENRIR_TELEGRAM_BOT_USERNAME ??
@@ -180,9 +186,9 @@ const uiCopy: Record<Locale, {
     friskyAccount: "Frisky Account",
     secondaryGate: "Secondary gate",
     routePrivateViaFenrir: "Route Zoom, Meet, Webex, or any room through Fenrir first.",
-    proCustomization: "Pro customization",
-    proCustomizationBodyTitle: "Starting at Pro, customers can add their logo and branded room visuals.",
-    proCustomizationBody: "Starter includes the clean Fenrir room gate. Pro and Operator unlock customer logo, custom room name styling, and a branded hero image on the secondary link.",
+    proCustomization: "The Pack customization",
+    proCustomizationBodyTitle: "With The Pack, customers can add their logo and branded room visuals.",
+    proCustomizationBody: "Free includes the clean Fenrir room gate. The Pack unlocks a customer logo, custom room-name styling, and a branded hero image on the secondary link.",
     telegramStatusCheck: "Telegram status check",
     linked: "linked",
     loginRequired: "login required",
@@ -195,7 +201,7 @@ const uiCopy: Record<Locale, {
     telegramReaddNeedChat: "Enter the Telegram group ID first.",
     telegramReaddReady: "Recovery invite ready. Fenrir opened a one-use Telegram link.",
     telegramReaddUnavailable: "Recovery invite could not be created. Check bot admin invite permissions.",
-    devRequestViaSignal: "Dev request via Frisky Signal",
+    devRequestViaSignal: "Support",
     devRequestViaSignalShort: "Frisky Signal",
     setupRoute: "Setup route",
     openingLaunchRoute: "Opening launch route",
@@ -280,9 +286,9 @@ const uiCopy: Record<Locale, {
     walkthroughStepsAdmin: ["Stable URL", "Rotate target", "Revoke leak", "Audit action"],
     walkthroughStepsLaunch: ["Customer clicks", "Fenrir explains", "Access unlocks", "Entry opens"],
     communityEmailPlaceholder: "you@community.com",
-    neonMagicBusy: "Creating Neon link...",
-    neonMagicButton: "Send Neon magic link",
-    neonMagicSuccessMessage: "Neon auth link sent. Check your inbox and follow the latest approval step.",
+    neonMagicBusy: "Signing you in...",
+    neonMagicButton: "Continue to Sign On",
+    neonMagicSuccessMessage: "Sign-in link sent. Check your inbox to continue into MyFenrir.",
     neonMagicDevLinkLabel: "Open dev auth link",
     fallbackPartnerLabel: "Fallback links",
     challengeLayer: "Challenge layer",
@@ -305,7 +311,7 @@ const uiCopy: Record<Locale, {
     setupInputRoomSlug: "access-room",
     setupInputRoomTitle: "Zoom room name / client title",
     setupInputRoomTarget: "Private call URL",
-    setupInputRoomCover: "Pro logo / branded image URL",
+    setupInputRoomCover: "Logo / branded image URL",
     setupInputGroupEmail: "you@community.com",
     setupInputCommunityEmail: "you@community.com",
     setupInputCustomDomain: "customer.myfenrir.com",
@@ -316,9 +322,9 @@ const uiCopy: Record<Locale, {
     friskyAccount: "Cuenta Frisky",
     secondaryGate: "Segunda puerta",
     routePrivateViaFenrir: "Ruta el Zoom, Meet, Webex o cualquier sala por Fenrir primero.",
-    proCustomization: "Personalizacion Pro",
-    proCustomizationBodyTitle: "Desde Pro, los clientes pueden agregar logo y portada de sala personalizada.",
-    proCustomizationBody: "Starter incluye la puerta limpia de sala. Pro y Operator habilitan logo del cliente, estilo de nombre y hero branding en el enlace secundario.",
+    proCustomization: "Personalizacion The Pack",
+    proCustomizationBodyTitle: "Con The Pack, los clientes pueden agregar logo y portada de sala personalizada.",
+    proCustomizationBody: "Gratis incluye la puerta limpia de sala. The Pack habilita logo del cliente, estilo de nombre y hero branding en el enlace secundario.",
     telegramStatusCheck: "Estado de Telegram",
     linked: "vinculado",
     loginRequired: "requiere inicio de sesion",
@@ -405,7 +411,7 @@ const uiCopy: Record<Locale, {
     setupInputRoomSlug: "sala-acceso",
     setupInputRoomTitle: "Nombre de sala / cliente",
     setupInputRoomTarget: "URL de llamada privada",
-    setupInputRoomCover: "Logo Pro / URL de portada",
+    setupInputRoomCover: "Logo / URL de portada",
     setupInputGroupEmail: "tu@comunidad.com",
     setupInputCommunityEmail: "tu@comunidad.com",
     setupInputCustomDomain: "cliente.myfenrir.com",
@@ -442,8 +448,8 @@ const uiCopy: Record<Locale, {
     walkthroughStepsAdmin: ["URL estable", "Rotar destino", "Revocar fuga", "Acción de auditoría"],
     walkthroughStepsLaunch: ["Cliente hace clic", "Fenrir explica", "Acceso desbloqueado", "Entrada abierta"],
     communityEmailPlaceholder: "tu@comunidad.com",
-    neonMagicBusy: "Creando enlace Neon...",
-    neonMagicButton: "Enviar enlace mágico Neon",
+    neonMagicBusy: "Iniciando sesión...",
+    neonMagicButton: "Continuar al inicio de sesión",
     neonMagicSuccessMessage: "Enlace de autenticación Neon enviado. Revisa el correo y sigue el último paso de aprobación.",
     neonMagicDevLinkLabel: "Abrir enlace de prueba Neon",
     fallbackPartnerLabel: "Enlaces de respaldo"
@@ -452,9 +458,9 @@ const uiCopy: Record<Locale, {
     friskyAccount: "Compte Frisky",
     secondaryGate: "Passerelle secondaire",
     routePrivateViaFenrir: "Acheminer Zoom, Meet, Webex ou toute salle via Fenrir en premier.",
-    proCustomization: "Personnalisation Pro",
-    proCustomizationBodyTitle: "À partir de Pro, les clients peuvent ajouter logo et visuels personnalisés.",
-    proCustomizationBody: "Starter garde la passerelle Fenrir standard. Pro et Operator débloquent logo client, style de nom personnalisé et hero image sur le lien secondaire.",
+    proCustomization: "Personnalisation The Pack",
+    proCustomizationBodyTitle: "Avec The Pack, les clients peuvent ajouter logo et visuels personnalises.",
+    proCustomizationBody: "Gratuit garde la passerelle Fenrir standard. The Pack debloque logo client, style de nom personnalise et hero image sur le lien secondaire.",
     telegramStatusCheck: "Etat Telegram",
     linked: "lié",
     loginRequired: "connexion requise",
@@ -541,7 +547,7 @@ const uiCopy: Record<Locale, {
     setupInputRoomSlug: "acces-salle",
     setupInputRoomTitle: "Nom de salle / client",
     setupInputRoomTarget: "URL d'appel privée",
-    setupInputRoomCover: "Logo Pro / URL image de marque",
+    setupInputRoomCover: "Logo / URL image de marque",
     setupInputGroupEmail: "vous@communaute.com",
     setupInputCommunityEmail: "vous@communaute.com",
     setupInputCustomDomain: "client.myfenrir.com",
@@ -578,8 +584,8 @@ const uiCopy: Record<Locale, {
     walkthroughStepsAdmin: ["URL stable", "Tourner la cible", "Révoquer la fuite", "Action d'audit"],
     walkthroughStepsLaunch: ["Client clique", "Fenrir explique", "Déblocage d'accès", "Entrée ouverte"],
     communityEmailPlaceholder: "vous@communaute.com",
-    neonMagicBusy: "Création du lien Neon...",
-    neonMagicButton: "Envoyer le lien magique Neon",
+    neonMagicBusy: "Connexion...",
+    neonMagicButton: "Continuer vers la connexion",
     neonMagicSuccessMessage: "Lien d'authentification Neon envoyé. Vérifiez votre e-mail et suivez l'étape d'approbation.",
     neonMagicDevLinkLabel: "Ouvrir le lien développeur Neon",
     fallbackPartnerLabel: "Liens de secours"
@@ -588,9 +594,9 @@ const uiCopy: Record<Locale, {
     friskyAccount: "Frisky Konto",
     secondaryGate: "Sekundaere Tor",
     routePrivateViaFenrir: "Routen Sie Zoom, Meet, Webex oder jede Room erst über Fenrir.",
-    proCustomization: "Pro Anpassung",
-    proCustomizationBodyTitle: "Ab Pro koennen Kunden eigenes Logo und gebrandete Raumvisuals nutzen.",
-    proCustomizationBody: "Starter enthaelt den clean Fenrir Raum-Gate. Pro und Operator aktivieren Kundenlogo, benutzerdefinierten Raumnamenstil und Hero-Bild auf dem Sekundaerlink.",
+    proCustomization: "The-Pack-Anpassung",
+    proCustomizationBodyTitle: "Mit The Pack koennen Kunden ihr Logo und gebrandete Raumvisuals nutzen.",
+    proCustomizationBody: "Gratis enthaelt das klare Fenrir-Raum-Gate. The Pack aktiviert Kundenlogo, benutzerdefinierten Raumnamenstil und Hero-Bild auf dem Sekundaerlink.",
     telegramStatusCheck: "Telegram-Status",
     linked: "verknuepft",
     loginRequired: "anmeldung erforderlich",
@@ -677,7 +683,7 @@ const uiCopy: Record<Locale, {
     setupInputRoomSlug: "raum-zugang",
     setupInputRoomTitle: "Raumname / Kunde",
     setupInputRoomTarget: "Private Call URL",
-    setupInputRoomCover: "Pro Logo / Marken-Bild URL",
+    setupInputRoomCover: "Logo / Marken-Bild URL",
     setupInputGroupEmail: "du@gemeinschaft.com",
     setupInputCommunityEmail: "du@gemeinschaft.com",
     setupInputCustomDomain: "kunde.myfenrir.com",
@@ -714,8 +720,8 @@ const uiCopy: Record<Locale, {
     walkthroughStepsAdmin: ["Stabile URL", "Ziel rotieren", "Leckung widerrufen", "Audit-Aktion"],
     walkthroughStepsLaunch: ["Kunde klickt", "Fenrir erklärt", "Zugriff entsperrt", "Einstieg öffnet"],
     communityEmailPlaceholder: "du@gemeinschaft.com",
-    neonMagicBusy: "Neon-Link wird erstellt...",
-    neonMagicButton: "Neon-Magic-Link senden",
+    neonMagicBusy: "Anmeldung...",
+    neonMagicButton: "Weiter zur Anmeldung",
     neonMagicSuccessMessage: "Neon-Auth-Link gesendet. E-Mail prüfen und dem letzten Freigabeschritt folgen.",
     neonMagicDevLinkLabel: "Neon-Entwicklerlink öffnen",
     fallbackPartnerLabel: "Fallback-Links"
@@ -725,7 +731,6 @@ const uiCopy: Record<Locale, {
 const confettiPieces = Array.from({ length: 28 }, (_, index) => index);
 const pageKeys = ["command", "links", "domains", "dns", "locks", "rooms", "telegram", "revocations", "audit", "faq", "billing", "brands"] as const;
 const legalRoutes = new Set(["/legal", "/terms", "/privacy", "/acceptable-use"]);
-const friskySignalDevRequestUrl = "https://t.me/friskysignal";
 const liveRoomProviders: Array<{ id: LiveRoomProvider; name: string; icon: string; brand: string; hint: string; placeholder: string }> = [
   {
     id: "zoom",
@@ -1011,7 +1016,6 @@ function isAuthCallbackPath(pathname: string) {
   const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
   return normalizedPath === "/auth/callback" || 
          normalizedPath === "/auth/v1/callback" || 
-         normalizedPath === "/login" ||
          normalizedPath === (import.meta.env.VITE_AUTH_REDIRECT_PATH || "/auth/callback");
 }
 
@@ -1027,14 +1031,6 @@ function activePageFromLocation(path: string, hash: string): PageKey {
 
 function dashboardPathFor(page: PageKey) {
   return page === "command" ? managedDashboardPath : `/${page}`;
-}
-
-function paidPlanFromProductLabel(label: string): PaidPlan | null {
-  const p = label.trim().toLowerCase();
-  if (p === "starter") return "starter";
-  if (p === "pro") return "pro";
-  if (p === "operator") return "operator";
-  return null;
 }
 
 export function App() {
@@ -1132,6 +1128,10 @@ export function App() {
   async function refreshAuth() {
     const result = await authService.me();
     setAuth(result.data);
+    if (result.data.authenticated && window.location.pathname === "/api/telegram/link/start") {
+      window.location.assign("/api/telegram/link/start");
+      return;
+    }
     if (result.data.authenticated && (isAuthCallbackPath(window.location.pathname) || window.location.hash.includes("access_token="))) {
       window.history.replaceState({}, "", managedDashboardPath);
     }
@@ -1152,7 +1152,11 @@ export function App() {
     const params = new URLSearchParams(window.location.search);
     const staleAuthError = params.get("auth_error");
     if (!staleAuthError) return;
-    if (staleAuthError.startsWith("missing_env:") || staleAuthError === "direct_oauth_disabled") {
+    if (
+      staleAuthError.startsWith("missing_env:") ||
+      staleAuthError === "direct_oauth_disabled" ||
+      staleAuthError === "supabase_session_failed:human_verification_required"
+    ) {
       params.delete("auth_error");
       const nextSearch = params.toString();
       window.history.replaceState({}, "", `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`);
@@ -1213,12 +1217,21 @@ export function App() {
     const params = new URLSearchParams(window.location.search);
     const billing = params.get("billing");
     if (!billing) return;
-    if (billing === "success") setNotice(copy[locale].billingReturnSuccess);
+    if (billing === "success") {
+      setNotice(copy[locale].billingReturnSuccess);
+      triggerCelebration("Welcome to the Pack", "Your MyFenrir subscription is active. The pack is ready.", "commerce");
+    }
     if (billing === "cancel") setNotice(copy[locale].billingReturnCancel);
     if (billing === "portal_return") setNotice(copy[locale].billingReturnPortal);
     void refresh();
     window.history.replaceState({}, "", window.location.pathname);
   }, [auth?.authenticated, locale]);
+
+  useEffect(() => {
+    // Replace the visitor-only prompt after authentication without overwriting
+    // a deliberate action, billing, or error notice.
+    if (auth?.authenticated && notice === c.initialNotice) setNotice(c.accountSub);
+  }, [auth?.authenticated, c.accountSub, c.initialNotice, notice]);
 
   useEffect(() => {
     if (!state || !activationVisible) return undefined;
@@ -1360,6 +1373,10 @@ export function App() {
   async function createBridge() {
     const domainId = selectedDomainRecord?.id;
     if (!domainId) return;
+    if (!chatInput.trim()) {
+      setNotice(ui.telegramReaddNeedChat);
+      return;
+    }
     const result = await bridgeService.create({
       domainId,
       slug: slugInput.trim() || ui.setupInputTelegramSlug,
@@ -1423,12 +1440,6 @@ export function App() {
     await refresh();
   }
 
-  async function checkTelegram() {
-    const result = await telegramService.checkPermissions(chatInput.trim());
-    setNotice(result.data.status === "ready" ? `${ui.readiness} ${ui.telegramStatusCheck.toLowerCase()}.` : "Missing Telegram permissions.");
-    await refresh();
-  }
-
   function startWizard(kind: "telegram" | "room" | "vault" | "domain" | "concierge") {
     if (kind === "telegram") {
       navigateActive("locks");
@@ -1484,17 +1495,6 @@ export function App() {
     );
   }
 
-  async function startStripeCheckout(plan: PaidPlan) {
-    setCheckoutPlan(plan);
-    navigateActive("billing");
-    try {
-      const { url } = await billingService.checkout(plan);
-      window.location.assign(url);
-    } catch {
-      setNotice(copy[locale].checkoutErrorGeneric);
-    }
-  }
-
   async function startTelegramStars() {
     navigateActive("billing");
     try {
@@ -1538,17 +1538,6 @@ export function App() {
     }
   }
 
-  function onPaidPlanPickedFromPricing(planLabel: string) {
-    const key = paidPlanFromProductLabel(planLabel);
-    if (!key) {
-      setNotice(planLabel.trim().toLowerCase() === "free" ? copy[locale].billingFreeTier : copy[locale].billingPaidPlanOnly);
-      return;
-    }
-    setCheckoutPlan(key);
-    navigateActive("billing");
-    void startStripeCheckout(key);
-  }
-
   function navigateActive(page: PageKey) {
     setActive(page);
     const nextPath = dashboardPathFor(page);
@@ -1557,19 +1546,13 @@ export function App() {
     }
   }
 
-  async function openBillingPortal() {
-    try {
-      const { url } = await billingService.portal();
-      window.location.assign(url);
-    } catch {
-      setNotice(copy[locale].billingPortalNeedsCustomer);
-    }
-  }
-
   async function registerPasskey() {
     try {
       setNotice(c.passkeyBusy);
       const { optionsJSON } = await webauthnService.registerOptions();
+      // Carga diferida: @simplewebauthn/browser sale del chunk inicial y sólo
+      // se descarga al registrar un passkey.
+      const { startRegistration } = await import("@simplewebauthn/browser");
       const registration = await startRegistration({ optionsJSON });
       await webauthnService.registerVerify(registration);
       setNotice(c.passkeySuccess);
@@ -1632,20 +1615,21 @@ export function App() {
   const show = (...pages: PageKey[]) => pages.includes(active);
 
   return (
-    <div className="app">
+    <div className="app threshold-dashboard">
       {activationVisible && <ProtocolActivated />}
-      <aside className="sidebar">
+      <aside className="sidebar threshold-rail">
         <div className="brand">
           <img className="brand-wordmark" src="/fenrir-cut-wordmark.svg" alt="Fenrir" />
           <div className="brand-lockup">
-            <b>Telegram Lock</b>
-            <small>{c.brandSmall}</small>
+            <b>MyFenrir</b>
+            <small>CONTROL PLANE · R/01</small>
           </div>
         </div>
         <nav>
           {c.nav.map((item, index) => (
             <button className={active === pageKeys[index] ? "active" : ""} onClick={() => navigateActive(pageKeys[index])} key={item}>
-              {item}
+              <span className="threshold-nav-index">{String(index).padStart(2, "0")}</span>
+              <span>{item}</span>
             </button>
           ))}
         </nav>
@@ -1661,7 +1645,7 @@ export function App() {
         </div>
       </aside>
 
-      <main>
+      <main className="threshold-main">
         <div className="fenrir-wallpaper" aria-hidden="true">
           <span className="wallpaper-orbit orbit-one" />
           <span className="wallpaper-orbit orbit-two" />
@@ -1669,7 +1653,17 @@ export function App() {
           <span className="wallpaper-paw">F</span>
           <span className="wallpaper-bot">◈</span>
         </div>
-        <header className="topbar">
+        <header className="topbar threshold-topbar">
+          <div className="threshold-engine" aria-hidden="true">
+            <span className="threshold-engine-ring ring-a" />
+            <span className="threshold-engine-ring ring-b" />
+            <span className="threshold-engine-ring ring-c" />
+            <span className="threshold-engine-scan" />
+            <span className="threshold-engine-core"><b>R/01</b><small>THRESHOLD<br />ONLINE</small></span>
+            <span className="threshold-engine-node node-a" />
+            <span className="threshold-engine-node node-b" />
+            <span className="threshold-engine-node node-c" />
+          </div>
           <div>
             <p className="label">{c.heroLabel}</p>
             <h1>{c.heroTitle}</h1>
@@ -1689,7 +1683,7 @@ export function App() {
               onChange={(event) => {
                 const next = event.target.value as Locale;
                 setLocale(next);
-                setNotice(copy[next].initialNotice);
+                setNotice(copy[next].accountSub);
               }}
               aria-label="Language"
             >
@@ -1698,7 +1692,7 @@ export function App() {
               ))}
             </select>
           <span className="status good">{state.user.authProvider} OAuth</span>
-          <span className="status amber">{state.org.plan}</span>
+          <span className="status amber">{planLabel(state.org.plan)}</span>
             <button className="ghost compact-button" onClick={signOut}>{c.signOut}</button>
           </div>
         </header>
@@ -1731,7 +1725,7 @@ export function App() {
             roomProvider={roomProviderInput}
             onDomain={() => navigateActive("domains")}
             onRoom={() => navigateActive("rooms")}
-            onCommunity={() => { window.open("https://communities.myfenrir.com/dashboard", "_blank", "noopener"); }}
+            onCommunity={() => window.location.assign(communityBridgeUrlForLocale(locale))}
           />
         )}
 
@@ -1783,28 +1777,10 @@ export function App() {
         </section>
 
         {show("billing") && <ProductionReadinessPanel c={c} readiness={readiness} loadFailed={readinessError} />}
-        {show("command", "brands") && <CommunityBrandWizardPanel locale={locale} onNotice={setNotice} />}
+        {show("command", "brands") && <CommunityBridgeHandoffPanel />}
 
         <div className="content-grid">
-          {show("command", "locks", "telegram") && <section className="panel wide">
-            <PanelTitle title={c.activeTelegramLocks} subtitle={c.activeTelegramLocksSub} />
-            <div className="form-row lock-form">
-              <select value={selectedDomain} onChange={(event) => setSelectedDomain(event.target.value)}>
-                <option value="" disabled>{c.chooseDomain}</option>
-                {state.domains.map((domain) => (
-                  <option key={domain.id} value={domain.id}>
-                    {domain.domain}
-                  </option>
-                ))}
-              </select>
-              <input value={slugInput} onChange={(event) => setSlugInput(event.target.value)} aria-label="Telegram lock slug" placeholder={ui.setupInputTelegramSlug} />
-              <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} aria-label="Telegram chat id" placeholder={ui.setupInputTelegramId} />
-              <input value={groupNameInput} onChange={(event) => setGroupNameInput(event.target.value)} aria-label="Telegram group name" placeholder={ui.setupInputGroupName} />
-              <input value={groupImageInput} onChange={(event) => setGroupImageInput(event.target.value)} aria-label="Telegram group image url" placeholder={ui.setupInputGroupPhoto} />
-              <button onClick={createBridge}>{c.createLock}</button>
-            </div>
-            <BridgeGallery bridges={state.bridges} invites={state.invites} onRotate={rotateBridge} onRevoke={revokeBridge} c={c} />
-          </section>}
+          {show("command", "locks", "telegram") && <CommunityBridgeHandoffPanel />}
 
           {show("command", "billing") && <section className="panel">
             <PanelTitle title={c.friskyAccount} subtitle={c.accountSub} />
@@ -1815,14 +1791,11 @@ export function App() {
             <KeyValue label={c.billingStatusLabel} value={billingStatus?.subscriptionStatus ?? c.billingStatusPlaceholder} />
             {billingStatus && (
               <p className="muted">
-                Limits: {billingStatus.limits.maxTelegramLocks ?? "∞"} locks · custom domain {billingStatus.limits.customDomainSupported ? "yes" : "no"}
+                Gates: 5 · linked community {billingStatus.limits.customDomainSupported ? "The Pack active" : "not active"}
                 {" · "}live rooms {billingStatus.limits.liveRoomsSupported ? "yes" : "no"}
               </p>
             )}
             <div className="row-actions">
-              <button type="button" className="ghost compact-button" onClick={() => void openBillingPortal()}>
-                {c.billingPortalButton}
-              </button>
               <button type="button" className="ghost compact-button" onClick={() => void registerPasskey()}>
                 {c.passkeyRegister}
               </button>
@@ -1837,7 +1810,6 @@ export function App() {
             telegram={serviceTelegram}
             subdomain={serviceSubdomain}
             mode={serviceMode}
-            checkoutPlan={checkoutPlan}
             onEmail={setServiceEmail}
             onOrg={setServiceOrg}
             onTelegram={setServiceTelegram}
@@ -1959,7 +1931,7 @@ export function App() {
               <input value={roomSlugInput} onChange={(event) => setRoomSlugInput(event.target.value)} aria-label="Live room slug" placeholder={ui.setupInputRoomSlug} />
               <input value={roomTitleInput} onChange={(event) => setRoomTitleInput(event.target.value)} aria-label="Live room title" placeholder={ui.setupInputRoomTitle} />
               <input value={roomTargetInput} onChange={(event) => setRoomTargetInput(event.target.value)} aria-label="Call target URL" placeholder={roomProviderPlaceholder(roomProviderInput)} />
-              <input value={roomCoverInput} onChange={(event) => setRoomCoverInput(event.target.value)} aria-label="Pro logo or room image URL" placeholder={ui.setupInputRoomCover} />
+              <input value={roomCoverInput} onChange={(event) => setRoomCoverInput(event.target.value)} aria-label="Logo or room image URL" placeholder={ui.setupInputRoomCover} />
               <button onClick={createLiveRoom}>{c.createPaidRoom}</button>
             </div>
             <div className="room-logo-actions" aria-label="Live room logo presets">
@@ -2019,21 +1991,11 @@ export function App() {
               <div className="row-actions">
                 {!telegramIdentity?.linked ? <button type="button" onClick={() => void linkTelegramIdentity()}>{ui.linkTelegramId}</button> : null}
                 {telegramIdentity?.linked ? <button type="button" onClick={() => void requestTelegramReadd()}>{ui.telegramReaddButton}</button> : null}
-                <a className="button-link ghost" href={friskySignalDevRequestUrl} target="_blank" rel="noreferrer">{ui.devRequestViaSignal}</a>
               </div>
             </div>
             <div className="form-column">
-              <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} aria-label="Telegram permission chat id" />
-              <button onClick={checkTelegram}>{c.checkBotPermissions}</button>
-            </div>
-            <div className="checks">
-              {state.telegramChecks.map((check) => (
-                <div className="check" key={check.chatId}>
-                  <b>{check.chatId}</b>
-                  <span className={check.status === "ready" ? "status good" : "status danger"}>{check.status}</span>
-                  <small>admin: {check.botIsAdmin ? "yes" : "no"} · invite: {check.canInviteUsers ? "yes" : "no"}</small>
-                </div>
-              ))}
+              <small>Fenrir verifies group administrator access and invite permission from the bot itself. Choose the verified group in Community Bridge.</small>
+              <a className="button-link" href={communityBridgeDashboardUrl}>Open Community Bridge →</a>
             </div>
           </section>}
 
@@ -2043,9 +2005,6 @@ export function App() {
               <button onClick={() => runAiOps("jules")}>{c.julesTicket}</button>
               <button className="secondary" onClick={() => runAiOps("gemini")}>{c.geminiDnsGuide}</button>
               <button className="ghost" onClick={() => runAiOps("cursor")}>{c.cursorHandoff}</button>
-            <a className="button-link ghost" href={friskySignalDevRequestUrl} target="_blank" rel="noreferrer">
-              {ui.devRequestViaSignal}
-            </a>
             </div>
             <p className="muted">{c.opsStackBody}</p>
           </section>}
@@ -2071,7 +2030,6 @@ export function App() {
                   <strong>{price}</strong>
                   <small>{body}</small>
                   {plan !== "Free" ? <button onClick={() => void startTelegramStars()}>{c.starsCheckout}</button> : null}
-                  <button className="ghost" onClick={() => onPaidPlanPickedFromPricing(plan)}>{c.upgrade}</button>
                 </div>
               ))}
             </div>
@@ -2187,9 +2145,10 @@ function overlayAuthState(state: AppState, auth: AuthSession): AppState {
 function planLabel(plan: Plan) {
   const labels: Record<Plan, string> = {
     free: "Free",
-    starter: "Starter",
-    pro: "Pro",
-    operator: "Operator"
+    starter: "The Pack",
+    pro: "The Pack",
+    operator: "The Pack",
+    standard: "The Pack"
   };
   return labels[plan];
 }
@@ -2206,10 +2165,11 @@ function authProviderLabel(provider: string) {
 
 function planLockLimit(plan: Plan) {
   const limits: Record<Plan, string> = {
-    free: "1",
-    starter: "3",
-    pro: "10",
-    operator: "unlimited"
+    free: "5",
+    starter: "5",
+    pro: "5",
+    operator: "5",
+    standard: "5"
   };
   return limits[plan];
 }
@@ -2233,7 +2193,7 @@ function SessionLabels({
 }) {
   const activeLocks = state.bridges.filter((bridge) => bridge.status === "active").length;
   const backendLimit = billingStatus?.limits.maxTelegramLocks;
-  const lockLimit = backendLimit === null ? "unlimited" : backendLimit ?? planLockLimit(state.org.plan);
+  const lockLimit = backendLimit === null ? "5" : backendLimit ?? planLockLimit(state.org.plan);
   const labels = [
     [c.sessionRole, role === "owner" ? c.sessionOwner : role === "admin" ? c.sessionAdmin : "User"],
     [c.sessionPlan, planLabel(state.org.plan)],
@@ -2285,9 +2245,7 @@ function BetaPreviewControls({
         <option value="owner">Owner view</option>
       </select>
       <select value={plan} onChange={(event) => onPlan(event.target.value as PaidPlan)}>
-        <option value="starter">Starter preview</option>
-        <option value="pro">Pro preview</option>
-        <option value="operator">Operator preview</option>
+        <option value="operator">The Pack preview</option>
       </select>
       <small>Preview only. Billing entitlement still comes from the backend.</small>
     </section>
@@ -2484,11 +2442,17 @@ const accessStateHelp: Record<DefaultAccessState, string> = {
 function communityAuthProviderLabel(provider: string) {
   if (provider === "magic_link") return "Magic link";
   if (provider === "microsoft") return "Microsoft";
+  if (provider === "authentik") return "FriskyDev Auth";
   return provider[0]?.toUpperCase() + provider.slice(1);
 }
 
-/** Providers the Community Gate OAuth bridge can complete end-to-end. */
-const communityOAuthProviders = ["google", "microsoft", "apple"] as const;
+/**
+ * Providers the Community Gate OAuth bridge can complete end-to-end.
+ * `authentik` is the broker: when it is enabled it fronts Google / Microsoft / Apple
+ * instead of sitting beside them, so a community normally enables EITHER authentik
+ * OR the direct three — not both. See docs/AUTHENTIK_OIDC_INTEGRATION.md.
+ */
+const communityOAuthProviders = ["google", "microsoft", "apple", "authentik"] as const;
 
 function communityOAuthStartUrl(provider: string, slug: string) {
   const params = new URLSearchParams({ slug, return_to: `/community/${slug}` });
@@ -3079,57 +3043,57 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
   const gateText = {
     en: {
       kicker: "Private community access",
-      body: "Enter with a scoped Neon session. Fenrir keeps the client portal, invite checks, and community membership state separated.",
+      body: "One MyFenrir identity across the gate and Community Bridge. Sign in once — your session carries over automatically.",
       stepIdentity: "Identity",
       stepIdentityBody: "Email link confirms the person.",
       stepInvite: "Invite",
       stepInviteBody: "Community rules decide the next door.",
       stepSession: "Session",
-      stepSessionBody: "Access stays isolated from Frisky admin auth.",
+      stepSessionBody: "Your MyFenrir session carries into Community Bridge.",
       emailHint: "Use the email tied to your invite or membership request.",
-      trustA: "No shared client-portal cookie",
+      trustA: "One shared MyFenrir identity",
       trustB: "Invite code ready",
       trustC: "Audit trail on approval"
     },
     es: {
       kicker: "Acceso privado de comunidad",
-      body: "Entra con una sesion Neon separada. Fenrir mantiene aislados el portal de clientes, los invites y el estado de membresia.",
+      body: "Una sola identidad MyFenrir entre el gate y Community Bridge. Entra una vez — tu sesion se comparte automaticamente.",
       stepIdentity: "Identidad",
       stepIdentityBody: "El enlace por email confirma a la persona.",
       stepInvite: "Invite",
       stepInviteBody: "Las reglas de comunidad deciden la siguiente puerta.",
       stepSession: "Sesion",
-      stepSessionBody: "El acceso queda aislado del auth admin Frisky.",
+      stepSessionBody: "Tu sesion MyFenrir se comparte con Community Bridge.",
       emailHint: "Usa el correo ligado a tu invite o solicitud.",
-      trustA: "Sin cookie compartida del portal",
+      trustA: "Identidad MyFenrir compartida",
       trustB: "Invite listo",
       trustC: "Auditoria en aprobacion"
     },
     fr: {
       kicker: "Acces communaute privee",
-      body: "Entrez avec une session Neon separee. Fenrir isole le portail client, les invitations et l'etat membre.",
+      body: "Une seule identite MyFenrir entre le gate et Community Bridge. Connectez-vous une fois, votre session est partagee.",
       stepIdentity: "Identite",
       stepIdentityBody: "Le lien email confirme la personne.",
       stepInvite: "Invitation",
       stepInviteBody: "Les regles communaute ouvrent la prochaine porte.",
       stepSession: "Session",
-      stepSessionBody: "L'acces reste isole de l'auth admin Frisky.",
+      stepSessionBody: "Votre session MyFenrir passe dans Community Bridge.",
       emailHint: "Utilisez l'email lie a votre invitation ou demande.",
-      trustA: "Pas de cookie portail partage",
+      trustA: "Identite MyFenrir partagee",
       trustB: "Invitation prete",
       trustC: "Audit a l'approbation"
     },
     de: {
       kicker: "Privater Community-Zugang",
-      body: "Betritt die Community mit einer getrennten Neon-Session. Fenrir trennt Client-Portal, Einladungen und Mitgliedsstatus.",
+      body: "Eine MyFenrir-Identitaet fuer Gate und Community Bridge. Einmal anmelden — deine Session wird geteilt.",
       stepIdentity: "Identitaet",
       stepIdentityBody: "Der E-Mail-Link bestaetigt die Person.",
       stepInvite: "Einladung",
       stepInviteBody: "Community-Regeln bestimmen die naechste Tuer.",
       stepSession: "Session",
-      stepSessionBody: "Der Zugang bleibt vom Frisky-Admin-Auth isoliert.",
+      stepSessionBody: "Deine MyFenrir-Session gilt auch in Community Bridge.",
       emailHint: "Nutze die E-Mail deiner Einladung oder Anfrage.",
-      trustA: "Kein geteilter Portal-Cookie",
+      trustA: "Geteilte MyFenrir-Identitaet",
       trustB: "Einladung bereit",
       trustC: "Audit bei Freigabe"
     }
@@ -3159,7 +3123,7 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmedEmail, slug })
+        body: JSON.stringify({ email: trimmedEmail, slug, locale })
       });
       const body = await response.json().catch(() => null) as { message?: string; devLink?: string; error?: string; detail?: string | { message?: string } } | null;
       if (!response.ok) throw new Error(readableCommunityError(body?.detail, body?.error));
@@ -3205,24 +3169,11 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
               <span className="status amber">Safe preview</span>
             </div>
           ) : null}
-          <div className="community-gate-steps" aria-label="Community access steps">
-            <section>
-              <b>01</b>
-              <span>{gateText.stepIdentity}</span>
-              <small>{gateText.stepIdentityBody}</small>
-            </section>
-            <section>
-              <b>02</b>
-              <span>{gateText.stepInvite}</span>
-              <small>{gateText.stepInviteBody}</small>
-            </section>
-            <section>
-              <b>03</b>
-              <span>{gateText.stepSession}</span>
-              <small>{gateText.stepSessionBody}</small>
-            </section>
-          </div>
+
           {oauthError ? <small className="community-auth-message error" role="alert">{oauthError}</small> : null}
+          <a className="button-link community-oauth-button" href={communityBridgeGateUrl(slug, locale)}>
+            Continue to Community Bridge SSO
+          </a>
           {enabledOAuthProviders.length > 0 ? (
             <div className="community-oauth-providers" aria-label="Social sign-in">
               {enabledOAuthProviders.map((provider) => (
@@ -3245,7 +3196,7 @@ function CommunityNeonGateRoute({ slug, locale, onLocale, c, ui }: {
               only method that cannot be locked out by a console misconfiguration. */}
           <form className="community-auth-form" onSubmit={requestLink}>
             <label>
-              <span>{c.serviceEmail}</span>
+              <span>Your email</span>
               <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required placeholder={ui.communityEmailPlaceholder} autoComplete="email" />
               <small>{gateText.emailHint}</small>
             </label>
@@ -3285,6 +3236,15 @@ function communityBrandAdminErrorMessage(error: unknown) {
 function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
   const [authNote, setAuthNote] = useState<string | null>(() => authErrorMessage());
   const [pendingProvider, setPendingProvider] = useState<AuthProvider | null>(null);
+  const [humanVerified, setHumanVerified] = useState(false);
+  const onHumanVerified = useCallback((verified: boolean) => {
+    setHumanVerified(verified);
+    if (!verified) return;
+    setAuthNote(null);
+    void authService.me().then((result) => {
+      if (result.data.authenticated) window.location.assign(postLoginDestination());
+    });
+  }, []);
 
   async function signInWithProvider(provider: AuthProvider) {
     setAuthNote(null);
@@ -3310,20 +3270,21 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
             <div className="lovable-auth-card-line" aria-hidden="true" />
             <div className="lovable-auth-brand">
               <div className="lovable-auth-mark-shell">
-                <img src="/fenrir-splash-icon.svg" alt="MyFenrir logo" />
+                <img src="/fenrir-splash-icon.svg?v=20260813-login" alt="" />
               </div>
-              <img className="lovable-auth-wordmark" src="/fenrir-cut-wordmark.svg" alt="MyFenrir wordmark logo" />
-              <h1>Welcome back</h1>
-              <p>Sign in to continue to MyFenrir</p>
+              <strong className="lovable-auth-name">MYFENRIR</strong>
+              <h1>Secure sign-in</h1>
+              <p>Verify once, then continue with your account.</p>
             </div>
 
             <div className="lovable-auth-actions">
+              <HumanVerificationGate onVerified={onHumanVerified} />
               {(["apple", "google", "microsoft"] as AuthProvider[]).map((provider) => (
                 <AuthProviderButton
                   key={provider}
                   provider={provider}
                   label={`Continue with ${provider === "apple" ? "Apple" : provider === "google" ? "Google" : "Microsoft"}`}
-                  disabled={pendingProvider !== null}
+                  disabled={pendingProvider !== null || !humanVerified}
                   onClick={() => void signInWithProvider(provider)}
                 />
               ))}
@@ -3344,9 +3305,9 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
           By continuing you agree to our <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.
         </p>
         <div className="lovable-auth-secured">
-          <p>Secured · End-to-end encrypted</p>
+          <p>Secured · private access only</p>
           <a href="https://myfenrir.com" aria-label="Powered by MyFenrir">
-            <img src="/fenrir-splash-icon.svg" alt="" />
+            <img src="/fenrir-splash-icon.svg?v=20260813-login" alt="" />
             <span>Powered by MyFenrir</span>
           </a>
         </div>
@@ -3412,16 +3373,8 @@ function authErrorMessage() {
     return `Could not read the Frisky login session after login. ${detail ? `(${detail})` : "Please retry from the sign-in screen."}`;
   }
   if (errorCode === "supabase_session_failed") {
+    if (detail === "human_verification_required") return null;
     return `Could not open a Fenrir admin session.${detail ? ` (${detail})` : ""}`;
-  }
-  if (errorCode === "workos_not_configured" || errorCode === "workos_login_init_failed") {
-    return "Sign-in is not fully configured yet. Please try again shortly or contact support.";
-  }
-  if (errorCode === "workos_state_invalid") {
-    return "Your sign-in attempt expired or could not be verified. Please start sign-in again.";
-  }
-  if (errorCode === "workos_exchange_failed" || errorCode === "workos_token_exchange_failed") {
-    return `Could not finish sign-in with the provider.${detail ? ` (${detail})` : " Please try again."}`;
   }
   if (errorCode === "missing_code") {
     return "The provider did not return a sign-in code. Please try again.";
@@ -3433,27 +3386,27 @@ function CommunityAuthProposalPanel({ proposal, locale }: { proposal: CommunityA
   const text = {
     en: {
       title: "Community Gate auth",
-      body: "Fenrir Community Gate uses its own Neon database, tables, and session cookie. It does not share FriskyDev client-portal auth.",
-      configured: "Neon ready",
-      missing: "Neon env pending"
+      body: "The Community Gate signs you in with your MyFenrir identity (Supabase). One sign-in carries into Community Bridge.",
+      configured: "Identity ready",
+      missing: "Identity pending"
     },
     es: {
       title: "Auth de Community Gate",
-      body: "Fenrir Community Gate usa su propia base Neon, tablas y cookie de sesion. No comparte el auth del portal FriskyDev.",
-      configured: "Neon listo",
-      missing: "Faltan env de Neon"
+      body: "El Community Gate te autentica con tu identidad MyFenrir (Supabase). Un solo inicio pasa a Community Bridge.",
+      configured: "Identidad lista",
+      missing: "Identidad pendiente"
     },
     fr: {
       title: "Auth Community Gate",
-      body: "Fenrir Community Gate utilise sa propre base Neon, ses tables et son cookie de session. Il ne partage pas l'auth du portail FriskyDev.",
-      configured: "Neon pret",
-      missing: "Env Neon en attente"
+      body: "Le Community Gate vous connecte avec votre identite MyFenrir (Supabase). Une connexion passe dans Community Bridge.",
+      configured: "Identite prete",
+      missing: "Identite en attente"
     },
     de: {
       title: "Community Gate Auth",
-      body: "Fenrir Community Gate nutzt eine eigene Neon-Datenbank, eigene Tabellen und ein eigenes Session-Cookie. Es teilt nicht das FriskyDev Client-Portal-Auth.",
-      configured: "Neon bereit",
-      missing: "Neon env fehlt"
+      body: "Das Community Gate meldet dich mit deiner MyFenrir-Identitaet (Supabase) an. Eine Anmeldung gilt auch in Community Bridge.",
+      configured: "Identitaet bereit",
+      missing: "Identitaet ausstehend"
     }
   }[locale];
 
@@ -3878,7 +3831,6 @@ function AccountServicePanel({
   telegram,
   subdomain,
   mode,
-  checkoutPlan,
   onEmail,
   onOrg,
   onTelegram,
@@ -3892,7 +3844,6 @@ function AccountServicePanel({
   telegram: string;
   subdomain: string;
   mode: "create" | "link" | null;
-  checkoutPlan: PaidPlan;
   onEmail: (value: string) => void;
   onOrg: (value: string) => void;
   onTelegram: (value: string) => void;
@@ -3925,7 +3876,7 @@ function AccountServicePanel({
 
         <div className="stripe-mvp-card">
           <span className="status amber">{c.stripeMode}</span>
-          <h3>{checkoutPlan.charAt(0).toUpperCase() + checkoutPlan.slice(1)}</h3>
+          <h3>Activate MyFenrir</h3>
           <p>{c.checkoutReady}</p>
           <div className="stars-bridge">
             <span className="status good">{c.starsMode}</span>
@@ -4229,7 +4180,14 @@ function LinkVaultPanel({
 function FaqPanel({ c }: { c: Copy }) {
   return (
     <section className="panel wide faq-panel">
-      <PanelTitle title={c.faqTitle} subtitle={c.faqSub} />
+      <div className="faq-heading-row">
+        <PanelTitle title={c.faqTitle} subtitle={c.faqSub} />
+        <a className="faq-wiki-link" href={knowledgeBaseUrl}>
+          <span>31 FIELD GUIDES</span>
+          <b>Open the new Wiki</b>
+          <i aria-hidden="true">↗</i>
+        </a>
+      </div>
       <div className="faq-grid">
         {c.faqs.map((item, index) => (
           <details className="faq-item" key={item[0]} open={index < 2}>

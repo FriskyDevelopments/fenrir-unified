@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { startRegistration } from "@simplewebauthn/browser";
-import { copy, type Copy, type Locale } from "../i18n";
+import { copy, detectLocale, languageNames, locales, type Copy, type Locale } from "../i18n";
 import {
   aiOpsService,
   appService,
@@ -21,14 +20,22 @@ import {
   type TelegramIdentityLinkPayload
 } from "../services/api";
 import type { AppState, FriskyBridge, FriskyDomain, FriskyLiveRoom, LiveRoomProvider, Plan } from "../services/types";
+import { communityBridgeDashboardUrl, communityBridgeUrlForLocale } from "../services/communityBridge";
 import { uiCopy, type UiCopy } from "../app/uiCopy";
 import {
+  addDomainTag,
+  commissionUrlSlug,
+  defaultDomainTags,
   defaultServiceOrg,
   defaultServiceSubdomain,
   domainSearchCandidates,
-  friskySignalDevRequestUrl,
+  domainTagPresets,
+  findCommissionLink,
+  legalRoutes,
   liveRoomProviders,
   lookupDomainDns,
+  managedDashboardPath,
+  openAnyUrl,
   openSafeUrl,
   pageKeys,
   parseDomainTags,
@@ -41,9 +48,11 @@ import {
   type PersonalLink,
   type VaultLink
 } from "../app/shared";
-import { activePageFromLocation, dashboardPathFor, paidPlanFromProductLabel } from "../app/routing";
-import { CommunityBrandWizardPanel } from "./communityGate";
-import { ProtocolActivated } from "./publicRoutes";
+import { activePageFromLocation, dashboardPathFor, isAuthCallbackPath } from "../app/routing";
+import { CommunityBridgeHandoffPanel, CommunityNeonGateRoute } from "./communityGate";
+import { FriskyBotOsRoute, FriskyGhostRoute, GoRoutePage, ProtocolActivated, PublicBridgeRoute, PublicRoomRoute } from "./publicRoutes";
+import { AuthGate } from "./authGate";
+import { LegalPage } from "./legalPage";
 import {
   AccountServicePanel,
   AuditLog,
@@ -58,6 +67,8 @@ import {
   ExampleDiagramCard,
   FaqPanel,
   FenrirSilhouette,
+  friendlyAccountLabel,
+  KeyValue,
   LaunchWowConsole,
   LinkVaultPanel,
   LiveDomainSearchPanel,
@@ -65,6 +76,7 @@ import {
   Metric,
   overlayAuthState,
   PanelTitle,
+  planLabel,
   ProductionReadinessPanel,
   ProtocolLivingSystem,
   ProviderBadge,
@@ -73,7 +85,7 @@ import {
   SetupInboxWizard,
   roomProviderPlaceholder
 } from "./dashboardPanels";
-import { buildVaultLinks } from "./vaultRoutes";
+import { buildVaultLinks, createVaultShareUrl, decodeVaultLinks, PublicVaultPage } from "./vaultRoutes";
 
 export function DashboardRoute() {
   const path = window.location.pathname;
@@ -109,6 +121,7 @@ export function DashboardRoute() {
   const [serviceSubdomain, setServiceSubdomain] = useState(defaultServiceSubdomain);
   const [serviceMode, setServiceMode] = useState<"create" | "link" | null>(null);
   const [checkoutPlan, setCheckoutPlan] = useState<PaidPlan>("starter");
+  const [courtesyCode, setCourtesyCode] = useState("");
   const [personalLinks, setPersonalLinks] = useState<PersonalLink[]>([]);
   const [personalTitle, setPersonalTitle] = useState("");
   const [personalUrl, setPersonalUrl] = useState("");
@@ -189,7 +202,11 @@ export function DashboardRoute() {
     const params = new URLSearchParams(window.location.search);
     const staleAuthError = params.get("auth_error");
     if (!staleAuthError) return;
-    if (staleAuthError.startsWith("missing_env:") || staleAuthError === "direct_oauth_disabled") {
+    if (
+      staleAuthError.startsWith("missing_env:") ||
+      staleAuthError === "direct_oauth_disabled" ||
+      staleAuthError === "supabase_session_failed:human_verification_required"
+    ) {
       params.delete("auth_error");
       const nextSearch = params.toString();
       window.history.replaceState({}, "", `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`);
@@ -250,7 +267,10 @@ export function DashboardRoute() {
     const params = new URLSearchParams(window.location.search);
     const billing = params.get("billing");
     if (!billing) return;
-    if (billing === "success") setNotice(copy[locale].billingReturnSuccess);
+    if (billing === "success") {
+      setNotice(copy[locale].billingReturnSuccess);
+      triggerCelebration("Welcome to the Pack", "Your MyFenrir subscription is active. The pack is ready.", "commerce");
+    }
     if (billing === "cancel") setNotice(copy[locale].billingReturnCancel);
     if (billing === "portal_return") setNotice(copy[locale].billingReturnPortal);
     void refresh();
@@ -370,6 +390,10 @@ export function DashboardRoute() {
   async function createBridge() {
     const domainId = selectedDomainRecord?.id;
     if (!domainId) return;
+    if (!chatInput.trim()) {
+      setNotice(ui.telegramReaddNeedChat);
+      return;
+    }
     const result = await bridgeService.create({
       domainId,
       slug: slugInput.trim() || ui.setupInputTelegramSlug,
@@ -422,12 +446,6 @@ export function DashboardRoute() {
   async function pauseRoom(room: FriskyLiveRoom) {
     await liveRoomService.pause(room.id);
     setNotice(`${room.publicUrl} is paused. The meeting target stays private.`);
-    await refresh();
-  }
-
-  async function checkTelegram() {
-    const result = await telegramService.checkPermissions(chatInput.trim());
-    setNotice(result.data.status === "ready" ? `${ui.readiness} ${ui.telegramStatusCheck.toLowerCase()}.` : "Missing Telegram permissions.");
     await refresh();
   }
 
@@ -490,7 +508,7 @@ export function DashboardRoute() {
     setCheckoutPlan(plan);
     navigateActive("billing");
     try {
-      const { url } = await billingService.checkout(plan);
+      const { url } = await billingService.checkout(plan, courtesyCode);
       window.location.assign(url);
     } catch {
       setNotice(copy[locale].checkoutErrorGeneric);
@@ -541,14 +559,13 @@ export function DashboardRoute() {
   }
 
   function onPaidPlanPickedFromPricing(planLabel: string) {
-    const key = paidPlanFromProductLabel(planLabel);
-    if (!key) {
-      setNotice(planLabel.trim().toLowerCase() === "free" ? copy[locale].billingFreeTier : copy[locale].billingPaidPlanOnly);
+    if (planLabel.trim().toLowerCase() === "free") {
+      setNotice(copy[locale].billingFreeTier);
       return;
     }
-    setCheckoutPlan(key);
-    navigateActive("billing");
-    void startStripeCheckout(key);
+    // The Pack has a single authoritative checkout path: Telegram Stars. The
+    // legacy card-plan keys are retained only to display old records safely.
+    void startTelegramStars();
   }
 
   function navigateActive(page: PageKey) {
@@ -572,6 +589,9 @@ export function DashboardRoute() {
     try {
       setNotice(c.passkeyBusy);
       const { optionsJSON } = await webauthnService.registerOptions();
+      // Carga diferida: @simplewebauthn/browser sale del chunk inicial y sólo
+      // se descarga al registrar un passkey desde el dashboard.
+      const { startRegistration } = await import("@simplewebauthn/browser");
       const registration = await startRegistration({ optionsJSON });
       await webauthnService.registerVerify(registration);
       setNotice(c.passkeySuccess);
@@ -634,20 +654,21 @@ export function DashboardRoute() {
   const show = (...pages: PageKey[]) => pages.includes(active);
 
   return (
-    <div className="app">
+    <div className="app threshold-dashboard">
       {activationVisible && <ProtocolActivated />}
-      <aside className="sidebar">
+      <aside className="sidebar threshold-rail">
         <div className="brand">
           <img className="brand-wordmark" src="/fenrir-cut-wordmark.svg" alt="Fenrir" />
           <div className="brand-lockup">
-            <b>Telegram Lock</b>
-            <small>{c.brandSmall}</small>
+            <b>MyFenrir</b>
+            <small>CONTROL PLANE · R/01</small>
           </div>
         </div>
         <nav>
           {c.nav.map((item, index) => (
             <button className={active === pageKeys[index] ? "active" : ""} onClick={() => navigateActive(pageKeys[index])} key={item}>
-              {item}
+              <span className="threshold-nav-index">{String(index).padStart(2, "0")}</span>
+              <span>{item}</span>
             </button>
           ))}
         </nav>
@@ -662,7 +683,7 @@ export function DashboardRoute() {
         </div>
       </aside>
 
-      <main>
+      <main className="threshold-main">
         <div className="fenrir-wallpaper" aria-hidden="true">
           <span className="wallpaper-orbit orbit-one" />
           <span className="wallpaper-orbit orbit-two" />
@@ -670,7 +691,17 @@ export function DashboardRoute() {
           <span className="wallpaper-paw">F</span>
           <span className="wallpaper-bot">◈</span>
         </div>
-        <header className="topbar">
+        <header className="topbar threshold-topbar">
+          <div className="threshold-engine" aria-hidden="true">
+            <span className="threshold-engine-ring ring-a" />
+            <span className="threshold-engine-ring ring-b" />
+            <span className="threshold-engine-ring ring-c" />
+            <span className="threshold-engine-scan" />
+            <span className="threshold-engine-core"><b>R/01</b><small>THRESHOLD<br />ONLINE</small></span>
+            <span className="threshold-engine-node node-a" />
+            <span className="threshold-engine-node node-b" />
+            <span className="threshold-engine-node node-c" />
+          </div>
           <div>
             <p className="label">{c.heroLabel}</p>
             <h1>{c.heroTitle}</h1>
@@ -699,7 +730,7 @@ export function DashboardRoute() {
               ))}
             </select>
           <span className="status good">{state.user.authProvider} OAuth</span>
-          <span className="status amber">{state.org.plan}</span>
+          <span className="status amber">{planLabel(state.org.plan)}</span>
             <button className="ghost compact-button" onClick={signOut}>{c.signOut}</button>
           </div>
         </header>
@@ -732,7 +763,7 @@ export function DashboardRoute() {
             roomProvider={roomProviderInput}
             onDomain={() => navigateActive("domains")}
             onRoom={() => navigateActive("rooms")}
-            onCommunity={() => { window.open("https://communities.myfenrir.com/dashboard", "_blank", "noopener"); }}
+            onCommunity={() => window.location.assign(communityBridgeUrlForLocale(locale))}
           />
         )}
 
@@ -784,28 +815,10 @@ export function DashboardRoute() {
         </section>
 
         {show("billing") && <ProductionReadinessPanel c={c} readiness={readiness} loadFailed={readinessError} />}
-        {show("command", "brands") && <CommunityBrandWizardPanel locale={locale} onNotice={setNotice} />}
+        {show("command", "brands") && <CommunityBridgeHandoffPanel />}
 
         <div className="content-grid">
-          {show("command", "locks", "telegram") && <section className="panel wide">
-            <PanelTitle title={c.activeTelegramLocks} subtitle={c.activeTelegramLocksSub} />
-            <div className="form-row lock-form">
-              <select value={selectedDomain} onChange={(event) => setSelectedDomain(event.target.value)}>
-                <option value="" disabled>{c.chooseDomain}</option>
-                {state.domains.map((domain) => (
-                  <option key={domain.id} value={domain.id}>
-                    {domain.domain}
-                  </option>
-                ))}
-              </select>
-              <input value={slugInput} onChange={(event) => setSlugInput(event.target.value)} aria-label="Telegram lock slug" placeholder={ui.setupInputTelegramSlug} />
-              <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} aria-label="Telegram chat id" placeholder={ui.setupInputTelegramId} />
-              <input value={groupNameInput} onChange={(event) => setGroupNameInput(event.target.value)} aria-label="Telegram group name" placeholder={ui.setupInputGroupName} />
-              <input value={groupImageInput} onChange={(event) => setGroupImageInput(event.target.value)} aria-label="Telegram group image url" placeholder={ui.setupInputGroupPhoto} />
-              <button onClick={createBridge}>{c.createLock}</button>
-            </div>
-            <BridgeGallery bridges={state.bridges} invites={state.invites} onRotate={rotateBridge} onRevoke={revokeBridge} c={c} />
-          </section>}
+          {show("command", "locks", "telegram") && <CommunityBridgeHandoffPanel />}
 
           {show("command", "billing") && <section className="panel">
             <PanelTitle title={c.friskyAccount} subtitle={c.accountSub} />
@@ -816,7 +829,7 @@ export function DashboardRoute() {
             <KeyValue label={c.billingStatusLabel} value={billingStatus?.subscriptionStatus ?? c.billingStatusPlaceholder} />
             {billingStatus && (
               <p className="muted">
-                Limits: {billingStatus.limits.maxTelegramLocks ?? "∞"} locks · custom domain {billingStatus.limits.customDomainSupported ? "yes" : "no"}
+                Gates: 5 · linked community {billingStatus.limits.customDomainSupported ? "The Pack active" : "not active"}
                 {" · "}live rooms {billingStatus.limits.liveRoomsSupported ? "yes" : "no"}
               </p>
             )}
@@ -839,6 +852,8 @@ export function DashboardRoute() {
             subdomain={serviceSubdomain}
             mode={serviceMode}
             checkoutPlan={checkoutPlan}
+            courtesyCode={courtesyCode}
+            onCourtesyCode={setCourtesyCode}
             onEmail={setServiceEmail}
             onOrg={setServiceOrg}
             onTelegram={setServiceTelegram}
@@ -958,7 +973,7 @@ export function DashboardRoute() {
               <input value={roomSlugInput} onChange={(event) => setRoomSlugInput(event.target.value)} aria-label="Live room slug" placeholder={ui.setupInputRoomSlug} />
               <input value={roomTitleInput} onChange={(event) => setRoomTitleInput(event.target.value)} aria-label="Live room title" placeholder={ui.setupInputRoomTitle} />
               <input value={roomTargetInput} onChange={(event) => setRoomTargetInput(event.target.value)} aria-label="Call target URL" placeholder={roomProviderPlaceholder(roomProviderInput)} />
-              <input value={roomCoverInput} onChange={(event) => setRoomCoverInput(event.target.value)} aria-label="Pro logo or room image URL" placeholder={ui.setupInputRoomCover} />
+              <input value={roomCoverInput} onChange={(event) => setRoomCoverInput(event.target.value)} aria-label="Logo or room image URL" placeholder={ui.setupInputRoomCover} />
               <button onClick={createLiveRoom}>{c.createPaidRoom}</button>
             </div>
             <div className="room-logo-actions" aria-label="Live room logo presets">
@@ -1010,21 +1025,11 @@ export function DashboardRoute() {
               <div className="row-actions">
                 {!telegramIdentity?.linked ? <button type="button" onClick={() => void linkTelegramIdentity()}>{ui.linkTelegramId}</button> : null}
                 {telegramIdentity?.linked ? <button type="button" onClick={() => void requestTelegramReadd()}>{ui.telegramReaddButton}</button> : null}
-                <a className="button-link ghost" href={friskySignalDevRequestUrl} target="_blank" rel="noreferrer">{ui.devRequestViaSignal}</a>
               </div>
             </div>
             <div className="form-column">
-              <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} aria-label="Telegram permission chat id" />
-              <button onClick={checkTelegram}>{c.checkBotPermissions}</button>
-            </div>
-            <div className="checks">
-              {state.telegramChecks.map((check) => (
-                <div className="check" key={check.chatId}>
-                  <b>{check.chatId}</b>
-                  <span className={check.status === "ready" ? "status good" : "status danger"}>{check.status}</span>
-                  <small>admin: {check.botIsAdmin ? "yes" : "no"} · invite: {check.canInviteUsers ? "yes" : "no"}</small>
-                </div>
-              ))}
+              <small>Fenrir verifies group administrator access and invite permission from the bot itself. Choose the verified group in Community Bridge.</small>
+              <a className="button-link" href={communityBridgeDashboardUrl}>Open Community Bridge →</a>
             </div>
           </section>}
 
@@ -1034,9 +1039,6 @@ export function DashboardRoute() {
               <button onClick={() => runAiOps("jules")}>{c.julesTicket}</button>
               <button className="secondary" onClick={() => runAiOps("gemini")}>{c.geminiDnsGuide}</button>
               <button className="ghost" onClick={() => runAiOps("cursor")}>{c.cursorHandoff}</button>
-            <a className="button-link ghost" href={friskySignalDevRequestUrl} target="_blank" rel="noreferrer">
-              {ui.devRequestViaSignal}
-            </a>
             </div>
             <p className="muted">{c.opsStackBody}</p>
           </section>}

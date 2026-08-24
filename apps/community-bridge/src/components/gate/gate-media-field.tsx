@@ -86,25 +86,8 @@ export function GateMediaField({ id, label, hint, value, onChange }: GateMediaFi
       return;
     }
 
-    // Content check for images — flagged files are deleted server-side and
-    // never accepted. Videos are served as-is (no frame screening yet).
-    if (file.type.startsWith("image/")) {
-      try {
-        const verdict = await verifyImage({ data: { bucket: BUCKET, path } });
-        if (!verdict.allowed) {
-          setBusy(false);
-          setError(verdict.reason ?? "This image is not allowed here.");
-          return;
-        }
-      } catch {
-        setBusy(false);
-        setError("Image verification failed — try again.");
-        return;
-      }
-    }
-
-    setBusy(false);
-    onChange(`/gate-media/${path}`);
+    const publicPath = `/gate-media/${path}`;
+    onChange(publicPath);
   }
 
   return (

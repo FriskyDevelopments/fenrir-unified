@@ -1,10 +1,16 @@
 import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from "@simplewebauthn/browser";
+import {
+  domainSearchCandidates,
+  frontDoorCandidates,
+  promisingResults,
+  rankResults,
+  searchDomains,
+  type DomainSearchResult
+} from "../../shared/domain-search";
 import { copy } from "../i18n";
-import { addBridge, addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
-// Auth broker is WorkOS AuthKit. The hosted flow mints the Fenrir session
-// cookie server-side in /api/auth/callback/workos, so the client no longer
-// performs any token exchange after the redirect (directAuthOrigin is declared below).
-import type { AppState, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TelegramPermissionCheck } from "./types";
+import { addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
+import { completeSupabaseSession, hasSupabaseCallbackInLocation, isSupabaseAuthConfigured, signInWithSupabase, signOutSupabase } from "./supabaseAuth";
+import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TrialPublic, TrialStatusPayload } from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
 export const defaultBillingCheckoutErrorMessage = copy.en.checkoutErrorGeneric;
@@ -22,6 +28,18 @@ const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? "").trim().
 
 export type PaidPlan = Exclude<Plan, "free">;
 
+export type DomainSearchResponse = {
+  ok: true;
+  mode: "front-door" | "exact";
+  checked: number;
+  results: DomainSearchResult[];
+  /** Clean, buyable names — the ones the wizard should offer to register. */
+  promising: string[];
+  checkedAt: string;
+  viaBrowserFallback?: true;
+  fallbackReason?: string;
+};
+
 export type BillingLimits = {
   maxTelegramLocks: number | null;
   maxFenrirSubdomains: number | null;
@@ -37,6 +55,7 @@ export type ReadinessPayload = {
     googleConfigured: boolean;
     microsoftConfigured: boolean;
     appleConfigured: boolean;
+    friskyAuthEnabled?: boolean;
   };
   billing: {
     stripeSecretConfigured: boolean;
@@ -200,38 +219,7 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
     }
     return { ok: true, data: domain } as T;
   }
-  if (path === "/api/bridges" && method === "POST") {
-    const bridge = addBridge(
-      String(body.domainId || store.domains[0]?.id || ""),
-      String(body.slug || "main"),
-      String(body.telegramChatId || "-10020260513"),
-      String(body.telegramGroupName || ""),
-      String(body.telegramGroupImageUrl || "")
-    );
-    const invite = store.invites.find((item) => item.id === bridge.currentInviteId);
-    return { ok: true, data: bridge, invite } as T;
-  }
-  if (path === "/api/bridges/rotate" && method === "POST") {
-    const bridge = store.bridges.find((item) => item.id === body.bridgeId);
-    if (!bridge) throw new Error("bridge_not_found");
-    const currentInvite = store.invites.find((item) => item.id === bridge.currentInviteId);
-    if (currentInvite) {
-      currentInvite.status = "revoked";
-      currentInvite.revokedAt = new Date().toISOString();
-    }
-    const invite: FriskyTelegramInvite = {
-      id: `frisky_invite_${Date.now()}`,
-      bridgeId: bridge.id,
-      inviteLink: `https://t.me/+${bridge.slug}Rotated${Math.random().toString(36).slice(2, 5)}`,
-      status: "active",
-      createdAt: new Date().toISOString()
-    };
-    store.invites.unshift(invite);
-    bridge.currentInviteId = invite.id;
-    bridge.status = "active";
-    bridge.rotatedAt = new Date().toISOString();
-    return { ok: true, data: bridge, invite } as T;
-  }
+  if (path === "/api/bridges" || path === "/api/bridges/rotate") throw new Error("legacy_bridge_retired");
   if (path === "/api/bridges/revoke" && method === "POST") {
     const bridge = store.bridges.find((item) => item.id === body.bridgeId);
     if (!bridge) throw new Error("bridge_not_found");
@@ -260,24 +248,7 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
     if (!room) throw new Error("room_not_found");
     return { ok: true, data: room } as T;
   }
-  if (path === "/api/telegram/check" && method === "POST") {
-    const check: TelegramPermissionCheck = {
-      chatId: String(body.chatId || "-10020260513"),
-      botIsAdmin: true,
-      canInviteUsers: true,
-      canRevokeLinks: true,
-      status: "ready"
-    };
-    store.telegramChecks.unshift(check);
-    return { ok: true, data: check } as T;
-  }
-  if (path.startsWith("/api/public/bridge/")) {
-    const slug = decodeURIComponent(path.split("/").pop() || "");
-    const bridge = store.bridges.find((item) => item.slug === slug && item.status === "active");
-    const invite = bridge ? store.invites.find((item) => item.id === bridge.currentInviteId && item.status === "active") : null;
-    if (!bridge || !invite) throw new Error("bridge_not_found");
-    return { ok: true, bridge, invite } as T;
-  }
+  if (path === "/api/telegram/check" || path.startsWith("/api/public/bridge/")) throw new Error("legacy_bridge_retired");
   if (path.startsWith("/api/public/room/")) {
     const slug = decodeURIComponent(path.split("/").pop() || "");
     const room = store.liveRooms.find((item) => item.slug === slug && item.status === "active");
@@ -365,20 +336,40 @@ export const webauthnService = {
 
 export const authService = {
   async me() {
-    // WorkOS AuthKit mints the Fenrir session cookie on the server callback,
-    // so the browser only needs to read the resulting session.
+    // Supabase Auth is the login broker: after the provider redirects back to
+    // /auth/callback, exchange the Supabase session for the Fenrir cookie.
+    if (hasSupabaseCallbackInLocation()) {
+      const completed = await completeSupabaseSession();
+      if (completed) {
+        return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
+      }
+    }
+
     try {
       const result = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
+      if (!result.authenticated) {
+        const completed = await completeSupabaseSession();
+        if (completed) {
+          return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
+        }
+      }
       return { ok: true as const, data: result };
     } catch {
       return { ok: true as const, data: { authenticated: false } as AuthSession };
     }
   },
   async login(provider: "google" | "microsoft" | "apple") {
+    // Supabase Auth is the restored login broker (the original working flow):
+    // signInWithOAuth against project yqevglppbhuoxxfsfnih, which holds the
+    // provider apps that accept its callback. Only if the bundle was built
+    // without Supabase config do we fall back to the direct per-provider stack.
+    // The banned broker is deliberately NOT in this path (1621d6a regression).
+    if (isSupabaseAuthConfigured()) {
+      await signInWithSupabase(provider);
+      return;
+    }
     const returnTo = safeCurrentAuthReturnPath();
-    // Route social sign-in through WorkOS AuthKit; the provider hint jumps
-    // straight to the matching hosted connection.
-    window.location.assign(`${directAuthOrigin}/api/auth/workos/login?provider=${provider}&return_to=${encodeURIComponent(returnTo)}`);
+    window.location.assign(`${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
   },
   async telegramLogin(payload: TelegramLoginPayload) {
     return apiRequest<{ ok: true; authenticated: true; user: AuthSession["user"]; org: AuthSession["org"] }>("/api/auth/telegram-session", {
@@ -387,6 +378,12 @@ export const authService = {
     });
   },
   async logout() {
+    try {
+      window.localStorage.removeItem("fenrir_post_auth_destination");
+    } catch {
+      // Optional cleanup only.
+    }
+    await signOutSupabase();
     await apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }).catch(() => null);
   }
 };
@@ -416,6 +413,42 @@ export const appService = {
 };
 
 export const domainService = {
+  /**
+   * Live availability sweep: public DNS (DoH) + registry (RDAP), server-side so the
+   * resolvers see one origin instead of every visitor's browser.
+   */
+  async search(input: { seed: string; mode: "front-door" | "exact"; limit?: number }) {
+    try {
+      return await apiRequest<DomainSearchResponse>("/api/domains/search", {
+        method: "POST",
+        body: JSON.stringify(input)
+      });
+    } catch (error) {
+      // Falling back to the browser keeps the check LIVE (same module, same sources)
+      // rather than degrading to a placeholder result.
+      const candidates =
+        input.mode === "front-door"
+          ? frontDoorCandidates(input.seed, { limit: input.limit ?? 12 })
+          : domainSearchCandidates(input.seed).slice(0, input.limit ?? 12);
+      if (!candidates.length) {
+        return {
+          ok: false as const,
+          error: { code: "no_candidates", message: "Enter a brand word or a full domain first." }
+        };
+      }
+      const results = rankResults(await searchDomains(candidates, { concurrency: 4 }));
+      return {
+        ok: true as const,
+        mode: input.mode,
+        checked: results.length,
+        results,
+        promising: promisingResults(results).map((result) => result.domain),
+        checkedAt: new Date().toISOString(),
+        viaBrowserFallback: true as const,
+        fallbackReason: error instanceof Error ? error.message : "api_unavailable"
+      };
+    }
+  },
   async create(domain: string) {
     return apiRequest<{ ok: true; data: AppState["domains"][number] }>("/api/domains", {
       method: "POST",
@@ -464,12 +497,6 @@ export const bridgeService = {
 };
 
 export const telegramService = {
-  async checkPermissions(chatId: string): Promise<{ ok: true; data: TelegramPermissionCheck }> {
-    return apiRequest<{ ok: true; data: TelegramPermissionCheck }>("/api/telegram/check", {
-      method: "POST",
-      body: JSON.stringify({ chatId })
-    });
-  },
   commandExamples: [
     "/bridge_link main <telegram_group_id>",
     "/bridge_rotate main",
@@ -477,6 +504,16 @@ export const telegramService = {
     "/bridge_links",
     "/bridge_check <telegram_group_id>"
   ]
+};
+
+// Kept as a named service so the optional report panel can remain type-safe
+// when a community security endpoint is enabled for a deployment.
+export const communitySecurityService = {
+  async getReport(communitySlug: string): Promise<{ ok: true; data: CommunitySecurityReport }> {
+    return apiRequest<{ ok: true; data: CommunitySecurityReport }>(
+      `/api/community-security/${encodeURIComponent(communitySlug)}`
+    );
+  }
 };
 
 export const aiOpsService = {
@@ -514,10 +551,10 @@ export const billingService = {
   async getStatus(): Promise<BillingStatusPayload> {
     return apiRequest<BillingStatusPayload>("/api/billing/status");
   },
-  async checkout(plan: PaidPlan): Promise<{ ok: true; url: string }> {
+  async checkout(plan: PaidPlan, courtesyCode?: string): Promise<{ ok: true; url: string }> {
     return apiRequest<{ ok: true; url: string }>("/api/billing/checkout", {
       method: "POST",
-      body: JSON.stringify({ plan })
+      body: JSON.stringify({ plan, ...(courtesyCode ? { courtesyCode } : {}) })
     });
   },
   async portal(): Promise<{ ok: true; url: string }> {
@@ -525,6 +562,36 @@ export const billingService = {
   },
   async telegramStars(): Promise<{ ok: true; botUsername: string; url: string; stars: number; mode: "telegram_stars" }> {
     return apiRequest<{ ok: true; botUsername: string; url: string; stars: number; mode: "telegram_stars" }>("/api/telegram/stars");
+  }
+};
+
+export const trialService = {
+  async status(): Promise<TrialStatusPayload> {
+    return apiRequest<TrialStatusPayload>("/api/trial/status");
+  },
+  async redeem(code: string): Promise<{ ok: true; requiresCard: boolean; next?: string; trial: TrialPublic | null }> {
+    return apiRequest<{ ok: true; requiresCard: boolean; next?: string; trial: TrialPublic | null }>("/api/trial/redeem", {
+      method: "POST",
+      body: JSON.stringify({ code })
+    });
+  },
+  async createSetupIntent(code?: string): Promise<{ ok: true; clientSecret: string; setupIntentId: string; customerId: string; trialId: string }> {
+    return apiRequest<{ ok: true; clientSecret: string; setupIntentId: string; customerId: string; trialId: string }>("/api/trial/setup-intent", {
+      method: "POST",
+      body: JSON.stringify(code ? { code } : {})
+    });
+  },
+  async verify(code?: string): Promise<{ ok: true; alreadyActive?: boolean; trial?: TrialPublic }> {
+    return apiRequest<{ ok: true; alreadyActive?: boolean; trial?: TrialPublic }>("/api/trial/verify", {
+      method: "POST",
+      body: JSON.stringify(code ? { code } : {})
+    });
+  },
+  async convert(plan: "starter" | "pro" | "operator"): Promise<{ ok: true; plan: string; subscriptionStatus: string; stripeSubscriptionId: string }> {
+    return apiRequest<{ ok: true; plan: string; subscriptionStatus: string; stripeSubscriptionId: string }>("/api/trial/convert", {
+      method: "POST",
+      body: JSON.stringify({ plan })
+    });
   }
 };
 
@@ -540,5 +607,40 @@ export const telegramIdentityService = {
       method: "POST",
       body: JSON.stringify(input)
     });
+  }
+};
+
+export type MediaKind = "avatar" | "cover" | "upload";
+
+export type MediaUploadResult = {
+  ok: true;
+  /** Object key inside the R2 bucket, e.g. `frisky_usr_.../avatar-1699999999999.png`. */
+  key: string;
+  /** Same-origin read path served by the Pages Function, e.g. `/api/media/r2/<key>`. */
+  url: string;
+};
+
+/**
+ * Uploads member media (avatars / covers / uploads) to the MyFenrir R2 bucket
+ * via the authenticated /api/media/upload Pages Function. Uses multipart
+ * FormData and does NOT set Content-Type, so the browser can add the multipart
+ * boundary. The fenrir_session cookie rides along via `credentials: "include"`.
+ */
+export const mediaService = {
+  async upload(file: File, kind: MediaKind = "upload"): Promise<MediaUploadResult> {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("kind", kind);
+
+    const response = await fetch("/api/media/upload", {
+      method: "POST",
+      credentials: "include",
+      body: form
+    });
+    const body = (await response.json().catch(() => null)) as (MediaUploadResult & { error?: string }) | null;
+    if (!response.ok || !body?.ok) {
+      throw new Error(body?.error ?? `media_upload_failed_${response.status}`);
+    }
+    return body;
   }
 };

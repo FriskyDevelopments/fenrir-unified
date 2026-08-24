@@ -1,36 +1,36 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { formatAuthError } from "@/lib/auth-errors";
 import { useBrand } from "@/config/brand-context";
-import {
-  brandOAuthRedirectUrl,
-  validateBrandRedirects,
-  type RedirectIssue,
-} from "@/lib/redirect-validation";
+import { validateBrandRedirects, type RedirectIssue } from "@/lib/redirect-validation";
 import { BRANDS, brandLoginCopy, getBrand, type ProviderId } from "@/config/brands";
 import { isDemoMode } from "@/config/demo-mode";
 import { logDemoEvent } from "@/config/demo-log";
+import { getSiteUrl } from "@/config/site-url";
 
 /** Build-time brand: head() is static, so it uses the deployment's brand. */
 const HEAD_BRAND = getBrand(import.meta.env["VITE_BRAND_ID"]);
-const SITE = "https://communities.myfenrir.com";
 
 export const Route = createFileRoute("/login")({
   ssr: false,
   validateSearch: (s: {
     next?: unknown;
     brand?: unknown;
+    sso?: unknown;
   }): {
     next?: string;
     brand?: string;
+    sso?: string;
   } => ({
     next: typeof s.next === "string" ? s.next : undefined,
     brand:
       typeof s.brand === "string" && BRANDS.some((b) => b.id === s.brand) ? s.brand : undefined,
+    sso: typeof s.sso === "string" ? s.sso : undefined,
   }),
 
   head: () => ({
@@ -46,10 +46,10 @@ export const Route = createFileRoute("/login")({
         content: `Single sign-on access to the ${HEAD_BRAND.name} portal.`,
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: `${SITE}/login` },
+      { property: "og:url", content: `${getSiteUrl()}/login` },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [{ rel: "canonical", href: `${SITE}/login` }],
+    links: [{ rel: "canonical", href: `${getSiteUrl()}/login` }],
   }),
   component: LoginPage,
 });
@@ -117,7 +117,7 @@ function LoginPage() {
   const { session, loading } = useAuth();
   const navigate = useNavigate();
   const brand = useBrand();
-  const search = Route.useSearch() as { next?: string };
+  const search = Route.useSearch() as { next?: string; sso?: string };
   const next = safeNext(search.next);
   const [pending, setPending] = useState<ProviderId | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +125,11 @@ function LoginPage() {
   // This route is client-only (ssr: false), so demo mode can be read up front —
   // resolving it late would let the signed-in redirect fire before we know.
   const [demo] = useState(() => isDemoMode());
+
+  // Community Bridge owns a single, same-origin login. Do not bounce an
+  // unauthenticated visitor through Quality or another identity provider:
+  // that was the source of the visible second-login loop. Existing shared
+  // MyFenrir sessions are still adopted by useAuth before this screen renders.
 
   // Runtime check: the brand's OAuth return and post-login paths must be
   // same-origin and on the allowed sign-in URL list, or SSO silently bounces.
@@ -164,24 +169,36 @@ function LoginPage() {
       return;
     }
 
-    // Direct Supabase OAuth against the canonical MyFenrir project — no broker.
+    const callback = new URL("/login", window.location.origin);
+    callback.searchParams.set("sso", "0");
+    if (next) callback.searchParams.set("next", next);
+
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: provider === "microsoft" ? "azure" : provider,
       options: {
-        redirectTo: next
-          ? new URL(next, window.location.origin).toString()
-          : brandOAuthRedirectUrl(brand, window.location.origin),
+        redirectTo: callback.toString(),
         scopes: provider === "microsoft" ? "email profile" : undefined,
       },
     });
     if (oauthError) {
       setPending(null);
       setError(formatAuthError(oauthError.message));
+      return;
     }
-    // On success the browser is redirected to the provider; nothing else to do.
   }
 
   const copy = brandLoginCopy(brand);
+
+  const asciiBoot = [
+    "╔══════════════════════════════════════╗",
+    "║  FRISKYDEV // COMMUNITY BRIDGE      ║",
+    "╠══════════════════════════════════════╣",
+    "║  [01] identity channel .... LINKING ║",
+    "║  [02] session cipher ...... SYNCING ║",
+    "║  [03] community graph .... MAPPING  ║",
+    "║  [04] fenrir gate ........ AWAKENING║",
+    "╚══════════════════════════════════════╝",
+  ];
 
   return (
     <AuthLayout
@@ -219,6 +236,65 @@ function LoginPage() {
         </span>
       }
     >
+      <AnimatePresence>
+        {pending ? (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020609]/92 px-4 backdrop-blur-xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            role="status"
+            aria-live="polite"
+            aria-label={`Connecting with ${pending}`}
+          >
+            <motion.div
+              className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-cyan-400/30 bg-black/80 p-5 shadow-[0_0_80px_rgba(34,211,238,0.16)] sm:p-8"
+              initial={{ scale: 0.94, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 220, damping: 24 }}
+            >
+              <motion.div
+                className="pointer-events-none absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent"
+                animate={{ top: ["5%", "95%", "5%"] }}
+                transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }}
+              />
+              <div className="mb-5 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.24em] text-cyan-300">
+                <span>Fenrir secure handoff</span>
+                <motion.span
+                  animate={{ opacity: [0.35, 1, 0.35] }}
+                  transition={{ duration: 0.8, repeat: Infinity }}
+                >
+                  ● LIVE
+                </motion.span>
+              </div>
+              <pre className="overflow-hidden whitespace-pre font-mono text-[clamp(8px,2.3vw,14px)] leading-[1.75] text-cyan-100/90">
+                {asciiBoot.map((line, index) => (
+                  <motion.span
+                    key={line}
+                    className="block"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.09 }}
+                  >
+                    {line}
+                  </motion.span>
+                ))}
+              </pre>
+              <div className="mt-6 h-1 overflow-hidden rounded-full bg-white/5">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-blue-500 via-cyan-300 to-emerald-400"
+                  initial={{ width: "4%" }}
+                  animate={{ width: "96%" }}
+                  transition={{ duration: 2.2, ease: [0.16, 1, 0.3, 1] }}
+                />
+              </div>
+              <p className="mt-4 font-mono text-xs uppercase tracking-[0.18em] text-white/45">
+                One login · one session · one active community
+              </p>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
       {configIssues.length > 0 ? (
         <div
           role="alert"

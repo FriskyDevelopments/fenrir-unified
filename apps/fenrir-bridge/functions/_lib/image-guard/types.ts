@@ -14,6 +14,11 @@ export interface VisionResult {
   appropriate: boolean;
   /** Does it look like the person is entering a room/space? */
   entering: boolean;
+  /**
+   * The classifier was not confident enough to decide on its own — a human
+   * has to look. Uncertainty is never resolved by rejecting.
+   */
+  needsReview?: boolean;
   /** Raw model response for debugging/logging */
   raw: string;
   /** Which model actually answered (after fallback chain) */
@@ -24,7 +29,14 @@ export interface VisionResult {
 
 // ── Decision the middleware makes ─────────────────────────
 
-export type GuardDecision = "allow" | "reject_no_person" | "reject_inappropriate" | "reject_not_entering" | "error";
+export type GuardDecision =
+  | "allow"
+  /** Uncertain — queued for a human. NOT a rejection: nothing is destroyed. */
+  | "needs_review"
+  | "reject_no_person"
+  | "reject_inappropriate"
+  | "reject_not_entering"
+  | "error";
 
 export interface GuardVerdict {
   decision: GuardDecision;

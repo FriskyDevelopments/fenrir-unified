@@ -10,11 +10,23 @@ export type OAuthEnv = BillingEnv & {
   APPLE_TEAM_ID?: string;
   APPLE_KEY_ID?: string;
   APPLE_PRIVATE_KEY?: string;
-  WORKOS_CLIENT_ID?: string;
-  WORKOS_API_KEY?: string;
+  /**
+   * Authentik broker (https://authentik.friskydev.com). The issuer is per-application and
+   * ends with a slash, e.g. `https://authentik.friskydev.com/application/o/<app-slug>/`.
+   */
+  AUTHENTIK_ISSUER?: string;
+  AUTHENTIK_CLIENT_ID?: string;
+  AUTHENTIK_CLIENT_SECRET?: string;
+  /**
+   * Hard kill switch. Must be exactly "true" for Authentik to be offered at all.
+   * Credentials alone are deliberately NOT enough: this keeps a half-finished Authentik
+   * rollout from appearing on a live gate, and lets the flag be flipped off instantly
+   * without unbinding secrets. The live Google/Microsoft/Apple path is untouched by it.
+   */
+  AUTHENTIK_ENABLED?: string;
 };
 
-export type OAuthProvider = "google" | "microsoft" | "apple" | "workos";
+export type OAuthProvider = "google" | "microsoft" | "apple" | "authentik";
 
 export type OAuthTransaction = {
   provider: OAuthProvider;
@@ -51,12 +63,30 @@ const transactionCookie = "fenrir_oauth_tx";
 const transactionMaxAge = 10 * 60;
 
 export function isOAuthProvider(value: unknown): value is OAuthProvider {
-  return value === "google" || value === "microsoft" || value === "apple" || value === "workos";
+  return value === "google" || value === "microsoft" || value === "apple";
 }
 
-/** Providers offered by the Community Gate. */
+/**
+ * Providers offered by the Community Gate. Deliberately narrower than isOAuthProvider():
+ */
 export function isCommunityOAuthProvider(value: unknown): value is OAuthProvider {
-  return isOAuthProvider(value);
+  return value === "google" || value === "microsoft" || value === "apple" || value === "authentik";
+}
+
+/**
+ * Authentik exposes ONE global authorize/token/userinfo triple and a per-application
+ * JWKS + issuer. Derived from AUTHENTIK_ISSUER so a single env var configures the lot.
+ */
+export function authentikEndpoints(issuer: string) {
+  const normalizedIssuer = issuer.trim().replace(/\/*$/, "/");
+  const origin = new URL(normalizedIssuer).origin;
+  return {
+    issuer: normalizedIssuer,
+    authorize: `${origin}/application/o/authorize/`,
+    token: `${origin}/application/o/token/`,
+    userinfo: `${origin}/application/o/userinfo/`,
+    jwks: `${normalizedIssuer}jwks/`
+  };
 }
 
 export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): boolean {
@@ -69,10 +99,22 @@ export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): 
   if (provider === "apple") {
     return Boolean(env.APPLE_CLIENT_ID?.trim() && env.APPLE_TEAM_ID?.trim() && env.APPLE_KEY_ID?.trim() && env.APPLE_PRIVATE_KEY?.trim());
   }
-  if (provider === "workos") {
-    return Boolean(env.WORKOS_CLIENT_ID?.trim() && env.WORKOS_API_KEY?.trim());
+  if (provider === "authentik") {
+    // Flag first: an unset/false AUTHENTIK_ENABLED means the provider does not exist,
+    // no matter what credentials are bound.
+    if (env.AUTHENTIK_ENABLED?.trim().toLowerCase() !== "true") return false;
+    if (!env.AUTHENTIK_ISSUER?.trim() || !env.AUTHENTIK_CLIENT_ID?.trim() || !env.AUTHENTIK_CLIENT_SECRET?.trim()) {
+      return false;
+    }
+    // A malformed issuer would blow up later inside the redirect; fail closed here.
+    try {
+      authentikEndpoints(env.AUTHENTIK_ISSUER);
+    } catch {
+      return false;
+    }
+    return true;
   }
-  return false;
+    return false;
 }
 
 export async function createOAuthTransaction(provider: OAuthProvider, env: OAuthEnv, returnTo: string): Promise<OAuthTransaction> {
@@ -81,11 +123,15 @@ export async function createOAuthTransaction(provider: OAuthProvider, env: OAuth
     state: randomUrlToken(32),
     verifier: randomUrlToken(64),
     nonce: randomUrlToken(32),
-    returnTo: safeAllowedReturnTo(returnTo, env),
+    returnTo: safeReturnPath(returnTo),
     exp: Math.floor(Date.now() / 1000) + transactionMaxAge
   };
 }
 
+/**
+ * Community Gate variant: carries the community slug through the round trip and
+ * constrains returnTo to a relative /community/... path (never cross-origin).
+ */
 export async function createCommunityOAuthTransaction(
   provider: OAuthProvider,
   _env: OAuthEnv,
@@ -154,27 +200,30 @@ export async function getAuthorizationUrl(provider: OAuthProvider, env: OAuthEnv
     return `https://appleid.apple.com/auth/authorize?${params.toString()}`;
   }
 
-  if (provider === "workos") {
-    const clientId = requireEnv(env.WORKOS_CLIENT_ID, "WORKOS_CLIENT_ID");
+  if (provider === "authentik") {
+    const clientId = requireEnv(env.AUTHENTIK_CLIENT_ID, "AUTHENTIK_CLIENT_ID");
+    const endpoints = authentikEndpoints(requireEnv(env.AUTHENTIK_ISSUER, "AUTHENTIK_ISSUER"));
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
       response_type: "code",
+      scope: "openid email profile",
       state: tx.state,
+      nonce: tx.nonce,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
-      provider: "authkit"
+      response_mode: "query"
     });
-    return `https://api.workos.com/user_management/authorize?${params.toString()}`;
+    return `${endpoints.authorize}?${params.toString()}`;
   }
 
-  throw new Error(`unsupported_provider:${provider}`);
+    throw new Error(`unsupported_provider:${provider}`);
 }
 
 export async function transactionSetCookie(tx: OAuthTransaction, env: OAuthEnv, domain?: string) {
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(tx)));
   const signature = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
-  let header = `${transactionCookie}=${encoded}.${signature}; Path=/api/auth; HttpOnly; Secure; SameSite=Lax; Max-Age=${transactionMaxAge}`;
+  let header = `${transactionCookie}=${encoded}.${signature}; Path=/api/auth; HttpOnly; Secure; SameSite=${transactionSameSite(tx.provider)}; Max-Age=${transactionMaxAge}`;
   if (domain) header += `; Domain=${domain}`;
   return header;
 }
@@ -182,7 +231,7 @@ export async function transactionSetCookie(tx: OAuthTransaction, env: OAuthEnv, 
 export async function signSessionTransfer(session: SessionPayload, returnTo: string, env: OAuthEnv) {
   const payload: OAuthSessionTransfer = {
     session,
-    returnTo: safeAllowedReturnTo(returnTo, env),
+    returnTo: safeReturnPath(returnTo),
     exp: Math.floor(Date.now() / 1000) + 60
   };
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(payload)));
@@ -195,12 +244,18 @@ export async function readSessionTransfer(token: string, env: OAuthEnv): Promise
   if (!encoded || !signature) return null;
   const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
-  const transfer = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthSessionTransfer;
+  let transfer: OAuthSessionTransfer;
+  try {
+    transfer = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthSessionTransfer;
+  } catch {
+    return null;
+  }
+  if (!transfer || typeof transfer !== "object") return null;
   if (!transfer.exp || transfer.exp < Math.floor(Date.now() / 1000)) return null;
   if (!transfer.session?.email || !transfer.session?.frisky_user_id || !transfer.session?.frisky_org_id) return null;
   return {
     session: transfer.session,
-    returnTo: safeAllowedReturnTo(transfer.returnTo, env),
+    returnTo: safeReturnPath(transfer.returnTo),
     exp: transfer.exp
   };
 }
@@ -217,9 +272,19 @@ const communityTransactionPath = "/api/community-auth";
 export async function communityTransactionSetCookie(tx: OAuthTransaction, env: OAuthEnv, domain?: string) {
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(tx)));
   const signature = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
-  let header = `${communityTransactionCookie}=${encoded}.${signature}; Path=${communityTransactionPath}; HttpOnly; Secure; SameSite=Lax; Max-Age=${transactionMaxAge}`;
+  let header = `${communityTransactionCookie}=${encoded}.${signature}; Path=${communityTransactionPath}; HttpOnly; Secure; SameSite=${transactionSameSite(tx.provider)}; Max-Age=${transactionMaxAge}`;
   if (domain) header += `; Domain=${domain}`;
   return header;
+}
+
+/**
+ * Apple returns via response_mode=form_post, i.e. a cross-site POST. A SameSite=Lax
+ * cookie is withheld on cross-site POSTs, so the transaction would never reach the
+ * callback and every Apple sign-in would fail with oauth_state_missing. SameSite=None
+ * is required there; the cookie stays HttpOnly + Secure + HMAC-signed + state-checked.
+ */
+function transactionSameSite(provider: OAuthProvider) {
+  return provider === "apple" ? "None" : "Lax";
 }
 
 export async function readCommunityOAuthTransaction(request: Request, env: OAuthEnv): Promise<OAuthTransaction | null> {
@@ -229,9 +294,9 @@ export async function readCommunityOAuthTransaction(request: Request, env: OAuth
   if (!encoded || !signature) return null;
   const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
-  const tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
-  if (!isOAuthProvider(tx.provider)) return null;
-  if (!tx.exp || tx.exp < Math.floor(Date.now() / 1000)) return null;
+  const tx = decodeTransaction(encoded);
+  if (!tx) return null;
+  if (!isCommunityOAuthProvider(tx.provider)) return null;
   return tx;
 }
 
@@ -241,7 +306,11 @@ export function clearCommunityTransactionCookie(domain?: string) {
   return header;
 }
 
-/** Only allow relative paths under /community for the community OAuth returnTo. */
+/**
+ * Community OAuth returnTo allow-list: relative paths under /community only.
+ * Never emits an absolute URL — an attacker-supplied ?return_to=https://evil.tld
+ * would otherwise turn the callback into an open redirect.
+ */
 export function safeCommunityReturnPath(value: string | null | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
   const pathname = value.split(/[?#]/, 1)[0] || "/";
@@ -256,8 +325,21 @@ export async function readOAuthTransaction(request: Request, env: OAuthEnv): Pro
   if (!encoded || !signature) return null;
   const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
-  const tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
+  const tx = decodeTransaction(encoded);
+  if (!tx) return null;
   if (!isOAuthProvider(tx.provider)) return null;
+  return tx;
+}
+
+/** Decode + shape-check a signed transaction blob. Returns null on garbage or expiry. */
+function decodeTransaction(encoded: string): OAuthTransaction | null {
+  let tx: OAuthTransaction;
+  try {
+    tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
+  } catch {
+    return null;
+  }
+  if (!tx || typeof tx !== "object") return null;
   if (!tx.exp || tx.exp < Math.floor(Date.now() / 1000)) return null;
   return tx;
 }
@@ -268,6 +350,12 @@ export function validateOAuthTransaction(tx: OAuthTransaction | null, provider: 
   if (!state || !timingSafeEqual(tx.state, state)) throw new Error("oauth_state_invalid");
 }
 
+/**
+ * Verify the provider round trip and return the raw identity, WITHOUT minting an
+ * operator session or applying the operator admin allow-list. The Community Gate
+ * bridge builds its own Neon session from this; exchangeCodeForSession() is the
+ * operator path and keeps the allow-list check.
+ */
 export async function exchangeCodeForIdentity(
   provider: OAuthProvider,
   env: OAuthEnv,
@@ -278,7 +366,7 @@ export async function exchangeCodeForIdentity(
   if (provider === "google") return exchangeGoogleCode(env, code, redirectUri, tx);
   if (provider === "microsoft") return exchangeMicrosoftCode(env, code, redirectUri, tx);
   if (provider === "apple") return exchangeAppleCode(env, code, redirectUri, tx);
-  if (provider === "workos") return exchangeWorkOSCode(env, code, redirectUri, tx);
+  if (provider === "authentik") return exchangeAuthentikCode(env, code, redirectUri, tx);
   throw new Error(`exchange_not_implemented_for:${provider}`);
 }
 
@@ -303,53 +391,10 @@ export async function exchangeCodeForSession(
 }
 
 export function safeReturnPath(value: string | null | undefined) {
-  if (!value) return "/main";
-  // SECURITY: this helper must NEVER emit an absolute (cross-origin) URL. Any
-  // absolute returnTo has to be allow-listed via safeAllowedReturnTo()/
-  // validateRedirectUri(); returning it verbatim here is an open redirect and a
-  // session-transfer exfiltration sink (attacker ?return_to=https://evil.tld).
-  if (!value.startsWith("/") || value.startsWith("//")) return "/main";
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/main";
   const pathname = value.split(/[?#]/, 1)[0] || "/";
   if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) return "/main";
   return value;
-}
-
-export function safeAllowedReturnTo(value: string | null | undefined, env: OAuthEnv) {
-  if (!value) return validateRedirectUri(null, env);
-  if (value.startsWith("http://") || value.startsWith("https://")) return validateRedirectUri(value, env);
-  return safeReturnPath(value);
-}
-
-export function validateRedirectUri(uri: string | null | undefined, env: OAuthEnv): string {
-  const defaultUri = env.PUBLIC_SITE_URL || "";
-  const allowed = (env.ALLOWED_REDIRECT_URIS || defaultUri)
-    .split(",")
-    .map((u) => u.trim())
-    .filter(Boolean);
-
-  if (!uri) {
-    if (!defaultUri) {
-      throw new Error("No Redirect URI provided and no default configured.");
-    }
-    return defaultUri;
-  }
-
-  if (allowed.includes(uri)) {
-    return uri;
-  }
-
-  // Allow sub-paths if the base domain is allowed (simple check)
-  for (const base of allowed) {
-    if (uri.startsWith(base) && (uri.length === base.length || uri[base.length] === "/" || uri[base.length] === "?")) {
-      return uri;
-    }
-  }
-
-  if (!defaultUri) {
-    throw new Error("Redirect URI not allowed and no default configured.");
-  }
-
-  return defaultUri;
 }
 
 async function exchangeGoogleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
@@ -379,6 +424,7 @@ async function exchangeGoogleCode(env: OAuthEnv, code: string, redirectUri: stri
     email,
     name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
     identityId,
+    // Google only omits email_verified for unverified accounts — default closed.
     emailVerified: parseBoolClaim(claims.email_verified, false)
   };
 }
@@ -412,6 +458,7 @@ async function exchangeMicrosoftCode(env: OAuthEnv, code: string, redirectUri: s
     email,
     name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
     identityId,
+    // Entra ID only emits email_verified/xms_edov for federated-domain edge cases.
     emailVerified: parseBoolClaim(claims.email_verified ?? claims.xms_edov, true)
   };
 }
@@ -443,55 +490,93 @@ async function exchangeAppleCode(env: OAuthEnv, code: string, redirectUri: strin
     email,
     name: email.split("@")[0],
     identityId,
+    // Apple omits email_verified for the private-relay alias, which is verified by construction.
     emailVerified: parseBoolClaim(claims.email_verified, true)
   };
 }
 
+/**
+ * Authentik as an OIDC broker. Same shape as the direct providers — the difference is that
+ * Google / Microsoft / Apple sit BEHIND Authentik as federated sources, so this single
+ * exchange covers all of them and `sub` is Authentik's stable user id, not the upstream one.
+ *
+ * That stability is the whole point: a user who signs in via Google today and Microsoft
+ * tomorrow keeps ONE `authentik:<sub>` identity, because Authentik does the account
+ * linking on its side instead of the bridge minting a second row per upstream provider.
+ */
+async function exchangeAuthentikCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
+  const clientId = requireEnv(env.AUTHENTIK_CLIENT_ID, "AUTHENTIK_CLIENT_ID");
+  const clientSecret = requireEnv(env.AUTHENTIK_CLIENT_SECRET, "AUTHENTIK_CLIENT_SECRET");
+  const endpoints = authentikEndpoints(requireEnv(env.AUTHENTIK_ISSUER, "AUTHENTIK_ISSUER"));
+
+  const tokens = await exchangeToken(endpoints.token, {
+    code,
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+    grant_type: "authorization_code",
+    code_verifier: tx.verifier
+  }, "authentik");
+
+  const claims = await verifyIdToken(tokens.id_token, {
+    // Pinned to THIS application's issuer, so a token minted for a DIFFERENT Authentik
+    // application on the same host is rejected. Anchored regex only to tolerate the
+    // trailing slash — Authentik emits `iss` with one, config may be pasted without.
+    issuer: new RegExp(`^${escapeRegExp(endpoints.issuer.replace(/\/$/, ""))}\\/?$`),
+    audience: clientId,
+    nonce: tx.nonce,
+    jwksUrl: endpoints.jwks
+  });
+
+  const sub = stringClaim(claims.sub, "authentik_missing_sub");
+  // Authentik only puts email/preferred_username in the id_token when the email/profile
+  // scope mappings are attached to the provider. Fall back to /userinfo rather than
+  // dead-ending the sign-in on a scope-mapping mistake.
+  let email = typeof claims.email === "string" && claims.email.trim() ? claims.email.trim() : "";
+  let name = typeof claims.name === "string" && claims.name.trim() ? claims.name.trim() : "";
+  let emailVerifiedClaim = claims.email_verified;
+
+  if (!email && tokens.access_token) {
+    const info = await fetchAuthentikUserInfo(endpoints.userinfo, tokens.access_token);
+    if (typeof info.email === "string") email = info.email.trim();
+    if (!name && typeof info.name === "string") name = info.name.trim();
+    if (emailVerifiedClaim === undefined) emailVerifiedClaim = info.email_verified;
+  }
+
+  if (!email) throw new Error("authentik_missing_email");
+
+  return {
+    provider: "authentik",
+    email,
+    name: name || email.split("@")[0],
+    identityId: `authentik:${sub}`,
+    // Authentik is our own broker: it either federated from a provider that already
+    // verified the address, or the operator created the account by hand. It omits
+    // email_verified unless the mapping is configured, so absence means "trusted",
+    // an explicit false still blocks.
+    emailVerified: parseBoolClaim(emailVerifiedClaim, true)
+  };
+}
+
+async function fetchAuthentikUserInfo(userinfoUrl: string, accessToken: string) {
+  const response = await httpFetch(userinfoUrl, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }
+  });
+  if (!response.ok) throw new Error(`authentik_userinfo_failed:${response.status}`);
+  return await response.json() as Record<string, unknown>;
+}
+
+
+
 let fetchOverride: typeof fetch | null = null;
 
-/** Test hook: override global fetch for OAuth token/JWKS calls. */
+/** Test hook: route OAuth token/JWKS calls through a stub instead of the network. */
 export function __setFetchForTests(fetchFn: typeof fetch | null) {
   fetchOverride = fetchFn;
 }
 
 function httpFetch(input: RequestInfo | URL, init?: RequestInit) {
   return (fetchOverride ?? fetch)(input, init);
-}
-
-async function exchangeWorkOSCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
-  const clientId = requireEnv(env.WORKOS_CLIENT_ID, "WORKOS_CLIENT_ID");
-  const apiKey = requireEnv(env.WORKOS_API_KEY, "WORKOS_API_KEY");
-
-  const res = await fetch("https://api.workos.com/user_management/authenticate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      client_id: clientId,
-      code,
-      code_verifier: tx.verifier,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code"
-    })
-  });
-
-  if (!res.ok) throw new Error(`workos_token_exchange_failed:${await res.text()}`);
-
-  const data = await res.json() as {
-    user?: { id?: string; email?: string; first_name?: string; last_name?: string; email_verified?: boolean };
-  };
-
-  const userId = data.user?.id;
-  const email = data.user?.email;
-  if (!userId || !email) throw new Error("workos_missing_user");
-
-  const name = [data.user?.first_name, data.user?.last_name].filter(Boolean).join(" ") || email.split("@")[0];
-  return {
-    provider: "workos",
-    email,
-    name,
-    identityId: `workos:${userId}`,
-    emailVerified: data.user?.email_verified ?? true
-  };
 }
 
 async function exchangeToken(url: string, params: Record<string, string>, provider: OAuthProvider) {
@@ -505,9 +590,11 @@ async function exchangeToken(url: string, params: Record<string, string>, provid
     throw new Error(`${provider}_token_exchange_failed:${await tokenRes.text()}`);
   }
 
-  const tokens = await tokenRes.json() as { id_token?: string };
+  const tokens = await tokenRes.json() as { id_token?: string; access_token?: string };
   if (!tokens.id_token) throw new Error(`${provider}_missing_id_token`);
-  return { id_token: tokens.id_token };
+  // access_token is only consumed by the Authentik /userinfo fallback; the direct
+  // providers ignore it and read everything off the verified id_token.
+  return { id_token: tokens.id_token, access_token: tokens.access_token };
 }
 
 async function verifyIdToken(token: string, options: {
@@ -611,6 +698,10 @@ async function hmac(secret: string, data: string) {
   return base64Url(new Uint8Array(signature));
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function timingSafeEqual(a: string, b: string) {
   if (a.length !== b.length) return false;
   let result = 0;
@@ -625,6 +716,7 @@ function stringClaim(value: unknown, error: string) {
   return value;
 }
 
+/** id_token booleans arrive as either true/false or the strings "true"/"false". */
 function parseBoolClaim(value: unknown, fallback: boolean): boolean {
   if (typeof value === "boolean") return value;
   if (typeof value === "string") {

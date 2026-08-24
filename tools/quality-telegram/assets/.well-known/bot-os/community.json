@@ -1,0 +1,16 @@
+{
+  "version": "1",
+  "environment": "quality",
+  "botType": "community",
+  "botName": "MyFenrir Protocol DEV",
+  "telegramUsername": "MyfenrirprotocolDEVbot",
+  "runtime": "cloudflare-worker",
+  "webhookPath": "/api/telegram/webhook?bot=dev",
+  "discoveryPath": "/.well-known/bot-os/community.json",
+  "gates": ["human-verification", "identity", "rules", "vibe"],
+  "ownership": {
+    "factory": "frisky-bot-os",
+    "runtime": "fenrir-gatekeeper",
+    "entitlementTruth": "fenrir-d1-and-stars"
+  }
+}

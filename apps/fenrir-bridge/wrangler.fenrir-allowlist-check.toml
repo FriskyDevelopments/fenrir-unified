@@ -1,0 +1,13 @@
+# Zone-routed Worker for the Gatekeeper allowlist contract. Exact paths only —
+# everything else on myfenrir.com keeps hitting Pages untouched. See the header
+# comment in workers/fenrir-allowlist-check.ts for why this is not a Pages deploy.
+name = "fenrir-allowlist-check"
+main = "workers/fenrir-allowlist-check.ts"
+compatibility_date = "2026-05-08"
+
+routes = [
+  { pattern = "myfenrir.com/api/internal/community/allowlist-check", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/api/internal/community/allowlist-check", zone_name = "myfenrir.com" },
+  { pattern = "myfenrir.com/api/internal/community/gate-create", zone_name = "myfenrir.com" },
+  { pattern = "www.myfenrir.com/api/internal/community/gate-create", zone_name = "myfenrir.com" }
+]

@@ -14,6 +14,7 @@ export type ReadinessSnapshot = {
     googleConfigured: boolean;
     microsoftConfigured: boolean;
     appleConfigured: boolean;
+    friskyAuthEnabled: boolean;
   };
   billing: {
     stripeSecretConfigured: boolean;
@@ -31,19 +32,25 @@ export type ReadinessSnapshot = {
   };
 };
 
-export function computeReadiness(env: OAuthEnv): ReadinessSnapshot {
-  // WorkOS AuthKit is the primary social/email broker and covers all three
-  // providers once configured; direct OAuth remains as a per-provider fallback.
-  const workosEnv = env as OAuthEnv & { WORKOS_CLIENT_ID?: string; WORKOS_API_KEY?: string };
-  const workosConfigured = nonEmpty(workosEnv.WORKOS_CLIENT_ID) && nonEmpty(workosEnv.WORKOS_API_KEY);
+export type ManagedTelegramRail = {
+  starsConfigured: boolean;
+  webhookConfigured: boolean;
+};
+
+export function computeReadiness(
+  env: OAuthEnv,
+  managedRail: ManagedTelegramRail = { starsConfigured: false, webhookConfigured: false }
+): ReadinessSnapshot {
+  const supabaseConfigured = nonEmpty(env.SUPABASE_URL) && nonEmpty(env.SUPABASE_ANON_KEY);
   const directGoogle = nonEmpty(env.GOOGLE_CLIENT_ID) && nonEmpty(env.GOOGLE_CLIENT_SECRET);
   const directMicrosoft = nonEmpty(env.MICROSOFT_CLIENT_ID) && nonEmpty(env.MICROSOFT_CLIENT_SECRET);
   const directApple = nonEmpty(env.APPLE_CLIENT_ID) && nonEmpty(env.APPLE_TEAM_ID) && nonEmpty(env.APPLE_KEY_ID) && nonEmpty(env.APPLE_PRIVATE_KEY);
 
   const auth = {
-    googleConfigured: workosConfigured || directGoogle,
-    microsoftConfigured: workosConfigured || directMicrosoft,
-    appleConfigured: workosConfigured || directApple
+    googleConfigured: directGoogle || (supabaseConfigured && enabled(env.FENRIR_GOOGLE_OAUTH_CONFIGURED)),
+    microsoftConfigured: directMicrosoft || (supabaseConfigured && enabled(env.FENRIR_MICROSOFT_OAUTH_CONFIGURED)),
+    appleConfigured: directApple || (supabaseConfigured && enabled(env.FENRIR_APPLE_OAUTH_CONFIGURED)),
+    friskyAuthEnabled: enabled(env.FRISKY_AUTH_ENABLED)
   };
 
   const telegramBotConfigured = nonEmpty(env.TELEGRAM_BOT_TOKEN) || nonEmpty(env.TELEGRAM_PROD_BOT_TOKEN);
@@ -57,8 +64,10 @@ export function computeReadiness(env: OAuthEnv): ReadinessSnapshot {
       nonEmpty(env.STRIPE_OPERATOR_PRICE_ID),
     telegramBotConfigured,
     telegramBotUsernameConfigured,
-    telegramStarsConfigured: telegramBotConfigured && telegramBotUsernameConfigured,
-    telegramWebhookSecretConfigured: nonEmpty(env.TELEGRAM_WEBHOOK_SECRET),
+    // Bot OS owns the production bot and canonical webhook. Do not falsely
+    // require duplicate secrets in the Pages dashboard runtime.
+    telegramStarsConfigured: (telegramBotConfigured && telegramBotUsernameConfigured) || managedRail.starsConfigured,
+    telegramWebhookSecretConfigured: nonEmpty(env.TELEGRAM_WEBHOOK_SECRET) || managedRail.webhookConfigured,
     d1Configured: env.DB != null,
     neonConfigured: nonEmpty(env.NEON_DATABASE_URL)
   };

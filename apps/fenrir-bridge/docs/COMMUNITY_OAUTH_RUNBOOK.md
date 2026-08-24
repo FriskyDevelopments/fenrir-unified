@@ -213,8 +213,7 @@ Also confirm these are already set on the Pages project:
 
 The bridge writes to `fenrir_community_oauth_identities`, already defined in
 `docs/neon-community-auth-schema.sql`. Its `provider` check constraint allows only
-`google` / `apple` / `microsoft` — which is why `workos` is excluded from the community
-bridge and stays on the operator gate.
+`google` / `apple` / `microsoft` — the only providers the community bridge offers.
 
 ```bash
 psql "$NEON_DATABASE_URL" -f docs/neon-community-auth-schema.sql   # idempotent

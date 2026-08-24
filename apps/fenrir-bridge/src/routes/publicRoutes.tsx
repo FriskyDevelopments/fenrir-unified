@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Copy } from "../i18n";
-import { bridgeService, liveRoomService } from "../services/api";
-import type { FriskyBridge, FriskyCommissionLink, FriskyLiveRoom, FriskyTelegramInvite } from "../services/types";
-import { absoluteUrl, commissionFallbackBySlug, openAnyUrl, resolveCommissionDestination, trustedFenrirImageUrl } from "../app/shared";
+import { bridgeService, liveRoomService, type AuthSession, type BillingStatusPayload, type PaidPlan, type TelegramIdentityLinkPayload } from "../services/api";
+import type { AppState, FriskyBridge, FriskyCommissionLink, FriskyLiveRoom, FriskyTelegramInvite, Plan } from "../services/types";
+import { absoluteUrl, commissionFallbackBySlug, openAnyUrl, resolveCommissionDestination, trustedFenrirImageUrl, type FenrirRole } from "../app/shared";
 import type { UiCopy } from "../app/uiCopy";
 import { GroupAvatar, providerLabel } from "./routeCommon";
 import { GlowCard } from "../components/GlowCard";
@@ -99,9 +99,10 @@ function overlayAuthState(state: AppState, auth: AuthSession): AppState {
 function planLabel(plan: Plan) {
   const labels: Record<Plan, string> = {
     free: "Free",
-    starter: "Starter",
-    pro: "Pro",
-    operator: "Operator"
+    starter: "The Pack",
+    pro: "The Pack",
+    operator: "The Pack",
+    standard: "The Pack"
   };
   return labels[plan];
 }
@@ -118,10 +119,11 @@ function authProviderLabel(provider: string) {
 
 function planLockLimit(plan: Plan) {
   const limits: Record<Plan, string> = {
-    free: "1",
-    starter: "3",
-    pro: "10",
-    operator: "unlimited"
+    free: "5",
+    starter: "5",
+    pro: "5",
+    operator: "5",
+    standard: "5"
   };
   return limits[plan];
 }
@@ -145,7 +147,7 @@ function SessionLabels({
 }) {
   const activeLocks = state.bridges.filter((bridge) => bridge.status === "active").length;
   const backendLimit = billingStatus?.limits.maxTelegramLocks;
-  const lockLimit = backendLimit === null ? "unlimited" : backendLimit ?? planLockLimit(state.org.plan);
+  const lockLimit = backendLimit === null ? "5" : backendLimit ?? planLockLimit(state.org.plan);
   const labels = [
     [c.sessionRole, role === "owner" ? c.sessionOwner : role === "admin" ? c.sessionAdmin : "User"],
     [c.sessionPlan, planLabel(state.org.plan)],
@@ -197,16 +199,14 @@ function BetaPreviewControls({
         <option value="owner">Owner view</option>
       </select>
       <select value={plan} onChange={(event) => onPlan(event.target.value as PaidPlan)}>
-        <option value="starter">Starter preview</option>
-        <option value="pro">Pro preview</option>
-        <option value="operator">Operator preview</option>
+        <option value="operator">The Pack preview</option>
       </select>
       <small>Preview only. Billing entitlement still comes from the backend.</small>
     </section>
   );
 }
 
-function PublicBridgeRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy }) {
+export function PublicBridgeRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy }) {
   const [resolved, setResolved] = useState<{ bridge: FriskyBridge; invite: FriskyTelegramInvite | null } | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -258,7 +258,7 @@ function PublicBridgeRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy 
   );
 }
 
-function PublicRoomRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy }) {
+export function PublicRoomRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy }) {
   const [room, setRoom] = useState<FriskyLiveRoom | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -327,7 +327,7 @@ function PublicRoomRoute({ slug, c, ui }: { slug: string; c: Copy; ui: UiCopy })
   );
 }
 
-function ProtocolActivated() {
+export function ProtocolActivated() {
   return (
     <div className="protocol-activated" aria-live="polite">
       <div className="lightning-mark" aria-hidden="true">
@@ -343,7 +343,7 @@ function ProtocolActivated() {
   );
 }
 
-function FriskyGhostRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
+export function FriskyGhostRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
   const theme = brandThemes.friskyGhost;
   return (
     <main className={`product-route ghost-route ${themeClassName(theme)}`} style={themeCssVars(theme)} data-theme={theme.key}>
@@ -360,7 +360,7 @@ function FriskyGhostRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
   );
 }
 
-function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
+export function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
   const theme = brandThemes.friskyGhost;
   const botModules = [
     {
@@ -382,7 +382,9 @@ function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
       title: "Payment Box",
       status: "Stars first",
       body: "Opens the official Telegram Stars payment box and waits for backend entitlement truth.",
-      actions: ["/subscribe", "Pro", "Operator"]
+      // Última aparición de planes retirados en la superficie. El canon deja
+      // dos ofertas: Free ($0) y The Pack ($14.99/mes por comunidad enlazada).
+      actions: ["/subscribe", "Free", "The Pack"]
     },
     {
       code: "MOD 04",
@@ -425,6 +427,31 @@ function FriskyBotOsRoute({ c, ui }: { c: Copy; ui: UiCopy }) {
             <code>/status</code>
           </div>
         </div>
+
+        <section className="bot-os-media" aria-label="Fenrir Bot OS motion system">
+          <video
+            className="bot-os-media-hero"
+            src="/bot-os/media/fenrir-welcome.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+          />
+          <div className="bot-os-media-grid">
+            {[
+              ["Pulse", "/bot-os/media/fenrir-pulse.mp4"],
+              ["Access", "/bot-os/media/fenrir-access.mp4"],
+              ["Beam", "/bot-os/media/fenrir-beam.mp4"],
+              ["Signal", "/bot-os/media/fenrir-signal.mp4"]
+            ].map(([label, src]) => (
+              <figure key={src}>
+                <video src={src} autoPlay muted loop playsInline preload="metadata" />
+                <figcaption>{label}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
 
         <div className="bot-module-grid">
           {botModules.map((module) => (

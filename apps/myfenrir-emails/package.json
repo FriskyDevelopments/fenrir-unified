@@ -1,0 +1,27 @@
+{
+  "name": "myfenrir-emails",
+  "version": "0.1.0",
+  "description": "MyFenrir — branded transactional + auth email. Cloudflare Worker with Cloudflare Email Service (env.EMAIL.send) as the default rail and Resend/MailerSend as automatic fallback. White-label brand engine, dark 'Fenrir' identity.",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:production": "wrangler deploy --env production",
+    "test": "node --import tsx --test src/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "tail": "wrangler tail",
+    "previews": "tsx scripts/render-previews.ts",
+    "test:send": "tsx scripts/send-test.ts"
+  },
+  "keywords": ["myfenrir", "email", "transactional", "auth", "cloudflare", "resend", "white-label", "fenrir"],
+  "author": "Frisky Developments",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260801.1",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "wrangler": "^4.20.0"
+  }
+}

@@ -6,9 +6,21 @@ import { toast } from "sonner";
 import { isDemoMode } from "@/config/demo-mode";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { GateForm, SLUG_PATTERN, useSlugAvailability } from "@/components/gate/gate-form";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/config/brand-context";
+import { getSiteUrl } from "@/config/site-url";
 import { deleteGate, getMyGate, updateGate } from "@/lib/gate.functions";
 import type { GateConfig } from "@/lib/gate-presets";
 
@@ -25,11 +37,11 @@ export const Route = createFileRoute("/gates/$id")({
       { property: "og:title", content: "Edit Gate — MyFenrir" },
       { property: "og:description", content: "Update your public MyFenrir sign-in gate." },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: `https://communities.myfenrir.com/gates/${params.id}` },
+      { property: "og:url", content: `${getSiteUrl()}/gates/${params.id}` },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
-    links: [{ rel: "canonical", href: `https://communities.myfenrir.com/gates/${params.id}` }],
+    links: [{ rel: "canonical", href: `${getSiteUrl()}/gates/${params.id}` }],
   }),
   component: EditGatePage,
 });
@@ -44,6 +56,7 @@ function EditGatePage() {
   const remove = useServerFn(deleteGate);
 
   const [config, setConfig] = useState<GateConfig | null>(null);
+  const [community, setCommunity] = useState<{ id: string; label: string } | null>(null);
   const [missing, setMissing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -52,7 +65,7 @@ function EditGatePage() {
   useEffect(() => {
     if (loading) return;
     if (!session) {
-      navigate({ to: "/login", search: { next: undefined } });
+      navigate({ to: "/login", search: { next: window.location.pathname } });
       return;
     }
     // Demo mode has no real bearer token; skip the protected fetch.
@@ -72,9 +85,15 @@ function EditGatePage() {
           id: _id,
           updated_at: _updatedAt,
           brand_id: _brandId,
-          community_id: _communityId,
+          community_id: communityId,
+          community_label: communityLabel,
           ...rest
         } = row;
+        setCommunity(
+          communityId && communityId !== "myfenrir-core"
+            ? { id: communityId, label: communityLabel }
+            : null,
+        );
         setConfig(rest);
       })
       .catch((error: unknown) => {
@@ -85,7 +104,7 @@ function EditGatePage() {
     return () => {
       active = false;
     };
-  }, [loading, session, id, fetchGate, navigate, brand.id]);
+  }, [loading, session, id, fetchGate, navigate, brand.id, brand.community.id]);
 
   const onSave = async () => {
     if (!config) return;
@@ -100,10 +119,26 @@ function EditGatePage() {
     setSaving(true);
     try {
       const saved = await persist({
-        data: { ...config, id, brand_id: brand.id, community_id: brand.community.id },
+        data: {
+          ...config,
+          id,
+          brand_id: brand.id,
+        },
       });
-      const { id: _id, updated_at: _updatedAt, ...rest } = saved;
-      setConfig(rest);
+      const {
+        id: _id,
+        updated_at: _updatedAt,
+        brand_id: _brandId,
+        community_id: communityId,
+        community_label: communityLabel,
+        ...nextConfig
+      } = saved;
+      setCommunity(
+        communityId && communityId !== "myfenrir-core"
+          ? { id: communityId, label: communityLabel }
+          : null,
+      );
+      setConfig(nextConfig);
       toast.success("Gate updated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not update gate");
@@ -116,7 +151,7 @@ function EditGatePage() {
     setDeleting(true);
     try {
       await remove({ data: { id, brand_id: brand.id } });
-      toast.success("Gate deleted");
+      toast.success("Gate removed from your MyFenrir account");
       navigate({ to: "/gates" });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not delete gate");
@@ -166,10 +201,42 @@ function EditGatePage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" loading={deleting} onClick={onDelete}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" loading={deleting}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Remove from my account
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove this Gate from MyFenrir?</AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-2">
+                    <span className="block">
+                      This permanently removes the Gate configuration. Its public address{" "}
+                      <strong className="text-foreground">/g/{config.slug}</strong> will stop
+                      working.
+                    </span>
+                    <span className="block">
+                      Your Telegram group, community mapping and bot remain untouched. To invalidate
+                      only the current entry link or QR, use{" "}
+                      <strong className="text-foreground">Revoke Gate link</strong> in the bot panel
+                      instead.
+                    </span>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep this Gate</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={deleting}
+                    onClick={() => void onDelete()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Yes, remove Gate from my account
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <Button
               variant="fenrir"
               loading={saving}
@@ -182,7 +249,20 @@ function EditGatePage() {
           </div>
         </div>
 
-        <GateForm config={config} onChange={(next) => setConfig(next)} slugStatus={slugStatus} />
+        <Card variant="muted" className="mb-5 p-5 sm:p-6">
+          <p className="text-sm font-semibold text-foreground">Telegram mapping</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            {community
+              ? `${community.label} is confirmed by Fenrir. To change it, verify another group with /connect in Telegram, then select it from My Gates.`
+              : "No group is confirmed yet. An admin must run /connect inside the protected Telegram group, then select it from My Gates. Fenrir confirms its permissions before this Gate goes live."}
+          </p>
+        </Card>
+
+        <GateForm
+          config={config}
+          onChange={(next) => setConfig(next)}
+          slugStatus={slugStatus}
+        />
       </main>
     </div>
   );

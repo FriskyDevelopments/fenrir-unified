@@ -1,0 +1,12 @@
+# Copy to .dev.vars for local `wrangler dev`. NEVER commit real values.
+# .dev.vars is gitignored. In production these are set via `wrangler secret put`.
+
+# Bearer token required by POST /send (any strong random string).
+# Generate: openssl rand -hex 32
+SEND_AUTH_TOKEN="dev-change-me"
+
+# Only needed for the resend fallback (op://FriskyDev-Infra/Email/password).
+RESEND_API_KEY=""
+
+# Only needed for the mailersend fallback.
+MAILERSEND_API_KEY=""

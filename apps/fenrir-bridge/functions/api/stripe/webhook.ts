@@ -9,6 +9,16 @@ import {
 } from "../../_lib/billing-db";
 import { assertPaidPlanMetadata, paidPlanFromStripePriceId } from "../../_lib/plan-catalog";
 import { constructStripeWebhookEvent, getStripe } from "../../_lib/stripe";
+import { anchorStripeCustomer } from "../../_lib/stripe-anchor";
+import { sendBillingEmail } from "../../_lib/transactional-email";
+import {
+  activateTrial,
+  claimInviteUse,
+  getInviteCode,
+  getTrialBySetupIntent,
+  isCodeExpired,
+  setTrialCardOnFile
+} from "../../_lib/trials-db";
 
 function subscriptionCustomerId(sub: Stripe.Subscription) {
   return typeof sub.customer === "string" ? sub.customer : sub.customer.id;
@@ -86,9 +96,16 @@ async function handleCheckoutSessionCompleted(env: BillingEnv, stripe: Stripe, s
     stripe_customer_id: customerId,
     email: email || "pending@unknown"
   });
+  await anchorStripeCustomer(env, {
+    stripe_customer_id: customerId,
+    frisky_org_id: orgId,
+    frisky_user_id: userId,
+    email: email || "pending@unknown"
+  }).catch((error) => console.error("stripe_customer_anchor_failed", String(error)));
 
   const sub = await stripe.subscriptions.retrieve(subId);
   await persistSubscriptionFromStripe(env, stripe, sub, orgId);
+  if (email) await sendBillingEmail(env, { to: email, subject: "Welcome to MyFenrir · Access granted", title: "Welcome to the Pack", body: "Your MyFenrir subscription is active and your community access is ready.", status: "ACCESS GRANTED", detail: "Plan: " + metaPlan + " · Payment method saved securely by Stripe" });
 }
 
 async function handleInvoicePaymentFailed(env: BillingEnv, stripe: Stripe, invoice: Stripe.Invoice) {
@@ -97,6 +114,31 @@ async function handleInvoicePaymentFailed(env: BillingEnv, stripe: Stripe, invoi
   if (!subId) return;
   const sub = await stripe.subscriptions.retrieve(subId);
   await persistSubscriptionFromStripe(env, stripe, sub);
+  const email = typeof invoice.customer_email === "string" ? invoice.customer_email : "";
+  if (email) await sendBillingEmail(env, { to: email, subject: "MyFenrir · Payment needs attention", title: "Payment needs attention", body: "Your latest payment could not be completed. Your access may be affected if the payment is not updated.", status: "PAYMENT ACTION", detail: "Open your Stripe billing portal to update your payment method." });
+}
+
+// Backstop for the MyFenrir trial flow: if the client never calls
+// /api/trial/verify, this activates a card-required trial once Stripe confirms
+// the SetupIntent. Idempotent — it no-ops if verify already handled the trial.
+async function handleTrialSetupIntentSucceeded(env: BillingEnv, setupIntent: Stripe.SetupIntent) {
+  const db = env.DB;
+  if (!db) return;
+  if (setupIntent.metadata?.kind !== "myfenrir_trial") return;
+
+  const trial = await getTrialBySetupIntent(db, setupIntent.id);
+  if (!trial) return;
+
+  await setTrialCardOnFile(db, trial.id, true);
+  if (trial.status !== "pending_card") return; // /api/trial/verify already activated it
+
+  const invite = await getInviteCode(db, trial.code);
+  if (!invite || invite.status !== "active" || isCodeExpired(invite)) return;
+
+  const claimed = await claimInviteUse(db, trial.code);
+  if (!claimed) return;
+
+  await activateTrial(db, trial.id, { durationDays: invite.duration_days, cardOnFile: true });
 }
 
 export async function onRequestPost(context: { request: Request; env: BillingEnv }) {
@@ -160,6 +202,11 @@ export async function onRequestPost(context: { request: Request; env: BillingEnv
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
         await handleInvoicePaymentFailed(context.env, stripe, invoice);
+        break;
+      }
+      case "setup_intent.succeeded": {
+        const setupIntent = event.data.object as Stripe.SetupIntent;
+        await handleTrialSetupIntentSucceeded(context.env, setupIntent);
         break;
       }
       default:

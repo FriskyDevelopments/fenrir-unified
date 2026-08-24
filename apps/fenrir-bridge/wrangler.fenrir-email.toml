@@ -1,0 +1,8 @@
+name = "fenrir-transactional-email"
+main = "workers/fenrir-transactional-email.js"
+compatibility_date = "2026-08-15"
+workers_dev = false
+
+[[send_email]]
+name = "EMAIL"
+allowed_sender_addresses = ["noreply@myfenrir.com"]

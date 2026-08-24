@@ -11,13 +11,15 @@
  *   - the post-login redirect
  *   - the matching Public Gate Builder preset (presets ARE the white-label themes)
  *
- * Nothing here is a code change: adding LORE, HostCasa, ClipsFlow or one
- * specific casa is a new object in BRANDS.
+ * Nothing here is a code change: adding LORE, ClipsFlow or any other brand
+ * is a new object in BRANDS.
  */
 
-// Brand art ships in /public — self-hosted, no Lovable asset proxy involved.
-const markAsset = { url: "/fenrir-mark.svg" };
-const wordmarkAsset = { url: "/fenrir-cut-wordmark.svg" };
+// Use assets shipped by this app. The old /__l5e path only exists in the
+// design workspace and returns 404 on gate.myfenrir.com.
+// La marca cuadrada de Fenrir (el favicon heredado era el icono de ClipsFlow).
+const MYFENRIR_MARK_URL = "/fenrir-mark.svg";
+const MYFENRIR_WORDMARK_URL = "/fenrir-cut-wordmark.svg";
 
 export type ProviderId = "apple" | "google" | "microsoft";
 
@@ -106,10 +108,10 @@ export const BRANDS: BrandConfig[] = [
     id: "myfenrir",
     name: "MyFenrir",
     tagline: "Secure access and public gates for your Telegram community",
-    // The bridge is its own product at communities.myfenrir.com — it deliberately
-    // does NOT claim myfenrir.com/www, which belong to the main dashboard app.
-    hosts: ["communities.myfenrir.com", "clipsflow-auth-hub.lovable.app"],
-    logo: { markUrl: markAsset.url, wordmarkUrl: wordmarkAsset.url, alt: "MyFenrir logo" },
+    // communities.* es la superficie separada del Community Bridge: sin este
+    // host caía en el brand por defecto y tomaba el logo del tenant heredado.
+    hosts: ["myfenrir.com", "www.myfenrir.com", "communities.myfenrir.com"],
+    logo: { markUrl: MYFENRIR_MARK_URL, wordmarkUrl: MYFENRIR_WORDMARK_URL, alt: "MyFenrir logo" },
     theme: {
       "--primary": "oklch(0.637 0.208 25.3)",
       "--ring": "oklch(0.637 0.208 25.3)",
@@ -120,7 +122,11 @@ export const BRANDS: BrandConfig[] = [
     redirect: { afterLogin: "/dashboard", oauthReturnPath: "/" },
     gatePreset: "fenrir-dark",
     terminalCommand: "fenrir --login",
-    links: { site: "https://myfenrir.com", terms: "/terms", privacy: "/privacy" },
+    links: {
+      site: "https://myfenrir.com",
+      terms: "https://www.myfenrir.com/terms",
+      privacy: "https://www.myfenrir.com/privacy",
+    },
   },
   {
     id: "lore",
@@ -141,28 +147,10 @@ export const BRANDS: BrandConfig[] = [
     redirect: { afterLogin: "/dashboard", oauthReturnPath: "/" },
     gatePreset: "lore-neon",
     terminalCommand: "lore --enter",
-    links: { terms: "/terms", privacy: "/privacy" },
-  },
-  {
-    id: "hostcasa",
-    name: "HostCasa",
-    tagline: "One sign-in for every casa you host",
-    hosts: ["hostcasa.com", "www.hostcasa.com"],
-    logo: { alt: "HostCasa logo" },
-    theme: {
-      "--primary": "oklch(0.74 0.15 62)",
-      "--accent": "oklch(0.70 0.11 165)",
-      "--ring": "oklch(0.74 0.15 62)",
-      "--background": "oklch(0.17 0.018 70)",
-      "--card": "oklch(0.235 0.026 70)",
-      "--glow-primary": "0 0 40px -8px oklch(0.74 0.15 62 / 42%)",
+    links: {
+      terms: "https://www.myfenrir.com/terms",
+      privacy: "https://www.myfenrir.com/privacy",
     },
-    providers: BASE_PROVIDERS,
-    community: { id: "hostcasa-hosts", label: "HostCasa hosts" },
-    redirect: { afterLogin: "/dashboard", oauthReturnPath: "/" },
-    gatePreset: "casa-warm",
-    terminalCommand: "hostcasa --login",
-    links: { terms: "/terms", privacy: "/privacy" },
   },
   {
     id: "clipsflow",
@@ -183,29 +171,10 @@ export const BRANDS: BrandConfig[] = [
     redirect: { afterLogin: "/dashboard", oauthReturnPath: "/" },
     gatePreset: "minimal",
     terminalCommand: "clipsflow --login",
-    links: { terms: "/terms", privacy: "/privacy" },
-  },
-  {
-    id: "casa-verde",
-    name: "Casa Verde",
-    tagline: "Private access for Casa Verde residents and guests",
-    hosts: ["casaverde.hostcasa.com"],
-    logo: { alt: "Casa Verde logo" },
-    theme: {
-      "--primary": "oklch(0.72 0.16 150)",
-      "--accent": "oklch(0.78 0.12 100)",
-      "--ring": "oklch(0.72 0.16 150)",
-      "--background": "oklch(0.16 0.02 160)",
-      "--card": "oklch(0.225 0.03 160)",
-      "--glow-primary": "0 0 40px -8px oklch(0.72 0.16 150 / 42%)",
+    links: {
+      terms: "https://www.myfenrir.com/terms",
+      privacy: "https://www.myfenrir.com/privacy",
     },
-    // A single casa may deliberately narrow the provider set.
-    providers: ["apple", "google"],
-    community: { id: "casa-verde", label: "Casa Verde" },
-    redirect: { afterLogin: "/dashboard", oauthReturnPath: "/" },
-    gatePreset: "casa-warm",
-    terminalCommand: "casa --unlock",
-    links: { terms: "/terms", privacy: "/privacy" },
   },
 ];
 

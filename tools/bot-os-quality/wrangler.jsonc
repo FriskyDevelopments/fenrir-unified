@@ -1,0 +1,12 @@
+{
+  "name": "frisky-bot-os-quality",
+  "account_id": "e2a7eccb24c4836847fd14d08c499bd0",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-13",
+  "kv_namespaces": [
+    {
+      "binding": "BOT_REGISTRY",
+      "id": "64647b29491b496e92be336c8eb60c58"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import { dbNotConfiguredResponse, missingEnvResponse, siteOrigin, type BillingEnv } from "../../_lib/billing-env";
 import { consumeTelegramAccountLinkCode } from "../../_lib/telegram-identity";
+import { consumeLinkCode, getAccountLinkByTelegramUser } from "../../_lib/account-links";
 import { applyStarsEntitlementForTelegramUser } from "../../_lib/stars-billing";
 import {
   createStarsOrder,
@@ -28,7 +29,7 @@ type TelegramUpdate = {
 type TelegramMessage = {
   message_id: number;
   text?: string;
-  chat: { id: number };
+  chat: { id: number; type?: string };
   from?: { id: number; username?: string; first_name?: string };
   successful_payment?: {
     currency: string;
@@ -80,6 +81,10 @@ export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
 async function handleMessage(env: BillingEnv, message: TelegramMessage, channel: string, origin: string) {
   const text = (message.text ?? "").trim();
   const textLower = text.toLowerCase();
+  if (isCommandForBot(text, "link", env)) {
+    await handleLinkCommand(env, message, channel);
+    return;
+  }
   const linkCode = linkCodeFromStart(textLower);
   if (linkCode) {
     const result = await consumeTelegramAccountLinkCode(env, env.DB!, linkCode, {
@@ -88,6 +93,14 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
       telegramUsername: message.from?.username,
       telegramFirstName: message.from?.first_name
     });
+    if (result.ok) {
+      await consumeLinkCode(env, {
+        code: linkCode,
+        telegramId: String(message.from?.id ?? message.chat.id),
+        telegramUsername: message.from?.username ?? null,
+        telegramFirstName: message.from?.first_name ?? null
+      }).catch((error) => console.error("account_links_write_failed", String(error)));
+    }
     await telegramApi(env, "sendMessage", {
       chat_id: message.chat.id,
       parse_mode: "Markdown",
@@ -112,6 +125,33 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
     return;
   }
 
+  if (/^\/start\s+link$/i.test(text)) {
+    const telegramId = String(message.from?.id ?? message.chat.id);
+    const account = await getAccountLinkByTelegramUser(env, telegramId);
+    const name = escapeMd(message.from?.first_name?.trim() || "there");
+    await telegramApi(env, "sendMessage", {
+      chat_id: message.chat.id,
+      parse_mode: "Markdown",
+      text: account
+        ? [
+            `🐺 *Welcome, ${name}*`,
+            "",
+            "✅ *Account linked with Frisky Dev*",
+            `MyFenrir account · ${escapeMd(maskEmail(account.email))}`,
+            "",
+            "Your identity is confirmed. Next, add Fenrir to the protected group and map it before the Gate can go live."
+          ].join("\n")
+        : [
+            `🐺 *Welcome, ${name}*`,
+            "",
+            "Your Telegram account is not linked to MyFenrir yet.",
+            "Open MyFenrir and generate the secure one-time Telegram link."
+          ].join("\n"),
+      reply_markup: { inline_keyboard: startActionButtons(env, origin) }
+    }, channel);
+    return;
+  }
+
   if (textLower.startsWith("/help") || textLower.startsWith("/commands")) {
     await telegramApi(env, "sendMessage", {
       chat_id: message.chat.id,
@@ -124,7 +164,9 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
         "*Commands*",
         "· `/start` — open dashboard + unlock",
         "· `/help` — this message",
-        "· `/subscribe` · `/unlock` — pay with Telegram Stars",
+        "· `/subscribe` · `/unlock` — open the Telegram Stars box (⭐1,150)",
+        "",
+        "The Pack is $14.99/month. Card, Stars, or crypto — same price.",
         "",
         "Link Telegram from the MyFenrir dashboard (Settings → Link Telegram), then manage locks there.",
         "",
@@ -172,15 +214,53 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
     title: starsTitle(env),
     description: starsDescription(env),
     payload,
-    provider_token: "",
+    // `provider_token` must be OMITTED for XTR, not sent empty (empty string
+    // previously returned PROVIDER_ACCOUNT_INVALID). `subscription_period` is
+    // required or Telegram charges once while we advertise "$14.99/month".
     currency: "XTR",
     prices: [{ label: starsLabel(env), amount }],
+    subscription_period: 2592000,
     protect_content: true
+  }, channel);
+}
+
+function isCommandForBot(text: string, command: string, env: BillingEnv) {
+  const match = text.match(new RegExp(`^/${command}(?:@([A-Za-z0-9_]+))?(?:\\s|$)`, "i"));
+  if (!match) return false;
+  const target = (match[1] ?? "").toLowerCase();
+  return !target || target === (env.FENRIR_TELEGRAM_BOT_USERNAME ?? "").replace(/^@/, "").toLowerCase();
+}
+
+async function handleLinkCommand(env: BillingEnv, message: TelegramMessage, channel: string) {
+  if (message.chat.type && message.chat.type !== "private") {
+    await telegramApi(env, "sendMessage", {
+      chat_id: message.chat.id,
+      text: "For security, send /link to me in a private chat."
+    }, channel);
+    return;
+  }
+
+  const appUrl = "https://www.myfenrir.com/main";
+  const menuButton = { type: "web_app", text: "Open MyFenrir", web_app: { url: appUrl } };
+  await telegramApi(env, "setChatMenuButton", { menu_button: menuButton }, channel).catch((error) => {
+    console.error("telegram_menu_button_failed", error);
+  });
+  await telegramApi(env, "sendMessage", {
+    chat_id: message.chat.id,
+    text: "Open MyFenrir, then tap Link Telegram ID. Telegram confirms automatically — there is no code to copy.",
+    reply_markup: { inline_keyboard: [[{ text: "Open MyFenrir", url: appUrl }]] }
   }, channel);
 }
 
 function escapeMd(s: string) {
   return s.replace(/([_*`\[])/g, "\\$1");
+}
+
+function maskEmail(email: string | null) {
+  if (!email || !email.includes("@")) return "verified identity";
+  const [local, domain] = email.split("@", 2);
+  const visible = (local || "").slice(0, 2);
+  return `${visible}${"•".repeat(Math.max(3, Math.min(6, (local || "").length - visible.length)))}@${domain}`;
 }
 
 function linkCodeFromStart(text: string) {

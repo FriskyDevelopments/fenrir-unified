@@ -2,6 +2,7 @@ import { readSession, type SessionPayload } from "./auth";
 import { noStoreJson } from "./responses";
 
 export type CommunityAuthEnv = {
+  EMAIL?: { send: (message: { to: string; from: { email: string; name?: string }; subject: string; html: string; text: string }) => Promise<unknown> };
   NEON_DATABASE_URL?: string;
   FENRIR_COMMUNITY_AUTH_SECRET?: string;
   FENRIR_COMMUNITY_AUTH_DEV_RETURN_LINK?: string;
@@ -18,7 +19,7 @@ export type CommunityAuthMode = "internal_only" | "allowlisted_owners" | "owner_
 export type DefaultAccessState = "provisional" | "open" | "invite_only" | "disabled";
 
 const DEFAULT_AUTH_PROVIDERS = ["magic_link"] as const;
-const SUPPORTED_AUTH_PROVIDERS = new Set(["magic_link", "google", "apple", "microsoft"]);
+const SUPPORTED_AUTH_PROVIDERS = new Set(["magic_link", "google", "apple", "microsoft", "authentik"]);
 const DEFAULT_FALLBACK_BRAND_PRIMARY_COLOR = "#22c7a8";
 const DEFAULT_FALLBACK_BRAND_SECONDARY_COLOR = "#8cb9ff";
 const DEFAULT_FALLBACK_BRAND_ACCENT_COLOR = "#9b8cff";

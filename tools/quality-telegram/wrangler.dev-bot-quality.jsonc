@@ -1,0 +1,21 @@
+{
+  // NEW isolated Quality worker for @MyfenrirprotocolDEVbot. No collision with
+  // existing workers. Deploy:
+  //   CLOUDFLARE_ACCOUNT_ID=e2a7eccb24c4836847fd14d08c499bd0 \
+  //     env -u CLOUDFLARE_API_TOKEN wrangler deploy \
+  //     -c tools/quality-telegram/wrangler.dev-bot-quality.jsonc
+  // Webhook URL: https://myfenrir-dev-bot-quality.<subdomain>.workers.dev/api/telegram/webhook?bot=dev
+  "name": "myfenrir-dev-bot-quality",
+  "account_id": "e2a7eccb24c4836847fd14d08c499bd0",
+  "main": "dev-bot-quality.mjs",
+  "assets": {
+    "directory": "assets",
+    "binding": "ASSETS",
+    "run_worker_first": ["/.well-known/*"]
+  },
+  "vars": {
+    "BOT_OS_CONTROL_PLANE": "https://frisky-bot-os-quality.hrgrrtks2p.workers.dev"
+  },
+  "compatibility_date": "2026-08-12",
+  "workers_dev": true
+}

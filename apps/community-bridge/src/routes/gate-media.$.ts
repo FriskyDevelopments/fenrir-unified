@@ -3,9 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 /**
  * Serves gate artwork uploads (logo / mascot / background — images, GIFs, MP4).
  *
- * The `gate-media` bucket is private (public buckets are disabled for this
- * workspace), so files are streamed through this public read-only route.
- * Only GET is exposed and nothing but the object bytes is returned.
+ * Gate artwork is public by design: it appears on shareable `/g/:slug` pages.
+ * Keep this compatibility route for already-saved `/gate-media/...` values,
+ * but redirect reads to Supabase Storage's public object endpoint. Uploads and
+ * mutations remain owner-scoped by RLS on `storage.objects`.
  */
 export const Route = createFileRoute("/gate-media/$")({
   server: {
@@ -18,16 +19,15 @@ export const Route = createFileRoute("/gate-media/$")({
           return new Response("Not found", { status: 404 });
         }
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data, error } = await supabaseAdmin.storage.from("gate-media").download(path);
-        if (error || !data) return new Response("Not found", { status: 404 });
+        const supabaseUrl =
+          process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"];
+        if (!supabaseUrl) return new Response("Media service unavailable", { status: 503 });
 
-        return new Response(await data.arrayBuffer(), {
-          headers: {
-            "content-type": data.type || "application/octet-stream",
-            "cache-control": "public, max-age=3600, stale-while-revalidate=86400",
-          },
-        });
+        const objectUrl = new URL(
+          `/storage/v1/object/public/gate-media/${path.split("/").map(encodeURIComponent).join("/")}`,
+          supabaseUrl,
+        );
+        return Response.redirect(objectUrl, 302);
       },
     },
   },

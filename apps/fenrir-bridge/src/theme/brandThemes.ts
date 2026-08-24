@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-export type BrandKey = "fenrir" | "neonNexus" | "stixMagic";
+export type BrandKey = "fenrir" | "friskyGhost" | "neonNexus" | "stixMagic";
 
 export type BrandTheme = {
   key: BrandKey;
@@ -21,6 +21,7 @@ export type BrandTheme = {
   glow: string;
   background:
     | "protocol"
+    | "ghost"
     | "nexus"
     | "experimental";
 };
@@ -45,17 +46,36 @@ export const brandThemes: Record<BrandKey, BrandTheme> = {
     glow: "rgba(194, 164, 105, .22)",
     background: "protocol"
   },
+  // Frisky Ghost bot-OS skin, restaurada del histórico (pre-6dabefe): la purga
+  // LORE retiró la entrada pero /ghost y /bot-os (publicRoutes) siguen usándola.
+  friskyGhost: {
+    key: "friskyGhost",
+    productName: "Frisky Ghost",
+    systemRole: "operational layer",
+    logoSrc: "/fenrir-cut-wordmark.svg",
+    logoAlt: "Frisky Ghost",
+    headline: "Ghost login for the bot operating layer.",
+    subheadline: "One auth engine, separate product landing, and operational routes for bot-of-bots workflows.",
+    lanes: ["BOT OS", "OPERATIONS", "SIGNALS", "WORKERS", "ROUTES"],
+    nodeStatus: ["GHOST ONLINE", "BOT OS READY", "ROUTES ISOLATED", "SIGNAL CLEAN"],
+    authKicker: "Ghost skin",
+    primary: "#f3f6f9",
+    secondary: "#8cb9ff",
+    accent: "#9b8cff",
+    glow: "rgba(140, 185, 255, .22)",
+    background: "ghost"
+  },
   neonNexus: {
     key: "neonNexus",
-    productName: "Neon Nexus",
+    productName: "MyFenrir",
     systemRole: "futuristic cyber layer",
     logoSrc: "/fenrir-cut-wordmark.svg",
-    logoAlt: "Neon Nexus",
-    headline: "Community access through a separate Neon gate.",
-    subheadline: "Invite verification, isolated sessions, and Neon-backed membership state for community products.",
-    lanes: ["NEON AUTH", "COMMUNITY ACCESS", "INVITE CODES", "SEPARATE DATABASE", "REAL GATE"],
-    nodeStatus: ["NEON READY", "INVITES CHECKED", "SESSION SCOPED", "AUDIT LOGGED"],
-    authKicker: "Neon auth",
+    logoAlt: "MyFenrir",
+    headline: "One identity for your whole community.",
+    subheadline: "Verify once, sign in, and your access carries across MyFenrir and Community Bridge.",
+    lanes: ["MYFENRIR IDENTITY", "COMMUNITY ACCESS", "SINGLE SIGN-ON", "MEMBERSHIP", "SECURE GATE"],
+    nodeStatus: ["IDENTITY READY", "VERIFIED", "SESSION SHARED", "AUDIT LOGGED"],
+    authKicker: "MyFenrir SSO",
     primary: "#22c7a8",
     secondary: "#8cb9ff",
     accent: "#9b8cff",

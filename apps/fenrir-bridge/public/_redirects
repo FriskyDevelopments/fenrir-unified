@@ -1,3 +1,5 @@
+/wiki https://myfenrir-docs.pages.dev/ 301
+/wiki/ https://myfenrir-docs.pages.dev/ 301
 /waitlist /waitlist/index.html 200
 /waitlist/admin-guide.html /waitlist/admin-guide/ 301
 /waitlist/admin-guide /waitlist/admin-guide.html 200
@@ -7,5 +9,7 @@
 /invitation /invitation/ 301
 /invitation/ /invitation/index.html 200
 /adminguidebook /adminguidebook.html 200
+/privacy /privacy/index.html 200
+/terms /terms/index.html 200
+/legal /legal/index.html 200
 /* /index.html 200
-

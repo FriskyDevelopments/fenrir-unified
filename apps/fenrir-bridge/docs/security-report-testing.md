@@ -9,7 +9,7 @@ This document provides a comprehensive guide for manually testing the Fenrir Com
    ```bash
    npm run mcp:beta:dev
    ```
-2. Ensure you have a valid local session (e.g., mock auth or authenticated via WorkOS).
+2. Ensure you have a valid local session (e.g., mock auth or authenticated via Supabase).
 
 ### 1.2 Endpoint Verification
 Make a `GET` request to `/api/community-gate/admin/security-report?communitySlug=fenrir`.

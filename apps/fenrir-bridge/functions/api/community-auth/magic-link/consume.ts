@@ -14,10 +14,17 @@ import {
   signCommunitySession
 } from "../../../_lib/community-auth";
 import { noStoreJson } from "../../../_lib/responses";
+import { mintSupabaseSharedSessionCookies } from "../../../_lib/supabase-shared-session";
 
 type MagicLinkConsume = {
   token?: unknown;
 };
+
+const COMMUNITY_BRIDGE_ORIGIN = "https://communities.myfenrir.com";
+
+function communityBridgeGateLocation(slug: string) {
+  return new URL(`/g/${encodeURIComponent(slug)}`, COMMUNITY_BRIDGE_ORIGIN).toString();
+}
 
 export async function onRequestPost(context: any) {
   if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured(context.env);
@@ -78,6 +85,13 @@ async function consumeMagicLink(context: any, token: string, redirectAfter: bool
     const session = await signCommunitySession(payload, context.env);
     const cookie = communitySessionSetCookie(session);
 
+    // ADDITIVE unification (same as OAuth callback): mint the Supabase session
+    // cookie on `.myfenrir.com` so communities.myfenrir.com shares this identity.
+    const supabaseCookies = await mintSupabaseSharedSessionCookies(context.env, user.email, {
+      name: user.display_name ?? user.email,
+      fenrirUserId: user.id,
+    });
+
     await createCommunitySessionRecord(context.env, {
       userId: user.id,
       sessionHash: await sha256Hex(session),
@@ -87,13 +101,13 @@ async function consumeMagicLink(context: any, token: string, redirectAfter: bool
     });
 
     if (redirectAfter) {
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: new URL(`/community/${slug}`, context.request.url).toString(),
-          "Set-Cookie": cookie
-        }
+      const headers = new Headers({
+        Location: communityBridgeGateLocation(slug),
+        "Cache-Control": "no-store",
       });
+      headers.append("Set-Cookie", cookie);
+      for (const supabaseCookie of supabaseCookies) headers.append("Set-Cookie", supabaseCookie);
+      return new Response(null, { status: 302, headers });
     }
 
     return noStoreJson({
@@ -117,9 +131,12 @@ async function consumeMagicLink(context: any, token: string, redirectAfter: bool
         communityOrgId: brand.communityOrgId
       }
     }, {
-      headers: {
-        "Set-Cookie": cookie
-      }
+      headers: (() => {
+        const headers = new Headers();
+        headers.append("Set-Cookie", cookie);
+        for (const supabaseCookie of supabaseCookies) headers.append("Set-Cookie", supabaseCookie);
+        return headers;
+      })(),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "community_auth_error";

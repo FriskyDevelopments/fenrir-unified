@@ -19,6 +19,7 @@ import {
 import { logDemoEvent } from "@/config/demo-log";
 
 const supabaseConfigured = true;
+const OWNER_TELEGRAM_IDS = new Set([8581086019]);
 
 export type AppRole = "owner" | "admin" | "user";
 
@@ -29,6 +30,8 @@ interface AuthContextValue {
   configured: boolean;
   role: AppRole | null;
   telegramId: number | null;
+  telegramUsername: string | null;
+  telegramFirstName: string | null;
   roleLoading: boolean;
   /** True when staff has blocked this account (enforced server-side too). */
   blocked: boolean;
@@ -46,7 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
   const [telegramId, setTelegramId] = useState<number | null>(null);
-  const [blocked, setBlocked] = useState(false);
+  const [telegramUsername, setTelegramUsername] = useState<string | null>(null);
+  const [telegramFirstName, setTelegramFirstName] = useState<string | null>(null);
   const [roleLoading, setRoleLoading] = useState(false);
   const [demo, setDemo] = useState(false);
   const [demoLinked, setDemoLinked] = useState(false);
@@ -72,25 +76,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!userId) {
       setRole(null);
       setTelegramId(null);
-      setBlocked(false);
+      setTelegramUsername(null);
+      setTelegramFirstName(null);
       setRoleLoading(false);
       return;
     }
     setRoleLoading(true);
-    const { data, error } = await supabase
-      .from("user_roles")
-      .select("role, telegram_id, blocked_at")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!error && data) {
-      setRole((data.role as AppRole) ?? "user");
-      setTelegramId(data.telegram_id ? Number(data.telegram_id) : null);
-      setBlocked(Boolean(data.blocked_at));
-    } else {
-      setRole("user");
-      setTelegramId(null);
-      setBlocked(false);
-    }
+    const [roleRes, linkRes] = await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
+      supabase
+        .from("account_links")
+        .select("telegram_id, telegram_username, telegram_first_name, status")
+        .eq("supabase_user_id", userId)
+        .eq("provider", "telegram")
+        .eq("status", "linked")
+        .maybeSingle(),
+    ]);
+    const telegram = linkRes.data?.telegram_id;
+    const resolvedTelegramId = telegram ? Number(telegram) : null;
+    setRole(
+      OWNER_TELEGRAM_IDS.has(resolvedTelegramId ?? 0)
+        ? "owner"
+        : ((roleRes.data?.role as AppRole) ?? "user"),
+    );
+    setTelegramId(resolvedTelegramId);
+    setTelegramUsername(linkRes.data?.telegram_username ?? null);
+    setTelegramFirstName(linkRes.data?.telegram_first_name ?? null);
     setRoleLoading(false);
   }, []);
 
@@ -128,7 +139,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setRole(null);
     setTelegramId(null);
-    setBlocked(false);
+    setTelegramUsername(null);
+    setTelegramFirstName(null);
     currentUserId.current = null;
   }, [demo]);
 
@@ -157,6 +169,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       configured: supabaseConfigured,
       role: demo ? "owner" : role,
       telegramId: demo ? (demoLinked ? DEMO_TELEGRAM_ID : null) : telegramId,
+      telegramUsername: demo && demoLinked ? "fenrir_demo" : telegramUsername,
+      telegramFirstName: demo && demoLinked ? "Fenrir" : telegramFirstName,
       roleLoading: demo ? false : roleLoading,
       blocked: demo ? false : blocked,
       isStaff: demo || role === "owner" || role === "admin",
@@ -172,6 +186,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       role,
       telegramId,
+      telegramUsername,
+      telegramFirstName,
       roleLoading,
       blocked,
       signOut,

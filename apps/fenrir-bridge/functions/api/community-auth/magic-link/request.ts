@@ -1,3 +1,4 @@
+import { sendMyFenrirEmail } from "../../../_lib/myfenrir-emails";
 import {
   communityAuthConfigured,
   communityAuthNotConfigured,
@@ -15,6 +16,7 @@ import { noStoreJson } from "../../../_lib/responses";
 type MagicLinkRequest = {
   email?: unknown;
   slug?: unknown;
+  locale?: unknown;
 };
 
 export async function onRequestPost(context: any) {
@@ -52,13 +54,42 @@ export async function onRequestPost(context: any) {
   const brandConfigured = await communityBrandConfigured(context.env);
   const origin = siteOrigin(context.request, context.env);
   const devReturnLink = context.env.FENRIR_COMMUNITY_AUTH_DEV_RETURN_LINK === "true";
+  const magicLink = `${origin}/api/community-auth/magic-link/consume?token=${encodeURIComponent(token)}`;
+  // Branded delivery via the dedicated myfenrir-emails Worker when configured
+  // (MYFENRIR_EMAILS_URL/_TOKEN); otherwise this gracefully falls back to the
+  // Pages EMAIL binding with a compact on-brand shell. Same response contract
+  // and error codes as before, so existing callers/tests keep working.
+  const emailResult = await sendMyFenrirEmail(context.env, {
+    template: "acceso",
+    to: email,
+    locale: typeof body?.locale === "string" ? body.locale as "en" | "es" | "fr" | "de" : "en",
+    data: {
+      url: magicLink,
+      minutos: 15,
+      comunidad: (brand as any)?.displayName ?? (brand as any)?.name ?? undefined,
+      email
+    }
+  });
+  if (!emailResult.ok) {
+    const notConfigured = emailResult.error === "email_not_configured";
+    if (!notConfigured) console.error("MyFenrir email send failed", emailResult.error);
+    return noStoreJson(
+      {
+        ok: false,
+        error: notConfigured ? "email_service_not_configured" : "email_delivery_failed",
+        linkId: link?.id,
+        expiresAt: link?.expires_at
+      },
+      { status: notConfigured ? 503 : 502 }
+    );
+  }
   return noStoreJson({
     ok: true,
-    delivery: "pending_provider",
+    delivery: emailResult.via === "worker" ? "myfenrir_emails_worker" : "cloudflare_email_service",
     brandConfigured,
     linkId: link?.id,
     expiresAt: link?.expires_at,
-    message: "Magic-link token created in Neon. Email delivery provider is not wired yet.",
-    ...(devReturnLink ? { devLink: `${origin}/api/community-auth/magic-link/consume?token=${encodeURIComponent(token)}` } : {})
+    message: "Magic link sent.",
+    ...(devReturnLink ? { devLink: magicLink } : {})
   });
 }
