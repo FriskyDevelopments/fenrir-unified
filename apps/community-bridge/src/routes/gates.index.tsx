@@ -408,7 +408,11 @@ function MyGatesPage() {
                             Verified Telegram group
                           </p>
                           <Select
-                            value={gate.community_id ?? undefined}
+                            value={
+                              verifiedDestinations.length > 0
+                                ? (gate.community_id ?? undefined)
+                                : undefined
+                            }
                             onValueChange={(communityId) =>
                               void selectTelegramDestination(gate, communityId)
                             }
