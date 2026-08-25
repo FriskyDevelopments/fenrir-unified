@@ -1,0 +1,15 @@
+# Common ignores for faster Docker builds with Depot
+node_modules
+dist
+build
+.next
+.git
+.gitignore
+*.log
+.env*
+.DS_Store
+coverage
+.vscode
+.idea
+*.md
+!README.md

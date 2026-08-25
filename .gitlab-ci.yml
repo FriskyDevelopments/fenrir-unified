@@ -213,3 +213,55 @@ community-bridge:deploy:
       url="https://communities.myfenrir.com/"
       code="$(curl -s -o /dev/null -w '%{http_code}' "$url" || echo ERR)"
       echo "prod communities http=$code"; case "$code" in 2*|3*) : ;; *) exit 1 ;; esac
+
+# =====================================================================
+# Example: Depot-powered Docker build (disabled by default)
+#
+# Depot runs the actual container build on fast remote builders with
+# persistent layer cache. The GitLab job only runs the thin CLI wrapper,
+# which helps conserve shared runner minutes for real Docker builds.
+#
+# Current pipeline has no docker builds (only node:22 + wrangler), so this
+# job is intentionally gated off until you need it.
+#
+# Setup (one-time):
+# 1. Run `depot login` locally and `depot init` in this repo (creates depot.json)
+#    OR create a project in the Depot dashboard and note the project ID.
+# 2. In Depot: Project Settings → Trust Relationships → "Add trust relationship"
+#    - Provider: GitLab CI
+#    - GitLab namespace ID (your group/user ID)
+#    - GitLab project ID (numeric)
+#    - (Recommended) Restrict to protected refs
+# 3. (Optional) Add a masked CI/CD variable DEPOT_PROJECT_ID if you want
+#    to override the one from depot.json.
+#
+# Usage:
+#   - Trigger manually or set USE_DEPOT_DOCKER=1 in a pipeline variable
+#   - The job will use OIDC (DEPOT_OIDC_TOKEN) — no static token needed
+#
+# Once wired, you can also use this pattern for moderation-service or
+# any future containerized jobs.
+# =====================================================================
+
+fenrir-bridge:docker-build:depot:
+  stage: verify
+  id_tokens:
+    DEPOT_OIDC_TOKEN:
+      aud: https://depot.dev
+  rules:
+    - if: '$USE_DEPOT_DOCKER == "1"'
+      when: on_success
+    - when: never
+  before_script:
+    - curl -fsSL https://depot.dev/install-cli.sh | DEPOT_INSTALL_DIR=/usr/local/bin sh
+  script:
+    - |
+      depot build \
+        ${DEPOT_PROJECT_ID:+--project "$DEPOT_PROJECT_ID"} \
+        -f apps/fenrir-bridge/Dockerfile \
+        -t fenrir-bridge:${CI_COMMIT_SHA:-latest} \
+        apps/fenrir-bridge
+  allow_failure: true
+  variables:
+    # Optional: uncomment if you want to force a specific builder size
+    # DEPOT_BUILDER: "x86-64-16x32"  # or arm-64-16x32 etc.

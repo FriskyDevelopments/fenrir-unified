@@ -1,7 +1,20 @@
+# Ignore heavy/unnecessary files during Docker build context
 node_modules
 dist
-.DS_Store
+build
+.next
+.git
+.gitignore
 *.log
-tsconfig.tsbuildinfo
-.env
-.env.*
+.env*
+.env.local
+.DS_Store
+coverage
+.vscode
+.idea
+*.md
+!README.md
+supabase
+.wrangler
+functions
+workers
