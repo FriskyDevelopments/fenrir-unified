@@ -31,19 +31,25 @@ function safeBrand(raw: string | null) {
   return /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(value) ? value : null;
 }
 
-function brandedLoginUrl(next: string, brand: string | null) {
+function safeGate(raw: string | null) {
+  const value = raw?.trim().toLowerCase() ?? "";
+  return /^[a-z0-9][a-z0-9-]{1,58}[a-z0-9]$/.test(value) ? value : null;
+}
+
+function brandedLoginUrl(next: string, brand: string | null, gate: string | null) {
   const url = new URL("/login", COMMUNITY_ORIGIN);
   const target = new URL(next);
   url.searchParams.set("next", `${target.pathname}${target.search}${target.hash}`);
   if (brand) url.searchParams.set("brand", brand);
+  if (gate) url.searchParams.set("gate", gate);
   return url.toString();
 }
 
-function brandedLoginResponse(next: string, brand: string | null) {
+function brandedLoginResponse(next: string, brand: string | null, gate: string | null) {
   return new Response(null, {
     status: 302,
     headers: {
-      Location: brandedLoginUrl(next, brand),
+      Location: brandedLoginUrl(next, brand, gate),
       "Cache-Control": "no-store",
     },
   });
@@ -76,12 +82,13 @@ export async function onRequestGet(context: { request: Request; env: Env }) {
   const requestUrl = new URL(context.request.url);
   const next = safeNext(requestUrl.searchParams.get("next"));
   const brand = safeBrand(requestUrl.searchParams.get("brand"));
+  const gate = safeGate(requestUrl.searchParams.get("gate"));
   const fenrirSession = await readSession(context.request, context.env);
   if (!fenrirSession) {
     // Never let an old attempt cookie bypass the branded surface or choose a
     // different auth broker. Retrying is safe because this page waits for a
     // deliberate provider click; it does not auto-bounce into SSO.
-    return brandedLoginResponse(next, brand);
+    return brandedLoginResponse(next, brand, gate);
   }
 
   try {
@@ -131,6 +138,6 @@ export async function onRequestGet(context: { request: Request; env: Env }) {
     return new Response(null, { status: 302, headers });
   } catch (error) {
     console.error("community_sso_failed", error instanceof Error ? error.message : "unknown");
-    return brandedLoginResponse(next, brand);
+    return brandedLoginResponse(next, brand, gate);
   }
 }

@@ -19,6 +19,7 @@ const requiredSource = [
   [["src/routes/g.$slug.tsx", "src/i18n/gate.ts"], "Proceed to SSO"],
   [["src/routes/g.$slug.tsx", "src/i18n/gate.ts"], "Continue Gate"],
   ["src/routes/g.$slug.tsx", "community-sso"],
+  ["src/routes/g.$slug.tsx", 'url.searchParams.set("gate", slug)'],
   ["src/lib/access.functions.ts", "Gate security:"],
   ["src/lib/access.functions.ts", "decision_note"],
   ["src/lib/access.functions.ts", "telegram_user_id"],
@@ -26,7 +27,10 @@ const requiredSource = [
   ["src/routes/access.tsx", "Ask info"],
   ["src/routes/login.tsx", "canonicalCommunityOAuthUrl"],
   ["src/routes/login.tsx", "availableBrandProviders"],
+  ["src/routes/login.tsx", "sourceGate"],
+  ["src/components/auth/auth-layout.tsx", "Community sign-in"],
   ["src/lib/canonical-auth.ts", "brandId"],
+  ["src/lib/canonical-auth.ts", "gateSlug"],
   ["src/lib/canonical-auth.ts", "/api/auth/community-sso"],
 ];
 
@@ -61,7 +65,9 @@ for (const [file, needle] of forbiddenSource) {
 
 const routeSource = read("src/routes/g.$slug.tsx");
 if (!/const needsSso = checkingAccess \|\| !session;/.test(routeSource)) {
-  fail("public Gate must only need SSO when there is no session; Telegram identity gaps belong to post-SSO security");
+  fail(
+    "public Gate must only need SSO when there is no session; Telegram identity gaps belong to post-SSO security",
+  );
 }
 if (!/needsSso\s*\?\s*ssoHref/.test(routeSource)) {
   fail("public Gate must send unauthenticated visitors directly to Community SSO");
@@ -89,10 +95,12 @@ if (existsSync(buildRoot)) {
   walk(buildRoot);
   const builtText = builtFiles.map((file) => readFileSync(file, "utf8")).join("\n");
   for (const needle of ["Link Telegram securely", "communities.myfenrir.com/activate"]) {
-    if (builtText.includes(needle)) fail(`built output contains forbidden gate regression text: ${needle}`);
+    if (builtText.includes(needle))
+      fail(`built output contains forbidden gate regression text: ${needle}`);
   }
   for (const needle of ["Proceed to SSO", "Gate security:", "Security context", "Ask info"]) {
-    if (!builtText.includes(needle)) fail(`built output is missing required contract text: ${needle}`);
+    if (!builtText.includes(needle))
+      fail(`built output is missing required contract text: ${needle}`);
   }
 }
 

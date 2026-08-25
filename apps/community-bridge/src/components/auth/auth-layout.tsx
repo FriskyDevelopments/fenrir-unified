@@ -6,8 +6,9 @@ import { BrandSwitcher } from "@/components/brand/brand-switcher";
 import { BrandSyncStatus } from "@/components/brand/brand-sync-status";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/config/brand-context";
-import { getPreset } from "@/lib/gate-presets";
+import { getPreset, isUsableMediaUrl, isVideoUrl } from "@/lib/gate-presets";
 import type { ProviderId } from "@/config/brands";
+import type { PublicGateConfig } from "@/lib/gate.functions";
 
 export function AuthLayout({
   title,
@@ -15,18 +16,28 @@ export function AuthLayout({
   children,
   footer,
   providers,
+  gate,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
   footer?: ReactNode;
   providers?: ProviderId[] | null;
+  gate?: PublicGateConfig | null;
 }) {
   const { isStaff } = useAuth();
   const brand = useBrand();
   // Sign-in is aligned to the gate: same atmosphere, accent glow and centred
   // column as the public gate this brand's visitors arrive from.
-  const preset = getPreset(brand.gatePreset);
+  const preset = getPreset(gate?.preset ?? brand.gatePreset);
+  const gateIdentityMedia =
+    gate?.logo_url && isUsableMediaUrl(gate.logo_url)
+      ? gate.logo_url
+      : gate?.mascot_url && isUsableMediaUrl(gate.mascot_url)
+        ? gate.mascot_url
+        : null;
+  const gateBackground =
+    gate?.background_url && isUsableMediaUrl(gate.background_url) ? gate.background_url : null;
   const previewing =
     typeof window !== "undefined" && new URLSearchParams(window.location.search).has("brand");
 
@@ -35,6 +46,35 @@ export function AuthLayout({
       className="relative isolate flex min-h-dvh flex-col items-center justify-center overflow-hidden px-6 py-14"
       style={{ background: preset.atmosphere }}
     >
+      {gateBackground ? (
+        <>
+          {isVideoUrl(gateBackground) ? (
+            <video
+              src={gateBackground}
+              aria-hidden="true"
+              className="absolute inset-0 -z-30 h-full w-full object-cover"
+              muted
+              loop
+              autoPlay
+              playsInline
+              preload="metadata"
+            />
+          ) : (
+            <img
+              src={gateBackground}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 -z-30 h-full w-full object-cover"
+              decoding="async"
+            />
+          )}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 -z-20"
+            style={{ background: preset.overlay }}
+          />
+        </>
+      ) : null}
       {/* Gate-matched atmosphere: accent glow + faint grid, never a flat fill */}
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div
@@ -59,8 +99,14 @@ export function AuthLayout({
 
       <div className="relative flex w-full max-w-sm flex-col items-center gap-6 text-center [&>*]:w-full">
         <div className="flex flex-col items-center gap-2">
-          <BrandSwitcher />
-          {isStaff || previewing ? <BrandSyncStatus /> : null}
+          {gate ? (
+            <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/55">
+              Community sign-in
+            </span>
+          ) : (
+            <BrandSwitcher />
+          )}
+          {!gate && (isStaff || previewing) ? <BrandSyncStatus /> : null}
         </div>
         {/* Terminal */}
         <div className="group relative">
@@ -95,11 +141,40 @@ export function AuthLayout({
 
             <div className="relative">
               <div className="mb-6 flex flex-col items-center text-center">
-                <div className="relative mb-3 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-ring/30 bg-card/70 shadow-glow">
-                  <BrandMark className="h-full w-full" />
-                </div>
-
-                <BrandWordmark className="mb-4 max-w-[168px]" />
+                {gate ? (
+                  gateIdentityMedia ? (
+                    isVideoUrl(gateIdentityMedia) ? (
+                      <video
+                        src={gateIdentityMedia}
+                        aria-hidden="true"
+                        className="mb-4 max-h-24 max-w-[180px] object-contain"
+                        muted
+                        loop
+                        autoPlay
+                        playsInline
+                        preload="metadata"
+                      />
+                    ) : (
+                      <img
+                        src={gateIdentityMedia}
+                        alt={`${gate.community_label} community mark`}
+                        className="mb-4 max-h-24 max-w-[180px] object-contain"
+                        decoding="async"
+                      />
+                    )
+                  ) : (
+                    <span className="mb-4 text-xl font-semibold uppercase tracking-[0.16em] text-foreground">
+                      {gate.community_label}
+                    </span>
+                  )
+                ) : (
+                  <>
+                    <div className="relative mb-3 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-ring/30 bg-card/70 shadow-glow">
+                      <BrandMark className="h-full w-full" />
+                    </div>
+                    <BrandWordmark className="mb-4 max-w-[168px]" />
+                  </>
+                )}
 
                 <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight text-foreground">
                   {title}

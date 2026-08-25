@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { AuthLayout } from "@/components/auth/auth-layout";
@@ -15,6 +16,7 @@ import {
   canonicalCommunityOAuthUrl,
   loadCanonicalProviders,
 } from "@/lib/canonical-auth";
+import { getPublicGate, type PublicGateConfig } from "@/lib/gate.functions";
 
 /** Build-time brand: head() is static, so it uses the deployment's brand. */
 const HEAD_BRAND = getBrand(import.meta.env["VITE_BRAND_ID"]);
@@ -24,15 +26,21 @@ export const Route = createFileRoute("/login")({
   validateSearch: (s: {
     next?: unknown;
     brand?: unknown;
+    gate?: unknown;
     sso?: unknown;
   }): {
     next?: string;
     brand?: string;
+    gate?: string;
     sso?: string;
   } => ({
     next: typeof s.next === "string" ? s.next : undefined,
     brand:
       typeof s.brand === "string" && BRANDS.some((b) => b.id === s.brand) ? s.brand : undefined,
+    gate:
+      typeof s.gate === "string" && /^[a-z0-9][a-z0-9-]{1,58}[a-z0-9]$/.test(s.gate)
+        ? s.gate
+        : undefined,
     sso: typeof s.sso === "string" ? s.sso : undefined,
   }),
 
@@ -119,8 +127,9 @@ function safeNext(next: unknown): string | null {
 function LoginPage() {
   const { session, loading } = useAuth();
   const navigate = useNavigate();
+  const loadPublicGate = useServerFn(getPublicGate);
   const brand = useBrand();
-  const search = Route.useSearch() as { next?: string; sso?: string };
+  const search = Route.useSearch() as { next?: string; gate?: string; sso?: string };
   const next = safeNext(search.next);
   const [pending, setPending] = useState<ProviderId | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +137,7 @@ function LoginPage() {
   const [enabledCanonicalProviders, setEnabledCanonicalProviders] = useState<ProviderId[] | null>(
     null,
   );
+  const [sourceGate, setSourceGate] = useState<PublicGateConfig | null>(null);
   // This route is client-only (ssr: false), so demo mode can be read up front —
   // resolving it late would let the signed-in redirect fire before we know.
   const [demo] = useState(() => isDemoMode());
@@ -153,6 +163,22 @@ function LoginPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (!search.gate) {
+      setSourceGate(null);
+      return () => {
+        active = false;
+      };
+    }
+    void loadPublicGate({ data: { slug: search.gate } })
+      .then((gate) => active && setSourceGate(gate?.brand_id === brand.id ? gate : null))
+      .catch(() => active && setSourceGate(null));
+    return () => {
+      active = false;
+    };
+  }, [brand.id, loadPublicGate, search.gate]);
 
   // Preserve the community's chosen order, but never advertise a provider
   // whose credentials are absent from the canonical MyFenrir runtime.
@@ -199,11 +225,13 @@ function LoginPage() {
         communityOrigin: window.location.origin,
         nextPath: next ?? brand.redirect.afterLogin,
         brandId: brand.id,
+        gateSlug: search.gate,
       }),
     );
   }
 
   const copy = brandLoginCopy(brand);
+  const communityName = sourceGate?.community_label.trim() || sourceGate?.headline.trim();
 
   const asciiBoot = [
     "╔══════════════════════════════════════╗",
@@ -219,8 +247,9 @@ function LoginPage() {
   return (
     <AuthLayout
       title={copy.headline}
-      subtitle={copy.subheadline}
+      subtitle={communityName ? `Sign in to continue to ${communityName}` : copy.subheadline}
       providers={enabledCanonicalProviders === null ? null : availableIds}
+      gate={sourceGate}
       footer={
         <span className="block space-y-2">
           <span className="block">
