@@ -34,6 +34,13 @@ const checks = [
       providersSource.includes("isDirectOAuthAvailable(provider, context.env)")
   },
   {
+    name: "the production App auth surface renders only advertised providers",
+    pass: appSource.includes("friskyClientAuthEngine") &&
+      appSource.includes(".enabledProviders()") &&
+      appSource.includes("enabledProviders?.map((provider)") &&
+      !appSource.includes('(["apple", "google", "microsoft"] as AuthProvider[]).map')
+  },
+  {
     name: "legacy Supabase callback support remains available for existing sessions",
     pass: supabaseAuthSource.includes("signInWithOAuth")
   },

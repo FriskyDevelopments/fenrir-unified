@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useBrand } from "@/config/brand-context";
 import { brandLoginCopy } from "@/config/brands";
+import type { ProviderId } from "@/config/brands";
 
 type Line = {
   prompt?: string;
@@ -11,12 +12,14 @@ type Line = {
 const CHAR_MS = 26;
 const LINE_DELAY_MS = 260;
 
-export function TerminalTyper() {
+export function TerminalTyper({ providers }: { providers?: ProviderId[] | null }) {
   const brand = useBrand();
   const copy = brandLoginCopy(brand);
 
   const lines = useMemo<Line[]>(() => {
-    const providerLine = `providers: ${brand.providers.join(" · ")}`;
+    const providerSignal =
+      providers === null ? "checking..." : (providers ?? brand.providers).join(" · ") || "none";
+    const providerLine = `providers: ${providerSignal}`;
     if (copy.terminalLines.length > 0) {
       return copy.terminalLines.map((text) => ({ text }));
     }
@@ -26,7 +29,7 @@ export function TerminalTyper() {
       { text: `› ${providerLine}`, className: "text-indigo-300" },
       { text: "awaiting identity_", className: "text-muted-foreground" },
     ];
-  }, [brand, copy]);
+  }, [brand, copy, providers]);
 
   const [lineIdx, setLineIdx] = useState(0);
   const [charIdx, setCharIdx] = useState(0);
