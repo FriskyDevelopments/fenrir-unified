@@ -225,22 +225,23 @@ community-bridge:deploy:
 # job is intentionally gated off until you need it.
 #
 # Setup (one-time):
-# 1. Run `depot login` locally and `depot init` in this repo (creates depot.json)
-#    OR create a project in the Depot dashboard and note the project ID.
-# 2. In Depot: Project Settings → Trust Relationships → "Add trust relationship"
+# 1. Note your Depot project ID (currently: k24w8s6znm / "default")
+# 2. In the Depot dashboard for project k24w8s6znm:
+#    Settings → Trust Relationships → "Add trust relationship"
 #    - Provider: GitLab CI
-#    - GitLab namespace ID (your group/user ID)
-#    - GitLab project ID (numeric)
-#    - (Recommended) Restrict to protected refs
-# 3. (Optional) Add a masked CI/CD variable DEPOT_PROJECT_ID if you want
-#    to override the one from depot.json.
+#    - GitLab namespace ID: 139139955
+#    - GitLab project ID: 82627266
+#    - (Recommended) Restrict to protected refs: yes
+# 3. (Optional but recommended) Add a masked CI/CD variable:
+#      DEPOT_PROJECT_ID = k24w8s6znm
 #
 # Usage:
-#   - Trigger manually or set USE_DEPOT_DOCKER=1 in a pipeline variable
-#   - The job will use OIDC (DEPOT_OIDC_TOKEN) — no static token needed
+#   - Trigger a pipeline with variable USE_DEPOT_DOCKER=1
+#   - The job requests DEPOT_OIDC_TOKEN (aud: https://depot.dev)
+#   - No static Depot token is stored in GitLab
 #
-# Once wired, you can also use this pattern for moderation-service or
-# any future containerized jobs.
+# The OIDC trust allows the Depot CLI running in GitLab CI to
+# authenticate without secrets.
 # =====================================================================
 
 fenrir-bridge:docker-build:depot:
@@ -257,7 +258,7 @@ fenrir-bridge:docker-build:depot:
   script:
     - |
       depot build \
-        ${DEPOT_PROJECT_ID:+--project "$DEPOT_PROJECT_ID"} \
+        --project "${DEPOT_PROJECT_ID:-k24w8s6znm}" \
         -f apps/fenrir-bridge/Dockerfile \
         -t fenrir-bridge:${CI_COMMIT_SHA:-latest} \
         apps/fenrir-bridge
