@@ -31,11 +31,21 @@ export async function onRequest(context: any) {
     if (typeof body?.grant !== "string" || typeof body.context !== "string") {
       return noStoreJson({ verified: false, error: "verification_grant_invalid" }, { status: 400 });
     }
-    const response = await fetch("https://friskydev-human-verification.hrgrrtks2p.workers.dev/api/grant/verify", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ grant: body.grant, context: body.context, audience: url.origin }),
-    }).catch(() => null);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5_000);
+    let response: Response | null = null;
+    try {
+      response = await fetch("https://friskydev-human-verification.hrgrrtks2p.workers.dev/api/grant/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ grant: body.grant, context: body.context, audience: url.origin }),
+        signal: controller.signal
+      });
+    } catch {
+      response = null;
+    } finally {
+      clearTimeout(timer);
+    }
     if (!response?.ok) return noStoreJson({ verified: false, error: "verification_grant_rejected" }, { status: 400 });
     const result = await response.json().catch(() => null) as { verified?: boolean; method?: string } | null;
     if (!result?.verified) return noStoreJson({ verified: false, error: "verification_grant_rejected" }, { status: 400 });

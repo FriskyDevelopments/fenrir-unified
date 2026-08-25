@@ -11,7 +11,9 @@
 
 CREATE TABLE IF NOT EXISTS courtesy_codes (
   code_hash TEXT PRIMARY KEY,
-  duration_days INTEGER NOT NULL CHECK (duration_days IN (30, 90, 180)),
+  -- 182 is the canonical "6 months": the same number the crypto ladder uses for
+  -- its `half` tier, so courtesy and paid crypto grants share one date rule.
+  duration_days INTEGER NOT NULL CHECK (duration_days IN (30, 90, 180, 182)),
   status TEXT NOT NULL DEFAULT 'unused' CHECK (status IN ('unused', 'used', 'revoked')),
   created_by TEXT NOT NULL,
   created_at TEXT NOT NULL,

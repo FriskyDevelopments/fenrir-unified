@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Send,
   Shield,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   UsersRound,
@@ -40,6 +41,7 @@ import {
 import { getPreset } from "@/lib/gate-presets";
 import { getMyGateViewStats, type GateViewStats } from "@/lib/gate-analytics.functions";
 import { listModerationReviews, type ModerationReview } from "@/lib/moderation.functions";
+import { checkMyCommunityAccess, type CommunityAccessStatus } from "@/lib/access.functions";
 
 export const Route = createFileRoute("/dashboard")({
   ssr: false,
@@ -188,7 +190,7 @@ function DashboardPage() {
     verifiedDestinations.map((destination) => destination.communityId),
   );
   const hasVerifiedDestination = gateRecords.some(
-    (gate) => Boolean(gate.community_id) && verifiedCommunityIds.has(gate.community_id),
+    (gate) => Boolean(gate.community_id) && verifiedCommunityIds.has(gate.community_id!),
   );
   const isComplete =
     Boolean(telegramId) && hasGates && hasVerifiedDestination && !gatesLoading && !gateLoadError;

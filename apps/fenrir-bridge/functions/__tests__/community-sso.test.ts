@@ -56,25 +56,27 @@ describe("community SSO", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("sends a signed-out visitor to the matching branded login", async () => {
+  it("sends a signed-out visitor to MyFenrir sign-in carrying the handoff", async () => {
     const request = new Request(
-      "https://www.myfenrir.com/api/auth/community-sso?next=https%3A%2F%2Fcommunities.myfenrir.com%2Fgate%3Fonboarding%3D1&brand=lore&gate=lore-archive",
+      "https://www.myfenrir.com/api/auth/community-sso?next=https%3A%2F%2Fcommunities.myfenrir.com%2Fgate%3Fonboarding%3D1",
     );
     const response = await onRequestGet({ request, env });
     const location = new URL(response.headers.get("location")!);
 
     expect(response.status).toBe(302);
-    expect(location.origin).toBe("https://communities.myfenrir.com");
-    expect(location.pathname).toBe("/login");
-    expect(location.searchParams.get("next")).toBe("/gate?onboarding=1");
-    expect(location.searchParams.get("brand")).toBe("lore");
-    expect(location.searchParams.get("gate")).toBe("lore-archive");
-    expect(response.headers.get("set-cookie")).toBeNull();
+    // The visitor authenticates on MyFenrir, not on the community's local form.
+    expect(location.origin).toBe("https://www.myfenrir.com");
+    // Parked on an app route: safeReturnPath() refuses OAuth return_to at /api/auth/*.
+    expect(location.pathname).toBe("/main");
+    const resume = new URL(location.searchParams.get("next")!, "https://www.myfenrir.com");
+    expect(resume.pathname).toBe("/api/auth/community-sso");
+    expect(resume.searchParams.get("next")).toBe("https://communities.myfenrir.com/gate?onboarding=1");
+    expect(response.headers.get("set-cookie")).toContain("fenrir_community_sso_attempted=1");
   });
 
-  it("keeps retries on the same branded login even when an old attempt cookie exists", async () => {
+  it("falls back to the visible login without looping when sign-in produced no session", async () => {
     const request = new Request(
-      "https://www.myfenrir.com/api/auth/community-sso?next=https%3A%2F%2Fcommunities.myfenrir.com%2Fgate%3Fonboarding%3D1&brand=clipsflow&gate=clipsflow-creators",
+      "https://www.myfenrir.com/api/auth/community-sso?next=https%3A%2F%2Fcommunities.myfenrir.com%2Fgate%3Fonboarding%3D1",
       { headers: { Cookie: "fenrir_community_sso_attempted=1" } },
     );
     const response = await onRequestGet({ request, env });
@@ -83,10 +85,8 @@ describe("community SSO", () => {
     expect(response.status).toBe(302);
     expect(location.origin).toBe("https://communities.myfenrir.com");
     expect(location.pathname).toBe("/login");
+    expect(location.searchParams.get("sso")).toBe("0");
     expect(location.searchParams.get("next")).toBe("/gate?onboarding=1");
-    expect(location.searchParams.get("brand")).toBe("clipsflow");
-    expect(location.searchParams.get("gate")).toBe("clipsflow-creators");
-    expect(response.headers.get("set-cookie")).toBeNull();
   });
 
   it("rejects an external post-login redirect", async () => {

@@ -1,0 +1,481 @@
+/* Telegram preview · visual-lab demonstration
+   ------------------------------------------------------------------------
+   Ported from the pre-removal `CommunityBotWalkthrough` phone mock
+   (fenrir-unified @ 7760635^, dropped by "replace mock Telegram phone with
+   live handoff"). It comes back ILLUSTRATIVE ONLY: this component receives
+   no real account state — no telegramLinked, no mappingVerified, no linked
+   identity label — so it can never be read as anyone's real progress.
+
+   COLOUR POLICY — deliberate, please do not "harmonise" this:
+   · The CHROME around the phone uses MyFenrir tokens from global.css
+     (--surface, --line, --text, --muted, --theme-primary, --teal, --amber,
+     --display, --mono and the --gate-* HSL set).
+   · The PHONE INTERIOR keeps Telegram's own hex values verbatim, because
+     the piece simulates Telegram. Repainting it with the MyFenrir palette
+     would destroy the very thing it demonstrates.
+*/
+
+.tpd {
+  position: relative;
+  z-index: 2;
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto 130px;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 56px;
+  align-items: center;
+  padding: 54px;
+  border: 1px solid var(--line);
+  border-radius: 32px;
+  background: linear-gradient(145deg, hsl(var(--gate-surface) / 0.82), hsl(var(--gate-bg) / 0.9));
+  box-shadow: 0 40px 100px -42px #000;
+}
+
+.tpd__copy { min-width: 0; }
+
+.tpd__label {
+  color: var(--theme-primary);
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.17em;
+}
+
+.tpd__copy h2 {
+  margin: 18px 0 14px;
+  font-family: var(--display);
+  font-size: clamp(32px, 4vw, 54px);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+  color: var(--text);
+  text-wrap: balance;
+}
+
+.tpd__copy > p {
+  margin: 0 0 14px;
+  max-width: 46ch;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+/* The demonstration flag. Text + icon, never colour alone. */
+.tpd__flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid hsl(var(--gate-accent) / 0.45);
+  border-radius: 999px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.tpd__flag::before {
+  content: "◑";
+  font-size: 11px;
+  line-height: 1;
+}
+
+.tpd__note {
+  margin: 18px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.tpd__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 44px;
+  margin-top: 22px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: var(--theme-primary);
+  color: #130708;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.tpd__cta:hover { opacity: 0.92; transform: translateY(-1px); }
+
+/* ── Stage: the flag sits directly above the frame, so the phone is never
+      seen without it, in a screenshot or otherwise. ─────────────────────── */
+
+.tpd__stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* ── Phone frame. Telegram hex from here down. ───────────────────────────── */
+
+.tpd__frame {
+  width: 100%;
+  max-width: 292px;
+  padding: 6px;
+  border: 7px solid #272b2a;
+  border-radius: 2.7rem;
+  background: #000;
+  box-shadow: 0 28px 80px -28px rgba(0, 0, 0, 0.95);
+}
+
+.tpd__screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 500px;
+  overflow: hidden;
+  border-radius: 2.1rem;
+  background: #0e171c;
+  font-family: "Outfit", system-ui, sans-serif;
+}
+
+.tpd__notch {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  z-index: 10;
+  width: 96px;
+  height: 24px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #000;
+}
+
+.tpd__statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px 8px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.tpd__chathead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: #17242b;
+}
+
+.tpd__back { color: #61a8de; font-size: 18px; line-height: 1; }
+
+.tpd__avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff334e, #611827);
+  font-size: 16px;
+}
+
+.tpd__who { min-width: 0; flex: 1; }
+.tpd__who b {
+  display: block;
+  overflow: hidden;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tpd__who span { display: block; color: #73b6e6; font-size: 9px; }
+.tpd__more { color: rgba(255, 255, 255, 0.55); font-size: 18px; line-height: 1; }
+
+/* ── Step tabs ───────────────────────────────────────────────────────────── */
+
+.tpd__tabs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: #101c22;
+}
+
+.tpd__tab {
+  position: relative;
+  overflow: hidden;
+  min-height: 44px;
+  padding: 8px 2px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.55);
+  font-family: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.3s ease, background 0.3s ease, color 0.3s ease;
+}
+
+.tpd__tab:hover { border-color: rgba(97, 168, 222, 0.4); color: rgba(255, 255, 255, 0.85); }
+
+.tpd__tab[aria-selected="true"] {
+  border-color: rgba(97, 168, 222, 0.7);
+  background: #246b94;
+  color: #fff;
+  box-shadow: 0 0 18px rgba(97, 168, 222, 0.32);
+}
+
+.tpd__tab:focus-visible { outline: 2px solid #9bc9e8; outline-offset: 2px; }
+
+.tpd__sweep {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  animation: tpd-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.tpd__tab-n {
+  position: relative;
+  display: block;
+  color: #9bc9e8;
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tpd__tab-label {
+  position: relative;
+  display: block;
+  margin-top: 2px;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tpd__tab-state {
+  position: relative;
+  display: block;
+  margin-top: 4px;
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fbbf5a;
+}
+
+.tpd__tab-state--seen { color: #6ee7b7; }
+.tpd__tab-state--current { color: #fff; animation: tpd-bounce 1s infinite; }
+
+/* ── Chat body ───────────────────────────────────────────────────────────── */
+
+.tpd__chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 12px 68px;
+}
+
+/* Replaces Telegram's "Today" separator: inside the frame, the piece still
+   says what it is. Contrast raised above the surrounding chrome on purpose. */
+.tpd__daymark {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.tpd__bubble {
+  position: relative;
+  max-width: 88%;
+  padding: 12px;
+  border-radius: 16px;
+  border-top-left-radius: 6px;
+  background: #18282f;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 11px;
+  line-height: 1.6;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.tpd__bubble--done {
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.15), #18282f);
+}
+
+.tpd__bubble p { margin: 0; }
+.tpd__bubble p + p { margin-top: 8px; }
+.tpd__bubble-title { color: #fff; font-weight: 600; }
+.tpd__bubble-sub { color: #9bc9e8; font-weight: 600; }
+.tpd__bubble-detail { color: rgba(255, 255, 255, 0.62); font-size: 10px; }
+
+/* The tap ripple. Decorative, aria-hidden in the markup. */
+.tpd__ripple {
+  position: absolute;
+  top: 12px;
+  left: 24px;
+  width: 64px;
+  height: 64px;
+  pointer-events: none;
+  border: 2px solid rgba(97, 168, 222, 0.7);
+  border-radius: 50%;
+  background: rgba(97, 168, 222, 0.2);
+  box-shadow: 0 0 38px rgba(97, 168, 222, 0.55);
+}
+
+.tpd__confirm {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(52, 211, 153, 0.2);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.tpd__confirm-tick {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(52, 211, 153, 0.15);
+  color: #6ee7b7;
+  font-size: 16px;
+}
+
+.tpd__confirm b { display: block; margin-top: 12px; color: #a7f3d0; font-weight: 600; }
+.tpd__confirm small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Inert stand-in for the launch link. Deliberately NOT an <a>: a demo must
+   not be able to start a real Telegram link flow. */
+.tpd__launch {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid rgba(97, 168, 222, 0.4);
+  border-radius: 12px;
+  background: rgba(36, 107, 148, 0.25);
+  color: #d7edff;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.tpd__advance {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: #246b94;
+  color: #fff;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.tpd__advance:hover { background: #2d7ca9; }
+.tpd__advance:focus-visible { outline: 2px solid #9bc9e8; outline-offset: 2px; }
+.tpd__advance--done { background: #047857; }
+.tpd__advance--done:hover { background: #059669; }
+
+.tpd__closed {
+  padding: 12px;
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  border-radius: 12px;
+  background: rgba(52, 211, 153, 0.1);
+  text-align: center;
+}
+.tpd__closed b { display: block; color: #a7f3d0; font-size: 10px; font-weight: 600; }
+.tpd__closed small { display: block; margin-top: 4px; color: rgba(255, 255, 255, 0.62); font-size: 9px; }
+
+.tpd__composer {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: #17242b;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 10px;
+}
+
+.tpd__composer span { margin-left: auto; color: #61a8de; }
+
+.tpd__caption {
+  max-width: 292px;
+  margin: 0;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  line-height: 1.6;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* ── Keyframes (replacing Tailwind's animate-pulse / animate-bounce) ─────── */
+
+@keyframes tpd-pulse { 50% { opacity: 0.5; } }
+
+@keyframes tpd-bounce {
+  0%, 100% { transform: translateY(-2px); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
+  50% { transform: none; animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .tpd {
+    grid-template-columns: 1fr;
+    gap: 34px;
+    margin-bottom: 90px;
+    padding: 34px 20px;
+    border-radius: 24px;
+  }
+  .tpd__copy h2 { font-size: 34px; }
+  .tpd__copy > p { max-width: none; }
+}
+
+@media (max-width: 380px) {
+  .tpd { padding: 26px 12px; }
+  .tpd__frame { border-width: 5px; }
+  .tpd__chat { padding-left: 8px; padding-right: 8px; }
+}
+
+/* ── Reduced motion: nothing moves, nothing is lost. The JS side also stops
+      auto-advancing and drops the spring transitions. ────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .tpd__sweep,
+  .tpd__tab-state--current,
+  .tpd__ripple { animation: none !important; }
+  .tpd__ripple { display: none; }
+  .tpd *,
+  .tpd__cta { transition: none !important; }
+}

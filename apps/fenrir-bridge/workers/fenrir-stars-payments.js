@@ -1,3 +1,7 @@
+// Neon: única fuente de "comunidad enlazada". Ver el bloque EJE DE COBRO más
+// abajo. Mismo driver y mismo secreto que workers/fenrir-allowlist-check.ts.
+import { neon } from "@neondatabase/serverless";
+
 const json = (body, init = {}) =>
   new Response(JSON.stringify(body), {
     ...init,
@@ -10,6 +14,26 @@ const starsPrice = (env) => {
   const parsed = Number.parseInt(env.FENRIR_STARS_PRICE || "1150", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1150;
 };
+
+/**
+ * The least anyone has ever legitimately paid for The Pack in Stars.
+ *
+ * 250, not 1150. The Stars rail really did charge ⭐250 in July 2026
+ * (FENRIR_STARS_PRICE = "250", see wrangler.fenrir-stars.toml at b08955d), and
+ * three members paid it. Setting this floor to today's list price would revoke
+ * people who paid exactly what was asked of them — a price rise must never
+ * reach backwards.
+ *
+ * This is NOT the price gate. New payments are held to the current catalogue
+ * price by isValidStarsPayment, which is what makes the 89 stale ⭐250 orders
+ * sitting in telegram_stars_orders unpayable. This constant only decides whether
+ * an entitlement row that ALREADY exists is credible enough to grant access, and
+ * ⭐5 — a hand-made TEST5STARSONLY0001 payload — is not, because it was never a
+ * price anyone was charged.
+ *
+ * Raise it only after confirming no live member paid less.
+ */
+const STARS_MIN_GRANT_AMOUNT = 250;
 
 const botUsername = (env) => (env.FENRIR_TELEGRAM_BOT_USERNAME || "").replace(/^@/, "").trim();
 
@@ -28,45 +52,94 @@ export function isValidFoundersStripeSession(session, userId, orgId) {
   const billingPeriod = session?.metadata?.billing_period;
   // Canon: $14.99/month = 1499 (confirmado por Francisco). No es 1500.
   const expectedAmount = billingPeriod === "annual" ? 14990 : 1499;
+
+  // Check the PRE-DISCOUNT total. `amount_total` is what was actually charged,
+  // so any promotion code makes it smaller than list price — and a 100%-off
+  // coupon makes it 0. Checkout has had `allow_promotion_codes: "true"` all
+  // along, so comparing amount_total meant a redeemed code produced a paid
+  // subscription that this validator rejected: money taken, access denied.
+  // `amount_subtotal` is the list price before discounts, which is what this
+  // guard was ever trying to assert — that the session bought The Pack at the
+  // canonical price, not some other price object on the same account.
+  const subtotal = Number(session?.amount_subtotal ?? session?.amount_total);
+
+  // A fully discounted subscription is never "paid": Stripe reports
+  // `no_payment_required` because there was nothing to charge.
+  const settled = session?.payment_status === "paid" || session?.payment_status === "no_payment_required";
+
   return Boolean(
-    session?.payment_status === "paid" &&
+    settled &&
       session?.mode === "subscription" &&
       session?.client_reference_id === orgId &&
       session?.metadata?.frisky_org_id === orgId &&
       session?.metadata?.frisky_user_id === userId &&
       session?.metadata?.plan === "standard" &&
       session?.currency === "usd" &&
-      session?.amount_total === expectedAmount &&
+      subtotal === expectedAmount &&
       session?.metadata?.offer === "founder_forever" &&
       (billingPeriod === "monthly" || billingPeriod === "annual") &&
       normalizeText(session?.subscription)
   );
 }
 
-export function isValidStarsPayment(payment, order, telegramUserId) {
+/**
+ * `expectedAmount` is the CATALOG price, and it is not optional in practice.
+ *
+ * This used to compare the payment only against `order.amount`, which is
+ * self-referential: it proves the buyer paid what the order asked for, never
+ * that the order asked for the right thing. Any order row carrying a low amount
+ * — a hand-made test row, or a stale row minted under an older price — stayed
+ * payable and bought the full Pack. A 5-Star order (about ten cents) unlocked
+ * the same access as 1,150.
+ *
+ * Both checks are kept: the payment must match its own order AND that order
+ * must carry the current list price. The crypto IPN has always validated
+ * against its ladder this way; this rail simply never did.
+ */
+export function isValidStarsPayment(payment, order, telegramUserId, expectedAmount) {
+  const expected = Number(expectedAmount);
+  if (!Number.isFinite(expected) || expected <= 0) return false;
   return Boolean(
     payment?.invoice_payload?.startsWith("fenrir_stars:") &&
       order &&
       order.status === "pending" &&
       String(order.telegram_user_id) === String(telegramUserId) &&
       payment.currency === "XTR" &&
-      payment.total_amount === Number(order.amount)
+      payment.total_amount === Number(order.amount) &&
+      Number(order.amount) === expected
   );
 }
 
-async function stripeRequest(env, path, params) {
+/**
+ * `apiVersion` pins Stripe-Version for a single call.
+ *
+ * Without it every request inherits whatever version the ACCOUNT defaults to,
+ * which Stripe moves on its own schedule. That is how `POST /v1/promotion_codes`
+ * started rejecting `coupon` as an unknown parameter: the account had rolled
+ * forward to a version where the shape changed. Pinning the version for the
+ * calls whose request shape we hardcode makes them stop drifting.
+ */
+async function stripeRequest(env, path, params, apiVersion) {
   const key = normalizeText(env.STRIPE_SECRET_KEY);
   if (!key) throw new Error("stripe_not_configured");
   const response = await fetch(`https://api.stripe.com/v1${path}`, {
     method: params ? "POST" : "GET",
     headers: {
       Authorization: `Bearer ${key}`,
+      ...(apiVersion ? { "Stripe-Version": apiVersion } : {}),
       ...(params ? { "content-type": "application/x-www-form-urlencoded" } : {})
     },
     body: params ? new URLSearchParams(params) : undefined
   });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(`stripe_${response.status}:${body?.error?.code || "request_failed"}`);
+  // Include Stripe's own `param` and `message`: a bare error code turns a
+  // one-line fix ("that parameter moved") into a guessing game.
+  if (!response.ok) {
+    const detail = [body?.error?.code || "request_failed", body?.error?.param, body?.error?.message]
+      .filter(Boolean)
+      .join(" | ");
+    throw new Error(`stripe_${response.status}:${detail}`);
+  }
   return body;
 }
 
@@ -111,6 +184,213 @@ export function foundersPriceId(env, billingPeriod) {
   return billingPeriod === "annual"
     ? normalizeText(env?.STRIPE_PACK_ANNUAL_PRICE_ID) || LIVE_FOUNDERS_ANNUAL_PRICE
     : normalizeText(env?.STRIPE_PACK_MONTHLY_PRICE_ID) || LIVE_FOUNDERS_MONTHLY_PRICE;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * EJE DE COBRO — la cantidad de Stripe sigue a las comunidades ENLAZADAS.
+ *
+ * La oferta publicada (pack-rails.tsx, plan-catalog.ts, i18n.ts en cuatro
+ * idiomas y FENRIR_STARS_DESCRIPTION) dice "$14.99/mes POR COMUNIDAD
+ * ENLAZADA". El código no la cumplía: los dos rieles fijaban la cantidad a
+ * mano en 1 y nada volvía a tocarla nunca. Con cero comunidades enlazadas
+ * cobraba $14.99; con tres, también $14.99. Plano vendido como métrico.
+ *
+ * "Enlazada" es una fila VERIFICADA en cb_community_destinations (Neon). No es
+ * "tiene un Gate": un Gate sin destino no protege ningún grupo, y cobrar por él
+ * es cobrar por algo que no ocurrió.
+ *
+ * Dos límites de Stripe, COMPROBADOS contra la API en vivo — no supuestos:
+ *
+ *  1) Un subscription item SÍ acepta quantity 0 sobre un precio `licensed`.
+ *     Previsualización de factura: HTTP 200, subtotal 0, línea
+ *     "0 × MyFenrir Pack — Founder Go-Live (at $14.99 / month) | amount: 0".
+ *     → Cero enlazadas PUEDE facturar cero. Ése es el objetivo del cambio.
+ *
+ *  2) Checkout en modo `subscription` NO acepta quantity 0:
+ *       HTTP 400 · invalid_request_error · parameter_invalid_integer
+ *       param=line_items[0][quantity]
+ *       "This value must be greater than or equal to 1."
+ *     → El alta nace forzosamente en ≥1 y se reconcilia a la baja justo
+ *       después. Por eso hay DOS funciones de cantidad y no una sola.
+ * ─────────────────────────────────────────────────────────────────────── */
+
+/** Piso que impone Stripe a `line_items[n][quantity]` en Checkout. */
+export const STRIPE_CHECKOUT_MIN_QUANTITY = 1;
+
+/**
+ * Cantidad REAL a facturar. Puede ser 0 — y con cero enlazadas debe serlo.
+ * Todo lo que no sea un entero positivo cuenta como 0: ante la duda, no cobrar.
+ */
+export function billedSeatQuantity(linkedCommunities) {
+  const n = Number(linkedCommunities);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.floor(n);
+}
+
+/**
+ * Cantidad con la que puede NACER una sesión de Checkout. Idéntica a la real
+ * salvo que Stripe prohíbe 0 en el alta (ver punto 2 arriba). El alta en 1 no
+ * es una promesa de cobro: `syncCommunitySeatQuantity` la baja a 0 en cuanto
+ * la suscripción existe si no hay ninguna comunidad enlazada.
+ */
+export function checkoutSeatQuantity(linkedCommunities) {
+  return Math.max(STRIPE_CHECKOUT_MIN_QUANTITY, billedSeatQuantity(linkedCommunities));
+}
+
+/**
+ * Prorrateo: asimétrico A PROPÓSITO.
+ *
+ *  - BAJA (desenlazar) → `create_prorations`: deja de cobrarse en el acto y
+ *    acredita la parte no usada. Nunca se sigue cobrando por un grupo que ya
+ *    no está enlazado.
+ *  - ALTA (enlazar) → `none`: la comunidad nueva empieza a facturar en la
+ *    renovación siguiente. Enlazar no debe disparar un cargo a mitad de ciclo
+ *    que el usuario no pulsó.
+ *
+ * Los dos errores posibles apuntan hacia el mismo lado: no cobrar de más.
+ * `null` significa que no hay nada que cambiar — la llamada a Stripe se omite.
+ */
+export function seatProrationBehavior(currentQuantity, nextQuantity) {
+  const from = billedSeatQuantity(currentQuantity);
+  const to = billedSeatQuantity(nextQuantity);
+  if (from === to) return null;
+  return to < from ? "create_prorations" : "none";
+}
+
+/**
+ * Sólo las filas de `billing_subscriptions` que son objetos Stripe de verdad.
+ * `stars:…`, `courtesy:…` y `referral:…` son ids sintéticos de otros rieles:
+ * pedirle a Stripe la cantidad de uno de ésos es un 404 garantizado.
+ */
+export function isStripeSubscriptionId(id) {
+  return /^sub_[A-Za-z0-9]+$/.test(normalizeText(id));
+}
+
+/**
+ * El interruptor existe porque encender esto REESCRIBE suscripciones vivas con
+ * tarjeta en archivo. Se despliega apagado; se enciende a sabiendas.
+ */
+function seatBillingEnabled(env) {
+  return normalizeText(env?.COMMUNITY_SEAT_BILLING_ENABLED) === "true";
+}
+
+/** Comunidades enlazadas verificadas de este dueño, leídas de Neon. */
+async function countLinkedCommunities(env, supabaseUserId) {
+  const url = normalizeText(env?.NEON_DATABASE_URL);
+  if (!url) throw new Error("neon_not_configured");
+  const sql = neon(url);
+  const rows = await sql`
+    select count(distinct community_id)::int as linked
+    from cb_community_destinations
+    where user_id = ${supabaseUserId}::uuid
+      and provider = 'telegram'
+      and status = 'verified'
+  `;
+  return billedSeatQuantity(rows?.[0]?.linked);
+}
+
+/** Dueño (UUID de Supabase) de una comunidad ya enlazada, según Neon. */
+async function ownerOfCommunity(env, communityId) {
+  const id = normalizeText(communityId);
+  if (!id) return "";
+  const url = normalizeText(env?.NEON_DATABASE_URL);
+  if (!url) throw new Error("neon_not_configured");
+  const sql = neon(url);
+  const rows = await sql`
+    select user_id
+    from cb_community_destinations
+    where community_id = ${id}
+      and provider = 'telegram'
+      and status = 'verified'
+    order by updated_at desc
+    limit 1
+  `;
+  return normalizeText(rows?.[0]?.user_id);
+}
+
+/**
+ * Cantidad de alta para Checkout, tolerante a fallos. Un Neon caído no puede
+ * impedir una compra: si no se puede contar, se cae al piso de Stripe (1) y la
+ * reconciliación posterior corrige. Nunca inventa una cantidad hacia arriba.
+ */
+async function checkoutSeatQuantityFor(env, supabaseUserId) {
+  try {
+    return checkoutSeatQuantity(await countLinkedCommunities(env, supabaseUserId));
+  } catch (error) {
+    console.error("checkout_seat_count_failed", error instanceof Error ? error.message : "unknown");
+    return STRIPE_CHECKOUT_MIN_QUANTITY;
+  }
+}
+
+/**
+ * Ids de org bajo los que este humano puede estar facturado. Mismo criterio que
+ * handleCommunityBillingStatus: el UUID de Supabase NO basta, porque las cuentas
+ * nacidas por el riel de identidad Fenrir viven bajo un `frisky_org_…` acuñado
+ * en telegram_identity_links.
+ */
+async function billableOrgIds(env, supabaseUserId, telegramUserId) {
+  const ids = new Set();
+  const uuid = normalizeText(supabaseUserId);
+  if (/^[0-9a-f-]{36}$/i.test(uuid)) ids.add(uuid);
+  const tg = normalizeText(telegramUserId);
+  if (/^\d{5,20}$/.test(tg)) {
+    const link = await env.DB.prepare(
+      `SELECT frisky_org_id FROM telegram_identity_links WHERE telegram_user_id = ? LIMIT 1`
+    ).bind(tg).first().catch(() => null);
+    const orgId = normalizeText(link?.frisky_org_id);
+    if (orgId) ids.add(orgId);
+  }
+  return [...ids];
+}
+
+/**
+ * Pone la cantidad de la suscripción a la altura de las comunidades enlazadas
+ * de verdad. IDEMPOTENTE: cuenta `distinct community_id`, así que enlazar dos
+ * veces el mismo grupo no mueve nada, y si la cantidad ya coincide no se llama
+ * a Stripe.
+ *
+ * Nunca lanza hacia arriba: enlazar un grupo no puede fallar porque Stripe esté
+ * caído. El fallo se registra y se devuelve, no se traga en silencio.
+ */
+export async function syncCommunitySeatQuantity(env, { supabaseUserId, telegramUserId, communityId } = {}) {
+  if (!seatBillingEnabled(env)) return { ok: true, changed: false, reason: "seat_billing_disabled" };
+  try {
+    // El dueño se resuelve contra Neon, no se deduce del id de Telegram: el
+    // mapa telegram→UUID vive en Supabase y aquí no se adivina. La fila que
+    // acabamos de escribir ya dice de quién es la comunidad.
+    const ownerId = normalizeText(supabaseUserId) || (await ownerOfCommunity(env, communityId));
+    const orgIds = await billableOrgIds(env, ownerId, telegramUserId);
+    if (orgIds.length === 0) return { ok: false, changed: false, reason: "no_billable_identity" };
+
+    const placeholders = orgIds.map(() => "?").join(",");
+    const rows = await env.DB.prepare(
+      `SELECT stripe_subscription_id FROM billing_subscriptions
+       WHERE frisky_org_id IN (${placeholders}) AND status = 'active'`
+    ).bind(...orgIds).all();
+    const subscriptionId = (rows?.results || [])
+      .map((row) => normalizeText(row?.stripe_subscription_id))
+      .find(isStripeSubscriptionId);
+    if (!subscriptionId) return { ok: true, changed: false, reason: "no_stripe_subscription" };
+
+    const target = await countLinkedCommunities(env, ownerId);
+    const subscription = await stripeRequest(env, `/subscriptions/${encodeURIComponent(subscriptionId)}`);
+    const item = subscription?.items?.data?.[0];
+    if (!item?.id) return { ok: false, changed: false, reason: "no_subscription_item" };
+
+    const current = billedSeatQuantity(item.quantity);
+    const behavior = seatProrationBehavior(current, target);
+    if (behavior === null) {
+      return { ok: true, changed: false, quantity: current, reason: "already_in_sync" };
+    }
+    await stripeRequest(env, `/subscription_items/${encodeURIComponent(item.id)}`, {
+      quantity: String(target),
+      proration_behavior: behavior
+    });
+    return { ok: true, changed: true, from: current, quantity: target, prorationBehavior: behavior };
+  } catch (error) {
+    console.error("community_seat_sync_failed", error instanceof Error ? error.message : "unknown");
+    return { ok: false, changed: false, reason: "sync_failed" };
+  }
 }
 
 /** "live" | "test" | "absent" | "unknown" — the mode only, never the key. */
@@ -159,6 +439,113 @@ async function verifyStripeSignature(env, payload, sigHeader) {
   return diff === 0;
 }
 
+/**
+ * The period end AS STRIPE REPORTS IT — never a date we invent.
+ *
+ * Stripe moved this field: it used to sit on the subscription, and on newer API
+ * versions it lives on each subscription item. Read both, because which one a
+ * webhook carries depends on the API version pinned to the account/endpoint,
+ * and guessing wrong silently yields no date — which is the perpetual-licence
+ * bug all over again.
+ */
+function stripeSubscriptionPeriodEnd(subscription) {
+  const candidates = [
+    subscription?.current_period_end,
+    ...(Array.isArray(subscription?.items?.data)
+      ? subscription.items.data.map((item) => item?.current_period_end)
+      : [])
+  ];
+  // Latest end across items: an item ending later still entitles the customer.
+  const seconds = candidates
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => b - a)[0];
+  if (seconds) return new Date(seconds * 1000).toISOString();
+
+  // Stripe always sends a period end for a live subscription, so reaching here
+  // means the payload shape changed again. Do NOT fall through to NULL: an
+  // access check reads NULL as active forever. Grant one billing interval and
+  // shout — the next invoice.payment_succeeded corrects it from Stripe's data.
+  const interval = normalizeText(subscription?.items?.data?.[0]?.plan?.interval) || "month";
+  const days = interval === "year" ? 366 : interval === "week" ? 8 : 31;
+  console.error("stripe_subscription_missing_period_end", normalizeText(subscription?.id), interval);
+  return new Date(Date.now() + days * 86400000).toISOString();
+}
+
+/**
+ * Write what Stripe says about a subscription.
+ *
+ * `current_period_end` is ALWAYS bound to a real date. The previous card rail
+ * inserted the literal NULL here, and because the entitlement check treats
+ * `current_period_end IS NULL` as active, every card subscriber held a
+ * perpetual licence that survived cancellation.
+ *
+ * Existing rows are updated by subscription id even without metadata — a
+ * renewal or cancellation must land on the row it belongs to. A row is only
+ * CREATED when the subscription carries the Pack metadata, so an unrelated
+ * subscription on the same Stripe account can never mint access here.
+ */
+async function upsertStripeSubscriptionRow(env, subscription, fallbackOrgId = "") {
+  const subscriptionId = normalizeText(subscription?.id);
+  if (!subscriptionId) return false;
+
+  const status = normalizeText(subscription?.status) || "active";
+  const periodEnd = stripeSubscriptionPeriodEnd(subscription);
+  const cancelAtPeriodEnd = subscription?.cancel_at_period_end ? 1 : 0;
+  const customerId =
+    normalizeText(typeof subscription?.customer === "string" ? subscription.customer : subscription?.customer?.id) ||
+    `stripe_${subscriptionId}`;
+  const ts = nowIso();
+
+  const existing = await env.DB
+    .prepare(`SELECT frisky_org_id FROM billing_subscriptions WHERE stripe_subscription_id = ? LIMIT 1`)
+    .bind(subscriptionId)
+    .first();
+
+  const orgId =
+    normalizeText(existing?.frisky_org_id) ||
+    normalizeText(subscription?.metadata?.frisky_org_id) ||
+    normalizeText(fallbackOrgId);
+
+  // No row yet and no Pack metadata to prove whose this is: ignore it rather
+  // than invent an owner.
+  if (!existing && (!orgId || normalizeText(subscription?.metadata?.plan) !== "standard")) return false;
+  if (!orgId) return false;
+
+  await env.DB.prepare(
+    `INSERT INTO billing_subscriptions (
+       stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
+       current_period_end, cancel_at_period_end, created_at, updated_at
+     ) VALUES (?, ?, ?, 'standard', ?, ?, ?, ?, ?)
+     ON CONFLICT(stripe_subscription_id) DO UPDATE SET
+       plan = 'standard',
+       status = excluded.status,
+       current_period_end = excluded.current_period_end,
+       cancel_at_period_end = excluded.cancel_at_period_end,
+       stripe_customer_id = excluded.stripe_customer_id,
+       updated_at = excluded.updated_at`
+  ).bind(subscriptionId, orgId, customerId, status, periodEnd, cancelAtPeriodEnd, ts, ts).run();
+  return true;
+}
+
+/** Fetch the subscription from Stripe so the period end is Stripe's, not ours. */
+async function fetchStripeSubscription(env, subscriptionId) {
+  const id = normalizeText(subscriptionId);
+  if (!id.startsWith("sub_")) return null;
+  try {
+    return await stripeRequest(env, `/subscriptions/${encodeURIComponent(id)}`);
+  } catch (error) {
+    console.error("stripe_subscription_fetch_failed", id, String(error));
+    return null;
+  }
+}
+
+/** The subscription id on an invoice, across old and new Stripe API shapes. */
+function invoiceSubscriptionId(invoice) {
+  const direct = typeof invoice?.subscription === "string" ? invoice.subscription : invoice?.subscription?.id;
+  return normalizeText(direct || invoice?.parent?.subscription_details?.subscription || "");
+}
+
 // Durable completion path (preferred). checkout.session.completed →
 // validate the session server-side → upsert billing_subscriptions active.
 // Idempotent via stripe_events + ON CONFLICT on the subscription id, so it is
@@ -183,29 +570,55 @@ async function handleStripeWebhook(request, env) {
     const userId = normalizeText(session?.metadata?.frisky_user_id);
     const orgId = normalizeText(session?.metadata?.frisky_org_id);
     if (isValidFoundersStripeSession(session, userId, orgId)) {
-      const ts = nowIso();
-      await env.DB.prepare(
-        `INSERT INTO billing_subscriptions (
-           stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
-           current_period_end, cancel_at_period_end, created_at, updated_at
-         ) VALUES (?, ?, ?, 'standard', 'active', NULL, 0, ?, ?)
-         ON CONFLICT(stripe_subscription_id) DO UPDATE SET
-           frisky_org_id = excluded.frisky_org_id,
-           plan = 'standard',
-           status = 'active',
-           updated_at = excluded.updated_at`
-      ).bind(
-        normalizeText(session.subscription),
-        orgId,
-        normalizeText(session.customer) || `checkout_${session.id}`,
-        ts,
-        ts
-      ).run();
+      // Read the subscription back from Stripe: the checkout session does not
+      // carry the billing period, and this row's expiry must be Stripe's own
+      // date. This insert used to bind the literal NULL, which the entitlement
+      // check reads as active forever.
+      const subscription = await fetchStripeSubscription(env, session.subscription);
+      if (subscription) {
+        await upsertStripeSubscriptionRow(env, subscription, orgId);
+      } else {
+        console.error("stripe_checkout_subscription_unreadable", normalizeText(session.id));
+      }
       // Referral attribution (Stripe/web rail): reward the referrer if this paid
       // checkout carried a ref_code. Idempotent + self-referral blocked.
       await recordStripeReferral(env, normalizeText(session?.metadata?.ref_code), orgId);
     }
   }
+
+  // Renewal clock. Without these the row froze at whatever the first checkout
+  // wrote: a renewed subscription expired anyway, and a cancelled one kept its
+  // access. Every one of them takes the date from Stripe's subscription object.
+  if (
+    event?.type === "customer.subscription.created" ||
+    event?.type === "customer.subscription.updated" ||
+    event?.type === "customer.subscription.deleted"
+  ) {
+    const subscription = event.data?.object;
+    if (event.type === "customer.subscription.deleted") {
+      // Do not delete the row — end it. `canceled` fails the entitlement check
+      // on its own, and the row stays as the record of what was sold.
+      await env.DB.prepare(
+        `UPDATE billing_subscriptions
+            SET status = 'canceled', updated_at = ?
+          WHERE stripe_subscription_id = ?`
+      ).bind(nowIso(), normalizeText(subscription?.id)).run();
+    } else {
+      await upsertStripeSubscriptionRow(env, subscription);
+    }
+  }
+
+  // The renewal that actually matters: money arrived, so the period moved.
+  // Re-read the subscription rather than trusting the invoice's own period,
+  // which describes the invoice line, not the subscription clock.
+  if (event?.type === "invoice.payment_succeeded" || event?.type === "invoice.paid") {
+    const subscriptionId = invoiceSubscriptionId(event.data?.object);
+    if (subscriptionId) {
+      const subscription = await fetchStripeSubscription(env, subscriptionId);
+      if (subscription) await upsertStripeSubscriptionRow(env, subscription);
+    }
+  }
+
   return json({ ok: true });
 }
 
@@ -322,7 +735,10 @@ async function handleFoundersCheckout(request, env) {
     // The dashboard-made quality Payment Links have this off, so a founder
     // could not redeem a code at all. API sessions accept them.
     allow_promotion_codes: "true",
-    "line_items[0][quantity]": "1",
+    // Nunca vuelvas a clavar "1" aquí. La cantidad es el eje de cobro: son las
+    // comunidades enlazadas. Stripe prohíbe 0 en el alta (ver EJE DE COBRO), así
+    // que el alta nace en ≥1 y syncCommunitySeatQuantity la reconcilia después.
+    "line_items[0][quantity]": String(await checkoutSeatQuantityFor(env, userId)),
     "line_items[0][price]": priceId,
     "metadata[frisky_user_id]": userId,
     "metadata[frisky_org_id]": orgId,
@@ -357,19 +773,19 @@ async function handleFoundersConfirm(request, env) {
   const session = await stripeRequest(env, `/checkout/sessions/${encodeURIComponent(sessionId)}`);
   const valid = isValidFoundersStripeSession(session, userId, orgId);
   if (!valid) return json({ ok: false, error: "payment_not_confirmed" }, { status: 409 });
-  const ts = nowIso();
-  await env.DB.prepare(
-    `INSERT INTO billing_subscriptions (
-      stripe_subscription_id, frisky_org_id, stripe_customer_id, plan, status,
-      current_period_end, cancel_at_period_end, created_at, updated_at
-    ) VALUES (?, ?, ?, 'standard', 'active', NULL, 0, ?, ?)
-    ON CONFLICT(stripe_subscription_id) DO UPDATE SET
-      frisky_org_id = excluded.frisky_org_id,
-      plan = 'standard',
-      status = 'active',
-      updated_at = excluded.updated_at`
-  ).bind(normalizeText(session.subscription), orgId, normalizeText(session.customer) || `checkout_${session.id}`, ts, ts).run();
-  return json({ ok: true, plan: "standard", status: "active" });
+  // Confirm-on-return backup for the webhook. Same rule: the expiry is Stripe's
+  // date, read off the subscription. This used to bind NULL, which the
+  // entitlement check reads as access that never ends.
+  const subscription = await fetchStripeSubscription(env, session.subscription);
+  if (!subscription) return json({ ok: false, error: "subscription_unreadable" }, { status: 502 });
+  const written = await upsertStripeSubscriptionRow(env, subscription, orgId);
+  if (!written) return json({ ok: false, error: "subscription_not_recorded" }, { status: 502 });
+  return json({
+    ok: true,
+    plan: "standard",
+    status: normalizeText(subscription.status) || "active",
+    currentPeriodEnd: stripeSubscriptionPeriodEnd(subscription)
+  });
 }
 
 async function handleCommunityBillingStatus(request, env) {
@@ -379,8 +795,31 @@ async function handleCommunityBillingStatus(request, env) {
   const telegramUserId = normalizeText(body?.telegramUserId);
   if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ ok: false, error: "invalid_identity" }, { status: 400 });
 
+  // Org ids this caller may legitimately be billed under.
+  //
+  // `userId` alone is NOT enough. community-bridge sends the Supabase auth UUID
+  // and (see founders-billing.functions.ts) assumes orgId === userId. For any
+  // account created through the Fenrir identity rail that assumption is false:
+  // telegram_identity_links stores minted ids like
+  // `frisky_org_FRISKYUSRSUPABASE9_…`, and billing_subscriptions is keyed by
+  // THAT, not by the UUID.
+  //
+  // Result before this fix: two surfaces disagreed about the same entitlement.
+  // The bot read telegram_stars_entitlements by Telegram id and said
+  // "The Pack · active"; this endpoint looked for frisky_org_id = <UUID>, found
+  // nothing, returned paid:false → the web app demanded an upgrade the operator
+  // had already paid for. The `plan` column was never the problem: 'standard' IS
+  // The Pack (see functions/_lib/plan-catalog.ts) and no query filters on it.
+  //
+  // telegram_identity_links is the canonical map from Telegram identity to
+  // Fenrir org id — memberProfileText already resolves it this way. Trusting it
+  // here does not widen access: the caller already proved it owns this Telegram
+  // id server-side before calling, and this endpoint is behind the billing
+  // secret. We only ADD the linked org id; the UUID lookup still works for
+  // accounts where org id and UUID genuinely coincide.
+  let identityLink = null;
   if (/^\d{5,20}$/.test(telegramUserId)) {
-    const [entitlement, identityLink] = await Promise.all([
+    const [entitlement, link] = await Promise.all([
       getEntitlement(env, telegramUserId),
       env.DB.prepare(
         `SELECT frisky_user_id, frisky_org_id
@@ -389,9 +828,15 @@ async function handleCommunityBillingStatus(request, env) {
          LIMIT 1`
       ).bind(telegramUserId).first()
     ]);
+    identityLink = link;
     const identityMatches =
       identityLink?.frisky_user_id === userId && identityLink?.frisky_org_id === userId;
-    if (entitlement?.status === "active" && identityMatches) {
+    // Same amount floor as applyStarsMembership. This is a third, independent
+    // path that mints a billing_subscriptions row from an entitlement, and it
+    // trusted `status` alone — so an underpaid entitlement row could be laundered
+    // into a paid subscription right here, bypassing the grant-time check.
+    const entitlementPaidEnough = Number(entitlement?.stars_amount) >= STARS_MIN_GRANT_AMOUNT;
+    if (entitlement?.status === "active" && identityMatches && entitlementPaidEnough) {
       const ts = nowIso();
       await env.DB.batch([
         env.DB.prepare(
@@ -410,12 +855,27 @@ async function handleCommunityBillingStatus(request, env) {
     }
   }
 
+  const orgIds = [userId];
+  const linkedOrgId = normalizeText(identityLink?.frisky_org_id);
+  if (linkedOrgId && !orgIds.includes(linkedOrgId)) orgIds.push(linkedOrgId);
+
+  // `current_period_end` is compared as TEXT, so both sides must be the same
+  // shape. Rows written by this Worker are ISO-8601 with a 'T' and a 'Z'; a row
+  // hand-patched in the console can end up as '2026-09-23 02:35:22' (SQLite
+  // datetime() style). A space sorts BEFORE 'T', so a same-day expiry in the
+  // patched shape compares as already expired. Comparing against the space
+  // variant too keeps a hand-patched row honest instead of silently dropping a
+  // day of paid access. Neither form is NULL, which is the rule that matters:
+  // an access check treats current_period_end IS NULL as active forever.
+  const now = nowIso();
+  const nowSqlite = now.replace("T", " ").slice(0, 19);
+  const placeholders = orgIds.map(() => "?").join(",");
   const subscription = await env.DB.prepare(
     `SELECT plan, status FROM billing_subscriptions
-     WHERE frisky_org_id = ? AND status IN ('active','trialing','past_due')
-       AND (current_period_end IS NULL OR current_period_end > ?)
+     WHERE frisky_org_id IN (${placeholders}) AND status IN ('active','trialing','past_due')
+       AND (current_period_end IS NULL OR current_period_end > ? OR current_period_end > ?)
      ORDER BY updated_at DESC LIMIT 1`
-  ).bind(userId, nowIso()).first();
+  ).bind(...orgIds, now, nowSqlite).first();
   return json({
     ok: true,
     paid: Boolean(subscription),
@@ -496,7 +956,14 @@ async function telegramApi(env, channel, method, body) {
     body: JSON.stringify(body)
   });
   const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.ok) throw new Error(`telegram_api_failed:${method}`);
+  // Carry Telegram's own error_code and description. A bare
+  // `telegram_api_failed:sendInvoice` in the logs says something broke but not
+  // what, and the Telegram webhook swallows throws to avoid retry spam — so
+  // this string is often the only trace a failure leaves.
+  if (!response.ok || !data?.ok) {
+    const detail = [data?.error_code, data?.description].filter(Boolean).join(" ");
+    throw new Error(`telegram_api_failed:${method}${detail ? `:${detail}` : ""}`);
+  }
   return data;
 }
 
@@ -522,6 +989,84 @@ async function getEntitlement(env, telegramUserId) {
     .first();
 }
 
+/**
+ * One answer to "may this person use the product", for the whole bot.
+ *
+ * getEntitlement alone was never that answer. It reads ONE table —
+ * telegram_stars_entitlements — so the bot could only see access bought with
+ * Stars. Courtesy grants, crypto and card subscriptions all live in
+ * billing_subscriptions under a minted `frisky_org_*` id, and the bot never
+ * looked there. Anyone holding those was treated as a prospect and shown the
+ * upgrade pitch: the same two-identifier-spaces split that made the web app
+ * demand an upgrade from a paying member.
+ *
+ * The owner check comes FIRST and touches no payment row at all. An owner is an
+ * owner whether or not they ever paid, so this must not be reachable through a
+ * billing table — otherwise voiding a stale test payment turns the owner into a
+ * prospect, which is exactly what would have happened here.
+ *
+ * The shape stays entitlement-like (`status`, `stars_amount`) so every existing
+ * `entitlement?.status === "active"` caller keeps working unchanged.
+ */
+async function resolveBotAccess(env, telegramUserId) {
+  const id = String(telegramUserId || "");
+
+  if (isOwner(env, id)) {
+    return { status: "active", access_source: "owner", stars_amount: null, until: null };
+  }
+
+  const [entitlement, link] = await Promise.all([
+    getEntitlement(env, id),
+    env.DB.prepare(
+      `SELECT frisky_org_id FROM telegram_identity_links WHERE telegram_user_id = ? LIMIT 1`
+    ).bind(id).first()
+  ]);
+
+  // Stars: active AND actually paid enough. ⭐5 was 'active' and bought nothing.
+  const paid = Number(entitlement?.stars_amount);
+  if (entitlement?.status === "active" && paid >= STARS_MIN_GRANT_AMOUNT) {
+    return { ...entitlement, status: "active", access_source: "stars", stars_amount: paid, until: null };
+  }
+
+  // Every other rail — courtesy, crypto, card — via the identity link.
+  const orgId = normalizeText(link?.frisky_org_id);
+  if (orgId) {
+    const sub = await env.DB.prepare(
+      `SELECT stripe_subscription_id, plan, status, current_period_end
+         FROM billing_subscriptions
+        WHERE frisky_org_id = ? AND status IN ('active','trialing','past_due')
+        ORDER BY updated_at DESC LIMIT 1`
+    ).bind(orgId).first();
+
+    if (sub) {
+      // A row with no end date is NOT access. That is the perpetual-licence bug
+      // this codebase has already shipped twice; the bot will not be the third
+      // place that reads NULL as "forever".
+      if (!sub.current_period_end) {
+        console.error("bot_access_row_without_period_end", id, String(sub.stripe_subscription_id));
+      } else if (Date.parse(String(sub.current_period_end).replace(" ", "T")) > Date.now()) {
+        return {
+          ...(entitlement || {}),
+          status: "active",
+          access_source: "subscription",
+          stars_amount: Number.isFinite(paid) ? paid : null,
+          until: sub.current_period_end
+        };
+      }
+    }
+  }
+
+  // No access. Keep the entitlement fields so the status reply can still explain
+  // an underpaid payment sitting on the account.
+  return {
+    ...(entitlement || {}),
+    status: "inactive",
+    access_source: null,
+    stars_amount: Number.isFinite(paid) ? paid : null,
+    until: null
+  };
+}
+
 async function applyStarsMembership(env, telegramUserId) {
   const [link, entitlement] = await Promise.all([
     env.DB.prepare(
@@ -533,6 +1078,28 @@ async function applyStarsMembership(env, telegramUserId) {
     ).bind(String(telegramUserId)).first()
   ]);
   if (!link || !entitlement) return { applied: false, reason: "telegram_not_linked" };
+
+  // Second gate, independent of the first. isValidStarsPayment guards the door
+  // at payment time; this guards the grant itself, because an entitlement row
+  // can also arrive by hand — which is exactly how a 5-Star row ended up marked
+  // active and unlocking the full Pack. Access is a function of what was paid,
+  // so read the amount here instead of trusting `status`.
+  //
+  // The floor is a CONSTANT, not starsPrice(env). Raising the list price must
+  // never retroactively revoke someone who paid the price that was current when
+  // they bought. Lower this only if a genuinely cheaper tier is ever sold.
+  const paidStars = Number(entitlement.stars_amount);
+  if (!Number.isFinite(paidStars) || paidStars < STARS_MIN_GRANT_AMOUNT) {
+    console.error(
+      "stars_grant_refused_underpaid",
+      String(telegramUserId),
+      "paid",
+      String(entitlement.stars_amount),
+      "floor",
+      String(STARS_MIN_GRANT_AMOUNT)
+    );
+    return { applied: false, reason: "underpaid" };
+  }
 
   const plan = normalizeText(env.FENRIR_STARS_PLAN).toLowerCase() || "standard";
   const safePlan = plan === "pro" || plan === "operator" ? plan : "standard";
@@ -822,6 +1389,11 @@ function isOwner(env, telegramUserId) {
 // 4. Rate limited per Telegram identity (the only redemption rail).
 // 5. Invalid / expired / already-used all collapse to one generic outcome.
 // 6. Every generation and redemption attempt is appended to courtesy_audit.
+// Windows an owner may grant. 182 is the canonical "6 months" — deliberately
+// the SAME number as NOWPAYMENTS_LADDER.half.days, so a courtesy 6-month grant
+// and a paid crypto 6-month grant land on identical date arithmetic. 180 stays
+// legal so callback_data already in flight keeps working (nada se borra).
+const COURTESY_DURATION_DAYS = [30, 90, 180, 182];
 const COURTESY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
 function generateCourtesyCode(length = 12) {
   const alphabet = COURTESY_ALPHABET;
@@ -934,6 +1506,364 @@ async function redeemCourtesyCode(env, rawCode, telegramUserId, chatId) {
   ]);
   await appendCourtesyAudit(env, "redeem", telegramUserId, "user", codeHash, "telegram");
   return { ok: true, durationDays, courtesyUntil };
+}
+
+// Owner mint over HTTP. Identical rail, table and single-use guarantees as the
+// /panel button — this only removes the requirement to be sitting in Telegram
+// to mint one, so a code can be issued from an ops runbook.
+//
+// Gated by FENRIR_ADMIN_TOKEN, deliberately NOT the community-bridge billing
+// secret: minting free access is an owner action, not a billing-service one, so
+// a leaked billing secret must not be able to print free Packs.
+//
+// The plaintext is returned exactly once and never persisted — only its HMAC
+// lands in D1, same as the Telegram path. Redemption stays on Telegram /redeem,
+// which is where identity (telegram_identity_links) is actually proven.
+async function handleCourtesyGenerate(request, env) {
+  // COURTESY_MINT_TOKEN is the dedicated credential for this endpoint;
+  // FENRIR_ADMIN_TOKEN keeps working as the owner-wide fallback. Separate secret
+  // so mint rights can be rotated without touching anything else that trusts the
+  // admin token. If NEITHER is set the endpoint is inert — 401, never open.
+  const configured = normalizeText(env.COURTESY_MINT_TOKEN) || normalizeText(env.FENRIR_ADMIN_TOKEN);
+  const supplied = normalizeText(request.headers.get("authorization")).replace(/^Bearer\s+/i, "");
+  if (!configured || !supplied || configured !== supplied) {
+    return json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+  const body = await request.json().catch(() => null);
+  const days = Number(body?.durationDays);
+  if (!COURTESY_DURATION_DAYS.includes(days)) {
+    return json({ ok: false, error: "invalid_duration", allowed: COURTESY_DURATION_DAYS }, { status: 400 });
+  }
+  const actor = normalizeText(String(body?.createdBy || "")) || "owner_http";
+  const { code } = await createCourtesyCode(env, days, actor);
+  return json({ ok: true, code, durationDays: days, redeem: `/redeem ${code}` });
+}
+
+/**
+ * Owner-gated Stripe billing operations.
+ *
+ * Exists so the live Stripe secret never has to leave the Worker. Everything
+ * here is done WITH the key the Worker already holds; nobody has to copy it into
+ * a shell, a runbook or a chat window to inspect billing or mint a coupon.
+ *
+ * Gated by COURTESY_MINT_TOKEN / FENRIR_ADMIN_TOKEN — the same owner credential
+ * as the courtesy mint, and deliberately not the billing-service secret.
+ */
+/**
+ * Pinned for the calls whose request shape is hardcoded here. The account's own
+ * default version moves on Stripe's schedule, which is what made
+ * POST /v1/promotion_codes start rejecting `coupon` as an unknown parameter.
+ */
+const STRIPE_OPS_API_VERSION = "2024-06-20";
+
+const STRIPE_REQUIRED_EVENTS = [
+  "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.payment_succeeded"
+];
+
+async function handleStripeOps(request, env) {
+  const configured = normalizeText(env.COURTESY_MINT_TOKEN) || normalizeText(env.FENRIR_ADMIN_TOKEN);
+  const supplied = normalizeText(request.headers.get("authorization")).replace(/^Bearer\s+/i, "");
+  if (!configured || !supplied || configured !== supplied) {
+    return json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+  const body = await request.json().catch(() => null);
+  const action = normalizeText(body?.action);
+
+  if (action === "inspect") {
+    const priceId = foundersPriceId(env, "monthly");
+    const price = await stripeRequest(env, `/prices/${encodeURIComponent(priceId)}`);
+    const product = await stripeRequest(env, `/products/${encodeURIComponent(normalizeText(price?.product))}`);
+    const endpoints = await stripeRequest(env, "/webhook_endpoints?limit=20");
+    return json({
+      ok: true,
+      price: {
+        id: price?.id,
+        active: price?.active,
+        unit_amount: price?.unit_amount,
+        currency: price?.currency,
+        recurring: price?.recurring?.interval,
+        product: price?.product
+      },
+      product: { id: product?.id, name: product?.name, active: product?.active },
+      webhooks: (endpoints?.data || []).map((endpoint) => ({
+        id: endpoint.id,
+        url: endpoint.url,
+        status: endpoint.status,
+        api_version: endpoint.api_version,
+        enabled_events: endpoint.enabled_events,
+        missing: STRIPE_REQUIRED_EVENTS.filter(
+          (name) => !(endpoint.enabled_events || []).includes(name) && !(endpoint.enabled_events || []).includes("*")
+        )
+      }))
+    });
+  }
+
+  // Subscribe our own endpoint to the renewal events. Without these the row
+  // freezes at the first checkout: renewals never extend it and cancellations
+  // never end it.
+  if (action === "ensure_events") {
+    const endpoints = await stripeRequest(env, "/webhook_endpoints?limit=20");
+    const target = (endpoints?.data || []).find((endpoint) =>
+      normalizeText(endpoint.url).includes("fenrir-stars-payments")
+    );
+    if (!target) return json({ ok: false, error: "webhook_endpoint_not_found" }, { status: 404 });
+    const merged = Array.from(new Set([...(target.enabled_events || []), ...STRIPE_REQUIRED_EVENTS]));
+    const params = { url: target.url };
+    merged.forEach((name, index) => {
+      params[`enabled_events[${index}]`] = name;
+    });
+    const updated = await stripeRequest(env, `/webhook_endpoints/${encodeURIComponent(target.id)}`, params);
+    return json({ ok: true, id: updated?.id, url: updated?.url, enabled_events: updated?.enabled_events });
+  }
+
+  // Coupon + promotion code for a 6-month comp on The Pack.
+  //
+  // percent_off 100 / duration repeating / duration_in_months 6 means Stripe
+  // itself stops discounting after the sixth invoice and starts charging — the
+  // subscription clock keeps running the whole time, so this grants six free
+  // months, not perpetual access. Scoped to the Pack product so the code cannot
+  // be applied to anything else on this account.
+  if (action === "create_promo") {
+    const code = normalizeText(body?.code).toUpperCase();
+    if (!/^[A-Z0-9]{4,24}$/.test(code)) {
+      return json({ ok: false, error: "invalid_code_format" }, { status: 400 });
+    }
+    const months = Number(body?.durationInMonths) || 6;
+    const maxRedemptions = Number(body?.maxRedemptions) || 1;
+
+    const priceId = foundersPriceId(env, "monthly");
+    const price = await stripeRequest(env, `/prices/${encodeURIComponent(priceId)}`);
+    const productId = normalizeText(price?.product);
+    if (!productId) return json({ ok: false, error: "pack_product_not_found" }, { status: 404 });
+
+    // Reuse an identical coupon instead of minting a second one. A failed
+    // promotion-code call used to leave an orphan coupon behind on every retry.
+    const existingCoupons = await stripeRequest(env, "/coupons?limit=100", null, STRIPE_OPS_API_VERSION);
+    const reusable = (existingCoupons?.data || []).find(
+      (candidate) =>
+        candidate?.valid &&
+        Number(candidate?.percent_off) === 100 &&
+        candidate?.duration === "repeating" &&
+        Number(candidate?.duration_in_months) === months &&
+        normalizeText(candidate?.metadata?.issued_by) === "fenrir-stars-payments" &&
+        (candidate?.applies_to?.products || []).includes(productId)
+    );
+
+    const coupon =
+      reusable ||
+      (await stripeRequest(
+        env,
+        "/coupons",
+        {
+          percent_off: "100",
+          duration: "repeating",
+          duration_in_months: String(months),
+          name: `The Pack · ${months} months comp`,
+          "applies_to[products][0]": productId,
+          "metadata[issued_by]": "fenrir-stars-payments",
+          "metadata[purpose]": "owner_comp"
+        },
+        STRIPE_OPS_API_VERSION
+      ));
+
+    const promo = await stripeRequest(
+      env,
+      "/promotion_codes",
+      {
+        coupon: normalizeText(coupon?.id),
+        code,
+        max_redemptions: String(maxRedemptions)
+      },
+      STRIPE_OPS_API_VERSION
+    );
+
+    return json({
+      ok: true,
+      code: promo?.code,
+      promotion_code_id: promo?.id,
+      coupon_id: coupon?.id,
+      percent_off: coupon?.percent_off,
+      duration: coupon?.duration,
+      duration_in_months: coupon?.duration_in_months,
+      applies_to_product: productId,
+      max_redemptions: promo?.max_redemptions,
+      active: promo?.active
+    });
+  }
+
+  // Reconcile D1 against Stripe. Stripe is the source of truth for the billing
+  // clock, so this walks the live subscriptions and re-writes each row through
+  // the same path the webhook uses.
+  //
+  // Two jobs: repair anything the old NULL-writing code left behind or dropped
+  // entirely, and prove the write path against real Stripe objects rather than
+  // a fixture. `dryRun` reports what it would do and touches nothing.
+  if (action === "resync") {
+    const dryRun = body?.dryRun !== false;
+    const list = await stripeRequest(env, "/subscriptions?status=all&limit=100");
+    const report = [];
+    for (const subscription of list?.data || []) {
+      const row = await env.DB
+        .prepare(`SELECT frisky_org_id, status, current_period_end FROM billing_subscriptions WHERE stripe_subscription_id = ? LIMIT 1`)
+        .bind(normalizeText(subscription.id))
+        .first();
+      const entry = {
+        id: subscription.id,
+        stripe_status: subscription.status,
+        stripe_period_end: stripeSubscriptionPeriodEnd(subscription),
+        metadata_org: normalizeText(subscription?.metadata?.frisky_org_id) || null,
+        metadata_plan: normalizeText(subscription?.metadata?.plan) || null,
+        row_exists: Boolean(row),
+        row_period_end: row?.current_period_end ?? null,
+        row_period_end_is_null: Boolean(row) && row.current_period_end === null
+      };
+      if (!dryRun) entry.written = await upsertStripeSubscriptionRow(env, subscription);
+      report.push(entry);
+    }
+    return json({ ok: true, dryRun, stripe_subscriptions: report.length, report });
+  }
+
+  // Stars dry run. `createInvoiceLink` takes the SAME invoice body as
+  // sendInvoice and returns the same validation errors, but produces a link
+  // instead of messaging anyone — so the exact production payload can be
+  // exercised against Telegram without a chat, a notification or a charge.
+  //
+  // Needed because a failing sendInvoice is invisible from outside: telegramApi
+  // throws, and the Telegram webhook swallows every throw to keep answering 200
+  // (otherwise Telegram retries and the bot spams). The raw Telegram response
+  // is returned verbatim here rather than summarised.
+  if (action === "stars_probe") {
+    const channel = normalizeText(body?.channel) === "dev" ? "dev" : "prod";
+    const token = botToken(env, channel);
+    if (!token) return json({ ok: false, error: "missing_telegram_token", channel }, { status: 503 });
+
+    const amount = starsPrice(env);
+    // A probe payload, never written to telegram_stars_orders — this creates no
+    // order because no one is paying it.
+    const probePayload = `fenrir_stars:probe:${crypto.randomUUID().replace(/-/g, "").slice(0, 18)}`;
+    const invoiceBody = starsInvoiceBody(env, probePayload, amount);
+
+    const call = async (payload) => {
+      const response = await fetch(`https://api.telegram.org/bot${token}/createInvoiceLink`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      return { http: response.status, body: await response.json().catch(() => null) };
+    };
+
+    const withSubscription = await call(invoiceBody);
+    // If the subscription form fails, try the one-shot form. Which of the two
+    // fails tells you whether the bot lacks Stars subscriptions specifically or
+    // Stars entirely — a distinction the error text alone does not give you.
+    const { subscription_period: _omit, ...oneShotBody } = invoiceBody;
+    const withoutSubscription = withSubscription.body?.ok ? null : await call(oneShotBody);
+
+    const me = await fetch(`https://api.telegram.org/bot${token}/getMe`)
+      .then((response) => response.json())
+      .catch(() => null);
+
+    return json({
+      ok: true,
+      channel,
+      bot: me?.result?.username || null,
+      amount,
+      currency: invoiceBody.currency,
+      payload_matches_ipn_regex: /^fenrir_stars:/.test(probePayload),
+      subscription_form: withSubscription,
+      one_shot_form: withoutSubscription
+    });
+  }
+
+  // Read a real Checkout Session back, verbatim. Needed to see what Stripe
+  // actually built — in particular the currency and amounts, which Adaptive
+  // Pricing can convert away from the list price the validator expects.
+  if (action === "inspect_session") {
+    const sessionId = normalizeText(body?.sessionId);
+    if (!/^cs_(test_|live_)?[A-Za-z0-9]+$/.test(sessionId)) {
+      return json({ ok: false, error: "invalid_session" }, { status: 400 });
+    }
+    const s = await stripeRequest(env, `/checkout/sessions/${encodeURIComponent(sessionId)}`);
+    return json({
+      ok: true,
+      id: s?.id,
+      mode: s?.mode,
+      status: s?.status,
+      payment_status: s?.payment_status,
+      currency: s?.currency,
+      amount_subtotal: s?.amount_subtotal,
+      amount_total: s?.amount_total,
+      currency_conversion: s?.currency_conversion ?? null,
+      client_reference_id: s?.client_reference_id,
+      metadata: s?.metadata ?? null,
+      subscription: s?.subscription ?? null,
+      would_validate: isValidFoundersStripeSession(
+        s,
+        normalizeText(s?.metadata?.frisky_user_id),
+        normalizeText(s?.metadata?.frisky_org_id)
+      )
+    });
+  }
+
+  // What the payment keyboard actually renders, straight from the deployed
+  // code. Lets the buttons and their destinations be checked without messaging
+  // anyone and without taking anyone's word for it.
+  if (action === "pay_rails") {
+    return json({
+      ok: true,
+      english: { text: payRailsText(false), reply_markup: payRailsKeyboard() },
+      spanish: { text: payRailsText(true), reply_markup: payRailsKeyboard() }
+    });
+  }
+
+  // Every keyboard the bot can attach, rendered from the deployed code, so the
+  // buttons and their destinations can be checked without messaging anyone.
+  if (action === "keyboards") {
+    const fakeConnect = (reason) => connectResultReply(env, reason ? { ok: false, reason } : { ok: true });
+    return json({
+      ok: true,
+      bot: botUsername(env),
+      pay_rails: payRailsKeyboard(),
+      status: statusKeyboard(),
+      redeem: redeemKeyboard(env, "EXAMPLECODE12"),
+      connect: {
+        ok: fakeConnect(null),
+        bot_permissions_missing: fakeConnect("bot_permissions_missing"),
+        telegram_identity_not_linked: fakeConnect("telegram_identity_not_linked"),
+        sync_failed: fakeConnect("sync_failed"),
+        actor_not_admin: fakeConnect("actor_not_admin"),
+        not_a_group: fakeConnect("not_a_group"),
+        screening_blocked: fakeConnect("screening_blocked"),
+        sync_not_configured: fakeConnect("sync_not_configured")
+      }
+    });
+  }
+
+  // What the bot would decide for a given Telegram id, without messaging them.
+  // `pitch` is the whole question: does this person get sold to, or not.
+  if (action === "bot_access") {
+    const id = normalizeText(String(body?.telegramUserId || ""));
+    if (!/^\d{5,20}$/.test(id)) return json({ ok: false, error: "invalid_telegram_id" }, { status: 400 });
+    const access = await resolveBotAccess(env, id);
+    const active = access?.status === "active";
+    return json({
+      ok: true,
+      telegramUserId: id,
+      status: access?.status ?? null,
+      access_source: access?.access_source ?? null,
+      stars_amount: access?.stars_amount ?? null,
+      until: access?.until ?? null,
+      pitch: !active,
+      reply: active ? alreadyActiveText(access, false) : payRailsText(false)
+    });
+  }
+
+  return json({ ok: false, error: "unknown_action" }, { status: 400 });
 }
 
 // ── Referral program (v1) ────────────────────────────────────────────────────
@@ -1201,7 +2131,7 @@ async function sendOwnerPanel(env, channel, message) {
       inline_keyboard: [[
         { text: "Courtesy · 30d", callback_data: "courtesy_gen:30" },
         { text: "90d", callback_data: "courtesy_gen:90" },
-        { text: "180d", callback_data: "courtesy_gen:180" }
+        { text: "6 months", callback_data: "courtesy_gen:182" }
       ]]
     }
   });
@@ -1462,7 +2392,17 @@ async function syncVerifiedTelegramDestination(env, channel, message) {
     console.error("group_admin_screening_blocked", telegramCommunityId(chat.id), (screening.blockedTelegramUserIds || []).join(","));
     return { ok: false, reason: "screening_blocked" };
   }
-  return { ok: true, communityId: telegramCommunityId(chat.id), screening: screening.state };
+  // El grupo ya está enlazado y verificado: AHORA la cantidad facturada tiene
+  // que reflejarlo. Va después del alta y nunca la bloquea — si Stripe falla,
+  // el grupo queda enlazado igual y la reconciliación se reintenta al próximo
+  // enlace. Idempotente: reenlazar el mismo grupo no mueve la cantidad.
+  const seats = await syncCommunitySeatQuantity(env, {
+    communityId: telegramCommunityId(chat.id),
+    telegramUserId: String(actorId)
+  });
+  if (!seats.ok) console.error("community_seat_sync_after_link", seats.reason || "unknown");
+
+  return { ok: true, communityId: telegramCommunityId(chat.id), screening: screening.state, seats };
 }
 // Member profile: plan, access, and courtesy window if any. Resolves from the
 // Telegram identity link → billing_subscriptions (with expiry) and the Stars
@@ -1597,18 +2537,22 @@ async function markPaid(env, payment, message, order) {
     .run();
 }
 
-async function sendStarsInvoice(env, channel, message) {
-  const amount = starsPrice(env);
-  const payload = await createOrder(env, String(message.from?.id || message.chat.id), String(message.chat.id), amount);
-  // Telegram Stars invoice canon: currency XTR, `provider_token` OMITTED (an
-  // empty string is not the same as absent — it previously returned
-  // PROVIDER_ACCOUNT_INVALID), exactly ONE entry in `prices`, and no
-  // shipping/address/phone/email/need_* /is_flexible fields.
-  // `subscription_period` is REQUIRED for a recurring Stars subscription:
-  // without it Telegram charges ONCE while we advertise "$14.99/month".
-  // 2592000 seconds (30 days) is the only value Telegram accepts.
-  await telegramApi(env, channel, "sendInvoice", {
-    chat_id: message.chat.id,
+/**
+ * The invoice body, in one place.
+ *
+ * Telegram Stars invoice canon: currency XTR, `provider_token` OMITTED (an
+ * empty string is not the same as absent — it previously returned
+ * PROVIDER_ACCOUNT_INVALID), exactly ONE entry in `prices`, and no
+ * shipping/address/phone/email/need_* /is_flexible fields.
+ * `subscription_period` is REQUIRED for a recurring Stars subscription:
+ * without it Telegram charges ONCE while we advertise "$14.99/month".
+ * 2592000 seconds (30 days) is the only value Telegram accepts.
+ *
+ * Shared with the ops probe so the diagnostic exercises the SAME body the bot
+ * sends — a probe that builds its own params proves nothing about production.
+ */
+function starsInvoiceBody(env, payload, amount) {
+  return {
     title: env.FENRIR_STARS_TITLE || "The Pack · MyFenrir",
     description:
       env.FENRIR_STARS_DESCRIPTION ||
@@ -1616,9 +2560,78 @@ async function sendStarsInvoice(env, channel, message) {
     payload,
     currency: "XTR",
     prices: [{ label: env.FENRIR_STARS_LABEL || "The Pack", amount }],
-    subscription_period: 2592000,
-    protect_content: true
+    subscription_period: 2592000
+  };
+}
+
+async function sendStarsInvoice(env, channel, message) {
+  const amount = starsPrice(env);
+  const payload = await createOrder(env, String(message.from?.id || message.chat.id), String(message.chat.id), amount);
+  await telegramApi(env, channel, "sendInvoice", {
+    chat_id: message.chat.id,
+    ...starsInvoiceBody(env, payload, amount)
+    // `protect_content` deliberately NOT sent. It was the only field here
+    // outside the documented Stars canon, it buys nothing on a payment box
+    // (there is no content to protect from forwarding), and it is the one
+    // parameter that differs between this call and the createInvoiceLink probe
+    // — which Telegram accepts with this exact body, subscription_period and
+    // all. Keep the body minimal; that rule already saved this invoice once
+    // (provider_token).
   });
+}
+
+/**
+ * Open the Stars payment box, and only claim it opened if it did.
+ *
+ * The old order was: promise first ("payment box opening…"), then attempt the
+ * invoice. telegramApi throws on a Telegram error and the webhook swallows every
+ * throw to keep returning 200 — so a failed sendInvoice left the operator
+ * staring at a promise that never happened, with nothing in the logs he could
+ * see. Invoice first; speak only about what actually occurred.
+ */
+async function openStarsCheckout(env, channel, message) {
+  const chatId = message?.chat?.id;
+  try {
+    await sendStarsInvoice(env, channel, message);
+    return true;
+  } catch (error) {
+    const reason = String(error);
+    console.error("stars_invoice_failed", reason, "chat", String(chatId), "type", String(message?.chat?.type));
+
+    // Fallback: an invoice LINK. createInvoiceLink takes the same body and has
+    // no chat_id, so it survives the cases sendInvoice does not — a group chat,
+    // or a chat where the bot may not post an invoice directly. Tapping the
+    // link opens the same Stars box. Verified working against this exact body.
+    try {
+      const amount = starsPrice(env);
+      const payload = await createOrder(env, String(message.from?.id || chatId), String(chatId), amount);
+      const link = await telegramApi(env, channel, "createInvoiceLink", starsInvoiceBody(env, payload, amount));
+      const url = normalizeText(link?.result);
+      if (url) {
+        await telegramApi(env, channel, "sendMessage", {
+          chat_id: chatId,
+          text: "The Pack · ⭐1,150 per month. Tap to open the Telegram Stars box.",
+          reply_markup: { inline_keyboard: [[{ text: "⭐ Pay with Telegram Stars", url }]] }
+        });
+        console.error("stars_invoice_link_fallback_used", reason);
+        return true;
+      }
+    } catch (fallbackError) {
+      console.error("stars_invoice_link_failed", String(fallbackError));
+    }
+
+    // Both forms failed. Say so plainly rather than promising a box.
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: chatId,
+      text: [
+        "The Telegram Stars box did not open.",
+        "",
+        "Nothing was charged. You can pay the same $14.99 by card or crypto in MyFenrir → Upgrade.",
+        "This has been logged for Fenrir to fix."
+      ].join("\n")
+    }).catch(() => {});
+    return false;
+  }
 }
 
 function paymentIntent(text) {
@@ -1647,6 +2660,20 @@ function menuIntent(text) {
   return /^\/(start|menu|help)\b/i.test(text) || /\b(menu|commands|modulos|módulos|ayuda|help)\b/i.test(text);
 }
 
+/**
+ * The Stars deep link fired by the /upgrade Stars rail
+ * (pack-rails.tsx → t.me/<bot>?start=fenrir_stars → "/start fenrir_stars").
+ *
+ * Exported so the routing ORDER can be asserted in a test. menuIntent() also
+ * matches this exact string — it swallows every `/start` regardless of payload —
+ * so whichever branch the webhook checks FIRST wins. When the Stars branch sat
+ * below menuIntent, the button answered with the Community control onboarding
+ * card and no invoice was ever sent. See the guard in the webhook handler.
+ */
+export function isStarsDeepLink(text) {
+  return /^\/start(?:@[A-Za-z0-9_]+)?\s+fenrir_stars\b/i.test(String(text || ""));
+}
+
 function commandForThisBot(text, command, env) {
   const match = text.match(new RegExp(`^/${command}(?:@([A-Za-z0-9_]+))?(?:\\s|$)`, "i"));
   if (!match) return false;
@@ -1658,7 +2685,17 @@ async function sendTelegramLinkStart(env, channel, message) {
   if (message.chat?.type && message.chat.type !== "private") {
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
-      text: "For security, send /link to me in a private chat."
+      text: "Linking happens in a private chat, for security.\n\nTap below and Fenrir will pick it up there.",
+      // A group button cannot open a private chat by itself — the deep link can.
+      ...(botUsername(env)
+        ? {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🔗 Link MyFenrir", url: `https://t.me/${botUsername(env)}?start=account` }]
+              ]
+            }
+          }
+        : {})
     });
     return;
   }
@@ -1709,8 +2746,15 @@ export function modularMenuText(text, entitlement) {
       "2 · Vincula y verifica tu grupo",
       "Agrega Fenrir como admin con permiso para crear invitaciones. Tú aceptas a cada persona antes de que reciba una invitación.",
       "",
-      "3 · Elige tu plan cuando lo necesites",
-      "Gratis incluye 5 gates para armar y probar. Enlazar una comunidad requiere The Pack: US$14.99/mes, con multi-admin y auditoría.",
+      // Paso 3 depende del derecho de acceso. Antes era texto fijo, así que a
+      // alguien con The Pack activo esta misma tarjeta le decía "Plan: The Pack
+      // · activo" arriba y "Enlazar una comunidad requiere The Pack" abajo: dos
+      // lecturas opuestas del mismo derecho, en el mismo mensaje. Quien ya pagó
+      // leía eso como que su pago no se aplicó.
+      active ? "3 · Tu plan ya cubre esto" : "3 · Elige tu plan cuando lo necesites",
+      active
+        ? "The Pack está activo en esta cuenta: ya puedes enlazar una comunidad, con multi-admin y auditoría. No hay nada más que pagar."
+        : "Gratis incluye 5 gates para armar y probar. Enlazar una comunidad requiere The Pack: US$14.99/mes, con multi-admin y auditoría.",
       "",
       "Puedes crear tu primer Gate sin pagar ni configurar DNS.",
       "",
@@ -1729,13 +2773,250 @@ export function modularMenuText(text, entitlement) {
     "2 · Link and verify your group",
     "Make Fenrir an admin with Invite Users. You approve each person before the bot creates their invite.",
     "",
-    "3 · Choose a plan when you need it",
-    "Free includes 5 gates to build and test. Linking a community requires The Pack: US$14.99/month, with multi-admin and audit logs.",
+    // Step 3 follows the entitlement. It used to be fixed copy, so this same
+    // card told an operator with The Pack active "Plan: The Pack · active" at
+    // the top and "Linking a community requires The Pack" at the bottom — two
+    // opposite readings of one right, in one message. Someone who had already
+    // paid read that as their payment never having applied.
+    active ? "3 · Your plan already covers this" : "3 · Choose a plan when you need it",
+    active
+      ? "The Pack is active on this account: you can link a community now, with multi-admin workflows and audit logs. There is nothing further to pay."
+      : "Free includes 5 gates to build and test. Linking a community requires The Pack: US$14.99/month, with multi-admin and audit logs.",
     "",
     "You can create your first Gate without paying or setting up DNS.",
     "",
     "Choose an action below to continue."
   ].join("\n");
+}
+
+/**
+ * The three rails as buttons.
+ *
+ * Asking someone to type “buy” before they may pay is friction invented for no
+ * reason: Telegram has inline keyboards precisely so a purchase is one tap.
+ * The typed commands still work — they are just never the only way in.
+ *
+ * Order is the price canon and not cosmetic: CARD FIRST, Stars second as the
+ * commodity rail, crypto third. Same list price on all three.
+ *
+ * Only Stars can complete inside Telegram — `fenrir_subscribe` opens the box in
+ * this chat. Card and crypto need the signed-in web session that holds the
+ * buyer's identity, so those buttons open Upgrade, which is where those rails
+ * live. `?rail=` is a hint for that page; nothing reads it yet.
+ */
+const UPGRADE_URL = "https://communities.myfenrir.com/upgrade";
+
+export function payRailsKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: "💳 Card · $14.99/month", url: `${UPGRADE_URL}?rail=card` }],
+      [{ text: "⭐ Telegram Stars · 1,150", callback_data: "fenrir_subscribe" }],
+      [{ text: "₿ Crypto · $14.99/month", url: `${UPGRADE_URL}?rail=crypto` }]
+    ]
+  };
+}
+
+/**
+ * Copy for the rails. Money, never percentages — a buyer cannot pay a
+ * percentage, and "+5%" is the kind of number people feel misled by later.
+ * NOWPayments' fee on $14.99 is about $0.75, and NOWPayments shows the exact
+ * figure on its own screen before anyone pays.
+ */
+export function payRailsText(spanish) {
+  if (spanish) {
+    return [
+      "The Pack · $14.99 al mes por comunidad enlazada.",
+      "",
+      "💳 Tarjeta — $14.99. Apple Pay y Google Pay incluidos.",
+      "⭐ Telegram Stars — ⭐1,150, el equivalente. Se cobra cada 30 días.",
+      "₿ Cripto — $14.99, el mismo precio. NOWPayments suma su comisión, unos $0.75, y te enseña la cifra exacta antes de que pagues.",
+      "",
+      "Elige abajo. Fenrir activa el acceso sólo cuando el pago está confirmado."
+    ].join("\n");
+  }
+  return [
+    "The Pack · $14.99 a month per linked community.",
+    "",
+    "💳 Card — $14.99. Apple Pay and Google Pay included.",
+    "⭐ Telegram Stars — ⭐1,150, the equivalent. Billed every 30 days.",
+    "₿ Crypto — $14.99, the same price. NOWPayments adds its processing fee, about $0.75, and shows you the exact figure before you pay.",
+    "",
+    "Pick one below. Fenrir activates access only once the payment is confirmed."
+  ].join("\n");
+}
+
+/**
+ * What to say to someone who already has access and asked to pay.
+ *
+ * Not a pitch and not a wall of features — what they can do with what they
+ * already hold. The source matters: an owner should never read a sentence about
+ * a subscription, and someone on courtesy should be told when it runs out
+ * rather than discovering it on the day.
+ */
+export function alreadyActiveText(access, spanish) {
+  const source = access?.access_source;
+  const until = access?.until ? String(access.until).slice(0, 10) : null;
+
+  if (spanish) {
+    if (source === "owner") {
+      return [
+        "Eres dueño de Fenrir. No hay nada que comprar.",
+        "",
+        "Tienes The Pack completo: comunidades enlazadas sin tope, multi-admin y auditoría.",
+        "/panel genera códigos de cortesía · /status revisa cualquier cuenta."
+      ].join("\n");
+    }
+    return [
+      "Ya tienes The Pack activo. No hace falta pagar de nuevo.",
+      ...(until ? ["", `Vigente hasta ${until}.`] : []),
+      "",
+      "Enlaza una comunidad desde MyFenrir → My Gates, o usa /status para ver el detalle."
+    ].join("\n");
+  }
+
+  if (source === "owner") {
+    return [
+      "You own Fenrir. There is nothing here for you to buy.",
+      "",
+      "You hold the full Pack: linked communities with no numeric cap, multi-admin workflows and audit logs.",
+      "/panel mints courtesy codes · /status checks any account."
+    ].join("\n");
+  }
+  return [
+    "The Pack is already active on this account. There is nothing to pay.",
+    ...(until ? ["", `Active through ${until}.`] : []),
+    "",
+    "Link a community from MyFenrir → My Gates, or run /status for the detail."
+  ].join("\n");
+}
+
+/**
+ * Buttons for the moments that used to end in "now go type a command".
+ *
+ * Every one of these keeps its typed command working. The button is never the
+ * only way in — it is just the way that does not require remembering a word
+ * while you are in another window, halfway through something else.
+ *
+ * `/connect` is the worst of them: the operator has just left Telegram's admin
+ * screen, and the instruction to run a command is the last thing they read
+ * before the flow dies. A retry button costs one tap and no memory.
+ */
+function connectRetryKeyboard(env, { link = false } = {}) {
+  const user = botUsername(env);
+  const rows = [[{ text: "🔄 Try again", callback_data: "fenrir_connect" }]];
+  // Linking happens in a private chat with the bot; a group button cannot do it,
+  // so this deep-links there instead of naming a command.
+  if (link && user) {
+    rows.push([{ text: "🔗 Link MyFenrir", url: `https://t.me/${user}?start=account` }]);
+  }
+  return { inline_keyboard: rows };
+}
+
+/** One tap to redeem, instead of copying a code out of a message by hand. */
+function redeemKeyboard(env, code) {
+  const user = botUsername(env);
+  if (!user) return undefined;
+  return {
+    inline_keyboard: [[{ text: "🎟 Redeem this code", url: `https://t.me/${user}?start=redeem_${code}` }]]
+  };
+}
+
+/** `/start redeem_<CODE>` — the deep link behind that button. */
+export function redeemDeepLinkCode(text) {
+  const match = String(text || "").match(/^\/start(?:@[A-Za-z0-9_]+)?\s+redeem_([A-Za-z0-9]{8,16})\b/i);
+  return match ? match[1] : null;
+}
+
+/**
+ * The redemption outcome, worded once. Shared by the typed `/redeem <CODE>` and
+ * by the one-tap deep link, so the two can never drift apart.
+ *
+ * Invalid, expired and already-used still collapse into one generic sentence —
+ * that is deliberate anti-enumeration, not vagueness.
+ */
+export function courtesyRedeemReply(result) {
+  if (result?.ok) {
+    const until = new Date(result.courtesyUntil).toISOString().slice(0, 10);
+    return [
+      "🎁 Courtesy access activated — The Pack.",
+      "",
+      `Duration: ${result.durationDays} days`,
+      `Access through: ${until}`,
+      "Covers 1 linked community · multi-admin · audit logs."
+    ].join("\n");
+  }
+  if (result?.reason === "rate_limited") return "Too many attempts. Please wait a few minutes and try again.";
+  if (result?.reason === "not_linked") {
+    return "Redeem from a MyFenrir-linked Telegram account.\n\nLink Telegram first, then tap the code again.";
+  }
+  return "That code could not be redeemed. Check it and try again, or contact MyFenrir support.";
+}
+
+/** Only `not_linked` is something the person can act on from here. */
+function redeemFailureKeyboard(env, reason) {
+  const user = botUsername(env);
+  if (reason !== "not_linked" || !user) return undefined;
+  return { inline_keyboard: [[{ text: "🔗 Link MyFenrir", url: `https://t.me/${user}?start=account` }]] };
+}
+
+/** Where "run /status for the detail" used to send people. */
+function statusKeyboard() {
+  return { inline_keyboard: [[{ text: "📊 My access", callback_data: "fenrir_status" }]] };
+}
+
+/**
+ * One reply for a /connect outcome, whether it came from the command or from
+ * the bot being made admin. Both used to word the same failures differently and
+ * both ended in "type it again".
+ *
+ * Only the recoverable outcomes get a retry. Offering "try again" for something
+ * the user cannot fix — a missing server secret, a blocked screening — is worse
+ * than saying nothing: it invites them to tap forever.
+ */
+function connectResultReply(env, result) {
+  const reason = result?.ok ? "ok" : result?.reason;
+  const replies = {
+    ok: {
+      text: "✅ This group is verified.\n\nOpen MyFenrir → My Gates and choose it from the verified Telegram group selector."
+    },
+    actor_not_admin: {
+      text: "Only a Telegram group admin can verify this group.\n\nAsk an admin of this group to tap below."
+    },
+    telegram_identity_not_linked: {
+      text: "Your MyFenrir account is not linked to Telegram yet.\n\nLink it first, then come back here and tap Try again.",
+      reply_markup: connectRetryKeyboard(env, { link: true })
+    },
+    bot_permissions_missing: {
+      text: "Fenrir needs to be an admin here with Invite Users switched on.\n\nTurn it on in this group's admin settings, then tap below.",
+      reply_markup: connectRetryKeyboard(env)
+    },
+    not_a_group: {
+      text: "Run this inside the Telegram group you want Fenrir to protect — it does not work in a private chat."
+    },
+    screening_blocked: {
+      text: "Fenrir could not verify this group. Open MyFenrir to continue."
+    },
+    sync_not_configured: {
+      text: "Group verification is not configured yet. Please contact the MyFenrir team."
+    },
+    sync_failed: {
+      text: "Fenrir could not save this group just now. Nothing is lost — tap below to retry.",
+      reply_markup: connectRetryKeyboard(env)
+    }
+  };
+  const reply = replies[reason] || replies.sync_failed;
+  // actor_not_admin is recoverable by a DIFFERENT person, so it gets the button
+  // too — the admin who can act is usually reading the same group.
+  if (reason === "actor_not_admin") return { ...reply, reply_markup: connectRetryKeyboard(env) };
+  return reply;
+}
+
+async function sendPayRails(env, channel, message, spanish) {
+  await telegramApi(env, channel, "sendMessage", {
+    chat_id: message.chat.id,
+    text: payRailsText(spanish),
+    reply_markup: payRailsKeyboard()
+  });
 }
 
 export function botMenuKeyboard(entitlement) {
@@ -1821,14 +3102,59 @@ function fallbackMind(text, entitlement) {
   if (menuIntent(text)) return modularMenuText(text, entitlement);
 
   if (statusIntent(text)) {
+    // `status === 'active'` alone is not access. The grant paths now require the
+    // paid amount to clear STARS_MIN_GRANT_AMOUNT, and this line must agree with
+    // them — an entitlement row worth 5 Stars once reported "Access: unlocked"
+    // while being nowhere near the price of The Pack.
+    //
+    // `Stars:` is the amount PAID, read from the entitlement row. It has never
+    // been an account balance, and it must not be mistaken for one.
+    // `entitlement` is already resolved by resolveBotAccess: it knows about the
+    // owner allowlist and about courtesy / crypto / card rows, not only Stars.
+    // Report the source, because "active" via ownership and "active" via a Stars
+    // payment are different facts and a member can tell the difference.
+    const paid = Number(entitlement?.stars_amount);
+    const source = entitlement?.access_source;
+    const unlocked = entitlement?.status === "active";
+    const until = entitlement?.until ? String(entitlement.until).slice(0, 10) : null;
+    const via = {
+      owner: { en: "Ownership", es: "Propiedad" },
+      stars: { en: "Telegram Stars", es: "Telegram Stars" },
+      subscription: { en: "Subscription", es: "Suscripción" }
+    }[source] || { en: "—", es: "—" };
+    // An underpaid Stars payment on file, with no access from any other rail.
+    const underpaid = !unlocked && Number.isFinite(paid) && paid > 0;
+
     if (spanishIntent(text)) {
-      return entitlement?.status === "active"
-        ? `Fenrir Protocol esta activo.\n\nAcceso: activo\nStars: ${entitlement.stars_amount}\nModo: Telegram Stars`
-        : "Fenrir Protocol todavia no esta activo.\n\n$14.99/mes.\nTarjeta y cripto en MyFenrir → Upgrade. /subscribe abre la caja de Telegram Stars (⭐1,150).";
+      if (unlocked) {
+        return [
+          "Fenrir Protocol esta activo.",
+          "",
+          "Acceso: activo",
+          `Via: ${via.es}`,
+          ...(source === "stars" ? [`Pagado: ⭐${paid}`] : []),
+          ...(until ? [`Vigente hasta: ${until}`] : [])
+        ].join("\n");
+      }
+      if (underpaid) {
+        return `Fenrir Protocol todavia no esta activo.\n\nSe registro un pago de ⭐${paid}, por debajo de los ⭐1,150 que cuesta The Pack, asi que no desbloquea acceso.\n/subscribe abre la caja por el precio correcto.`;
+      }
+      return "Fenrir Protocol todavia no esta activo.\n\n$14.99/mes.\nTarjeta y cripto en MyFenrir → Upgrade. /subscribe abre la caja de Telegram Stars (⭐1,150).";
     }
-    return entitlement?.status === "active"
-      ? `Fenrir Protocol is active.\n\nAccess: unlocked\nStars: ${entitlement.stars_amount}\nMode: Telegram Stars`
-      : "Fenrir Protocol is not active yet.\n\n$14.99/month.\nCard and crypto in MyFenrir → Upgrade. /subscribe opens the Telegram Stars box (⭐1,150).";
+    if (unlocked) {
+      return [
+        "Fenrir Protocol is active.",
+        "",
+        "Access: unlocked",
+        `Via: ${via.en}`,
+        ...(source === "stars" ? [`Paid: ⭐${paid}`] : []),
+        ...(until ? [`Active through: ${until}`] : [])
+      ].join("\n");
+    }
+    if (underpaid) {
+      return `Fenrir Protocol is not active yet.\n\nA payment of ⭐${paid} is on record, below the ⭐1,150 The Pack costs, so it does not unlock access.\n/subscribe opens the box at the correct price.`;
+    }
+    return "Fenrir Protocol is not active yet.\n\n$14.99/month.\nCard and crypto in MyFenrir → Upgrade. /subscribe opens the Telegram Stars box (⭐1,150).";
   }
 
   if (pricingIntent(text)) {
@@ -1925,9 +3251,9 @@ function fallbackMind(text, entitlement) {
       "5. Create a bridge slug.",
       "6. Share the stable public URL.",
       "",
-      "Free gives you 5 gates to test. Linking a community requires The Pack ($14.99/month).",
-      "",
-      "Say “buy” and I’ll show you the three ways to pay."
+      "Free gives you 5 gates to test. Linking a community requires The Pack ($14.99/month)."
+      // The three ways to pay arrive as buttons with this reply, not as a word
+      // the buyer has to guess and type.
     ].join("\n");
   }
 
@@ -2016,7 +3342,7 @@ async function handleTelegramWebhook(request, env, url) {
   if (update.callback_query) {
     const query = update.callback_query;
     const callbackMessage = query.message || { chat: { id: query.from.id }, from: query.from, text: "" };
-    const entitlement = await getEntitlement(env, query.from?.id || callbackMessage.chat.id);
+    const entitlement = await resolveBotAccess(env, query.from?.id || callbackMessage.chat.id);
 
     // Owner-only: generate a single-use courtesy code (30 / 90 / 180 days).
     if (typeof query.data === "string" && query.data.startsWith("courtesy_gen:")) {
@@ -2025,7 +3351,7 @@ async function handleTelegramWebhook(request, env, url) {
         return json({ ok: true });
       }
       const days = Number(query.data.split(":")[1]);
-      if (![30, 90, 180].includes(days)) {
+      if (!COURTESY_DURATION_DAYS.includes(days)) {
         await telegramApi(env, channel, "answerCallbackQuery", { callback_query_id: query.id, text: "Invalid duration." });
         return json({ ok: true });
       }
@@ -2041,7 +3367,10 @@ async function handleTelegramWebhook(request, env, url) {
           "",
           "Single-use · shown once · store it securely.",
           "Redeem: `/redeem " + code + "`"
-        ].join("\n")
+        ].join("\n"),
+        // The owner usually mints a code to hand to someone else. Forwarding a
+        // message with a button beats asking them to retype a 12-character code.
+        reply_markup: redeemKeyboard(env, code)
       });
       return json({ ok: true });
     }
@@ -2073,12 +3402,36 @@ async function handleTelegramWebhook(request, env, url) {
       text: "Fenrir module selected."
     });
 
-    if (query.data === "fenrir_subscribe") {
+    // Retry /connect without retyping it. `from` is the person who tapped, so
+    // the admin check inside syncVerifiedTelegramDestination still judges the
+    // right actor — a non-admin tapping this is rejected exactly as before.
+    if (query.data === "fenrir_connect") {
+      const result = await syncVerifiedTelegramDestination(env, channel, {
+        chat: callbackMessage.chat,
+        from: query.from
+      });
       await telegramApi(env, channel, "sendMessage", {
         chat_id: callbackMessage.chat.id,
-        text: "Opening the Telegram Stars box — ⭐1,150 for The Pack, one linked community, billed monthly.\nPrefer card or crypto at the same $14.99? MyFenrir → Upgrade.\nFenrir activates access only after the payment is confirmed."
+        ...connectResultReply(env, result)
       });
-      await sendStarsInvoice(env, channel, callbackMessage);
+      return json({ ok: true });
+    }
+
+    if (query.data === "fenrir_subscribe") {
+      // `from` MUST be the person who tapped, not query.message.from — on a
+      // button attached to a bot message that is the BOT. createOrder would then
+      // stamp the order with the bot's id, and isValidStarsPayment compares the
+      // order's telegram_user_id against the real payer, so the payment would be
+      // rejected after the money moved.
+      //
+      // No "opening the box" line before the attempt either: openStarsCheckout
+      // speaks only about what actually happened, and falls back to an invoice
+      // link if sendInvoice fails.
+      await openStarsCheckout(env, channel, {
+        chat: callbackMessage.chat,
+        from: query.from,
+        text: ""
+      });
       return json({ ok: true });
     }
 
@@ -2134,7 +3487,10 @@ async function handleTelegramWebhook(request, env, url) {
       if (becameAdmin) {
         await telegramApi(env, channel, "sendMessage", {
           chat_id: membership.chat.id,
-          text: "Make Fenrir an admin and enable Invite Users, then run /connect again."
+          // The operator is one screen away from Telegram's permission toggles.
+          // Asking them to come back and type a command is where this flow died.
+          text: "Fenrir is an admin here but cannot invite yet.\n\nTurn on Invite Users in this group's admin settings, then tap below.",
+          reply_markup: connectRetryKeyboard(env)
         });
       }
       return json({ ok: true });
@@ -2142,18 +3498,9 @@ async function handleTelegramWebhook(request, env, url) {
     if (wasReady) return json({ ok: true });
 
     const result = await syncVerifiedTelegramDestination(env, channel, membership);
-    const autoReplies = {
-      ok: "✅ This group is verified. Open MyFenrir → My Gates and choose it from the verified Telegram group selector.",
-      actor_not_admin: "Only a Telegram group admin can verify this group.",
-      telegram_identity_not_linked:
-        "Link your MyFenrir account first in a private chat with /link, then run /connect here again.",
-      screening_blocked: "Fenrir could not verify this group. Open MyFenrir to continue.",
-      sync_not_configured: "Group verification is not configured yet. Please contact the MyFenrir team.",
-      sync_failed: "Fenrir could not save this group just now. Run /connect to retry."
-    };
     await telegramApi(env, channel, "sendMessage", {
       chat_id: membership.chat.id,
-      text: autoReplies[result.ok ? "ok" : result.reason] || autoReplies.sync_failed
+      ...connectResultReply(env, result)
     });
     return json({ ok: true });
   }
@@ -2163,9 +3510,18 @@ async function handleTelegramWebhook(request, env, url) {
     const payment = message.successful_payment;
     const order = await getOrder(env, payment.invoice_payload);
     const telegramUserId = String(message.from?.id || message.chat.id);
-    const valid = isValidStarsPayment(payment, order, telegramUserId);
+    const valid = isValidStarsPayment(payment, order, telegramUserId, starsPrice(env));
     if (!valid) {
-      console.error("stars_payment_validation_failed", telegramUserId);
+      console.error(
+        "stars_payment_validation_failed",
+        telegramUserId,
+        "paid",
+        String(payment?.total_amount),
+        "order",
+        String(order?.amount),
+        "expected",
+        String(starsPrice(env))
+      );
       await telegramApi(env, channel, "sendMessage", {
         chat_id: message.chat.id,
         text: "This payment did not match an active MyFenrir invoice. Membership was not changed. Run /subscribe for a fresh invoice."
@@ -2189,7 +3545,7 @@ async function handleTelegramWebhook(request, env, url) {
   const text = normalizeText(message?.text);
   if (!text) return json({ ok: true });
 
-  const entitlement = await getEntitlement(env, message.from?.id || message.chat.id);
+  const entitlement = await resolveBotAccess(env, message.from?.id || message.chat.id);
 
   const gateAccessToken = gateAccessTokenFromStart(text);
   if (gateAccessToken) {
@@ -2233,6 +3589,38 @@ async function handleTelegramWebhook(request, env, url) {
     return json({ ok: true });
   }
 
+  // Stars deep link from the /upgrade Stars rail (pack-rails.tsx sends the
+  // operator to t.me/<bot>?start=fenrir_stars).
+  //
+  // This MUST stay here, with the other /start payloads, and ABOVE menuIntent().
+  // menuIntent() matches /^\/(start|menu|help)\b/ — it swallows EVERY /start,
+  // payload and all. While the only Stars branch lived further down (next to
+  // /subscribe), `/start fenrir_stars` never reached it: it hit the menu first
+  // and returned, so clicking "Pay with Telegram Stars" answered with the
+  // Community control onboarding card instead of opening the payment box.
+  // Every other deep link (account / discover / mapping / readiness / gate /
+  // link_ / gate_ / ref_) was already handled above menuIntent; this one was
+  // the single outlier. Do not move it below menuIntent again.
+  if (isStarsDeepLink(text)) {
+    await openStarsCheckout(env, channel, message);
+    return json({ ok: true });
+  }
+
+  // `/start redeem_<CODE>` — the button attached to a freshly minted courtesy
+  // code. Same rule as the Stars deep link: it MUST sit above menuIntent, which
+  // swallows every /start regardless of payload.
+  const deepLinkCode = redeemDeepLinkCode(text);
+  if (deepLinkCode) {
+    const telegramUserId = String(message.from?.id || message.chat.id);
+    const result = await redeemCourtesyCode(env, deepLinkCode, telegramUserId, String(message.chat.id));
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: message.chat.id,
+      text: courtesyRedeemReply(result),
+      ...(result.ok ? {} : { reply_markup: redeemFailureKeyboard(env, result.reason) })
+    });
+    return json({ ok: true });
+  }
+
   if (/^\/start(?:@[A-Za-z0-9_]+)?(?:\s+gate)?$/i.test(text)) {
     await sendIdentityWelcome(env, channel, message);
     return json({ ok: true });
@@ -2248,22 +3636,16 @@ async function handleTelegramWebhook(request, env, url) {
   // group into the owner's Community Bridge dashboard selector.
   if (commandForThisBot(text, "connect", env)) {
     const result = await syncVerifiedTelegramDestination(env, channel, message);
-    const replies = {
-      ok: "✅ This group is verified. Open MyFenrir → My Gates and choose it from the verified Telegram group selector.",
-      not_a_group: "Run /connect inside the Telegram group you want Fenrir to protect.",
-      actor_not_admin: "Only a Telegram group admin can verify this group.",
-      bot_permissions_missing: "Make Fenrir an admin and enable Invite Users, then run /connect again.",
-      telegram_identity_not_linked: "Link your MyFenrir account first in a private chat with /link, then run /connect here again.",
-      sync_not_configured: "Group verification is not configured yet. Please contact the MyFenrir team.",
-      // Ni se nombra a nadie ni se dice que haya alguien bloqueado: lo primero
-      // es una acusación pública, lo segundo convierte el grupo en una cacería.
-      // El motivo y los IDs quedan en el log interno y en la pantalla del dueño.
-      screening_blocked: "Fenrir could not verify this group. Open MyFenrir to continue.",
-      sync_failed: "Fenrir could not save this group just now. Please try again."
-    };
+    // Shared with the my_chat_member path. The two used to word the same
+    // failures differently, and both ended by naming a command to retype.
+    //
+    // screening_blocked still names nobody and never says someone was blocked:
+    // the first is a public accusation, the second turns the group into a
+    // manhunt. The reason and the ids stay in the internal log and on the
+    // owner's screen.
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
-      text: replies[result.ok ? "ok" : result.reason] || replies.sync_failed
+      ...connectResultReply(env, result)
     });
     return json({ ok: true });
   }
@@ -2369,25 +3751,13 @@ async function handleTelegramWebhook(request, env, url) {
     const supplied = text.replace(/^\/redeem(?:@[A-Za-z0-9_]+)?\s*/i, "").trim();
     const telegramUserId = String(message.from?.id || message.chat.id);
     const result = await redeemCourtesyCode(env, supplied, telegramUserId, String(message.chat.id));
-    let reply;
-    if (result.ok) {
-      const until = new Date(result.courtesyUntil).toISOString().slice(0, 10);
-      reply = [
-        "🎁 Courtesy access activated — The Pack.",
-        "",
-        `Duration: ${result.durationDays} days`,
-        `Access through: ${until}`,
-        "Covers 1 linked community · multi-admin · audit logs."
-      ].join("\n");
-    } else if (result.reason === "rate_limited") {
-      reply = "Too many attempts. Please wait a few minutes and try again.";
-    } else if (result.reason === "not_linked") {
-      reply = "Redeem from a MyFenrir-linked Telegram account. Open MyFenrir → Link Telegram, then run /redeem again.";
-    } else {
-      // Generic, identical for invalid / expired / already-used (anti-enumeration).
-      reply = "That code could not be redeemed. Check it and try again, or contact MyFenrir support.";
-    }
-    await telegramApi(env, channel, "sendMessage", { chat_id: message.chat.id, text: reply });
+    // Same wording as the one-tap deep link — one helper, so the two paths
+    // cannot drift.
+    await telegramApi(env, channel, "sendMessage", {
+      chat_id: message.chat.id,
+      text: courtesyRedeemReply(result),
+      ...(result.ok ? {} : { reply_markup: redeemFailureKeyboard(env, result.reason) })
+    });
     return json({ ok: true });
   }
 
@@ -2396,12 +3766,40 @@ async function handleTelegramWebhook(request, env, url) {
     return json({ ok: true });
   }
 
-  if (/^\/subscribe\b/i.test(text) || /^\/unlock\b/i.test(text) || /^\/start\s+fenrir_stars\b/i.test(text) || paymentIntent(text)) {
-    await telegramApi(env, channel, "sendMessage", {
-      chat_id: message.chat.id,
-      text: "Fenrir Protocol payment box opening. Telegram Stars handles the transaction; Fenrir verifies access after payment."
-    });
-    await sendStarsInvoice(env, channel, message);
+  // Nobody who already has access gets sold to — not the owner, not a courtesy
+  // holder, not a paying member. Selling The Pack to the person who owns the
+  // product, or to someone already paying for it, is not a UX wrinkle: it means
+  // the bot could not see the access they hold.
+  const alreadyIn = entitlement?.status === "active";
+
+  // Explicit Stars intent — /subscribe, /unlock, or the Stars deep link — opens
+  // the Stars box directly. The buyer already chose the rail.
+  if (/^\/subscribe\b/i.test(text) || /^\/unlock\b/i.test(text) || isStarsDeepLink(text)) {
+    if (alreadyIn) {
+      await telegramApi(env, channel, "sendMessage", {
+        chat_id: message.chat.id,
+        text: alreadyActiveText(entitlement, spanishIntent(text)),
+        reply_markup: statusKeyboard()
+      });
+      return json({ ok: true });
+    }
+    await openStarsCheckout(env, channel, message);
+    return json({ ok: true });
+  }
+
+  // Anything that merely means "I want to pay" gets the CHOICE, not one rail.
+  // This used to drop straight into the Stars box, which quietly made Stars the
+  // default and contradicted the canon that card comes first.
+  if (paymentIntent(text)) {
+    if (alreadyIn) {
+      await telegramApi(env, channel, "sendMessage", {
+        chat_id: message.chat.id,
+        text: alreadyActiveText(entitlement, spanishIntent(text)),
+        reply_markup: statusKeyboard()
+      });
+      return json({ ok: true });
+    }
+    await sendPayRails(env, channel, message, spanishIntent(text));
     return json({ ok: true });
   }
 
@@ -2409,7 +3807,11 @@ async function handleTelegramWebhook(request, env, url) {
     const answer = fallbackMind(text, entitlement);
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
-      text: answer
+      text: answer,
+      // The setup path ends at "linking a community requires The Pack". Ending
+      // there with no way to act on it is what produced the magic-word prompt
+      // this keyboard replaces.
+      ...(entitlement?.status === "active" ? {} : { reply_markup: payRailsKeyboard() })
     });
     return json({ ok: true });
   }
@@ -2418,7 +3820,10 @@ async function handleTelegramWebhook(request, env, url) {
     const answer = fallbackMind(text, entitlement);
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
-      text: answer
+      text: answer,
+      // Someone asking the price is the single most likely person to buy. Do
+      // not make them find the next step on their own.
+      ...(entitlement?.status === "active" ? {} : { reply_markup: payRailsKeyboard() })
     });
     return json({ ok: true });
   }
@@ -2517,6 +3922,14 @@ export default {
     if (url.pathname === "/api/internal/founders-confirm" && request.method === "POST") {
       try { return await handleFoundersConfirm(request, env); }
       catch (error) { console.error("founders_confirm_failed", String(error)); return json({ ok: false, error: "stripe_confirmation_failed" }, { status: 502 }); }
+    }
+    if (url.pathname === "/api/internal/stripe/ops" && request.method === "POST") {
+      try { return await handleStripeOps(request, env); }
+      catch (error) { console.error("stripe_ops_failed", String(error)); return json({ ok: false, error: "stripe_ops_failed", detail: String(error) }, { status: 502 }); }
+    }
+    if (url.pathname === "/api/internal/courtesy/generate" && request.method === "POST") {
+      try { return await handleCourtesyGenerate(request, env); }
+      catch (error) { console.error("courtesy_generate_failed", String(error)); return json({ ok: false, error: "courtesy_generate_failed" }, { status: 500 }); }
     }
     if (url.pathname === "/api/internal/community-billing-status" && request.method === "POST") {
       try { return await handleCommunityBillingStatus(request, env); }

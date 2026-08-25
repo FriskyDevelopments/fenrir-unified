@@ -1,4 +1,4 @@
-import { readSession } from "../../_lib/auth";
+import { readCookie, readSession } from "../../_lib/auth";
 
 type Env = {
   SESSION_SECRET?: string;
@@ -8,6 +8,11 @@ type Env = {
 };
 
 const COMMUNITY_ORIGIN = "https://communities.myfenrir.com";
+// Where a signed-out visitor is parked to authenticate. It has to be an app
+// route rather than this endpoint, because safeReturnPath() refuses to send an
+// OAuth `return_to` at /api/auth/* — that guard stays exactly as it is.
+const SIGN_IN_PATH = "/main";
+const ATTEMPT_COOKIE = "fenrir_community_sso_attempted";
 const STORAGE_CHUNK_SIZE = 3000;
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 400;
 
@@ -26,42 +31,49 @@ function safeNext(raw: string | null) {
   }
 }
 
-function safeBrand(raw: string | null) {
-  const value = raw?.trim().toLowerCase() ?? "";
-  return /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(value) ? value : null;
-}
-
-function safeGate(raw: string | null) {
-  const value = raw?.trim().toLowerCase() ?? "";
-  return /^[a-z0-9][a-z0-9-]{1,58}[a-z0-9]$/.test(value) ? value : null;
-}
-
-function brandedLoginUrl(next: string, brand: string | null, gate: string | null) {
+function loginFallback(next: string) {
   const url = new URL("/login", COMMUNITY_ORIGIN);
+  url.searchParams.set("sso", "0");
   const target = new URL(next);
   url.searchParams.set("next", `${target.pathname}${target.search}${target.hash}`);
-  if (brand) url.searchParams.set("brand", brand);
-  if (gate) url.searchParams.set("gate", gate);
   return url.toString();
 }
 
-function brandedLoginResponse(next: string, brand: string | null, gate: string | null) {
+function fallbackResponse(next: string) {
   return new Response(null, {
     status: 302,
     headers: {
-      Location: brandedLoginUrl(next, brand, gate),
+      Location: loginFallback(next),
       "Cache-Control": "no-store",
+      "Set-Cookie": "fenrir_community_sso_attempted=1; Path=/; Domain=.myfenrir.com; Max-Age=120; SameSite=Lax; Secure",
     },
   });
 }
 
 /**
  * A visitor arriving from a public Gate has no MyFenrir session yet — that is
- * the normal case, not an error. Keep them on Community Bridge's branded login
- * surface; that screen starts the canonical MyFenrir OAuth flow and returns to
- * this endpoint after identity succeeds. The brand is presentation context,
- * never authorization state.
+ * the normal case, not an error. Sending them to the community's own login
+ * strands them: the button promised SSO and delivered a local email form.
+ * Park them on the MyFenrir sign-in surface instead, carrying this endpoint in
+ * `?next=` so the handoff resumes the moment they have an identity.
  */
+function signInRedirect(requestUrl: URL, next: string) {
+  const handoff = new URL("/api/auth/community-sso", requestUrl.origin);
+  handoff.searchParams.set("next", next);
+  const signIn = new URL(SIGN_IN_PATH, requestUrl.origin);
+  signIn.searchParams.set("next", `${handoff.pathname}${handoff.search}`);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: signIn.toString(),
+      "Cache-Control": "no-store",
+      // Doubles as the loop guard: if we land back here still signed out, the
+      // sign-in round trip did not take and we stop bouncing.
+      "Set-Cookie": `${ATTEMPT_COOKIE}=1; Path=/; Domain=.myfenrir.com; Max-Age=300; SameSite=Lax; Secure`,
+    },
+  });
+}
+
 function sessionCookies(storageKey: string, value: string) {
   const encodedName = encodeURIComponent(storageKey);
   const encodedValue = encodeURIComponent(value);
@@ -81,14 +93,13 @@ function sessionCookies(storageKey: string, value: string) {
 export async function onRequestGet(context: { request: Request; env: Env }) {
   const requestUrl = new URL(context.request.url);
   const next = safeNext(requestUrl.searchParams.get("next"));
-  const brand = safeBrand(requestUrl.searchParams.get("brand"));
-  const gate = safeGate(requestUrl.searchParams.get("gate"));
   const fenrirSession = await readSession(context.request, context.env);
   if (!fenrirSession) {
-    // Never let an old attempt cookie bypass the branded surface or choose a
-    // different auth broker. Retrying is safe because this page waits for a
-    // deliberate provider click; it does not auto-bounce into SSO.
-    return brandedLoginResponse(next, brand, gate);
+    // Already came back from sign-in and still no session: stop looping and
+    // hand the visitor to the community's own login.
+    return readCookie(context.request, ATTEMPT_COOKIE)
+      ? fallbackResponse(next)
+      : signInRedirect(requestUrl, next);
   }
 
   try {
@@ -134,10 +145,14 @@ export async function onRequestGet(context: { request: Request; env: Env }) {
       user: auth.user,
     });
     const headers = new Headers({ Location: next, "Cache-Control": "no-store" });
+    headers.append(
+      "Set-Cookie",
+      "fenrir_community_sso_attempted=; Path=/; Domain=.myfenrir.com; Max-Age=0; SameSite=Lax; Secure",
+    );
     for (const cookie of sessionCookies(`sb-${ref}-auth-token`, value)) headers.append("Set-Cookie", cookie);
     return new Response(null, { status: 302, headers });
   } catch (error) {
     console.error("community_sso_failed", error instanceof Error ? error.message : "unknown");
-    return brandedLoginResponse(next, brand, gate);
+    return fallbackResponse(next);
   }
 }

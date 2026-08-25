@@ -23,4 +23,21 @@ describe("production readiness", () => {
     expect(snapshot.billing.telegramWebhookSecretConfigured).toBe(true);
     expect(snapshot.app.readyForPaidUsers).toBe(true);
   });
+
+  it("accepts minimal non-Stripe path with only one primary auth provider + Telegram rail", () => {
+    // Mirrors the relaxed go-live criteria: at least one OAuth (not all three)
+    const snapshot = computeReadiness(
+      {
+        GOOGLE_CLIENT_ID: "google-id",
+        GOOGLE_CLIENT_SECRET: "google-secret",
+        DB: {},
+        NEON_DATABASE_URL: "postgres://private"
+      },
+      { starsConfigured: true, webhookConfigured: true }
+    );
+
+    expect(snapshot.auth.googleConfigured).toBe(true);
+    expect(snapshot.auth.microsoftConfigured).toBe(false);
+    expect(snapshot.app.readyForPaidUsers).toBe(true);
+  });
 });

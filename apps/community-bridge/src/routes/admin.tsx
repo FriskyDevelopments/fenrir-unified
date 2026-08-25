@@ -29,8 +29,17 @@ import {
 import { useAuth, type AppRole } from "@/hooks/use-auth";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { formatAuthError } from "@/lib/auth-errors";
-import { ArrowLeft, Loader2, Save, X } from "lucide-react";
+import { ArrowLeft, Loader2, Save, ShieldBan, ShieldCheck, X } from "lucide-react";
 import { CourtesyPanel } from "@/components/admin/courtesy-panel";
+import { BRANDS } from "@/config/brands";
+import {
+  getAdmissionRequirements,
+  saveAdmissionRequirements,
+  listAdmissionWhitelist,
+  addToAdmissionWhitelist,
+  removeFromAdmissionWhitelist,
+  type WhitelistEntry,
+} from "@/lib/admission.functions";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,

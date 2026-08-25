@@ -83,16 +83,16 @@ async function checkHandleVerdict(handle: string): Promise<HandleDecision> {
 }
 
 async function gateSecuritySummary(identity: {
-  telegram_id: string;
+  telegram_id?: string | number | null;
   telegram_username?: string | null;
   telegram_first_name?: string | null;
 }) {
   const telegramUsername = identity.telegram_username ?? null;
   const handleDecision = telegramUsername ? await checkHandleVerdict(telegramUsername) : "review";
-  const usernameStatus =
+  const usernameStatus: "blocked" | "review" | "pass" =
     handleDecision === "block" ? "blocked" : handleDecision === "review" ? "review" : "pass";
   const photoStatus = "review" as const;
-  const overall =
+  const overall: "blocked" | "review" | "ok" =
     usernameStatus === "blocked" ? "blocked" : usernameStatus === "review" || photoStatus === "review" ? "review" : "ok";
   const usernameLabel = telegramUsername ? `@${telegramUsername}` : "missing username";
   return {
@@ -182,7 +182,7 @@ export const runGateSecurityPreflight = createServerFn({ method: "POST" })
     return {
       status: summary.overall,
       identity: {
-        telegramId: identity.telegram_id,
+        telegramId: String(identity.telegram_id),
         telegramUsername: identity.telegram_username ?? null,
         telegramFirstName: identity.telegram_first_name ?? null,
       },
@@ -192,6 +192,27 @@ export const runGateSecurityPreflight = createServerFn({ method: "POST" })
         { key: "blacklist", label: "Blacklist screen", status: summary.usernameStatus },
         { key: "cp", label: "CP safety screen", status: summary.usernameStatus },
       ],
+    };
+  });
+
+export type CommunityAccessStatus = {
+  source: "neon";
+  configured: boolean;
+  allowed: boolean | null;
+};
+
+export const checkMyCommunityAccess = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => z.object({ communitySlug: z.string() }).parse(data))
+  .handler(async ({ context, data }): Promise<CommunityAccessStatus> => {
+    const email = applicantEmail(context.claims);
+    if (!email) return { source: "neon", configured: false, allowed: null };
+    const { checkNeonAllowlist } = await import("@/lib/neon-access.server");
+    const result = await checkNeonAllowlist(data.communitySlug, email);
+    return {
+      source: "neon",
+      configured: result.configured,
+      allowed: result.allowed,
     };
   });
 

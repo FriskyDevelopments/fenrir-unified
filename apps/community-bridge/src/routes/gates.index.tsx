@@ -222,10 +222,16 @@ function MyGatesPage() {
             </p>
             {quota && (
               <p className="mt-3 text-xs font-medium text-muted-foreground">
-                {quota.used} of {quota.limit} Gate drafts used
-                {` · ${verifiedDestinations.length} verified Telegram ${verifiedDestinations.length === 1 ? "group" : "groups"}`}
-                {` · ${quota.profileType === "free" ? "Free workspace" : "The Pack workspace"}`}
-                {!quota.canCreate && " · Draft limit reached"}
+                {/* El "∞" prometía un cupo sin techo: PACK_GATE_LIMIT es finito
+                    e igual al de Free. El eje que se paga son las comunidades
+                    enlazadas, no el número de Gates. */}
+                {quota.used} of {quota.limit} gates used
+                {` · ${
+                  quota.profileType === "free"
+                    ? `Free: ${FREE_GATE_LIMIT} Gates`
+                    : "The Pack · billed per linked community"
+                }`}
+                {!quota.canCreate && " · Gate draft limit reached"}
               </p>
             )}
           </div>
@@ -407,41 +413,30 @@ function MyGatesPage() {
                           <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                             Verified Telegram group
                           </p>
-                          <Select
-                            value={
-                              verifiedDestinations.length > 0
-                                ? (gate.community_id ?? undefined)
-                                : undefined
-                            }
-                            onValueChange={(communityId) =>
-                              void selectTelegramDestination(gate, communityId)
-                            }
-                            disabled={
-                              assigningGateId === gate.id || verifiedDestinations.length === 0
-                            }
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue
-                                placeholder={
-                                  verifiedDestinations.length > 0
-                                    ? "Choose a verified group"
-                                    : "No verified groups yet"
-                                }
-                              />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {verifiedDestinations.map((destination) => (
-                                <SelectItem
-                                  key={destination.communityId}
-                                  value={destination.communityId}
-                                >
-                                  {destination.displayName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {verifiedDestinations.length === 0 ? (
-                            <div className="mt-2 rounded-md border border-dashed border-amber-400/30 bg-amber-400/5 px-3 py-2 text-[10px] leading-relaxed text-muted-foreground">
+                          {verifiedDestinations.length > 0 ? (
+                            <Select
+                              value={gate.community_id ?? undefined}
+                              onValueChange={(communityId) =>
+                                void selectTelegramDestination(gate, communityId)
+                              }
+                              disabled={assigningGateId === gate.id}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Choose a verified group" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {verifiedDestinations.map((destination) => (
+                                  <SelectItem
+                                    key={destination.communityId}
+                                    value={destination.communityId}
+                                  >
+                                    {destination.displayName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <div className="rounded-md border border-dashed border-amber-400/30 bg-amber-400/5 px-3 py-2 text-[10px] leading-relaxed text-muted-foreground">
                               No verified group yet. Open the Telegram launch walkthrough above, add
                               @Myfenrir_bot as an admin, then run{" "}
                               <span className="font-mono text-foreground">
@@ -450,7 +445,7 @@ function MyGatesPage() {
                               in the protected group. This selector will unlock only after Fenrir
                               verifies that mapping.
                             </div>
-                          ) : null}
+                          )}
                         </div>
                       </div>
                     </div>

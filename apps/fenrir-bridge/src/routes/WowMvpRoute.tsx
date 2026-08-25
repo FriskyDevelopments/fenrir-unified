@@ -1,6 +1,7 @@
 import { useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { getBrandPreset, type MascotKey } from "@frisky/gate-brand";
 import { communityBridgeDashboardUrl } from "../services/communityBridge";
+import { TelegramPreviewDemo } from "../components/TelegramPreviewDemo";
 import "./wow-mvp.css";
 
 type PresetId = "fenrir-dark" | "lore-neon" | "aurora-mint";
@@ -149,6 +150,8 @@ export function WowMvpRoute() {
           <div className="cb-pulse__progress"><i style={{ width: `${(pulse + 1) * 33.333}%` }} /></div>
         </div>
       </section>
+
+      <TelegramPreviewDemo realGateHref={communityBridgeDashboardUrl} />
 
       <section className="cb-final"><div className="cb-final__glow" /><span className="cb-pill">READY WHEN YOUR COMMUNITY IS</span><h2>Create the front door<br />your people remember.</h2><a className="cb-primary" href={communityBridgeDashboardUrl}>Build it in Community Bridge <LineIcon name="arrow" /></a><small>No Gate is created from this visual lab.</small></section>
       <footer className="cb-footer"><BrandLockup compact /><p>MyFenrir identity · Community Bridge access</p><a href="/">Exit visual lab</a></footer>

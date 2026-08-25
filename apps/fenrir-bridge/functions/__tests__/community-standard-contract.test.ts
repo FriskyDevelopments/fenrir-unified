@@ -62,10 +62,15 @@ describe("Community Bridge Standard billing validation", () => {
       currency: "XTR",
       total_amount: 1150,
     };
-    expect(isValidStarsPayment(payment, order, "8379")).toBe(true);
-    expect(isValidStarsPayment(payment, order, "9999")).toBe(false);
-    expect(isValidStarsPayment({ ...payment, total_amount: 250 }, order, "8379")).toBe(false);
-    expect(isValidStarsPayment(payment, { ...order, status: "paid" }, "8379")).toBe(false);
+    // The catalogue price is now a required argument: matching the order alone
+    // was self-referential and let a 5-Star order buy the full Pack.
+    const PRICE = 1150;
+    expect(isValidStarsPayment(payment, order, "8379", PRICE)).toBe(true);
+    expect(isValidStarsPayment(payment, order, "9999", PRICE)).toBe(false);
+    expect(isValidStarsPayment({ ...payment, total_amount: 250 }, order, "8379", PRICE)).toBe(false);
+    expect(isValidStarsPayment(payment, { ...order, status: "paid" }, "8379", PRICE)).toBe(false);
+    // Fail closed when the caller forgets to supply the price.
+    expect(isValidStarsPayment(payment, order, "8379")).toBe(false);
   });
 });
 

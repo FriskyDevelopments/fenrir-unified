@@ -12,6 +12,27 @@ describe("member-facing bot menu", () => {
     expect(menu).not.toContain("MOD 01");
   });
 
+  it("never states the plan and the upgrade demand in the same card", () => {
+    // Regression: step 3 was fixed copy, so an operator with The Pack active
+    // read "Plan: The Pack · active" and "Linking a community requires The Pack"
+    // in one message — and reasonably concluded the payment never applied.
+    const active = modularMenuText("/menu", { status: "active" });
+
+    expect(active).toContain("The Pack · active");
+    expect(active).not.toContain("Linking a community requires The Pack");
+    expect(active).toContain("Your plan already covers this");
+
+    // "quiero" is one of the spanishIntent triggers; "menu" keeps it on the menu.
+    const spanish = modularMenuText("quiero el menu", { status: "active" });
+    expect(spanish).toContain("The Pack · activo");
+    expect(spanish).not.toContain("Enlazar una comunidad requiere The Pack");
+
+    // The unpaid card must still ask for the money.
+    const free = modularMenuText("/menu", { status: "inactive" });
+    expect(free).toContain("Linking a community requires The Pack");
+    expect(free).not.toContain("The Pack · active");
+  });
+
   it("does not offer a paid activation to an already-active member", () => {
     expect(botMenuKeyboard({ status: "inactive" }).flat()).toContainEqual({
       text: "⭐ Activate The Pack · Stars",
