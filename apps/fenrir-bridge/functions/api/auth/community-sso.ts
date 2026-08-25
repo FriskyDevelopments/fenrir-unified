@@ -1,4 +1,4 @@
-import { readSession } from "../../_lib/auth";
+import { readCookie, readSession } from "../../_lib/auth";
 
 type Env = {
   SESSION_SECRET?: string;
@@ -8,6 +8,11 @@ type Env = {
 };
 
 const COMMUNITY_ORIGIN = "https://communities.myfenrir.com";
+// Where a signed-out visitor is parked to authenticate. It has to be an app
+// route rather than this endpoint, because safeReturnPath() refuses to send an
+// OAuth `return_to` at /api/auth/* — that guard stays exactly as it is.
+const SIGN_IN_PATH = "/main";
+const ATTEMPT_COOKIE = "fenrir_community_sso_attempted";
 const STORAGE_CHUNK_SIZE = 3000;
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 400;
 
@@ -45,6 +50,30 @@ function fallbackResponse(next: string) {
   });
 }
 
+/**
+ * A visitor arriving from a public Gate has no MyFenrir session yet — that is
+ * the normal case, not an error. Sending them to the community's own login
+ * strands them: the button promised SSO and delivered a local email form.
+ * Park them on the MyFenrir sign-in surface instead, carrying this endpoint in
+ * `?next=` so the handoff resumes the moment they have an identity.
+ */
+function signInRedirect(requestUrl: URL, next: string) {
+  const handoff = new URL("/api/auth/community-sso", requestUrl.origin);
+  handoff.searchParams.set("next", next);
+  const signIn = new URL(SIGN_IN_PATH, requestUrl.origin);
+  signIn.searchParams.set("next", `${handoff.pathname}${handoff.search}`);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: signIn.toString(),
+      "Cache-Control": "no-store",
+      // Doubles as the loop guard: if we land back here still signed out, the
+      // sign-in round trip did not take and we stop bouncing.
+      "Set-Cookie": `${ATTEMPT_COOKIE}=1; Path=/; Domain=.myfenrir.com; Max-Age=300; SameSite=Lax; Secure`,
+    },
+  });
+}
+
 function sessionCookies(storageKey: string, value: string) {
   const encodedName = encodeURIComponent(storageKey);
   const encodedValue = encodeURIComponent(value);
@@ -65,7 +94,13 @@ export async function onRequestGet(context: { request: Request; env: Env }) {
   const requestUrl = new URL(context.request.url);
   const next = safeNext(requestUrl.searchParams.get("next"));
   const fenrirSession = await readSession(context.request, context.env);
-  if (!fenrirSession) return fallbackResponse(next);
+  if (!fenrirSession) {
+    // Already came back from sign-in and still no session: stop looping and
+    // hand the visitor to the community's own login.
+    return readCookie(context.request, ATTEMPT_COOKIE)
+      ? fallbackResponse(next)
+      : signInRedirect(requestUrl, next);
+  }
 
   try {
     const supabaseUrl = required(context.env.SUPABASE_URL, "SUPABASE_URL").replace(/\/$/, "");

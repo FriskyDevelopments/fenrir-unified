@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Send,
   Shield,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   UsersRound,
@@ -31,13 +32,16 @@ import { motion, useReducedMotion, useScroll, useSpring } from "motion/react";
 import { TelegramIdentityCard } from "@/components/telegram/telegram-identity-card";
 import { DEMO_TELEGRAM_PROFILE, isDemoMode } from "@/config/demo-mode";
 import { useBrand } from "@/config/brand-context";
-import { listMyGates, type GateRecord } from "@/lib/gate.functions";
+import {
+  listMyGates,
+  listVerifiedTelegramDestinations,
+  type GateRecord,
+  type VerifiedTelegramDestination,
+} from "@/lib/gate.functions";
 import { getPreset } from "@/lib/gate-presets";
 import { getMyGateViewStats, type GateViewStats } from "@/lib/gate-analytics.functions";
-import {
-  listModerationReviews,
-  type ModerationReview,
-} from "@/lib/moderation.functions";
+import { listModerationReviews, type ModerationReview } from "@/lib/moderation.functions";
+import { checkMyCommunityAccess, type CommunityAccessStatus } from "@/lib/access.functions";
 
 export const Route = createFileRoute("/dashboard")({
   ssr: false,
@@ -69,11 +73,15 @@ function DashboardPage() {
   const navigate = useNavigate();
   const brand = useBrand();
   const fetchGates = useServerFn(listMyGates);
+  const fetchVerifiedDestinations = useServerFn(listVerifiedTelegramDestinations);
   const fetchGateStats = useServerFn(getMyGateViewStats);
   const fetchPendingReviews = useServerFn(listModerationReviews);
   const [demo, setDemo] = useState(false);
   const [gateCount, setGateCount] = useState<number | null>(null);
   const [gateRecords, setGateRecords] = useState<GateRecord[]>([]);
+  const [verifiedDestinations, setVerifiedDestinations] = useState<VerifiedTelegramDestination[]>(
+    [],
+  );
   const [gateStats, setGateStats] = useState<GateViewStats[]>([]);
   const [gatesLoading, setGatesLoading] = useState(true);
   const [gateLoadError, setGateLoadError] = useState(false);
@@ -114,8 +122,8 @@ function DashboardPage() {
     setGatesLoading(true);
     setGateLoadError(false);
     setStatsLoadError(false);
-    void Promise.allSettled([fetchGates(), fetchGateStats()])
-      .then(([gatesResult, statsResult]) => {
+    void Promise.allSettled([fetchGates(), fetchGateStats(), fetchVerifiedDestinations()])
+      .then(([gatesResult, statsResult, destinationsResult]) => {
         if (!active) return;
         if (gatesResult.status === "fulfilled") {
           setGateCount(gatesResult.value.length);
@@ -131,12 +139,18 @@ function DashboardPage() {
         } else {
           setStatsLoadError(true);
         }
+        if (destinationsResult.status === "fulfilled") {
+          setVerifiedDestinations(destinationsResult.value);
+        } else {
+          // A failed lookup is never evidence that a community is live.
+          setVerifiedDestinations([]);
+        }
       })
       .finally(() => active && setGatesLoading(false));
     return () => {
       active = false;
     };
-  }, [loading, session, fetchGates, fetchGateStats, loadAttempt]);
+  }, [loading, session, fetchGates, fetchGateStats, fetchVerifiedDestinations, loadAttempt]);
 
   useEffect(() => {
     if (loading || !session) return;
@@ -168,11 +182,18 @@ function DashboardPage() {
   const totalViews = gateStats.reduce((sum, item) => sum + item.total, 0);
   const recentViews = gateStats.reduce((sum, item) => sum + item.last7, 0);
 
-  // "Complete" is decided by the real Neon lookup, never guessed: an owner who
-  // has linked Telegram AND has at least one Gate is done with setup — show the
-  // success state and next actions instead of any onboarding/setup prompt.
+  // A Gate draft and an account-level Telegram identity do not protect a
+  // community. Completion requires a Gate mapped to one of this owner's
+  // bot-verified Telegram destinations.
   const hasGates = (gateCount ?? 0) > 0;
-  const isComplete = Boolean(telegramId) && hasGates && !gatesLoading && !gateLoadError;
+  const verifiedCommunityIds = new Set(
+    verifiedDestinations.map((destination) => destination.communityId),
+  );
+  const hasVerifiedDestination = gateRecords.some(
+    (gate) => Boolean(gate.community_id) && verifiedCommunityIds.has(gate.community_id!),
+  );
+  const isComplete =
+    Boolean(telegramId) && hasGates && hasVerifiedDestination && !gatesLoading && !gateLoadError;
 
   if (loading || roleLoading || !session) {
     return (
@@ -556,12 +577,14 @@ function DashboardPage() {
                   body: "Share a Gate link or QR to bring people in.",
                 },
                 ...(isOwner
-                  ? [{
-                    to: "/access" as const,
-                    icon: Shield,
-                    title: "Accept access requests",
-                    body: "Approve people before Fenrir issues their private invite.",
-                  }]
+                  ? [
+                      {
+                        to: "/access" as const,
+                        icon: Shield,
+                        title: "Accept access requests",
+                        body: "Approve people before Fenrir issues their private invite.",
+                      },
+                    ]
                   : []),
               ].map((action) => {
                 const Icon = action.icon;
@@ -665,15 +688,23 @@ function DashboardPage() {
                           </span>
                         </td>
                         <td className="max-w-72 px-6 py-4">
-                          <p className="truncate font-mono text-xs text-foreground" title={review.subject_ref}>
+                          <p
+                            className="truncate font-mono text-xs text-foreground"
+                            title={review.subject_ref}
+                          >
                             {review.subject_ref}
                           </p>
-                          <p className="mt-1 text-[11px] text-muted-foreground">{review.subject_kind}</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            {review.subject_kind}
+                          </p>
                         </td>
                         <td className="px-6 py-4 text-xs text-muted-foreground">
                           <span>Apparent age: {review.apparent_age ?? "—"}</span>
                           <span className="mx-2 text-border">·</span>
-                          <span>Explicit: {review.explicit === null ? "—" : review.explicit ? "yes" : "no"}</span>
+                          <span>
+                            Explicit:{" "}
+                            {review.explicit === null ? "—" : review.explicit ? "yes" : "no"}
+                          </span>
                         </td>
                         <td className="px-6 py-4 text-xs text-muted-foreground sm:px-8">
                           <span className="inline-flex items-center gap-1.5">

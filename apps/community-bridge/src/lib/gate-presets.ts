@@ -179,6 +179,8 @@ export interface GateConfig {
   logo_url: string | null;
   mascot_url: string | null;
   background_url: string | null;
+  brand_id?: string;
+  community_id?: string | null;
 }
 
 /*

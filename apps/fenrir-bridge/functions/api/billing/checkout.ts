@@ -61,6 +61,17 @@ export async function onRequestPost(context: { request: Request; env: BillingEnv
       mode: "subscription",
       client_reference_id: session.frisky_org_id,
       customer_email: session.email,
+      // quantity: 1 es CORRECTO aquí, y no es el bug del eje de cobro.
+      //
+      // Esta ruta rechaza "standard" arriba a propósito: sólo vende starter,
+      // pro y operator, que son planes PLANOS con tope de locks (ver
+      // _lib/plan-catalog.ts) — su precio no depende de cuántas comunidades
+      // haya enlazadas, así que la cantidad siempre es 1 licencia de plan.
+      //
+      // El que SÍ se cobra por comunidad enlazada es The Pack, y se vende por
+      // workers/fenrir-stars-payments.js. Si algún día este endpoint empieza a
+      // vender The Pack, esta línea deja de ser correcta: usa
+      // checkoutSeatQuantity() y reconcilia con syncCommunitySeatQuantity().
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${origin}/?billing=success`,
       cancel_url: `${origin}/?billing=cancel`,

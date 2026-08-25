@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Loader2, Upload, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { verifyUploadedImage } from "@/lib/moderation.functions";
+import { moderateUpload } from "@/lib/moderate-upload.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ASPECT_PRESETS, ImageCropDialog } from "@/components/brand/image-crop-dialog";
@@ -26,7 +26,7 @@ export function BrandAssetUpload({ label, brandId, kind, value, onChange }: Bran
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<File | null>(null);
-  const verifyImage = useServerFn(verifyUploadedImage);
+  const moderateImage = useServerFn(moderateUpload);
 
   async function upload(file: File) {
     setError(null);
@@ -52,6 +52,27 @@ export function BrandAssetUpload({ label, brandId, kind, value, onChange }: Bran
         ?.toLowerCase()
         .replace(/[^a-z0-9]/g, "") || "png";
     const path = `${brandId}/${kind}-${Date.now()}.${ext}`;
+    let verdict: Awaited<ReturnType<typeof moderateImage>>;
+    try {
+      verdict = await moderateImage({
+        data: {
+          image: await fileToDataUri(file),
+          subject_ref: `/brand-asset/${path}`,
+          subject_kind: "brand_asset",
+          community_id: brandId,
+        },
+      });
+    } catch {
+      setBusy(false);
+      setError("Image verification failed — try again.");
+      return;
+    }
+    if (verdict.decision === "reject") {
+      setBusy(false);
+      setError("This image is not allowed here.");
+      return;
+    }
+
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
       .upload(path, file, { upsert: true, contentType: file.type });
@@ -63,20 +84,6 @@ export function BrandAssetUpload({ label, brandId, kind, value, onChange }: Bran
           ? "Only staff can upload brand assets."
           : uploadError.message,
       );
-      return;
-    }
-
-    // Content check — flagged files are deleted server-side and never accepted.
-    try {
-      const verdict = await verifyImage({ data: { bucket: BUCKET, path } });
-      if (!verdict.allowed) {
-        setBusy(false);
-        setError(verdict.reason ?? "This image is not allowed here.");
-        return;
-      }
-    } catch {
-      setBusy(false);
-      setError("Image verification failed — try again.");
       return;
     }
 
@@ -159,4 +166,13 @@ export function BrandAssetUpload({ label, brandId, kind, value, onChange }: Bran
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>
   );
+}
+
+function fileToDataUri(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read image"));
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsDataURL(file);
+  });
 }

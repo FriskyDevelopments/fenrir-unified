@@ -47,18 +47,24 @@ npm run build && wrangler pages deploy dist/ --project-name fenrir-bridge
   telegram_stars_entitlements, telegram_stars_orders, webauthn_credentials,
   workspace_members, workspaces
 
-## Current Status (2026-05-23)
-- ✅ `myfenrir.com` is live and returning HTTP 200
-- ✅ D1 database has 17 tables (schema applied)
-- ✅ All required secrets set in Cloudflare Pages production env
-- ✅ Non-Stripe go-live path uses Telegram Stars + D1 entitlement state
-- ⚠️ Stripe/card billing is optional standby and must not block this launch path
+## Current Status (2026-08-24)
+- ✅ `myfenrir.com` + `www` live; `npm run verify:prod` and `verify:readiness` (unauth) all green on prod
+- ✅ Go-live audit merged to main + deployed (Cloudflare Pages `fenrir-bridge`)
+  - Mocks/fake data eliminated in security-report
+  - Queries aligned to real Neon gate schema (profiles, community_memberships, verification_sessions, communities)
+  - Readiness relaxed for non-Stripe path: `readyForPaidUsers` now requires **at least one** primary auth provider (Google/Microsoft/Apple/frisky) + D1 + Neon + Telegram Stars rail
+- ✅ 72 tests, typecheck, production build all clean
+- ✅ Fresh post-merge hygiene audit (megabug + cloudflare + workers-best-practices dimensions) on main: no critical regressions or mocks; one scoped robustness fix + compat date bump
+- ✅ D1 (17 tables) + Neon for gate + app-state operational
+- ✅ Community gate, Telegram Stars, auth flows passing smoke tests
+- ⚠️ Stripe/card billing remains optional standby
 
-## Immediate Tasks for AI Agents
-1. **BUILD & DEPLOY** — Run `npm run build` then `wrangler pages deploy dist/ --project-name fenrir-bridge`
-2. **TELEGRAM STARS SECRETS** — Required for this launch: TELEGRAM_BOT_TOKEN or TELEGRAM_PROD_BOT_TOKEN, FENRIR_TELEGRAM_BOT_USERNAME or MYFENRIR_TELEGRAM_BOT_USERNAME, TELEGRAM_WEBHOOK_SECRET
-3. **VERIFY /api/readiness** — After deploy, authenticated `curl https://myfenrir.com/api/readiness` should return JSON with `readyForPaidUsers: true` when OAuth, D1, and Telegram Stars are configured
-4. **GOOGLE OAUTH REDIRECT** — Ensure `https://myfenrir.com/auth/callback` is added to Google Cloud Console OAuth client
+## Immediate / Post-Deploy Tasks
+- Verify authenticated `/api/readiness` (with valid session) reports `readyForPaidUsers: true`
+- Confirm Google OAuth redirect URIs registered for production
+- Wire `CommunitySecurityReport` component into admin UI (API + service + types ready)
+- Monitor Telegram Stars entitlements and community gate review flows in prod
+- Keep secrets only in Cloudflare Pages env (never in git)
 
 ## Working Rules
 - Keep changes minimal and scoped

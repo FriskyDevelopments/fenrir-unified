@@ -128,18 +128,18 @@ export const getMyGateViewStats = createServerFn({ method: "GET" })
     since.setUTCDate(since.getUTCDate() - (DAYS - 1));
     since.setUTCHours(0, 0, 0, 0);
 
-    const [recent, totals] = await Promise.all([
+    const [recent, totals] = (await Promise.all([
       sql`
         select gate_id, viewed_at from cb_gate_views
         where gate_id = any(${ids}::uuid[]) and viewed_at >= ${since.toISOString()}
         limit 50000
-      ` as Promise<Array<{ gate_id: string; viewed_at: string | Date }>>,
+      `,
       sql`
         select gate_id from cb_gate_views
         where gate_id = any(${ids}::uuid[])
         limit 50000
-      ` as Promise<Array<{ gate_id: string }>>,
-    ]);
+      `,
+    ])) as unknown as [Array<{ gate_id: string; viewed_at: string | Date }>, Array<{ gate_id: string }>];
 
     const stats = new Map<string, GateViewStats>(
       ids.map((id) => [id, { gate_id: id, total: 0, last7: 0, daily: emptyDays() }]),

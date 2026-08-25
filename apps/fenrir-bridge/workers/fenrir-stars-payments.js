@@ -1,3 +1,7 @@
+// Neon: única fuente de "comunidad enlazada". Ver el bloque EJE DE COBRO más
+// abajo. Mismo driver y mismo secreto que workers/fenrir-allowlist-check.ts.
+import { neon } from "@neondatabase/serverless";
+
 const json = (body, init = {}) =>
   new Response(JSON.stringify(body), {
     ...init,
@@ -180,6 +184,213 @@ export function foundersPriceId(env, billingPeriod) {
   return billingPeriod === "annual"
     ? normalizeText(env?.STRIPE_PACK_ANNUAL_PRICE_ID) || LIVE_FOUNDERS_ANNUAL_PRICE
     : normalizeText(env?.STRIPE_PACK_MONTHLY_PRICE_ID) || LIVE_FOUNDERS_MONTHLY_PRICE;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * EJE DE COBRO — la cantidad de Stripe sigue a las comunidades ENLAZADAS.
+ *
+ * La oferta publicada (pack-rails.tsx, plan-catalog.ts, i18n.ts en cuatro
+ * idiomas y FENRIR_STARS_DESCRIPTION) dice "$14.99/mes POR COMUNIDAD
+ * ENLAZADA". El código no la cumplía: los dos rieles fijaban la cantidad a
+ * mano en 1 y nada volvía a tocarla nunca. Con cero comunidades enlazadas
+ * cobraba $14.99; con tres, también $14.99. Plano vendido como métrico.
+ *
+ * "Enlazada" es una fila VERIFICADA en cb_community_destinations (Neon). No es
+ * "tiene un Gate": un Gate sin destino no protege ningún grupo, y cobrar por él
+ * es cobrar por algo que no ocurrió.
+ *
+ * Dos límites de Stripe, COMPROBADOS contra la API en vivo — no supuestos:
+ *
+ *  1) Un subscription item SÍ acepta quantity 0 sobre un precio `licensed`.
+ *     Previsualización de factura: HTTP 200, subtotal 0, línea
+ *     "0 × MyFenrir Pack — Founder Go-Live (at $14.99 / month) | amount: 0".
+ *     → Cero enlazadas PUEDE facturar cero. Ése es el objetivo del cambio.
+ *
+ *  2) Checkout en modo `subscription` NO acepta quantity 0:
+ *       HTTP 400 · invalid_request_error · parameter_invalid_integer
+ *       param=line_items[0][quantity]
+ *       "This value must be greater than or equal to 1."
+ *     → El alta nace forzosamente en ≥1 y se reconcilia a la baja justo
+ *       después. Por eso hay DOS funciones de cantidad y no una sola.
+ * ─────────────────────────────────────────────────────────────────────── */
+
+/** Piso que impone Stripe a `line_items[n][quantity]` en Checkout. */
+export const STRIPE_CHECKOUT_MIN_QUANTITY = 1;
+
+/**
+ * Cantidad REAL a facturar. Puede ser 0 — y con cero enlazadas debe serlo.
+ * Todo lo que no sea un entero positivo cuenta como 0: ante la duda, no cobrar.
+ */
+export function billedSeatQuantity(linkedCommunities) {
+  const n = Number(linkedCommunities);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.floor(n);
+}
+
+/**
+ * Cantidad con la que puede NACER una sesión de Checkout. Idéntica a la real
+ * salvo que Stripe prohíbe 0 en el alta (ver punto 2 arriba). El alta en 1 no
+ * es una promesa de cobro: `syncCommunitySeatQuantity` la baja a 0 en cuanto
+ * la suscripción existe si no hay ninguna comunidad enlazada.
+ */
+export function checkoutSeatQuantity(linkedCommunities) {
+  return Math.max(STRIPE_CHECKOUT_MIN_QUANTITY, billedSeatQuantity(linkedCommunities));
+}
+
+/**
+ * Prorrateo: asimétrico A PROPÓSITO.
+ *
+ *  - BAJA (desenlazar) → `create_prorations`: deja de cobrarse en el acto y
+ *    acredita la parte no usada. Nunca se sigue cobrando por un grupo que ya
+ *    no está enlazado.
+ *  - ALTA (enlazar) → `none`: la comunidad nueva empieza a facturar en la
+ *    renovación siguiente. Enlazar no debe disparar un cargo a mitad de ciclo
+ *    que el usuario no pulsó.
+ *
+ * Los dos errores posibles apuntan hacia el mismo lado: no cobrar de más.
+ * `null` significa que no hay nada que cambiar — la llamada a Stripe se omite.
+ */
+export function seatProrationBehavior(currentQuantity, nextQuantity) {
+  const from = billedSeatQuantity(currentQuantity);
+  const to = billedSeatQuantity(nextQuantity);
+  if (from === to) return null;
+  return to < from ? "create_prorations" : "none";
+}
+
+/**
+ * Sólo las filas de `billing_subscriptions` que son objetos Stripe de verdad.
+ * `stars:…`, `courtesy:…` y `referral:…` son ids sintéticos de otros rieles:
+ * pedirle a Stripe la cantidad de uno de ésos es un 404 garantizado.
+ */
+export function isStripeSubscriptionId(id) {
+  return /^sub_[A-Za-z0-9]+$/.test(normalizeText(id));
+}
+
+/**
+ * El interruptor existe porque encender esto REESCRIBE suscripciones vivas con
+ * tarjeta en archivo. Se despliega apagado; se enciende a sabiendas.
+ */
+function seatBillingEnabled(env) {
+  return normalizeText(env?.COMMUNITY_SEAT_BILLING_ENABLED) === "true";
+}
+
+/** Comunidades enlazadas verificadas de este dueño, leídas de Neon. */
+async function countLinkedCommunities(env, supabaseUserId) {
+  const url = normalizeText(env?.NEON_DATABASE_URL);
+  if (!url) throw new Error("neon_not_configured");
+  const sql = neon(url);
+  const rows = await sql`
+    select count(distinct community_id)::int as linked
+    from cb_community_destinations
+    where user_id = ${supabaseUserId}::uuid
+      and provider = 'telegram'
+      and status = 'verified'
+  `;
+  return billedSeatQuantity(rows?.[0]?.linked);
+}
+
+/** Dueño (UUID de Supabase) de una comunidad ya enlazada, según Neon. */
+async function ownerOfCommunity(env, communityId) {
+  const id = normalizeText(communityId);
+  if (!id) return "";
+  const url = normalizeText(env?.NEON_DATABASE_URL);
+  if (!url) throw new Error("neon_not_configured");
+  const sql = neon(url);
+  const rows = await sql`
+    select user_id
+    from cb_community_destinations
+    where community_id = ${id}
+      and provider = 'telegram'
+      and status = 'verified'
+    order by updated_at desc
+    limit 1
+  `;
+  return normalizeText(rows?.[0]?.user_id);
+}
+
+/**
+ * Cantidad de alta para Checkout, tolerante a fallos. Un Neon caído no puede
+ * impedir una compra: si no se puede contar, se cae al piso de Stripe (1) y la
+ * reconciliación posterior corrige. Nunca inventa una cantidad hacia arriba.
+ */
+async function checkoutSeatQuantityFor(env, supabaseUserId) {
+  try {
+    return checkoutSeatQuantity(await countLinkedCommunities(env, supabaseUserId));
+  } catch (error) {
+    console.error("checkout_seat_count_failed", error instanceof Error ? error.message : "unknown");
+    return STRIPE_CHECKOUT_MIN_QUANTITY;
+  }
+}
+
+/**
+ * Ids de org bajo los que este humano puede estar facturado. Mismo criterio que
+ * handleCommunityBillingStatus: el UUID de Supabase NO basta, porque las cuentas
+ * nacidas por el riel de identidad Fenrir viven bajo un `frisky_org_…` acuñado
+ * en telegram_identity_links.
+ */
+async function billableOrgIds(env, supabaseUserId, telegramUserId) {
+  const ids = new Set();
+  const uuid = normalizeText(supabaseUserId);
+  if (/^[0-9a-f-]{36}$/i.test(uuid)) ids.add(uuid);
+  const tg = normalizeText(telegramUserId);
+  if (/^\d{5,20}$/.test(tg)) {
+    const link = await env.DB.prepare(
+      `SELECT frisky_org_id FROM telegram_identity_links WHERE telegram_user_id = ? LIMIT 1`
+    ).bind(tg).first().catch(() => null);
+    const orgId = normalizeText(link?.frisky_org_id);
+    if (orgId) ids.add(orgId);
+  }
+  return [...ids];
+}
+
+/**
+ * Pone la cantidad de la suscripción a la altura de las comunidades enlazadas
+ * de verdad. IDEMPOTENTE: cuenta `distinct community_id`, así que enlazar dos
+ * veces el mismo grupo no mueve nada, y si la cantidad ya coincide no se llama
+ * a Stripe.
+ *
+ * Nunca lanza hacia arriba: enlazar un grupo no puede fallar porque Stripe esté
+ * caído. El fallo se registra y se devuelve, no se traga en silencio.
+ */
+export async function syncCommunitySeatQuantity(env, { supabaseUserId, telegramUserId, communityId } = {}) {
+  if (!seatBillingEnabled(env)) return { ok: true, changed: false, reason: "seat_billing_disabled" };
+  try {
+    // El dueño se resuelve contra Neon, no se deduce del id de Telegram: el
+    // mapa telegram→UUID vive en Supabase y aquí no se adivina. La fila que
+    // acabamos de escribir ya dice de quién es la comunidad.
+    const ownerId = normalizeText(supabaseUserId) || (await ownerOfCommunity(env, communityId));
+    const orgIds = await billableOrgIds(env, ownerId, telegramUserId);
+    if (orgIds.length === 0) return { ok: false, changed: false, reason: "no_billable_identity" };
+
+    const placeholders = orgIds.map(() => "?").join(",");
+    const rows = await env.DB.prepare(
+      `SELECT stripe_subscription_id FROM billing_subscriptions
+       WHERE frisky_org_id IN (${placeholders}) AND status = 'active'`
+    ).bind(...orgIds).all();
+    const subscriptionId = (rows?.results || [])
+      .map((row) => normalizeText(row?.stripe_subscription_id))
+      .find(isStripeSubscriptionId);
+    if (!subscriptionId) return { ok: true, changed: false, reason: "no_stripe_subscription" };
+
+    const target = await countLinkedCommunities(env, ownerId);
+    const subscription = await stripeRequest(env, `/subscriptions/${encodeURIComponent(subscriptionId)}`);
+    const item = subscription?.items?.data?.[0];
+    if (!item?.id) return { ok: false, changed: false, reason: "no_subscription_item" };
+
+    const current = billedSeatQuantity(item.quantity);
+    const behavior = seatProrationBehavior(current, target);
+    if (behavior === null) {
+      return { ok: true, changed: false, quantity: current, reason: "already_in_sync" };
+    }
+    await stripeRequest(env, `/subscription_items/${encodeURIComponent(item.id)}`, {
+      quantity: String(target),
+      proration_behavior: behavior
+    });
+    return { ok: true, changed: true, from: current, quantity: target, prorationBehavior: behavior };
+  } catch (error) {
+    console.error("community_seat_sync_failed", error instanceof Error ? error.message : "unknown");
+    return { ok: false, changed: false, reason: "sync_failed" };
+  }
 }
 
 /** "live" | "test" | "absent" | "unknown" — the mode only, never the key. */
@@ -524,7 +735,10 @@ async function handleFoundersCheckout(request, env) {
     // The dashboard-made quality Payment Links have this off, so a founder
     // could not redeem a code at all. API sessions accept them.
     allow_promotion_codes: "true",
-    "line_items[0][quantity]": "1",
+    // Nunca vuelvas a clavar "1" aquí. La cantidad es el eje de cobro: son las
+    // comunidades enlazadas. Stripe prohíbe 0 en el alta (ver EJE DE COBRO), así
+    // que el alta nace en ≥1 y syncCommunitySeatQuantity la reconcilia después.
+    "line_items[0][quantity]": String(await checkoutSeatQuantityFor(env, userId)),
     "line_items[0][price]": priceId,
     "metadata[frisky_user_id]": userId,
     "metadata[frisky_org_id]": orgId,
@@ -2178,7 +2392,17 @@ async function syncVerifiedTelegramDestination(env, channel, message) {
     console.error("group_admin_screening_blocked", telegramCommunityId(chat.id), (screening.blockedTelegramUserIds || []).join(","));
     return { ok: false, reason: "screening_blocked" };
   }
-  return { ok: true, communityId: telegramCommunityId(chat.id), screening: screening.state };
+  // El grupo ya está enlazado y verificado: AHORA la cantidad facturada tiene
+  // que reflejarlo. Va después del alta y nunca la bloquea — si Stripe falla,
+  // el grupo queda enlazado igual y la reconciliación se reintenta al próximo
+  // enlace. Idempotente: reenlazar el mismo grupo no mueve la cantidad.
+  const seats = await syncCommunitySeatQuantity(env, {
+    communityId: telegramCommunityId(chat.id),
+    telegramUserId: String(actorId)
+  });
+  if (!seats.ok) console.error("community_seat_sync_after_link", seats.reason || "unknown");
+
+  return { ok: true, communityId: telegramCommunityId(chat.id), screening: screening.state, seats };
 }
 // Member profile: plan, access, and courtesy window if any. Resolves from the
 // Telegram identity link → billing_subscriptions (with expiry) and the Stars

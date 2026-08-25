@@ -74,7 +74,9 @@ function MyGatesPage() {
   const [stats, setStats] = useState<GateViewStats[] | null>(null);
   const [quota, setQuota] = useState<GateQuota | null>(null);
   const [botReadiness, setBotReadiness] = useState<CommunityBotReadiness[]>([]);
-  const [verifiedDestinations, setVerifiedDestinations] = useState<VerifiedTelegramDestination[]>([]);
+  const [verifiedDestinations, setVerifiedDestinations] = useState<VerifiedTelegramDestination[]>(
+    [],
+  );
   const [assigningGateId, setAssigningGateId] = useState<string | null>(null);
 
   // Readiness is intentionally public operational metadata. Query the Bot OS
@@ -182,7 +184,9 @@ function MyGatesPage() {
       const saved = await assignTelegramDestination({
         data: { id: gate.id, brand_id: gate.brand_id, community_id: communityId },
       });
-      setGates((current) => current?.map((item) => (item.id === saved.id ? saved : item)) ?? current);
+      setGates(
+        (current) => current?.map((item) => (item.id === saved.id ? saved : item)) ?? current,
+      );
       const destination = verifiedDestinations.find((item) => item.communityId === communityId);
       toast.success(`${destination?.displayName ?? "Telegram group"} connected to this Gate`);
     } catch (error) {
@@ -227,16 +231,17 @@ function MyGatesPage() {
                     ? `Free: ${FREE_GATE_LIMIT} Gates`
                     : "The Pack · billed per linked community"
                 }`}
-                {!quota.canCreate && " · Profile limit reached"}
+                {!quota.canCreate && " · Gate draft limit reached"}
               </p>
             )}
           </div>
           {quota?.canCreate === false ? (
-            <Button asChild variant="fenrir" title={`Limit: ${quota.limit} gates per profile`}>
-              <Link to="/upgrade">
-                <Plus className="mr-2 h-4 w-4" />
-                Ascend to Pack
-              </Link>
+            <Button
+              asChild
+              variant="outline"
+              title={`Limit: ${quota.limit} Gate drafts per profile`}
+            >
+              <Link to="/gates">Review your Gates</Link>
             </Button>
           ) : (
             <Button asChild variant="fenrir">
@@ -264,12 +269,18 @@ function MyGatesPage() {
               username: telegramUsername,
               firstName: telegramFirstName,
             }}
-            mappings={[...new Map([
-              [brand.community.id, brand.community.label],
-              ...gates
-                .filter((gate): gate is GateRecord & { community_id: string } => Boolean(gate.community_id))
-                .map((gate) => [gate.community_id, gate.community_label || gate.headline] as const),
-            ]).entries()].map(([id, label]) => ({
+            mappings={[
+              ...new Map([
+                [brand.community.id, brand.community.label],
+                ...gates
+                  .filter((gate): gate is GateRecord & { community_id: string } =>
+                    Boolean(gate.community_id),
+                  )
+                  .map(
+                    (gate) => [gate.community_id, gate.community_label || gate.headline] as const,
+                  ),
+              ]).entries(),
+            ].map(([id, label]) => ({
               communityId: id,
               communityLabel: label,
               verified: botReadiness.find((item) => item.communityId === id)?.verified === true,
@@ -347,106 +358,117 @@ function MyGatesPage() {
               const connected = readiness?.verified === true;
               return (
                 <Card
-                key={gate.id}
-                className={`group relative overflow-hidden p-0 transition duration-500 hover:-translate-y-1 hover:border-primary/35 hover:shadow-[0_28px_80px_-45px_hsl(var(--primary))] ${index === 0 ? "sm:col-span-2 lg:col-span-2" : ""}`}
-              >
-                {index === 0 ? (
-                  <div className="absolute left-4 top-4 z-20 rounded-full border border-white/15 bg-black/55 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-xl">
-                    Primary Gate
-                  </div>
-                ) : null}
-                <GatePreview
-                  config={gate}
-                  compact
-                  className={index === 0 ? "h-64 sm:h-72" : "h-40"}
-                />
-                <div className="space-y-3 p-4">
-                  <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-start">
-                    <div className="min-w-0">
-                      <p
-                        className={`truncate font-semibold tracking-tight ${index === 0 ? "text-lg" : "text-sm"}`}
-                      >
-                        {gate.headline}
-                      </p>
-                      <p className="truncate text-[11px] text-muted-foreground">/g/{gate.slug}</p>
+                  key={gate.id}
+                  className={`group relative overflow-hidden p-0 transition duration-500 hover:-translate-y-1 hover:border-primary/35 hover:shadow-[0_28px_80px_-45px_hsl(var(--primary))] ${index === 0 ? "sm:col-span-2 lg:col-span-2" : ""}`}
+                >
+                  {index === 0 ? (
+                    <div className="absolute left-4 top-4 z-20 rounded-full border border-white/15 bg-black/55 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-xl">
+                      Primary Gate
                     </div>
-                    <span
-                      className={`w-fit rounded-full border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] ${connected ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300" : "border-amber-400/25 bg-amber-400/10 text-amber-300"}`}
-                    >
-                      {connected ? "Live" : "Setup pending"}
-                    </span>
-                    <div className="sm:col-span-2">
-                      <p className="mt-1 truncate text-[11px] font-medium text-primary">
-                        {connected
-                          ? `Connected community: ${
-                              gate.community_id === "myfenrir-core" ||
-                              !gate.community_label ||
-                              gate.community_label === gate.community_id
-                                ? brand.community.label
-                                : gate.community_label
-                            }`
-                          : gate.community_id
-                            ? "Community connection needs attention"
-                            : "No verified group selected"}
-                      </p>
-                      <p
-                        className={`mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${connected ? "text-emerald-400" : "text-amber-400"}`}
+                  ) : null}
+                  <GatePreview
+                    config={gate}
+                    compact
+                    className={index === 0 ? "h-64 sm:h-72" : "h-40"}
+                  />
+                  <div className="space-y-3 p-4">
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-start">
+                      <div className="min-w-0">
+                        <p
+                          className={`truncate font-semibold tracking-tight ${index === 0 ? "text-lg" : "text-sm"}`}
+                        >
+                          {gate.headline}
+                        </p>
+                        <p className="truncate text-[11px] text-muted-foreground">/g/{gate.slug}</p>
+                      </div>
+                      <span
+                        className={`w-fit rounded-full border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] ${connected ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300" : "border-amber-400/25 bg-amber-400/10 text-amber-300"}`}
                       >
-                        {connected
-                          ? "Bot admin verified"
-                          : gate.community_id
-                            ? "Bot admin needs attention"
-                            : "Select this Gate in Fenrir to choose a verified group"}
-                      </p>
-                      {verifiedDestinations.length > 0 ? (
+                        {connected ? "Live" : "Setup pending"}
+                      </span>
+                      <div className="sm:col-span-2">
+                        <p className="mt-1 truncate text-[11px] font-medium text-primary">
+                          {connected
+                            ? `Connected community: ${
+                                gate.community_id === "myfenrir-core" ||
+                                !gate.community_label ||
+                                gate.community_label === gate.community_id
+                                  ? brand.community.label
+                                  : gate.community_label
+                              }`
+                            : gate.community_id
+                              ? "Community connection needs attention"
+                              : "No verified group selected"}
+                        </p>
+                        <p
+                          className={`mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${connected ? "text-emerald-400" : "text-amber-400"}`}
+                        >
+                          {connected
+                            ? "Bot admin verified"
+                            : gate.community_id
+                              ? "Bot admin needs attention"
+                              : "Select this Gate in Fenrir to choose a verified group"}
+                        </p>
                         <div className="mt-3 max-w-sm">
                           <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                             Verified Telegram group
                           </p>
-                          <Select
-                            value={gate.community_id ?? undefined}
-                            onValueChange={(communityId) => void selectTelegramDestination(gate, communityId)}
-                            disabled={assigningGateId === gate.id}
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Choose a verified group" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {verifiedDestinations.map((destination) => (
-                                <SelectItem key={destination.communityId} value={destination.communityId}>
-                                  {destination.displayName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {verifiedDestinations.length > 0 ? (
+                            <Select
+                              value={gate.community_id ?? undefined}
+                              onValueChange={(communityId) =>
+                                void selectTelegramDestination(gate, communityId)
+                              }
+                              disabled={assigningGateId === gate.id}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Choose a verified group" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {verifiedDestinations.map((destination) => (
+                                  <SelectItem
+                                    key={destination.communityId}
+                                    value={destination.communityId}
+                                  >
+                                    {destination.displayName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <div className="rounded-md border border-dashed border-amber-400/30 bg-amber-400/5 px-3 py-2 text-[10px] leading-relaxed text-muted-foreground">
+                              No verified group yet. Open the Telegram launch walkthrough above, add
+                              @Myfenrir_bot as an admin, then run{" "}
+                              <span className="font-mono text-foreground">
+                                /connect@Myfenrir_bot
+                              </span>{" "}
+                              in the protected group. This selector will unlock only after Fenrir
+                              verifies that mapping.
+                            </div>
+                          )}
                         </div>
-                      ) : !gate.community_id ? (
-                        <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
-                          Verified groups will appear here after Fenrir confirms its access in Telegram.
-                        </p>
-                      ) : null}
+                      </div>
+                    </div>
+                    <GateAnalyticsPanel
+                      stats={stats?.find((s) => s.gate_id === gate.id)}
+                      accent={getPreset(gate.preset).accent}
+                      loading={stats === null}
+                    />
+
+                    <div className="flex items-center gap-2">
+                      <Button asChild size="sm" variant="outline" className="flex-1">
+                        <Link to="/gates/$id" params={{ id: gate.id }}>
+                          Edit
+                        </Link>
+                      </Button>
+                      <Button asChild size="sm" variant="ghost">
+                        <a href={`/g/${gate.slug}`} target="_blank" rel="noreferrer">
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          <span className="sr-only">Open {gate.slug}</span>
+                        </a>
+                      </Button>
                     </div>
                   </div>
-                  <GateAnalyticsPanel
-                    stats={stats?.find((s) => s.gate_id === gate.id)}
-                    accent={getPreset(gate.preset).accent}
-                    loading={stats === null}
-                  />
-
-                  <div className="flex items-center gap-2">
-                    <Button asChild size="sm" variant="outline" className="flex-1">
-                      <Link to="/gates/$id" params={{ id: gate.id }}>
-                        Edit
-                      </Link>
-                    </Button>
-                    <Button asChild size="sm" variant="ghost">
-                      <a href={`/g/${gate.slug}`} target="_blank" rel="noreferrer">
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        <span className="sr-only">Open {gate.slug}</span>
-                      </a>
-                    </Button>
-                  </div>
-                </div>
                 </Card>
               );
             })}

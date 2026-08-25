@@ -1,8 +1,6 @@
 import { useRef, useState } from "react";
 import { Film, ImageIcon, Loader2, Upload, X } from "lucide-react";
-import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { verifyUploadedImage } from "@/lib/moderation.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +36,6 @@ export function GateMediaField({ id, label, hint, value, onChange }: GateMediaFi
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const verifyImage = useServerFn(verifyUploadedImage);
 
   const invalidUrl = Boolean(value) && !isUsableMediaUrl(value!);
   const isVideo = isVideoUrl(value);

@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [telegramUsername, setTelegramUsername] = useState<string | null>(null);
   const [telegramFirstName, setTelegramFirstName] = useState<string | null>(null);
   const [roleLoading, setRoleLoading] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const [demo, setDemo] = useState(false);
   const [demoLinked, setDemoLinked] = useState(false);
   const currentUserId = useRef<string | null>(null);
@@ -78,12 +79,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTelegramId(null);
       setTelegramUsername(null);
       setTelegramFirstName(null);
+      setBlocked(false);
       setRoleLoading(false);
       return;
     }
     setRoleLoading(true);
     const [roleRes, linkRes] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
+      supabase.from("user_roles").select("role, blocked_at").eq("user_id", userId).maybeSingle(),
       supabase
         .from("account_links")
         .select("telegram_id, telegram_username, telegram_first_name, status")
@@ -102,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTelegramId(resolvedTelegramId);
     setTelegramUsername(linkRes.data?.telegram_username ?? null);
     setTelegramFirstName(linkRes.data?.telegram_first_name ?? null);
+    setBlocked(Boolean(roleRes.data?.blocked_at));
     setRoleLoading(false);
   }, []);
 
@@ -141,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTelegramId(null);
     setTelegramUsername(null);
     setTelegramFirstName(null);
+    setBlocked(false);
     currentUserId.current = null;
   }, [demo]);
 
