@@ -7,17 +7,20 @@ import { BrandSyncStatus } from "@/components/brand/brand-sync-status";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/config/brand-context";
 import { getPreset } from "@/lib/gate-presets";
+import type { ProviderId } from "@/config/brands";
 
 export function AuthLayout({
   title,
   subtitle,
   children,
   footer,
+  providers,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
   footer?: ReactNode;
+  providers?: ProviderId[] | null;
 }) {
   const { isStaff } = useAuth();
   const brand = useBrand();
@@ -67,7 +70,7 @@ export function AuthLayout({
             style={{ background: "var(--gradient-nexus)" }}
           />
           <div className="relative">
-            <TerminalTyper />
+            <TerminalTyper providers={providers} />
           </div>
         </div>
 

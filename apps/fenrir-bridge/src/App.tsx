@@ -3258,6 +3258,18 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
   const [authNote, setAuthNote] = useState<string | null>(() => authErrorMessage());
   const [pendingProvider, setPendingProvider] = useState<AuthProvider | null>(null);
   const [humanVerified, setHumanVerified] = useState(false);
+  const [enabledProviders, setEnabledProviders] = useState<AuthProvider[] | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void friskyClientAuthEngine
+      .enabledProviders()
+      .then((providers) => active && setEnabledProviders(providers))
+      .catch(() => active && setEnabledProviders([]));
+    return () => {
+      active = false;
+    };
+  }, []);
   const onHumanVerified = useCallback((verified: boolean) => {
     setHumanVerified(verified);
     if (!verified) return;
@@ -3282,7 +3294,7 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
     <main className="lovable-auth-page" data-login-source="lovable-bd06c2e4">
       <div className="lovable-auth-atmosphere" aria-hidden="true" />
       <div className="lovable-auth-column">
-        <LovableAuthTerminal />
+        <LovableAuthTerminal providers={enabledProviders} />
 
         <section className="lovable-auth-card-wrap" aria-label="Fenrir sign-in">
           <div className="lovable-auth-card-glow" aria-hidden="true" />
@@ -3300,7 +3312,7 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
 
             <div className="lovable-auth-actions">
               <HumanVerificationGate onVerified={onHumanVerified} />
-              {(["apple", "google", "microsoft"] as AuthProvider[]).map((provider) => (
+              {enabledProviders?.map((provider) => (
                 <AuthProviderButton
                   key={provider}
                   provider={provider}
@@ -3309,6 +3321,10 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
                   onClick={() => void signInWithProvider(provider)}
                 />
               ))}
+              {enabledProviders === null ? <small className="muted">Checking available sign-in…</small> : null}
+              {enabledProviders?.length === 0 ? (
+                <small className="muted">No OAuth provider is available right now.</small>
+              ) : null}
             </div>
 
             {authNote ? <div className="lovable-auth-error" role="alert">{authNote}</div> : null}
@@ -3337,8 +3353,9 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
   );
 }
 
-function LovableAuthTerminal() {
-  const lines = ["fenrir --login", "establishing secure channel...", "› providers: apple · google · microsoft", "awaiting identity_"];
+function LovableAuthTerminal({ providers }: { providers: AuthProvider[] | null }) {
+  const providerSignal = providers === null ? "checking..." : providers.length > 0 ? providers.join(" · ") : "none";
+  const lines = ["fenrir --login", "establishing secure channel...", `› providers: ${providerSignal}`, "awaiting identity_"];
   const [visibleLines, setVisibleLines] = useState(1);
 
   useEffect(() => {

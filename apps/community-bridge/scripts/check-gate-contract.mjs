@@ -24,6 +24,10 @@ const requiredSource = [
   ["src/lib/access.functions.ts", "telegram_user_id"],
   ["src/routes/access.tsx", "Security context"],
   ["src/routes/access.tsx", "Ask info"],
+  ["src/routes/login.tsx", "canonicalCommunityOAuthUrl"],
+  ["src/routes/login.tsx", "availableBrandProviders"],
+  ["src/lib/canonical-auth.ts", "brandId"],
+  ["src/lib/canonical-auth.ts", "/api/auth/community-sso"],
 ];
 
 const forbiddenSource = [
@@ -32,6 +36,7 @@ const forbiddenSource = [
   ["src/lib/gate.functions.ts", "Link Telegram securely"],
   ["src/routes/g.$slug.tsx", 'href="/activate"'],
   ["src/routes/g.$slug.tsx", "communities.myfenrir.com/activate"],
+  ["src/routes/login.tsx", "supabase.auth.signInWithOAuth"],
 ];
 
 function read(rel) {

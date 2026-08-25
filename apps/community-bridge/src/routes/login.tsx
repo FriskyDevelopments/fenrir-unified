@@ -3,15 +3,18 @@ import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { formatAuthError } from "@/lib/auth-errors";
 import { useBrand } from "@/config/brand-context";
 import { validateBrandRedirects, type RedirectIssue } from "@/lib/redirect-validation";
 import { BRANDS, brandLoginCopy, getBrand, type ProviderId } from "@/config/brands";
 import { isDemoMode } from "@/config/demo-mode";
 import { logDemoEvent } from "@/config/demo-log";
 import { getSiteUrl } from "@/config/site-url";
+import {
+  availableBrandProviders,
+  canonicalCommunityOAuthUrl,
+  loadCanonicalProviders,
+} from "@/lib/canonical-auth";
 
 /** Build-time brand: head() is static, so it uses the deployment's brand. */
 const HEAD_BRAND = getBrand(import.meta.env["VITE_BRAND_ID"]);
@@ -122,6 +125,9 @@ function LoginPage() {
   const [pending, setPending] = useState<ProviderId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [configIssues, setConfigIssues] = useState<RedirectIssue[]>([]);
+  const [enabledCanonicalProviders, setEnabledCanonicalProviders] = useState<ProviderId[] | null>(
+    null,
+  );
   // This route is client-only (ssr: false), so demo mode can be read up front —
   // resolving it late would let the signed-in redirect fire before we know.
   const [demo] = useState(() => isDemoMode());
@@ -138,8 +144,23 @@ function LoginPage() {
   }, [brand]);
   const blocked = configIssues.some((i) => i.field === "oauthReturnPath");
 
-  // Only the providers this brand enables, in the brand's configured order.
-  const providers = brand.providers
+  useEffect(() => {
+    let active = true;
+    void loadCanonicalProviders()
+      .then((providers) => active && setEnabledCanonicalProviders(providers))
+      .catch(() => active && setEnabledCanonicalProviders([]));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Preserve the community's chosen order, but never advertise a provider
+  // whose credentials are absent from the canonical MyFenrir runtime.
+  const availableIds =
+    enabledCanonicalProviders === null
+      ? []
+      : availableBrandProviders(brand.providers, enabledCanonicalProviders);
+  const providers = availableIds
     .map((id) => PROVIDERS.find((p) => p.id === id))
     .filter((p): p is ProviderConfig => Boolean(p));
 
@@ -148,8 +169,11 @@ function LoginPage() {
     // screen (and its simulated actions) can be reviewed.
     if (demo) return;
     if (!loading && session) {
-      if (next) window.location.replace(next);
-      else navigate({ to: brand.redirect.afterLogin });
+      if (next) {
+        const target = new URL(next, window.location.origin);
+        target.searchParams.set("brand", brand.id);
+        window.location.replace(`${target.pathname}${target.search}${target.hash}`);
+      } else navigate({ to: brand.redirect.afterLogin });
     }
   }, [demo, loading, session, navigate, next, brand]);
 
@@ -169,22 +193,14 @@ function LoginPage() {
       return;
     }
 
-    const callback = new URL("/login", window.location.origin);
-    callback.searchParams.set("sso", "0");
-    if (next) callback.searchParams.set("next", next);
-
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: provider === "microsoft" ? "azure" : provider,
-      options: {
-        redirectTo: callback.toString(),
-        scopes: provider === "microsoft" ? "email profile" : undefined,
-      },
-    });
-    if (oauthError) {
-      setPending(null);
-      setError(formatAuthError(oauthError.message));
-      return;
-    }
+    window.location.assign(
+      canonicalCommunityOAuthUrl({
+        provider,
+        communityOrigin: window.location.origin,
+        nextPath: next ?? brand.redirect.afterLogin,
+        brandId: brand.id,
+      }),
+    );
   }
 
   const copy = brandLoginCopy(brand);
@@ -204,6 +220,7 @@ function LoginPage() {
     <AuthLayout
       title={copy.headline}
       subtitle={copy.subheadline}
+      providers={enabledCanonicalProviders === null ? null : availableIds}
       footer={
         <span className="block space-y-2">
           <span className="block">
@@ -330,6 +347,19 @@ function LoginPage() {
             </Button>
           );
         })}
+
+        {enabledCanonicalProviders === null ? (
+          <p className="text-center text-xs text-muted-foreground">Checking available sign-in…</p>
+        ) : null}
+        {enabledCanonicalProviders?.length === 0 ? (
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            Sign-in is temporarily unavailable. No provider is enabled in the canonical MyFenrir
+            runtime.
+          </div>
+        ) : null}
 
         {error ? (
           <div

@@ -12,6 +12,7 @@ describe("public auth provider capabilities", () => {
     });
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
     await expect(response.json()).resolves.toEqual({
       ok: true,
       providers: ["microsoft"],
