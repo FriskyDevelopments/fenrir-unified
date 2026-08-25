@@ -58,7 +58,7 @@ describe("community SSO", () => {
 
   it("sends a signed-out visitor to the matching branded login", async () => {
     const request = new Request(
-      "https://www.myfenrir.com/api/auth/community-sso?next=https%3A%2F%2Fcommunities.myfenrir.com%2Fgate%3Fonboarding%3D1&brand=lore",
+      "https://www.myfenrir.com/api/auth/community-sso?next=https%3A%2F%2Fcommunities.myfenrir.com%2Fgate%3Fonboarding%3D1&brand=lore&gate=lore-archive",
     );
     const response = await onRequestGet({ request, env });
     const location = new URL(response.headers.get("location")!);
@@ -68,12 +68,13 @@ describe("community SSO", () => {
     expect(location.pathname).toBe("/login");
     expect(location.searchParams.get("next")).toBe("/gate?onboarding=1");
     expect(location.searchParams.get("brand")).toBe("lore");
+    expect(location.searchParams.get("gate")).toBe("lore-archive");
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 
   it("keeps retries on the same branded login even when an old attempt cookie exists", async () => {
     const request = new Request(
-      "https://www.myfenrir.com/api/auth/community-sso?next=https%3A%2F%2Fcommunities.myfenrir.com%2Fgate%3Fonboarding%3D1&brand=clipsflow",
+      "https://www.myfenrir.com/api/auth/community-sso?next=https%3A%2F%2Fcommunities.myfenrir.com%2Fgate%3Fonboarding%3D1&brand=clipsflow&gate=clipsflow-creators",
       { headers: { Cookie: "fenrir_community_sso_attempted=1" } },
     );
     const response = await onRequestGet({ request, env });
@@ -84,6 +85,7 @@ describe("community SSO", () => {
     expect(location.pathname).toBe("/login");
     expect(location.searchParams.get("next")).toBe("/gate?onboarding=1");
     expect(location.searchParams.get("brand")).toBe("clipsflow");
+    expect(location.searchParams.get("gate")).toBe("clipsflow-creators");
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 

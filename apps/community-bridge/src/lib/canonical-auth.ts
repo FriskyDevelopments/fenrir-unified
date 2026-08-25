@@ -7,6 +7,7 @@ export function canonicalCommunityOAuthUrl(input: {
   communityOrigin: string;
   nextPath: string;
   brandId: string;
+  gateSlug?: string;
 }) {
   const nextPath =
     input.nextPath.startsWith("/") && !input.nextPath.startsWith("//")
@@ -18,6 +19,7 @@ export function canonicalCommunityOAuthUrl(input: {
   const handoff = new URL("/api/auth/community-sso", CANONICAL_AUTH_ORIGIN);
   handoff.searchParams.set("next", target.toString());
   handoff.searchParams.set("brand", input.brandId);
+  if (input.gateSlug) handoff.searchParams.set("gate", input.gateSlug);
 
   // The direct OAuth return allow-list intentionally rejects /api/auth/*.
   // Returning through /main lets the signed-in App resume this one explicit

@@ -28,6 +28,13 @@ export interface GateRecord extends GateConfig {
   community_label: string;
 }
 
+export interface PublicGateConfig extends GateConfig {
+  brand_id: string;
+  community_id: string | null;
+  /** Verified community name when linked; otherwise the Gate's public name. */
+  community_label: string;
+}
+
 export interface VerifiedTelegramDestination {
   communityId: string;
   displayName: string;
@@ -106,7 +113,9 @@ async function signGateHandoff(payload: string, secret: string): Promise<string>
     false,
     ["sign"],
   );
-  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
+  const signature = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)),
+  );
   // A 128-bit HMAC tag keeps the complete Telegram `start` payload below its
   // 64-character limit while remaining infeasible to forge during its 5-minute TTL.
   return base64Url(signature.slice(0, 16));
@@ -114,10 +123,7 @@ async function signGateHandoff(payload: string, secret: string): Promise<string>
 
 async function isOwnerProfile(context: GateAuthedContext): Promise<boolean> {
   const [{ data, error }, { data: link }] = await Promise.all([
-    context.supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", context.userId),
+    context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
     context.supabase
       .from("account_links")
       .select("telegram_id")
@@ -158,11 +164,17 @@ async function hasPaidMembership(owner: boolean, context: GateAuthedContext): Pr
     .eq("provider", "telegram")
     .eq("status", "linked")
     .maybeSingle();
-  const response = await fetch("https://fenrir-stars-payments.hrgrrtks2p.workers.dev/api/internal/community-billing-status", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ userId: context.userId, telegramUserId: data?.telegram_id ? String(data.telegram_id) : null }),
-  }).catch(() => null);
+  const response = await fetch(
+    "https://fenrir-stars-payments.hrgrrtks2p.workers.dev/api/internal/community-billing-status",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: context.userId,
+        telegramUserId: data?.telegram_id ? String(data.telegram_id) : null,
+      }),
+    },
+  ).catch(() => null);
   if (!response?.ok) return false;
   const billing = (await response.json().catch(() => null)) as {
     paid?: boolean;
@@ -445,9 +457,21 @@ export const getPublicGate = createServerFn({ method: "GET" })
     try {
       const sql = neonSql();
       rows = (await sql`
-        select brand_id, community_id, slug, preset, headline, subheadline, logo_url, mascot_url, background_url
-        from cb_gate_configs
-        where slug = ${slug}
+        select g.brand_id, g.community_id, g.slug, g.preset, g.headline, g.subheadline,
+          g.logo_url, g.mascot_url, g.background_url,
+          coalesce(
+            (select d.display_name from cb_community_destinations d
+             where d.user_id = g.user_id
+               and d.community_id = g.community_id
+               and d.provider = 'telegram' and d.status = 'verified'
+             order by d.updated_at desc limit 1),
+            (select coalesce(t.community_label, t.name) from cb_brand_tenants t
+             where t.community_id = g.community_id and t.is_active = true
+             order by t.updated_at desc limit 1),
+            g.headline
+          ) as community_label
+        from cb_gate_configs g
+        where g.slug = ${slug}
         limit 1
       `) as GateRow[];
     } catch (cause) {
@@ -473,6 +497,7 @@ export const getPublicGate = createServerFn({ method: "GET" })
     return {
       brand_id: String(row["brand_id"]),
       community_id: (row["community_id"] as string | null) ?? null,
+      community_label: String(row["community_label"] ?? row["headline"]),
       slug: String(row["slug"]),
       preset: String(row["preset"]),
       headline: String(row["headline"]),
@@ -480,7 +505,7 @@ export const getPublicGate = createServerFn({ method: "GET" })
       logo_url: (row["logo_url"] as string | null) ?? null,
       mascot_url: (row["mascot_url"] as string | null) ?? null,
       background_url: (row["background_url"] as string | null) ?? null,
-    } as GateConfig;
+    } satisfies PublicGateConfig;
   });
 
 /**
@@ -523,7 +548,9 @@ export const createGateTelegramHandoff = createServerFn({ method: "POST" })
     ]);
 
     if (identityResult.error || !identityResult.data?.telegram_id) {
-      throw new Error("Telegram identity missing from this SSO session. Return from Telegram and continue through the Gate.");
+      throw new Error(
+        "Telegram identity missing from this SSO session. Return from Telegram and continue through the Gate.",
+      );
     }
     const externalChatId = String((destinationResult as GateRow[])[0]?.["external_id"] ?? "");
     if (!externalChatId) {

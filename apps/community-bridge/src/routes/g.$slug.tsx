@@ -26,7 +26,6 @@ const TELEGRAM_BOT_USERNAME = (
   (import.meta.env["VITE_TELEGRAM_BOT_USERNAME"] as string | undefined) ?? "Myfenrir_bot"
 ).replace(/^@/, "");
 
-
 function telegramDeepLink(start: string) {
   return `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${encodeURIComponent(start)}`;
 }
@@ -39,6 +38,10 @@ function communitySsoUrl(slug: string, brandId: string) {
   const url = new URL("https://www.myfenrir.com/api/auth/community-sso");
   url.searchParams.set("next", `https://communities.myfenrir.com${gateReturnPath(slug)}`);
   url.searchParams.set("brand", brandId);
+  // The Gate is the public source of the community's visual identity. Carry
+  // its slug separately so the login surface can resolve that identity again
+  // instead of falling back to a generic platform card.
+  url.searchParams.set("gate", slug);
   return url.toString();
 }
 
@@ -178,7 +181,9 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [accessRequested, setAccessRequested] = useState(false);
   const [securityPreflight, setSecurityPreflight] = useState<GateSecurityPreflight | null>(null);
-  const [gateOutcome, setGateOutcome] = useState<"granted" | "review" | "pending" | "blocked" | null>(null);
+  const [gateOutcome, setGateOutcome] = useState<
+    "granted" | "review" | "pending" | "blocked" | null
+  >(null);
 
   const checkingAccess = loading || roleLoading;
   const telegramReady = Boolean(session && telegramId);
@@ -204,7 +209,9 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
       const { token } = await createTelegramHandoff({ data: { slug: params.slug } });
       window.location.assign(telegramDeepLink(token));
     } catch (error) {
-      setHandoffError(error instanceof Error ? error.message : "Could not start the secure Telegram handoff.");
+      setHandoffError(
+        error instanceof Error ? error.message : "Could not start the secure Telegram handoff.",
+      );
     } finally {
       setHandoffPending(false);
     }
@@ -232,14 +239,22 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
         return;
       }
       const result = await requestAccess({ data: { slug: params.slug } });
-      setGateOutcome(result.status === "granted" ? "granted" : result.status === "pending" ? "pending" : "review");
+      setGateOutcome(
+        result.status === "granted"
+          ? "granted"
+          : result.status === "pending"
+            ? "pending"
+            : "review",
+      );
       if (result.status === "granted") {
         await continueToTelegram();
         return;
       }
       setAccessRequested(true);
     } catch (error) {
-      setHandoffError(error instanceof Error ? error.message : "Could not submit your access request.");
+      setHandoffError(
+        error instanceof Error ? error.message : "Could not submit your access request.",
+      );
     } finally {
       setHandoffPending(false);
     }
@@ -262,13 +277,7 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
           subheadline: authenticatedStaff ? copy.ownerAccessActive : config.subheadline,
         }}
         hideLogo
-        actionHref={
-          authenticatedStaff
-            ? "/gates"
-            : needsSso
-              ? ssoHref
-              : undefined
-        }
+        actionHref={authenticatedStaff ? "/gates" : needsSso ? ssoHref : undefined}
         actionLabel={
           authenticatedStaff
             ? copy.openMyGates
@@ -278,7 +287,7 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
                 ? handoffError
                 : handoffPending
                   ? copy.runningSecurity
-                : accessRequested
+                  : accessRequested
                     ? copy.reviewSubmitted
                     : communityConfirmed
                       ? copy.continueGate
@@ -294,11 +303,13 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
         actionPending={handoffPending}
       />
       <GateLanguageSwitcher locale={locale} onChange={setLocale} />
-      {securityPreflight ? (
-        <GateSecurityPanel preflight={securityPreflight} copy={copy} />
-      ) : null}
+      {securityPreflight ? <GateSecurityPanel preflight={securityPreflight} copy={copy} /> : null}
       {gateOutcome ? (
-        <GateOutcomeCelebration outcome={gateOutcome} email={session?.user.email ?? null} copy={copy} />
+        <GateOutcomeCelebration
+          outcome={gateOutcome}
+          email={session?.user.email ?? null}
+          copy={copy}
+        />
       ) : null}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 px-5 pb-8">
         <GateShare slug={params.slug} accent={preset.accent} />
@@ -325,7 +336,10 @@ function GateOutcomeCelebration({
   return (
     <aside className="absolute inset-x-0 top-8 z-20 mx-auto w-[min(92vw,430px)] overflow-hidden rounded-3xl border border-white/15 bg-black/75 p-5 text-white shadow-2xl backdrop-blur-xl">
       {outcome === "granted" ? (
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(0,229,255,.38),transparent_28%),radial-gradient(circle_at_80%_30%,rgba(255,91,217,.30),transparent_25%),radial-gradient(circle_at_50%_100%,rgba(255,217,102,.26),transparent_28%)]" />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(0,229,255,.38),transparent_28%),radial-gradient(circle_at_80%_30%,rgba(255,91,217,.30),transparent_25%),radial-gradient(circle_at_50%_100%,rgba(255,217,102,.26),transparent_28%)]"
+        />
       ) : null}
       <div className="relative">
         <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/45">
@@ -333,13 +347,23 @@ function GateOutcomeCelebration({
         </p>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight">{outcomeCopy.title}</h2>
         <p className="mt-2 text-sm leading-relaxed text-white/68">{outcomeCopy.body}</p>
-        {email ? <p className="mt-3 text-xs text-white/42">{copy.emailPrefix}: {email}</p> : null}
+        {email ? (
+          <p className="mt-3 text-xs text-white/42">
+            {copy.emailPrefix}: {email}
+          </p>
+        ) : null}
       </div>
     </aside>
   );
 }
 
-function GateSecurityPanel({ preflight, copy }: { preflight: GateSecurityPreflight; copy: GateCopy }) {
+function GateSecurityPanel({
+  preflight,
+  copy,
+}: {
+  preflight: GateSecurityPreflight;
+  copy: GateCopy;
+}) {
   return (
     <aside className="absolute inset-x-0 bottom-24 z-10 mx-auto w-[min(92vw,430px)] rounded-3xl border border-white/12 bg-black/70 p-4 text-white shadow-2xl backdrop-blur-xl">
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/45">
@@ -347,9 +371,14 @@ function GateSecurityPanel({ preflight, copy }: { preflight: GateSecurityPreflig
       </p>
       <div className="mt-3 grid gap-2">
         {preflight.checks.map((check) => (
-          <div key={check.key} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs">
+          <div
+            key={check.key}
+            className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs"
+          >
             <span>{check.label}</span>
-            <span className="font-mono uppercase tracking-[0.16em] text-white/60">{check.status}</span>
+            <span className="font-mono uppercase tracking-[0.16em] text-white/60">
+              {check.status}
+            </span>
           </div>
         ))}
       </div>
