@@ -29,11 +29,13 @@
     "pretypecheck": "bash scripts/run-with-node-lts.sh node scripts/clean-icloud-dupes.mjs"
   },
   "dependencies": {
+    "@better-auth/oauth-provider": "^1.7.1",
     "@neondatabase/serverless": "^1.0.1",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.0",
     "@supabase/supabase-js": "^2.105.3",
     "@vitejs/plugin-react": "^5.2.0",
+    "better-auth": "^1.7.1",
     "motion": "^12.43.0",
     "posthog-js": "^1.414.0",
     "react": "^19.2.1",

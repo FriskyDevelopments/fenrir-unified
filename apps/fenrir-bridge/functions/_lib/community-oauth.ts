@@ -32,8 +32,15 @@ import {
   type OAuthProvider
 } from "./oauth";
 import { mintSupabaseSharedSessionCookies, type SupabaseSharedEnv } from "./supabase-shared-session";
+import {
+  betterAuthEnabled,
+  betterAuthOrigin,
+  configuredBetterAuthProviders,
+  isFriskySocialProvider,
+  type FriskyBetterAuthEnv,
+} from "./better-auth";
 
-export type CommunityOAuthEnv = CommunityAuthEnv & OAuthEnv;
+export type CommunityOAuthEnv = CommunityAuthEnv & OAuthEnv & FriskyBetterAuthEnv;
 
 type CommunitySql = Awaited<ReturnType<typeof communitySql>>;
 
@@ -50,8 +57,6 @@ export function communityOAuthCallbackPath(provider: OAuthProvider) {
   return `/api/community-auth/oauth/callback/${provider}`;
 }
 
-const COMMUNITY_OAUTH_PROVIDERS: OAuthProvider[] = ["google", "microsoft", "apple", "authentik"];
-
 /**
  * Which providers actually have credentials bound in this environment. Lets the gate
  * hide buttons that would dead-end on `provider_not_configured`, and lets the brand
@@ -60,7 +65,11 @@ const COMMUNITY_OAUTH_PROVIDERS: OAuthProvider[] = ["google", "microsoft", "appl
 export function availableCommunityAuthProviders(env: CommunityOAuthEnv): string[] {
   return [
     "magic_link",
-    ...COMMUNITY_OAUTH_PROVIDERS.filter((provider) => isDirectOAuthAvailable(provider, env))
+    ...(betterAuthEnabled(env)
+      ? configuredBetterAuthProviders(env)
+      : (["google", "microsoft", "apple"] as OAuthProvider[]).filter((provider) =>
+          isDirectOAuthAvailable(provider, env),
+        ))
   ];
 }
 
@@ -75,11 +84,11 @@ export async function handleCommunityOAuthStart(context: {
   provider: string;
 }) {
   if (!communityAuthConfigured(context.env)) return communityAuthNotConfigured();
-  if (!isCommunityOAuthProvider(context.provider)) {
+  if (!isFriskySocialProvider(context.provider)) {
     return jsonError("unsupported_provider", 404);
   }
 
-  const provider = context.provider as OAuthProvider;
+  const provider = context.provider;
   const requestUrl = new URL(context.request.url);
   const slug = normalizeCommunitySlug(requestUrl.searchParams.get("slug"));
   if (!slug) {
@@ -88,7 +97,34 @@ export async function handleCommunityOAuthStart(context: {
 
   const origin = siteOrigin(context.request, context.env);
 
-  if (!isDirectOAuthAvailable(provider, context.env)) {
+  if (!betterAuthEnabled(context.env)) {
+    if (!isDirectOAuthAvailable(provider, context.env)) {
+      return redirect(communityOAuthErrorLocation(origin, slug, "provider_not_configured"));
+    }
+    try {
+      const brand = await ensureCommunityBrandPayload(context.env, slug);
+      if (!brand.enabled_auth_providers.includes(provider)) {
+        return redirect(communityOAuthErrorLocation(origin, slug, "provider_not_enabled"));
+      }
+      const returnTo = safeCommunityReturnPath(
+        requestUrl.searchParams.get("return_to") || `/community/${slug}`,
+      );
+      const tx = await createCommunityOAuthTransaction(provider, context.env, {
+        community: slug,
+        returnTo,
+      });
+      const callbackUri = `${origin}/api/community-auth/oauth/callback/${provider}`;
+      const authUrl = await getAuthorizationUrl(provider, context.env, callbackUri, tx);
+      return redirect(authUrl, {
+        "Set-Cookie": await communityTransactionSetCookie(tx, context.env),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "oauth_start_failed";
+      return redirect(communityOAuthErrorLocation(origin, slug, message));
+    }
+  }
+
+  if (!configuredBetterAuthProviders(context.env).includes(provider)) {
     return redirect(communityOAuthErrorLocation(origin, slug, "provider_not_configured"));
   }
 
@@ -101,16 +137,15 @@ export async function handleCommunityOAuthStart(context: {
     const returnTo = safeCommunityReturnPath(
       requestUrl.searchParams.get("return_to") || `/community/${slug}`
     );
-    const tx = await createCommunityOAuthTransaction(provider, context.env, {
-      community: slug,
-      returnTo
-    });
-    const callbackUri = `${origin}/api/community-auth/oauth/callback/${provider}`;
-    const authUrl = await getAuthorizationUrl(provider, context.env, callbackUri, tx);
+    const completion = new URL("/api/community-auth/better-complete", origin);
+    completion.searchParams.set("provider", provider);
+    completion.searchParams.set("slug", slug);
+    completion.searchParams.set("return_to", returnTo);
 
-    return redirect(authUrl, {
-      "Set-Cookie": await communityTransactionSetCookie(tx, context.env)
-    });
+    const authUrl = new URL("/sign-in", betterAuthOrigin(context.env));
+    authUrl.searchParams.set("provider", provider);
+    authUrl.searchParams.set("return_to", `${completion.pathname}${completion.search}`);
+    return redirect(authUrl.toString());
   } catch (error) {
     console.error("Community OAuth start failed", error);
     const message = error instanceof Error ? error.message : "oauth_start_failed";
