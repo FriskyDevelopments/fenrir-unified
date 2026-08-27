@@ -1,10 +1,21 @@
 import { readCookie, readSession } from "../../_lib/auth";
+import {
+  readCommunitySession,
+  type CommunityAuthEnv,
+  type CommunitySessionPayload,
+} from "../../_lib/community-auth";
+import {
+  mintSupabaseSharedSessionCookies,
+  type SupabaseSharedEnv,
+} from "../../_lib/supabase-shared-session";
 
 type Env = {
   SESSION_SECRET?: string;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
+  FENRIR_COMMUNITY_AUTH_SECRET?: string;
+  NEON_DATABASE_URL?: string;
 };
 
 const COMMUNITY_ORIGIN = "https://communities.myfenrir.com";
@@ -25,7 +36,9 @@ function safeNext(raw: string | null) {
   if (!raw) return `${COMMUNITY_ORIGIN}/dashboard`;
   try {
     const url = new URL(raw, COMMUNITY_ORIGIN);
-    return url.origin === COMMUNITY_ORIGIN ? url.toString() : `${COMMUNITY_ORIGIN}/dashboard`;
+    return url.origin === COMMUNITY_ORIGIN
+      ? url.toString()
+      : `${COMMUNITY_ORIGIN}/dashboard`;
   } catch {
     return `${COMMUNITY_ORIGIN}/dashboard`;
   }
@@ -35,7 +48,10 @@ function loginFallback(next: string) {
   const url = new URL("/login", COMMUNITY_ORIGIN);
   url.searchParams.set("sso", "0");
   const target = new URL(next);
-  url.searchParams.set("next", `${target.pathname}${target.search}${target.hash}`);
+  url.searchParams.set(
+    "next",
+    `${target.pathname}${target.search}${target.hash}`
+  );
   return url.toString();
 }
 
@@ -45,7 +61,8 @@ function fallbackResponse(next: string) {
     headers: {
       Location: loginFallback(next),
       "Cache-Control": "no-store",
-      "Set-Cookie": "fenrir_community_sso_attempted=1; Path=/; Domain=.myfenrir.com; Max-Age=120; SameSite=Lax; Secure",
+      "Set-Cookie":
+        "fenrir_community_sso_attempted=1; Path=/; Domain=.myfenrir.com; Max-Age=120; SameSite=Lax; Secure",
     },
   });
 }
@@ -82,9 +99,16 @@ function sessionCookies(storageKey: string, value: string) {
     return [`${encodedName}=${encodedValue}; ${attributes}`];
   }
   const cookies: string[] = [];
-  for (let index = 0; index * STORAGE_CHUNK_SIZE < encodedValue.length; index += 1) {
+  for (
+    let index = 0;
+    index * STORAGE_CHUNK_SIZE < encodedValue.length;
+    index += 1
+  ) {
     cookies.push(
-      `${encodedName}.${index}=${encodedValue.slice(index * STORAGE_CHUNK_SIZE, (index + 1) * STORAGE_CHUNK_SIZE)}; ${attributes}`,
+      `${encodedName}.${index}=${encodedValue.slice(
+        index * STORAGE_CHUNK_SIZE,
+        (index + 1) * STORAGE_CHUNK_SIZE
+      )}; ${attributes}`
     );
   }
   return cookies;
@@ -93,21 +117,101 @@ function sessionCookies(storageKey: string, value: string) {
 export async function onRequestGet(context: { request: Request; env: Env }) {
   const requestUrl = new URL(context.request.url);
   const next = safeNext(requestUrl.searchParams.get("next"));
+
+  // --- Resolve identity: prefer operator session, fall back to community session ---
   const fenrirSession = await readSession(context.request, context.env);
-  if (!fenrirSession) {
-    // Already came back from sign-in and still no session: stop looping and
-    // hand the visitor to the community's own login.
+  const communitySession: CommunitySessionPayload | null = fenrirSession
+    ? null
+    : await readCommunitySession(
+        context.request,
+        context.env as CommunityAuthEnv
+      ).catch(() => null);
+
+  const resolvedEmail = fenrirSession?.email ?? communitySession?.email;
+  const resolvedName =
+    fenrirSession?.name ?? communitySession?.email?.split("@")[0] ?? "";
+  const resolvedUserId =
+    fenrirSession?.frisky_user_id ?? communitySession?.user_id ?? "";
+
+  if (!resolvedEmail) {
+    // No session of either type. Redirect to sign-in (or fallback if already
+    // attempted once to prevent looping).
     return readCookie(context.request, ATTEMPT_COOKIE)
       ? fallbackResponse(next)
       : signInRedirect(requestUrl, next);
   }
 
+  // --- Mint Supabase shared session and redirect to Community Bridge ---
   try {
-    const supabaseUrl = required(context.env.SUPABASE_URL, "SUPABASE_URL").replace(/\/$/, "");
-    const anonKey = required(context.env.SUPABASE_ANON_KEY, "SUPABASE_ANON_KEY");
-    const serviceKey = required(context.env.SUPABASE_SERVICE_ROLE_KEY, "SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseCookies = await mintSupabaseSharedSessionCookies(
+      context.env as SupabaseSharedEnv,
+      resolvedEmail,
+      { name: resolvedName, fenrirUserId: resolvedUserId }
+    );
 
-    const linkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
+    // mintSupabaseSharedSessionCookies is best-effort. If Supabase env vars are
+    // missing or the mint fails, fall back to the inline implementation so the
+    // operator-session path keeps working exactly as before.
+    if (!supabaseCookies.length && fenrirSession) {
+      return await mintInlineSupabaseSession(
+        context.env,
+        fenrirSession.email,
+        fenrirSession.name,
+        fenrirSession.frisky_user_id,
+        next
+      );
+    }
+
+    if (!supabaseCookies.length) {
+      // Community session exists but Supabase mint failed — still redirect to
+      // community login so the user isn't stuck in a loop.
+      return fallbackResponse(next);
+    }
+
+    const headers = new Headers({
+      Location: next,
+      "Cache-Control": "no-store",
+    });
+    headers.append(
+      "Set-Cookie",
+      "fenrir_community_sso_attempted=; Path=/; Domain=.myfenrir.com; Max-Age=0; SameSite=Lax; Secure"
+    );
+    for (const cookie of supabaseCookies) headers.append("Set-Cookie", cookie);
+    return new Response(null, { status: 302, headers });
+  } catch (error) {
+    console.error(
+      "community_sso_failed",
+      error instanceof Error ? error.message : "unknown"
+    );
+    return fallbackResponse(next);
+  }
+}
+
+/**
+ * Legacy inline Supabase session minting — kept as fallback for the operator-session
+ * path if mintSupabaseSharedSessionCookies returns empty (e.g. missing service key
+ * in env). This preserves the previous behavior byte-for-byte.
+ */
+async function mintInlineSupabaseSession(
+  env: Env,
+  email: string,
+  name: string,
+  friskyUserId: string,
+  next: string
+) {
+  const supabaseUrl = required(env.SUPABASE_URL, "SUPABASE_URL").replace(
+    /\/$/,
+    ""
+  );
+  const anonKey = required(env.SUPABASE_ANON_KEY, "SUPABASE_ANON_KEY");
+  const serviceKey = required(
+    env.SUPABASE_SERVICE_ROLE_KEY,
+    "SUPABASE_SERVICE_ROLE_KEY"
+  );
+
+  const linkResponse = await fetch(
+    `${supabaseUrl}/auth/v1/admin/generate_link`,
+    {
       method: "POST",
       headers: {
         apikey: serviceKey,
@@ -116,43 +220,53 @@ export async function onRequestGet(context: { request: Request; env: Env }) {
       },
       body: JSON.stringify({
         type: "magiclink",
-        email: fenrirSession.email,
-        options: { data: { full_name: fenrirSession.name, fenrir_user_id: fenrirSession.frisky_user_id } },
+        email,
+        options: { data: { full_name: name, fenrir_user_id: friskyUserId } },
       }),
-    });
-    const link = (await linkResponse.json().catch(() => null)) as { hashed_token?: string } | null;
-    if (!linkResponse.ok || !link?.hashed_token) throw new Error("supabase_generate_link_failed");
-
-    const verifyResponse = await fetch(`${supabaseUrl}/auth/v1/verify`, {
-      method: "POST",
-      headers: { apikey: anonKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ token_hash: link.hashed_token, type: "magiclink" }),
-    });
-    const auth = (await verifyResponse.json().catch(() => null)) as
-      | { access_token?: string; refresh_token?: string; expires_in?: number; token_type?: string; user?: unknown }
-      | null;
-    if (!verifyResponse.ok || !auth?.access_token || !auth.refresh_token || !auth.user) {
-      throw new Error("supabase_verify_failed");
     }
+  );
+  const link = (await linkResponse.json().catch(() => null)) as {
+    hashed_token?: string;
+  } | null;
+  if (!linkResponse.ok || !link?.hashed_token)
+    throw new Error("supabase_generate_link_failed");
 
-    const ref = new URL(supabaseUrl).hostname.split(".")[0] || "auth";
-    const value = JSON.stringify({
-      access_token: auth.access_token,
-      refresh_token: auth.refresh_token,
-      expires_in: auth.expires_in ?? 3600,
-      expires_at: Math.floor(Date.now() / 1000) + (auth.expires_in ?? 3600),
-      token_type: auth.token_type ?? "bearer",
-      user: auth.user,
-    });
-    const headers = new Headers({ Location: next, "Cache-Control": "no-store" });
-    headers.append(
-      "Set-Cookie",
-      "fenrir_community_sso_attempted=; Path=/; Domain=.myfenrir.com; Max-Age=0; SameSite=Lax; Secure",
-    );
-    for (const cookie of sessionCookies(`sb-${ref}-auth-token`, value)) headers.append("Set-Cookie", cookie);
-    return new Response(null, { status: 302, headers });
-  } catch (error) {
-    console.error("community_sso_failed", error instanceof Error ? error.message : "unknown");
-    return fallbackResponse(next);
+  const verifyResponse = await fetch(`${supabaseUrl}/auth/v1/verify`, {
+    method: "POST",
+    headers: { apikey: anonKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ token_hash: link.hashed_token, type: "magiclink" }),
+  });
+  const auth = (await verifyResponse.json().catch(() => null)) as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+    token_type?: string;
+    user?: unknown;
+  } | null;
+  if (
+    !verifyResponse.ok ||
+    !auth?.access_token ||
+    !auth.refresh_token ||
+    !auth.user
+  ) {
+    throw new Error("supabase_verify_failed");
   }
+
+  const ref = new URL(supabaseUrl).hostname.split(".")[0] || "auth";
+  const value = JSON.stringify({
+    access_token: auth.access_token,
+    refresh_token: auth.refresh_token,
+    expires_in: auth.expires_in ?? 3600,
+    expires_at: Math.floor(Date.now() / 1000) + (auth.expires_in ?? 3600),
+    token_type: auth.token_type ?? "bearer",
+    user: auth.user,
+  });
+  const headers = new Headers({ Location: next, "Cache-Control": "no-store" });
+  headers.append(
+    "Set-Cookie",
+    "fenrir_community_sso_attempted=; Path=/; Domain=.myfenrir.com; Max-Age=0; SameSite=Lax; Secure"
+  );
+  for (const cookie of sessionCookies(`sb-${ref}-auth-token`, value))
+    headers.append("Set-Cookie", cookie);
+  return new Response(null, { status: 302, headers });
 }

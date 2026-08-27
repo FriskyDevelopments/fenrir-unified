@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Copy, Locale } from "../i18n";
 import { authService, webauthnService } from "../services/api";
-import { friskyClientAuthEngine, type AuthProvider } from "../services/authGateway";
+import {
+  friskyClientAuthEngine,
+  type AuthProvider,
+} from "../services/authGateway";
 import { AuthProviderButton } from "../components/AuthProviderButton";
 import { AuthSurface } from "../components/AuthSurface";
 import { GlowCard } from "../components/GlowCard";
@@ -12,14 +15,28 @@ import { HumanVerificationGate } from "../components/HumanVerificationGate";
 
 function postLoginDestination() {
   const requested = new URLSearchParams(window.location.search).get("next");
-  return requested?.startsWith("/") && !requested.startsWith("//") ? requested : managedDashboardPath;
+  return requested?.startsWith("/") && !requested.startsWith("//")
+    ? requested
+    : managedDashboardPath;
 }
 
-export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
+export function AuthGate({
+  c,
+  locale,
+  onLocale,
+}: {
+  c: Copy;
+  locale: Locale;
+  onLocale: (locale: Locale) => void;
+}) {
   const theme = brandThemes.fenrir;
-  const [passkeyNote, setPasskeyNote] = useState<string | null>(() => authErrorMessage());
+  const [passkeyNote, setPasskeyNote] = useState<string | null>(() =>
+    authErrorMessage()
+  );
   const [humanVerified, setHumanVerified] = useState(false);
-  const [enabledProviders, setEnabledProviders] = useState<AuthProvider[] | null>(null);
+  const [enabledProviders, setEnabledProviders] = useState<
+    AuthProvider[] | null
+  >(null);
 
   useEffect(() => {
     let active = true;
@@ -36,7 +53,8 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
     if (!verified) return;
     setPasskeyNote(null);
     void authService.me().then((result) => {
-      if (result.data.authenticated) window.location.assign(postLoginDestination());
+      if (result.data.authenticated)
+        window.location.assign(postLoginDestination());
     });
   }, []);
 
@@ -65,70 +83,97 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
   }
 
   return (
-    <AuthSurface theme={{ ...theme, subheadline: c.authSub }} locale={locale} onLocale={onLocale} railLabel="Fenrir ecosystem">
-        <GlowCard className="auth-card" aria-label="Fenrir sign-in">
-          <div className="auth-card-header">
-            <span className="status good">{c.realAuth}</span>
-            <span className="auth-card-kicker">{theme.authKicker}</span>
-          </div>
-          <h2 className="auth-enter-title" data-text={c.authTitle}>
-            <span>{c.authTitle}</span>
-          </h2>
-          <HumanVerificationGate onVerified={onHumanVerified} />
-          <div className="auth-actions">
-            {enabledProviders?.map((provider) => (
-              <AuthProviderButton
-                key={provider}
-                provider={provider}
-                label={providerLabel(provider, c)}
-                disabled={!humanVerified}
-                onClick={() => void signInWithProvider(provider)}
-              />
-            ))}
-            {enabledProviders === null ? <small className="muted">Checking available sign-in…</small> : null}
-            {enabledProviders?.length === 0 ? (
-              <small className="muted">No OAuth provider is available right now. Existing passkeys remain available.</small>
-            ) : null}
-          </div>
-          <div className="auth-passkey-row">
-            <button type="button" className="secondary" disabled={!humanVerified} onClick={() => void signInWithPasskey()}>
-              {c.passkeySignIn}
-            </button>
-            {passkeyNote ? <small className="muted">{passkeyNote}</small> : null}
-          </div>
-          <div className="auth-2fa-recommend">
-            <p className="label">{c.twoFactorRecommendTitle}</p>
-            <p className="muted">{c.twoFactorRecommendBody}</p>
-            <nav className="two-factor-links" aria-label="2FA provider help">
-              <a href={twoFactorHelpLinks.google} target="_blank" rel="noreferrer noopener">
-                {c.twoFactorGoogleLinkLabel}
-              </a>
-              <a href={twoFactorHelpLinks.microsoft} target="_blank" rel="noreferrer noopener">
-                {c.twoFactorMicrosoftLinkLabel}
-              </a>
-              <a href={twoFactorHelpLinks.apple} target="_blank" rel="noreferrer noopener">
-                {c.twoFactorAppleLinkLabel}
-              </a>
+    <AuthSurface
+      theme={{ ...theme, subheadline: c.authSub }}
+      locale={locale}
+      onLocale={onLocale}
+      railLabel="Fenrir ecosystem"
+    >
+      <GlowCard className="auth-card" aria-label="Fenrir sign-in">
+        <div className="auth-card-header">
+          <span className="status good">{c.realAuth}</span>
+          <span className="auth-card-kicker">{theme.authKicker}</span>
+        </div>
+        <h2 className="auth-enter-title" data-text={c.authTitle}>
+          <span>{c.authTitle}</span>
+        </h2>
+        <HumanVerificationGate onVerified={onHumanVerified} />
+        <div className="auth-actions">
+          {enabledProviders?.map((provider) => (
+            <AuthProviderButton
+              key={provider}
+              provider={provider}
+              label={providerLabel(provider, c)}
+              disabled={!humanVerified}
+              onClick={() => void signInWithProvider(provider)}
+            />
+          ))}
+          {enabledProviders === null ? (
+            <small className="muted">Checking available sign-in…</small>
+          ) : null}
+          {enabledProviders?.length === 0 ? (
+            <small className="muted">
+              No OAuth provider is available right now. Existing passkeys remain
+              available.
+            </small>
+          ) : null}
+        </div>
+        <div className="auth-passkey-row">
+          <button
+            type="button"
+            className="secondary"
+            disabled={!humanVerified}
+            onClick={() => void signInWithPasskey()}
+          >
+            {c.passkeySignIn}
+          </button>
+          {passkeyNote ? <small className="muted">{passkeyNote}</small> : null}
+        </div>
+        <div className="auth-2fa-recommend">
+          <p className="label">{c.twoFactorRecommendTitle}</p>
+          <p className="muted">{c.twoFactorRecommendBody}</p>
+          <nav className="two-factor-links" aria-label="2FA provider help">
+            <a
+              href={twoFactorHelpLinks.google}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              {c.twoFactorGoogleLinkLabel}
+            </a>
+            <a
+              href={twoFactorHelpLinks.microsoft}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              {c.twoFactorMicrosoftLinkLabel}
+            </a>
+            <a
+              href={twoFactorHelpLinks.apple}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              {c.twoFactorAppleLinkLabel}
+            </a>
+          </nav>
+        </div>
+        <div className="auth-node-status" aria-label="Fenrir node status">
+          <b>FENRIR NODE STATUS</b>
+          {theme.nodeStatus.map((item) => (
+            <span key={item}>{item}</span>
+          ))}
+        </div>
+        <div className="auth-foot">
+          <div>
+            <small>{c.authEnvHint}</small>
+            <nav className="legal-links" aria-label="Legal links">
+              <a href="/legal">{c.legal}</a>
+              <a href="/terms">{c.terms}</a>
+              <a href="/privacy">{c.privacy}</a>
             </nav>
           </div>
-          <div className="auth-node-status" aria-label="Fenrir node status">
-            <b>FENRIR NODE STATUS</b>
-            {theme.nodeStatus.map((item) => (
-              <span key={item}>{item}</span>
-            ))}
-          </div>
-          <div className="auth-foot">
-            <div>
-              <small>{c.authEnvHint}</small>
-              <nav className="legal-links" aria-label="Legal links">
-                <a href="/legal">{c.legal}</a>
-                <a href="/terms">{c.terms}</a>
-                <a href="/privacy">{c.privacy}</a>
-              </nav>
-            </div>
-          </div>
-          <BrandSignature c={c} compact />
-        </GlowCard>
+        </div>
+        <BrandSignature c={c} compact />
+      </GlowCard>
     </AuthSurface>
   );
 }
@@ -155,17 +200,25 @@ function authErrorMessage() {
     return "The provider denied access. Try again and confirm consent to continue with this account.";
   }
   if (errorCode === "oauth_callback_error") {
-    return `Provider error while returning from sign-in.${detail ? ` ${detail}` : ""}`;
+    return `Provider error while returning from sign-in.${
+      detail ? ` ${detail}` : ""
+    }`;
   }
   if (errorCode === "code_exchange_failed") {
-    return `Could not exchange the OAuth callback code. ${detail ? `(${detail})` : "Please try again."}`;
+    return `Could not exchange the OAuth callback code. ${
+      detail ? `(${detail})` : "Please try again."
+    }`;
   }
   if (errorCode === "session_lookup_failed") {
-    return `Could not read the Frisky login session after login. ${detail ? `(${detail})` : "Please retry from the sign-in screen."}`;
+    return `Could not read the Frisky login session after login. ${
+      detail ? `(${detail})` : "Please retry from the sign-in screen."
+    }`;
   }
   if (errorCode === "supabase_session_failed") {
     if (detail === "human_verification_required") return null;
-    return `Could not open a Fenrir admin session.${detail ? ` (${detail})` : ""}`;
+    return `Could not open a Fenrir admin session.${
+      detail ? ` (${detail})` : ""
+    }`;
   }
   if (errorCode === "missing_code") {
     return "The provider did not return a sign-in code. Please try again.";

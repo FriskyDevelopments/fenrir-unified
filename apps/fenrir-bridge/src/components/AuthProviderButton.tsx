@@ -7,10 +7,17 @@ type AuthProviderButtonProps = {
   disabled?: boolean;
 };
 
-export function AuthProviderButton({ provider, label, onClick, disabled = false }: AuthProviderButtonProps) {
+export function AuthProviderButton({
+  provider,
+  label,
+  onClick,
+  disabled = false,
+}: AuthProviderButtonProps) {
   return (
     <button
-      className={`auth-provider-button ${provider}-auth-button ${provider === "microsoft" ? "secondary" : ""}`.trim()}
+      className={`auth-provider-button ${provider}-auth-button ${
+        provider === "microsoft" ? "secondary" : ""
+      }`.trim()}
       type="button"
       onClick={onClick}
       disabled={disabled}

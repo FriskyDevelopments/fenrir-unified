@@ -20,7 +20,7 @@ export const friskyClientAuthEngine: AuthEngine = {
   },
   signInWithProvider(provider) {
     return authService.login(provider);
-  }
+  },
 };
 
 export const neonCommunityAuthEngine: AuthEngine = {
@@ -32,5 +32,5 @@ export const neonCommunityAuthEngine: AuthEngine = {
   },
   async signInWithProvider() {
     throw new Error("neon_magic_link_auth_only");
-  }
+  },
 };

@@ -16,20 +16,6 @@ import { upsertProfileForSession } from "../../../_lib/supabase-profiles";
 
 async function handleCallback(context: EventContext<OAuthEnv, "provider", unknown>) {
   const provider = context.params.provider;
-
-  // Apple direct OAuth retired in favor of Supabase-brokered sign-in.
-  // Always return 410 Gone for the legacy path (matches audit intent).
-  if (provider === "apple") {
-    return noStoreJson(
-      {
-        ok: false,
-        error: "direct_oauth_retired",
-        detail: "Apple direct OAuth has been retired. Use the Supabase Apple provider via /login."
-      },
-      { status: 410 }
-    );
-  }
-
   if (!isOAuthProvider(provider)) {
     return noStoreJson({ ok: false, error: "unsupported_provider" }, { status: 404 });
   }

@@ -1,16 +1,42 @@
-import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from "@simplewebauthn/browser";
+import type {
+  AuthenticationResponseJSON,
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+  RegistrationResponseJSON,
+} from "@simplewebauthn/browser";
 import {
   domainSearchCandidates,
   frontDoorCandidates,
   promisingResults,
   rankResults,
   searchDomains,
-  type DomainSearchResult
+  type DomainSearchResult,
 } from "../../shared/domain-search";
 import { copy } from "../i18n";
-import { addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
-import { completeSupabaseSession, hasSupabaseCallbackInLocation, signOutSupabase } from "./supabaseAuth";
-import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TrialPublic, TrialStatusPayload } from "./types";
+import {
+  addDomain,
+  addLiveRoom,
+  appendAudit,
+  pauseLiveRoom,
+  store,
+  trackCommissionClick,
+} from "./mockStore";
+import {
+  completeSupabaseSession,
+  hasSupabaseCallbackInLocation,
+  signOutSupabase,
+} from "./supabaseAuth";
+import type {
+  AppState,
+  CommunitySecurityReport,
+  FriskyBridge,
+  FriskyLiveRoom,
+  FriskyTelegramInvite,
+  LiveRoomProvider,
+  Plan,
+  TrialPublic,
+  TrialStatusPayload,
+} from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
 export const defaultBillingCheckoutErrorMessage = copy.en.checkoutErrorGeneric;
@@ -24,7 +50,9 @@ const telegramBotUsername = () =>
     .replace(/^@/, "")
     .trim();
 
-const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? "").trim().replace(/\/$/, "");
+const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? "")
+  .trim()
+  .replace(/\/$/, "");
 
 export type PaidPlan = Exclude<Plan, "free">;
 
@@ -141,18 +169,27 @@ async function apiRequest<T>(path: string, init?: RequestInit) {
     const response = await fetch(path, {
       credentials: "include",
       headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-      ...init
+      ...init,
     });
-    const body = await response.json().catch(() => null) as T | null;
+    const body = (await response.json().catch(() => null)) as T | null;
     if (!body) {
       return devApiFallback<T>(path, init, `api_empty_${response.status}`);
     }
     if (!response.ok) {
-      return devApiFallback<T>(path, init, (body as { error?: string } | null)?.error ?? `api_error_${response.status}`);
+      return devApiFallback<T>(
+        path,
+        init,
+        (body as { error?: string } | null)?.error ??
+          `api_error_${response.status}`
+      );
     }
     return body as T;
   } catch (error) {
-    return devApiFallback<T>(path, init, error instanceof Error ? error.message : "api_unavailable");
+    return devApiFallback<T>(
+      path,
+      init,
+      error instanceof Error ? error.message : "api_unavailable"
+    );
   }
 }
 
@@ -168,12 +205,12 @@ function devAuthSession(): AuthSession & { ok: true } {
       id: store.user.id,
       email: store.user.email,
       name: store.user.name,
-      authProvider: "google"
+      authProvider: "google",
     },
     org: {
       id: store.org.id,
-      plan: store.org.plan
-    }
+      plan: store.org.plan,
+    },
   };
 }
 
@@ -181,19 +218,31 @@ function safeCurrentAuthReturnPath() {
   const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   if (!path.startsWith("/") || path.startsWith("//")) return "/main";
   const pathname = window.location.pathname || "/";
-  if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) {
+  if (
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname.startsWith("/auth/") ||
+    pathname.startsWith("/api/auth/")
+  ) {
     return "/main";
   }
   return path;
 }
 
-function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: string): T {
+function devApiFallback<T>(
+  path: string,
+  init: RequestInit | undefined,
+  reason: string
+): T {
   if (!import.meta.env.DEV) {
     throw new Error(reason);
   }
 
   const method = (init?.method ?? "GET").toUpperCase();
-  const body = typeof init?.body === "string" ? JSON.parse(init.body || "{}") as Record<string, unknown> : {};
+  const body =
+    typeof init?.body === "string"
+      ? (JSON.parse(init.body || "{}") as Record<string, unknown>)
+      : {};
 
   if (path === "/api/auth/me") {
     return devAuthSession() as T;
@@ -211,7 +260,9 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
     return { ok: true, data: addDomain(String(body.domain || "")) } as T;
   }
   if (path === "/api/domains/check" && method === "POST") {
-    const domain = store.domains.find((item) => item.id === body.domainId) ?? store.domains[0];
+    const domain =
+      store.domains.find((item) => item.id === body.domainId) ??
+      store.domains[0];
     if (domain) {
       domain.status = "verified";
       domain.certificateStatus = "active";
@@ -219,13 +270,16 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
     }
     return { ok: true, data: domain } as T;
   }
-  if (path === "/api/bridges" || path === "/api/bridges/rotate") throw new Error("legacy_bridge_retired");
+  if (path === "/api/bridges" || path === "/api/bridges/rotate")
+    throw new Error("legacy_bridge_retired");
   if (path === "/api/bridges/revoke" && method === "POST") {
     const bridge = store.bridges.find((item) => item.id === body.bridgeId);
     if (!bridge) throw new Error("bridge_not_found");
     bridge.status = "revoked";
     bridge.revokedAt = new Date().toISOString();
-    const currentInvite = store.invites.find((item) => item.id === bridge.currentInviteId);
+    const currentInvite = store.invites.find(
+      (item) => item.id === bridge.currentInviteId
+    );
     if (currentInvite) {
       currentInvite.status = "revoked";
       currentInvite.revokedAt = bridge.revokedAt;
@@ -248,10 +302,13 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
     if (!room) throw new Error("room_not_found");
     return { ok: true, data: room } as T;
   }
-  if (path === "/api/telegram/check" || path.startsWith("/api/public/bridge/")) throw new Error("legacy_bridge_retired");
+  if (path === "/api/telegram/check" || path.startsWith("/api/public/bridge/"))
+    throw new Error("legacy_bridge_retired");
   if (path.startsWith("/api/public/room/")) {
     const slug = decodeURIComponent(path.split("/").pop() || "");
-    const room = store.liveRooms.find((item) => item.slug === slug && item.status === "active");
+    const room = store.liveRooms.find(
+      (item) => item.slug === slug && item.status === "active"
+    );
     if (!room) throw new Error("room_not_found");
     return { ok: true, room } as T;
   }
@@ -270,8 +327,8 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
         customDomainSupported: false,
         liveRoomsSupported: true,
         multiAdminWorkflows: false,
-        auditLogScope: "standard"
-      }
+        auditLogScope: "standard",
+      },
     } as T;
   }
   if (path === "/api/telegram/link" && method === "POST") {
@@ -281,14 +338,24 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
       linked: false,
       code,
       expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-      url: `https://t.me/${telegramBotUsername()}?start=link_${code}`
+      url: `https://t.me/${telegramBotUsername()}?start=link_${code}`,
     } as T;
   }
   if (path === "/api/telegram/link") {
-    return { ok: true, linked: false, telegramUserId: null, telegramUsername: null, linkedAt: null } as T;
+    return {
+      ok: true,
+      linked: false,
+      telegramUserId: null,
+      telegramUsername: null,
+      linkedAt: null,
+    } as T;
   }
   if (path === "/api/telegram/readd" && method === "POST") {
-    const bridge = store.bridges.find((item) => item.status === "active" && (item.id === body.bridgeId || item.telegramChatId === body.chatId));
+    const bridge = store.bridges.find(
+      (item) =>
+        item.status === "active" &&
+        (item.id === body.bridgeId || item.telegramChatId === body.chatId)
+    );
     if (!bridge) throw new Error("telegram_bridge_not_found");
     return {
       ok: true,
@@ -299,7 +366,7 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
       bridgeId: bridge.id,
       chatId: bridge.telegramChatId,
       inviteUrl: "https://t.me/+fenrirRecoveryInvite",
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString()
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     } as T;
   }
   throw new Error(reason);
@@ -310,28 +377,44 @@ async function webauthnPost<T>(path: string, body?: unknown): Promise<T> {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: body !== undefined ? JSON.stringify(body) : "{}"
+    body: body !== undefined ? JSON.stringify(body) : "{}",
   });
-  const data = await response.json().catch(() => null) as T | { error?: string } | null;
+  const data = (await response.json().catch(() => null)) as
+    | T
+    | { error?: string }
+    | null;
   if (!response.ok) {
-    throw new Error((data as { error?: string } | null)?.error ?? `api_error_${response.status}`);
+    throw new Error(
+      (data as { error?: string } | null)?.error ??
+        `api_error_${response.status}`
+    );
   }
   return data as T;
 }
 
 export const webauthnService = {
-  async registerOptions(): Promise<{ ok: true; optionsJSON: PublicKeyCredentialCreationOptionsJSON }> {
+  async registerOptions(): Promise<{
+    ok: true;
+    optionsJSON: PublicKeyCredentialCreationOptionsJSON;
+  }> {
     return webauthnPost("/api/webauthn/register-options");
   },
-  async registerVerify(registration: RegistrationResponseJSON): Promise<{ ok: true }> {
+  async registerVerify(
+    registration: RegistrationResponseJSON
+  ): Promise<{ ok: true }> {
     return webauthnPost("/api/webauthn/register-verify", registration);
   },
-  async loginOptions(): Promise<{ ok: true; optionsJSON: PublicKeyCredentialRequestOptionsJSON }> {
+  async loginOptions(): Promise<{
+    ok: true;
+    optionsJSON: PublicKeyCredentialRequestOptionsJSON;
+  }> {
     return webauthnPost("/api/webauthn/login-options");
   },
-  async loginVerify(assertion: AuthenticationResponseJSON): Promise<{ ok: true }> {
+  async loginVerify(
+    assertion: AuthenticationResponseJSON
+  ): Promise<{ ok: true }> {
     return webauthnPost("/api/webauthn/login-verify", assertion);
-  }
+  },
 };
 
 export const authService = {
@@ -341,21 +424,34 @@ export const authService = {
     if (hasSupabaseCallbackInLocation()) {
       const completed = await completeSupabaseSession();
       if (completed) {
-        return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
+        return {
+          ok: true as const,
+          data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me"),
+        };
       }
     }
 
     try {
-      const result = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
+      const result = await apiRequest<AuthSession & { ok: boolean }>(
+        "/api/auth/me"
+      );
       if (!result.authenticated) {
         const completed = await completeSupabaseSession();
         if (completed) {
-          return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
+          return {
+            ok: true as const,
+            data: await apiRequest<AuthSession & { ok: boolean }>(
+              "/api/auth/me"
+            ),
+          };
         }
       }
       return { ok: true as const, data: result };
     } catch {
-      return { ok: true as const, data: { authenticated: false } as AuthSession };
+      return {
+        ok: true as const,
+        data: { authenticated: false } as AuthSession,
+      };
     }
   },
   async login(provider: "google" | "microsoft" | "apple") {
@@ -364,7 +460,11 @@ export const authService = {
     // existing sessions and callbacks, but its social providers are not assumed
     // to be enabled merely because its public URL/key exist.
     const returnTo = safeCurrentAuthReturnPath();
-    window.location.assign(`${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
+    window.location.assign(
+      `${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(
+        returnTo
+      )}`
+    );
   },
   async enabledProviders() {
     const result = await apiRequest<{
@@ -374,9 +474,14 @@ export const authService = {
     return result.providers;
   },
   async telegramLogin(payload: TelegramLoginPayload) {
-    return apiRequest<{ ok: true; authenticated: true; user: AuthSession["user"]; org: AuthSession["org"] }>("/api/auth/telegram-session", {
+    return apiRequest<{
+      ok: true;
+      authenticated: true;
+      user: AuthSession["user"];
+      org: AuthSession["org"];
+    }>("/api/auth/telegram-session", {
       method: "POST",
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
   },
   async logout() {
@@ -386,32 +491,43 @@ export const authService = {
       // Optional cleanup only.
     }
     await signOutSupabase();
-    await apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }).catch(() => null);
-  }
+    await apiRequest<{ ok: boolean }>("/api/auth/logout", {
+      method: "POST",
+    }).catch(() => null);
+  },
 };
 
 export const liveRoomService = {
-  async create(input: { domainId: string; slug: string; title: string; provider: LiveRoomProvider; targetUrl: string; coverImageUrl: string }) {
+  async create(input: {
+    domainId: string;
+    slug: string;
+    title: string;
+    provider: LiveRoomProvider;
+    targetUrl: string;
+    coverImageUrl: string;
+  }) {
     return apiRequest<{ ok: true; data: FriskyLiveRoom }>("/api/rooms", {
       method: "POST",
-      body: JSON.stringify(input)
+      body: JSON.stringify(input),
     });
   },
   async pause(roomId: string) {
     return apiRequest<{ ok: true; data: FriskyLiveRoom }>("/api/rooms/pause", {
       method: "POST",
-      body: JSON.stringify({ roomId })
+      body: JSON.stringify({ roomId }),
     });
   },
   async publicRedirect(slug: string) {
-    return apiRequest<{ ok: true; room: FriskyLiveRoom }>(`/api/public/room/${encodeURIComponent(slug)}`);
-  }
+    return apiRequest<{ ok: true; room: FriskyLiveRoom }>(
+      `/api/public/room/${encodeURIComponent(slug)}`
+    );
+  },
 };
 
 export const appService = {
   async load(): Promise<{ ok: true; data: AppState }> {
     return apiRequest<{ ok: true; data: AppState }>("/api/app-state");
-  }
+  },
 };
 
 export const domainService = {
@@ -419,11 +535,15 @@ export const domainService = {
    * Live availability sweep: public DNS (DoH) + registry (RDAP), server-side so the
    * resolvers see one origin instead of every visitor's browser.
    */
-  async search(input: { seed: string; mode: "front-door" | "exact"; limit?: number }) {
+  async search(input: {
+    seed: string;
+    mode: "front-door" | "exact";
+    limit?: number;
+  }) {
     try {
       return await apiRequest<DomainSearchResponse>("/api/domains/search", {
         method: "POST",
-        body: JSON.stringify(input)
+        body: JSON.stringify(input),
       });
     } catch (error) {
       // Falling back to the browser keeps the check LIVE (same module, same sources)
@@ -435,10 +555,15 @@ export const domainService = {
       if (!candidates.length) {
         return {
           ok: false as const,
-          error: { code: "no_candidates", message: "Enter a brand word or a full domain first." }
+          error: {
+            code: "no_candidates",
+            message: "Enter a brand word or a full domain first.",
+          },
         };
       }
-      const results = rankResults(await searchDomains(candidates, { concurrency: 4 }));
+      const results = rankResults(
+        await searchDomains(candidates, { concurrency: 4 })
+      );
       return {
         ok: true as const,
         mode: input.mode,
@@ -447,45 +572,72 @@ export const domainService = {
         promising: promisingResults(results).map((result) => result.domain),
         checkedAt: new Date().toISOString(),
         viaBrowserFallback: true as const,
-        fallbackReason: error instanceof Error ? error.message : "api_unavailable"
+        fallbackReason:
+          error instanceof Error ? error.message : "api_unavailable",
       };
     }
   },
   async create(domain: string) {
-    return apiRequest<{ ok: true; data: AppState["domains"][number] }>("/api/domains", {
-      method: "POST",
-      body: JSON.stringify({ domain })
-    });
+    return apiRequest<{ ok: true; data: AppState["domains"][number] }>(
+      "/api/domains",
+      {
+        method: "POST",
+        body: JSON.stringify({ domain }),
+      }
+    );
   },
   async checkDns(domainId: string) {
     try {
-      return await apiRequest<{ ok: true; data: AppState["domains"][number] }>("/api/domains/check", {
-        method: "POST",
-        body: JSON.stringify({ domainId })
-      });
+      return await apiRequest<{ ok: true; data: AppState["domains"][number] }>(
+        "/api/domains/check",
+        {
+          method: "POST",
+          body: JSON.stringify({ domainId }),
+        }
+      );
     } catch (error) {
-      return { ok: false as const, error: { code: "dns_check_failed", message: error instanceof Error ? error.message : "DNS check failed." } };
+      return {
+        ok: false as const,
+        error: {
+          code: "dns_check_failed",
+          message: error instanceof Error ? error.message : "DNS check failed.",
+        },
+      };
     }
-  }
+  },
 };
 
 export const bridgeService = {
-  async create(input: { domainId: string; slug: string; telegramChatId: string; telegramGroupName: string; telegramGroupImageUrl: string }) {
-    return apiRequest<{ ok: true; data: FriskyBridge; invite: FriskyTelegramInvite }>("/api/bridges", {
+  async create(input: {
+    domainId: string;
+    slug: string;
+    telegramChatId: string;
+    telegramGroupName: string;
+    telegramGroupImageUrl: string;
+  }) {
+    return apiRequest<{
+      ok: true;
+      data: FriskyBridge;
+      invite: FriskyTelegramInvite;
+    }>("/api/bridges", {
       method: "POST",
-      body: JSON.stringify(input)
+      body: JSON.stringify(input),
     });
   },
   async rotate(bridgeId: string) {
-    return apiRequest<{ ok: true; data: FriskyBridge; invite: FriskyTelegramInvite }>("/api/bridges/rotate", {
+    return apiRequest<{
+      ok: true;
+      data: FriskyBridge;
+      invite: FriskyTelegramInvite;
+    }>("/api/bridges/rotate", {
       method: "POST",
-      body: JSON.stringify({ bridgeId })
+      body: JSON.stringify({ bridgeId }),
     });
   },
   async revoke(bridgeId: string) {
     return apiRequest<{ ok: true; data: FriskyBridge }>("/api/bridges/revoke", {
       method: "POST",
-      body: JSON.stringify({ bridgeId })
+      body: JSON.stringify({ bridgeId }),
     });
   },
   async publicRedirect(slug: string) {
@@ -495,7 +647,7 @@ export const bridgeService = {
       invite: FriskyTelegramInvite | null;
       access: { inviteAvailable: boolean; reason: string };
     }>(`/api/public/bridge/${encodeURIComponent(slug)}`);
-  }
+  },
 };
 
 export const telegramService = {
@@ -504,97 +656,167 @@ export const telegramService = {
     "/bridge_rotate main",
     "/bridge_revoke main",
     "/bridge_links",
-    "/bridge_check <telegram_group_id>"
-  ]
+    "/bridge_check <telegram_group_id>",
+  ],
 };
 
 // Kept as a named service so the optional report panel can remain type-safe
 // when a community security endpoint is enabled for a deployment.
 export const communitySecurityService = {
-  async getReport(communitySlug: string): Promise<{ ok: true; data: CommunitySecurityReport }> {
+  async getReport(
+    communitySlug: string
+  ): Promise<{ ok: true; data: CommunitySecurityReport }> {
     return apiRequest<{ ok: true; data: CommunitySecurityReport }>(
       `/api/community-security/${encodeURIComponent(communitySlug)}`
     );
-  }
+  },
 };
 
 export const aiOpsService = {
   julesTicket() {
-    appendAudit("jules_ticket_created", "FriskyOrg", store.org.id, { label: "backend hardening task" });
+    appendAudit("jules_ticket_created", "FriskyOrg", store.org.id, {
+      label: "backend hardening task",
+    });
   },
   geminiDnsExplanation() {
-    appendAudit("gemini_dns_explained", "FriskyDomain", store.domains[0]?.id ?? "none", { assistant: "Gemini", note: "DNS wizard guidance generated." });
+    appendAudit(
+      "gemini_dns_explained",
+      "FriskyDomain",
+      store.domains[0]?.id ?? "none",
+      { assistant: "Gemini", note: "DNS wizard guidance generated." }
+    );
   },
   cursorHandoff() {
-    appendAudit("cursor_handoff_exported", "FriskyOrg", store.org.id, { target: "Cursor workspace" });
-  }
+    appendAudit("cursor_handoff_exported", "FriskyOrg", store.org.id, {
+      target: "Cursor workspace",
+    });
+  },
 };
 
 export const commerceService = {
   click(slug: string) {
     return trackCommissionClick(slug);
-  }
+  },
 };
 
 export const readinessService = {
   async get(): Promise<ReadinessPayload | null> {
     try {
-      const response = await fetch("/api/readiness", { credentials: "same-origin" });
-      const body = (await response.json().catch(() => null)) as ReadinessPayload | null;
+      const response = await fetch("/api/readiness", {
+        credentials: "same-origin",
+      });
+      const body = (await response
+        .json()
+        .catch(() => null)) as ReadinessPayload | null;
       if (!response.ok || !body?.ok) return null;
       return body;
     } catch {
       return null;
     }
-  }
+  },
 };
 
 export const billingService = {
   async getStatus(): Promise<BillingStatusPayload> {
     return apiRequest<BillingStatusPayload>("/api/billing/status");
   },
-  async checkout(plan: PaidPlan, courtesyCode?: string): Promise<{ ok: true; url: string }> {
+  async checkout(
+    plan: PaidPlan,
+    courtesyCode?: string
+  ): Promise<{ ok: true; url: string }> {
     return apiRequest<{ ok: true; url: string }>("/api/billing/checkout", {
       method: "POST",
-      body: JSON.stringify({ plan, ...(courtesyCode ? { courtesyCode } : {}) })
+      body: JSON.stringify({ plan, ...(courtesyCode ? { courtesyCode } : {}) }),
     });
   },
   async portal(): Promise<{ ok: true; url: string }> {
-    return apiRequest<{ ok: true; url: string }>("/api/billing/portal", { method: "POST" });
+    return apiRequest<{ ok: true; url: string }>("/api/billing/portal", {
+      method: "POST",
+    });
   },
-  async telegramStars(): Promise<{ ok: true; botUsername: string; url: string; stars: number; mode: "telegram_stars" }> {
-    return apiRequest<{ ok: true; botUsername: string; url: string; stars: number; mode: "telegram_stars" }>("/api/telegram/stars");
-  }
+  async telegramStars(): Promise<{
+    ok: true;
+    botUsername: string;
+    url: string;
+    stars: number;
+    mode: "telegram_stars";
+  }> {
+    return apiRequest<{
+      ok: true;
+      botUsername: string;
+      url: string;
+      stars: number;
+      mode: "telegram_stars";
+    }>("/api/telegram/stars");
+  },
 };
 
 export const trialService = {
   async status(): Promise<TrialStatusPayload> {
     return apiRequest<TrialStatusPayload>("/api/trial/status");
   },
-  async redeem(code: string): Promise<{ ok: true; requiresCard: boolean; next?: string; trial: TrialPublic | null }> {
-    return apiRequest<{ ok: true; requiresCard: boolean; next?: string; trial: TrialPublic | null }>("/api/trial/redeem", {
+  async redeem(code: string): Promise<{
+    ok: true;
+    requiresCard: boolean;
+    next?: string;
+    trial: TrialPublic | null;
+  }> {
+    return apiRequest<{
+      ok: true;
+      requiresCard: boolean;
+      next?: string;
+      trial: TrialPublic | null;
+    }>("/api/trial/redeem", {
       method: "POST",
-      body: JSON.stringify({ code })
+      body: JSON.stringify({ code }),
     });
   },
-  async createSetupIntent(code?: string): Promise<{ ok: true; clientSecret: string; setupIntentId: string; customerId: string; trialId: string }> {
-    return apiRequest<{ ok: true; clientSecret: string; setupIntentId: string; customerId: string; trialId: string }>("/api/trial/setup-intent", {
+  async createSetupIntent(code?: string): Promise<{
+    ok: true;
+    clientSecret: string;
+    setupIntentId: string;
+    customerId: string;
+    trialId: string;
+  }> {
+    return apiRequest<{
+      ok: true;
+      clientSecret: string;
+      setupIntentId: string;
+      customerId: string;
+      trialId: string;
+    }>("/api/trial/setup-intent", {
       method: "POST",
-      body: JSON.stringify(code ? { code } : {})
+      body: JSON.stringify(code ? { code } : {}),
     });
   },
-  async verify(code?: string): Promise<{ ok: true; alreadyActive?: boolean; trial?: TrialPublic }> {
-    return apiRequest<{ ok: true; alreadyActive?: boolean; trial?: TrialPublic }>("/api/trial/verify", {
+  async verify(
+    code?: string
+  ): Promise<{ ok: true; alreadyActive?: boolean; trial?: TrialPublic }> {
+    return apiRequest<{
+      ok: true;
+      alreadyActive?: boolean;
+      trial?: TrialPublic;
+    }>("/api/trial/verify", {
       method: "POST",
-      body: JSON.stringify(code ? { code } : {})
+      body: JSON.stringify(code ? { code } : {}),
     });
   },
-  async convert(plan: "starter" | "pro" | "operator"): Promise<{ ok: true; plan: string; subscriptionStatus: string; stripeSubscriptionId: string }> {
-    return apiRequest<{ ok: true; plan: string; subscriptionStatus: string; stripeSubscriptionId: string }>("/api/trial/convert", {
+  async convert(plan: "starter" | "pro" | "operator"): Promise<{
+    ok: true;
+    plan: string;
+    subscriptionStatus: string;
+    stripeSubscriptionId: string;
+  }> {
+    return apiRequest<{
+      ok: true;
+      plan: string;
+      subscriptionStatus: string;
+      stripeSubscriptionId: string;
+    }>("/api/trial/convert", {
       method: "POST",
-      body: JSON.stringify({ plan })
+      body: JSON.stringify({ plan }),
     });
-  }
+  },
 };
 
 export const telegramIdentityService = {
@@ -602,14 +824,19 @@ export const telegramIdentityService = {
     return apiRequest<TelegramIdentityLinkPayload>("/api/telegram/link");
   },
   async start(): Promise<TelegramIdentityLinkStartPayload> {
-    return apiRequest<TelegramIdentityLinkStartPayload>("/api/telegram/link", { method: "POST" });
+    return apiRequest<TelegramIdentityLinkStartPayload>("/api/telegram/link", {
+      method: "POST",
+    });
   },
-  async readd(input: { bridgeId?: string; chatId?: string }): Promise<TelegramReaddPayload> {
+  async readd(input: {
+    bridgeId?: string;
+    chatId?: string;
+  }): Promise<TelegramReaddPayload> {
     return apiRequest<TelegramReaddPayload>("/api/telegram/readd", {
       method: "POST",
-      body: JSON.stringify(input)
+      body: JSON.stringify(input),
     });
-  }
+  },
 };
 
 export type MediaKind = "avatar" | "cover" | "upload";
@@ -629,7 +856,10 @@ export type MediaUploadResult = {
  * boundary. The fenrir_session cookie rides along via `credentials: "include"`.
  */
 export const mediaService = {
-  async upload(file: File, kind: MediaKind = "upload"): Promise<MediaUploadResult> {
+  async upload(
+    file: File,
+    kind: MediaKind = "upload"
+  ): Promise<MediaUploadResult> {
     const form = new FormData();
     form.append("file", file);
     form.append("kind", kind);
@@ -637,12 +867,14 @@ export const mediaService = {
     const response = await fetch("/api/media/upload", {
       method: "POST",
       credentials: "include",
-      body: form
+      body: form,
     });
-    const body = (await response.json().catch(() => null)) as (MediaUploadResult & { error?: string }) | null;
+    const body = (await response.json().catch(() => null)) as
+      | (MediaUploadResult & { error?: string })
+      | null;
     if (!response.ok || !body?.ok) {
       throw new Error(body?.error ?? `media_upload_failed_${response.status}`);
     }
     return body;
-  }
+  },
 };
