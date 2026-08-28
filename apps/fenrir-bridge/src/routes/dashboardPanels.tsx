@@ -1254,17 +1254,27 @@ export function DnsWizard({ domains, selected, onSelect, c }: { domains: FriskyD
             <span className={selected.status === "verified" && selected.certificateStatus === "active" ? "status good" : "status amber"}>{c.steps[3]}</span>
           </div>
         </div>
-        <DnsRecord type="NS" name="@" value={selected.cloudflareNameservers?.join(" / ") ?? "Cloudflare assigned nameservers"} purpose={c.nsPurpose} />
-        <DnsRecord type="TXT" name={selected.txtRecordName} value={selected.txtRecordValue} purpose={c.txtPurpose} />
-        <DnsRecord type="CNAME" name={selected.cnameHost} value={selected.cnameTarget} purpose={c.cnamePurpose} />
-        <div className="provider-tabs">
-          {["Cloudflare recommended", "Dynadot registrar", "Namecheap registrar", "Generic registrar"].map((provider) => (
-            <div className="provider" key={provider}>
-              <b>{provider}</b>
-              <small>{c.friskyTipBody}</small>
+        {selected.txtRecordValue || selected.cnameTarget ? (
+          <>
+            <DnsRecord type="NS" name="@" value={selected.cloudflareNameservers?.join(" / ") ?? "Cloudflare assigned nameservers"} purpose={c.nsPurpose} />
+            <DnsRecord type="TXT" name={selected.txtRecordName} value={selected.txtRecordValue} purpose={c.txtPurpose} />
+            <DnsRecord type="CNAME" name={selected.cnameHost} value={selected.cnameTarget} purpose={c.cnamePurpose} />
+            <div className="provider-tabs">
+              {["Cloudflare recommended", "Dynadot registrar", "Namecheap registrar", "Generic registrar"].map((provider) => (
+                <div className="provider" key={provider}>
+                  <b>{provider}</b>
+                  <small>{c.friskyTipBody}</small>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        ) : (
+          <p className="frisky-tip">
+            {selected.certificateStatus === "active"
+              ? `${selected.domain} is live on this Cloudflare account.`
+              : `${selected.domain} is attached. SSL ${selected.certificateStatus}.`}
+          </p>
+        )}
       </div>
     </div>
   );
