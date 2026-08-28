@@ -11,19 +11,18 @@ export type OAuthEnv = BillingEnv & {
   APPLE_KEY_ID?: string;
   APPLE_PRIVATE_KEY?: string;
   /**
-   * Authentik broker (https://authentik.friskydev.com). The issuer is per-application and
-   * ends with a slash, e.g. `https://authentik.friskydev.com/application/o/<app-slug>/`.
+   * @deprecated Authentik is leftover. The Authentik VM was destroyed 2026-08-28.
+   * These env names may still exist in old dashboards; they must never enable login.
    */
   AUTHENTIK_ISSUER?: string;
   AUTHENTIK_CLIENT_ID?: string;
   AUTHENTIK_CLIENT_SECRET?: string;
   /**
-   * Hard kill switch. Must be exactly "true" for Authentik to be offered at all.
-   * Credentials alone are deliberately NOT enough: this keeps a half-finished Authentik
-   * rollout from appearing on a live gate, and lets the flag be flipped off instantly
-   * without unbinding secrets. The live Google/Microsoft/Apple path is untouched by it.
+   * @deprecated No-op. Authentik is retired leftover identity, not Fenrir login.
+   * Even AUTHENTIK_ENABLED=true does not offer the provider.
    */
   AUTHENTIK_ENABLED?: string;
+  FRISKY_AUTH_ENABLED?: string;
 };
 
 export type OAuthProvider = "google" | "microsoft" | "apple" | "authentik";
@@ -74,8 +73,9 @@ export function isCommunityOAuthProvider(value: unknown): value is OAuthProvider
 }
 
 /**
- * Authentik exposes ONE global authorize/token/userinfo triple and a per-application
- * JWKS + issuer. Derived from AUTHENTIK_ISSUER so a single env var configures the lot.
+ * Authentik OIDC endpoints for the destroyed Identity Core hostname.
+ * Kept only so leftover docs and tests can name the stale URLs. Never call these
+ * for live login — `isDirectOAuthAvailable("authentik")` is always false.
  */
 export function authentikEndpoints(issuer: string) {
   const normalizedIssuer = issuer.trim().replace(/\/*$/, "/");
@@ -100,19 +100,9 @@ export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): 
     return Boolean(env.APPLE_CLIENT_ID?.trim() && env.APPLE_TEAM_ID?.trim() && env.APPLE_KEY_ID?.trim() && env.APPLE_PRIVATE_KEY?.trim());
   }
   if (provider === "authentik") {
-    // Flag first: an unset/false AUTHENTIK_ENABLED means the provider does not exist,
-    // no matter what credentials are bound.
-    if (env.AUTHENTIK_ENABLED?.trim().toLowerCase() !== "true") return false;
-    if (!env.AUTHENTIK_ISSUER?.trim() || !env.AUTHENTIK_CLIENT_ID?.trim() || !env.AUTHENTIK_CLIENT_SECRET?.trim()) {
-      return false;
-    }
-    // A malformed issuer would blow up later inside the redirect; fail closed here.
-    try {
-      authentikEndpoints(env.AUTHENTIK_ISSUER);
-    } catch {
-      return false;
-    }
-    return true;
+    // Authentik VM destroyed 2026-08-28. Never offer it as live identity,
+    // even if leftover AUTHENTIK_* secrets are still bound.
+    return false;
   }
     return false;
 }
@@ -201,20 +191,7 @@ export async function getAuthorizationUrl(provider: OAuthProvider, env: OAuthEnv
   }
 
   if (provider === "authentik") {
-    const clientId = requireEnv(env.AUTHENTIK_CLIENT_ID, "AUTHENTIK_CLIENT_ID");
-    const endpoints = authentikEndpoints(requireEnv(env.AUTHENTIK_ISSUER, "AUTHENTIK_ISSUER"));
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: "openid email profile",
-      state: tx.state,
-      nonce: tx.nonce,
-      code_challenge: codeChallenge,
-      code_challenge_method: "S256",
-      response_mode: "query"
-    });
-    return `${endpoints.authorize}?${params.toString()}`;
+    throw new Error("authentik_retired");
   }
 
     throw new Error(`unsupported_provider:${provider}`);
@@ -366,7 +343,7 @@ export async function exchangeCodeForIdentity(
   if (provider === "google") return exchangeGoogleCode(env, code, redirectUri, tx);
   if (provider === "microsoft") return exchangeMicrosoftCode(env, code, redirectUri, tx);
   if (provider === "apple") return exchangeAppleCode(env, code, redirectUri, tx);
-  if (provider === "authentik") return exchangeAuthentikCode(env, code, redirectUri, tx);
+  if (provider === "authentik") throw new Error("authentik_retired");
   throw new Error(`exchange_not_implemented_for:${provider}`);
 }
 
@@ -494,79 +471,6 @@ async function exchangeAppleCode(env: OAuthEnv, code: string, redirectUri: strin
     emailVerified: parseBoolClaim(claims.email_verified, true)
   };
 }
-
-/**
- * Authentik as an OIDC broker. Same shape as the direct providers — the difference is that
- * Google / Microsoft / Apple sit BEHIND Authentik as federated sources, so this single
- * exchange covers all of them and `sub` is Authentik's stable user id, not the upstream one.
- *
- * That stability is the whole point: a user who signs in via Google today and Microsoft
- * tomorrow keeps ONE `authentik:<sub>` identity, because Authentik does the account
- * linking on its side instead of the bridge minting a second row per upstream provider.
- */
-async function exchangeAuthentikCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
-  const clientId = requireEnv(env.AUTHENTIK_CLIENT_ID, "AUTHENTIK_CLIENT_ID");
-  const clientSecret = requireEnv(env.AUTHENTIK_CLIENT_SECRET, "AUTHENTIK_CLIENT_SECRET");
-  const endpoints = authentikEndpoints(requireEnv(env.AUTHENTIK_ISSUER, "AUTHENTIK_ISSUER"));
-
-  const tokens = await exchangeToken(endpoints.token, {
-    code,
-    client_id: clientId,
-    client_secret: clientSecret,
-    redirect_uri: redirectUri,
-    grant_type: "authorization_code",
-    code_verifier: tx.verifier
-  }, "authentik");
-
-  const claims = await verifyIdToken(tokens.id_token, {
-    // Pinned to THIS application's issuer, so a token minted for a DIFFERENT Authentik
-    // application on the same host is rejected. Anchored regex only to tolerate the
-    // trailing slash — Authentik emits `iss` with one, config may be pasted without.
-    issuer: new RegExp(`^${escapeRegExp(endpoints.issuer.replace(/\/$/, ""))}\\/?$`),
-    audience: clientId,
-    nonce: tx.nonce,
-    jwksUrl: endpoints.jwks
-  });
-
-  const sub = stringClaim(claims.sub, "authentik_missing_sub");
-  // Authentik only puts email/preferred_username in the id_token when the email/profile
-  // scope mappings are attached to the provider. Fall back to /userinfo rather than
-  // dead-ending the sign-in on a scope-mapping mistake.
-  let email = typeof claims.email === "string" && claims.email.trim() ? claims.email.trim() : "";
-  let name = typeof claims.name === "string" && claims.name.trim() ? claims.name.trim() : "";
-  let emailVerifiedClaim = claims.email_verified;
-
-  if (!email && tokens.access_token) {
-    const info = await fetchAuthentikUserInfo(endpoints.userinfo, tokens.access_token);
-    if (typeof info.email === "string") email = info.email.trim();
-    if (!name && typeof info.name === "string") name = info.name.trim();
-    if (emailVerifiedClaim === undefined) emailVerifiedClaim = info.email_verified;
-  }
-
-  if (!email) throw new Error("authentik_missing_email");
-
-  return {
-    provider: "authentik",
-    email,
-    name: name || email.split("@")[0],
-    identityId: `authentik:${sub}`,
-    // Authentik is our own broker: it either federated from a provider that already
-    // verified the address, or the operator created the account by hand. It omits
-    // email_verified unless the mapping is configured, so absence means "trusted",
-    // an explicit false still blocks.
-    emailVerified: parseBoolClaim(emailVerifiedClaim, true)
-  };
-}
-
-async function fetchAuthentikUserInfo(userinfoUrl: string, accessToken: string) {
-  const response = await httpFetch(userinfoUrl, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }
-  });
-  if (!response.ok) throw new Error(`authentik_userinfo_failed:${response.status}`);
-  return await response.json() as Record<string, unknown>;
-}
-
-
 
 let fetchOverride: typeof fetch | null = null;
 

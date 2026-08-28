@@ -1,8 +1,11 @@
-# Direct OAuth Provider Wiring
+# Direct / leftover OAuth Provider Wiring
 
-MyFenrir member sign-in is Supabase Auth (client-side `signInWithOAuth`), so
-the SPA never needs these routes for the main login. The direct per-provider
-wiring below belongs to the **Community Gate** (Neon) OAuth endpoints:
+MyFenrir **app login** is Better Auth (`@frisky/auth`) at `/api/frisky-auth/*`
+once `FRISKY_AUTH_ENABLED=1`. See `docs/FRISKY_AUTH_MIGRATION.md`.
+
+The SPA must not treat Authentik or Firebase as the app IdP.
+
+Community Gate (Neon) OAuth endpoints remain a **separate** membership plane:
 
 - Google: `/api/community-auth/oauth/google`
 - Microsoft: `/api/community-auth/oauth/microsoft`
@@ -11,8 +14,8 @@ wiring below belongs to the **Community Gate** (Neon) OAuth endpoints:
 The Fenrir MCP beta worker authenticates with a static bearer token
 (`FRISKY_BOT_API_TOKEN`); it has no OAuth discovery endpoints.
 
-The callback validates the OAuth transaction cookie, PKCE verifier, state,
-nonce, and OIDC ID token before minting `fenrir_session`.
+Leftover direct `/api/auth/callback/*` routes below are the pre-Better-Auth
+operator path. Prefer the Better Auth callbacks in the migration doc.
 
 ## Production URLs
 
@@ -21,9 +24,14 @@ Use these values for the production app:
 - App origin: `https://myfenrir.com`
 - WWW origin: `https://www.myfenrir.com`
 - Auth origin: `https://auth.myfenrir.com`
-- Google callback: `https://auth.myfenrir.com/api/auth/callback/google`
-- Microsoft callback: `https://auth.myfenrir.com/api/auth/callback/microsoft`
-- Apple callback: `https://auth.myfenrir.com/api/auth/callback/apple`
+- Better Auth (app login, once `FRISKY_AUTH_ENABLED=1`):
+  - `https://www.myfenrir.com/api/frisky-auth/callback/google`
+  - `https://www.myfenrir.com/api/frisky-auth/callback/microsoft`
+  - `https://www.myfenrir.com/api/frisky-auth/callback/apple` (not live until `APPLE_CLIENT_SECRET`)
+- Leftover direct OAuth (cutover fallback only):
+  - Google callback: `https://auth.myfenrir.com/api/auth/callback/google`
+  - Microsoft callback: `https://auth.myfenrir.com/api/auth/callback/microsoft`
+  - Apple callback: `https://auth.myfenrir.com/api/auth/callback/apple`
 
 ## Google
 

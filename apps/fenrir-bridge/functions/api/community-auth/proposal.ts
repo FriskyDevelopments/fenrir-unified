@@ -7,7 +7,8 @@ export async function onRequestGet(context: any) {
   return noStoreJson({
     ok: true,
     product: "fenrir-community-gate",
-    auth: "firebase",
+    auth: "fenrir_community_session",
+    legacyFirebaseBearer: true,
     database: "neon",
     configured: communityGateAuthConfigured(context.env),
     legacyMagicLinkConfigured: communityAuthConfigured(context.env),
@@ -20,11 +21,11 @@ export async function onRequestGet(context: any) {
       sharedFriskyD1Tables: false
     },
     requiredEnv: [
-      "FIREBASE_PROJECT_ID",
+      "FENRIR_COMMUNITY_AUTH_SECRET",
       "NEON_DATABASE_URL"
     ],
     optionalEnv: [
-      "FENRIR_COMMUNITY_AUTH_SECRET",
+      "FIREBASE_PROJECT_ID",
       "FENRIR_COMMUNITY_AUTH_DEV_RETURN_LINK",
       "PUBLIC_SITE_URL"
     ],

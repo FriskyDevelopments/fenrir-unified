@@ -2181,6 +2181,7 @@ function authProviderLabel(provider: string) {
   if (value.includes("microsoft") || value.includes("azure")) return "Microsoft";
   if (value.includes("telegram")) return "Telegram";
   if (value.includes("passkey")) return "Passkey";
+  if (value.includes("frisky") || value.includes("better-auth")) return "Frisky";
   return provider || "OAuth";
 }
 
@@ -2463,17 +2464,16 @@ const accessStateHelp: Record<DefaultAccessState, string> = {
 function communityAuthProviderLabel(provider: string) {
   if (provider === "magic_link") return "Magic link";
   if (provider === "microsoft") return "Microsoft";
-  if (provider === "authentik") return "FriskyDev Auth";
+  if (provider === "authentik") return "Retired Authentik (not Fenrir identity)";
   return provider[0]?.toUpperCase() + provider.slice(1);
 }
 
 /**
  * Providers the Community Gate OAuth bridge can complete end-to-end.
- * `authentik` is the broker: when it is enabled it fronts Google / Microsoft / Apple
- * instead of sitting beside them, so a community normally enables EITHER authentik
- * OR the direct three — not both. See docs/AUTHENTIK_OIDC_INTEGRATION.md.
+ * Authentik is leftover (VM destroyed 2026-08-28) and is not shown.
+ * Community membership still uses fenrir_* + fenrir_community_session.
  */
-const communityOAuthProviders = ["google", "microsoft", "apple", "authentik"] as const;
+const communityOAuthProviders = ["google", "microsoft", "apple"] as const;
 
 function communityOAuthStartUrl(provider: string, slug: string) {
   const params = new URLSearchParams({ slug, return_to: `/community/${slug}` });
@@ -3249,7 +3249,7 @@ function communityBrandAdminErrorMessage(error: unknown) {
   }
   if (error.status === 401 || error.error === "authentication_required") return "Not signed in. Sign in to the Fenrir admin before customizing this Community Gate.";
   if (error.status === 403 || error.error === "forbidden") return "Forbidden. Your account is not an owner or allowlisted admin for this Community Gate.";
-  if (error.status === 503 || error.error === "community_auth_not_configured") return readableCommunityError(error.detail, "Missing Community Gate config. Firebase Auth handles sign-in; Neon is only the gate data plane.");
+  if (error.status === 503 || error.error === "community_auth_not_configured") return readableCommunityError(error.detail, "Missing Community Gate config. Membership uses fenrir_community_session and Neon fenrir_* tables; Firebase bearer verification is leftover, not Fenrir app identity.");
   if (error.error === "community_gate_schema_missing") return "Missing Neon schema. Apply the Community Gate schema before customizing this gate.";
   return `Community Gate load failed: ${error.error || `HTTP ${error.status}`}.`;
 }

@@ -7,8 +7,12 @@
 
 ## Quick Context
 This is the **production monorepo** for Fenrir Bridge. The app is deployed to Cloudflare Pages
-(`fenrir-bridge` project) at `myfenrir.com`. All secrets are already set in Cloudflare Pages
-production environment (SUPABASE_URL, SUPABASE_ANON_KEY, SESSION_SECRET, TELEGRAM_BOT_TOKEN, etc.).
+(`fenrir-bridge` project) at `myfenrir.com`.
+
+App login (who is this user?) is Better Auth (`@frisky/auth`) on Neon `app_auth_*` once
+`FRISKY_AUTH_ENABLED=1` plus `BETTER_AUTH_SECRET` / provider secrets are bound. Until that
+flag is set, leftover direct OAuth under `/api/auth/*` still serves Google/Microsoft.
+Community membership stays on `fenrir_*` + `fenrir_community_session`. Authentik is leftover.
 
 ## Setup
 ```bash
@@ -26,12 +30,12 @@ npm run build && wrangler pages deploy dist/ --project-name fenrir-bridge
 ```
 
 ## Code Map
-- `src/App.tsx` — root component, Supabase auth session management
+- `src/App.tsx` — root component, Better Auth / Fenrir session management
 - `src/components/` — UI components (sections, shared)
 - `src/services/` — API client layer
 - `functions/` — Cloudflare Pages Functions (edge API)
 - `functions/_lib/` — shared utilities: auth.ts, billing-env.ts, readiness.ts, responses.ts
-- `functions/api/` — API routes: auth/, billing/, bridges/, domains/, telegram/, stripe/, webauthn/
+- `functions/api/` — API routes: frisky-auth/, auth/, billing/, bridges/, domains/, telegram/, stripe/, webauthn/
 - `public/` — static assets (SVG icons, webmanifest, brand assets)
 - `workers/` — standalone Cloudflare Workers (fenrir-gate-router, fenrir-stars-payments)
 - `database/` — D1 schema SQL files

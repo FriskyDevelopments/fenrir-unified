@@ -20,7 +20,7 @@ export async function onRequestGet(context: any) {
         product: "fenrir-community-gate",
         error: "community_gate_data_not_configured",
         detail: {
-          message: "Firebase Auth accepted the user, but the Community Gate data plane still needs NEON_DATABASE_URL and docs/neon-community-gate-schema.sql.",
+          message: "Community Gate accepted the member, but the Neon data plane still needs NEON_DATABASE_URL and docs/neon-community-gate-schema.sql.",
           missing: ["NEON_DATABASE_URL"]
         },
         user: {

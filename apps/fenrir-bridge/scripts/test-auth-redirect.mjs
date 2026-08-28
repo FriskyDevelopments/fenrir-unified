@@ -1,6 +1,6 @@
-// Guard: new MyFenrir sign-ins use only runtime-advertised direct OAuth
-// providers. Existing Supabase callback/session support stays in place for
-// legacy sessions. WorkOS is banned from this repo (same treatment as Vercel).
+// Guard: new MyFenrir sign-ins prefer Better Auth (@frisky/auth) when
+// /api/auth/providers reports engine=better-auth. Direct OAuth remains a
+// cutover fallback. WorkOS is banned from this repo (same treatment as Vercel).
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -27,11 +27,12 @@ function workosMatches() {
 const offenders = workosMatches();
 const checks = [
   {
-    name: "new social login uses only runtime-advertised direct OAuth providers",
-    pass: apiSource.includes('/api/auth/login/${provider}') &&
+    name: "new social login prefers Better Auth when providers.engine is better-auth",
+    pass: apiSource.includes("signInWithFriskyAuth") &&
+      apiSource.includes('engine === "better-auth"') &&
       apiSource.includes('>("/api/auth/providers")') &&
       !apiSource.includes("signInWithSupabase(provider)") &&
-      providersSource.includes("isDirectOAuthAvailable(provider, context.env)")
+      providersSource.includes("better-auth")
   },
   {
     name: "the production App auth surface renders only advertised providers",
@@ -41,7 +42,7 @@ const checks = [
       !appSource.includes('(["apple", "google", "microsoft"] as AuthProvider[]).map')
   },
   {
-    name: "legacy Supabase callback support remains available for existing sessions",
+    name: "legacy Supabase callback support remains available for existing sessions only",
     pass: supabaseAuthSource.includes("signInWithOAuth")
   },
   {

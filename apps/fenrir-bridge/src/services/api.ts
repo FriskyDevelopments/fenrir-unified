@@ -10,6 +10,7 @@ import {
 import { copy } from "../i18n";
 import { addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
 import { completeSupabaseSession, hasSupabaseCallbackInLocation, signOutSupabase } from "./supabaseAuth";
+import { signInWithFriskyAuth, signOutFriskyAuthClient } from "./friskyAuth";
 import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TrialPublic, TrialStatusPayload } from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
@@ -118,7 +119,7 @@ export type AuthSession = {
     id: string;
     email: string;
     name: string;
-    authProvider: "google" | "microsoft" | "apple" | "telegram" | "passkey";
+    authProvider: "google" | "microsoft" | "apple" | "telegram" | "passkey" | "frisky";
   };
   org?: {
     id: string;
@@ -336,8 +337,8 @@ export const webauthnService = {
 
 export const authService = {
   async me() {
-    // Supabase Auth is the login broker: after the provider redirects back to
-    // /auth/callback, exchange the Supabase session for the Fenrir cookie.
+    // Leftover Supabase callbacks may still complete existing sessions.
+    // New social login uses Better Auth when /api/auth/providers.engine is better-auth.
     if (hasSupabaseCallbackInLocation()) {
       const completed = await completeSupabaseSession();
       if (completed) {
@@ -359,18 +360,24 @@ export const authService = {
     }
   },
   async login(provider: "google" | "microsoft" | "apple") {
-    // New sign-ins use only the direct provider stack whose runtime credentials
-    // are advertised by /api/auth/providers. The Supabase project still accepts
-    // existing sessions and callbacks, but its social providers are not assumed
-    // to be enabled merely because its public URL/key exist.
+    const caps = await this.authCapabilities();
+    if (caps.engine === "better-auth") {
+      await signInWithFriskyAuth(provider);
+      return;
+    }
     const returnTo = safeCurrentAuthReturnPath();
     window.location.assign(`${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
   },
-  async enabledProviders() {
-    const result = await apiRequest<{
+  async authCapabilities() {
+    return apiRequest<{
       ok: true;
+      engine: "better-auth" | "legacy-direct-oauth";
       providers: Array<"google" | "microsoft" | "apple">;
+      appleLive: boolean;
     }>("/api/auth/providers");
+  },
+  async enabledProviders() {
+    const result = await this.authCapabilities();
     return result.providers;
   },
   async telegramLogin(payload: TelegramLoginPayload) {
@@ -385,6 +392,7 @@ export const authService = {
     } catch {
       // Optional cleanup only.
     }
+    await signOutFriskyAuthClient();
     await signOutSupabase();
     await apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }).catch(() => null);
   }

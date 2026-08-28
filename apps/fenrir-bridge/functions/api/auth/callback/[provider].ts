@@ -24,7 +24,7 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
       {
         ok: false,
         error: "direct_oauth_retired",
-        detail: "Apple direct OAuth has been retired. Use the Supabase Apple provider via /login."
+        detail: "Apple direct OAuth is disabled. App login uses Better Auth at /api/frisky-auth when FRISKY_AUTH_ENABLED=1. Marketing still lists Apple; it is not live until Apple env + Better Auth callbacks are set."
       },
       { status: 410 }
     );

@@ -114,6 +114,7 @@ function authProviderLabel(provider: string) {
   if (value.includes("microsoft") || value.includes("azure")) return "Microsoft";
   if (value.includes("telegram")) return "Telegram";
   if (value.includes("passkey")) return "Passkey";
+  if (value.includes("frisky") || value.includes("better-auth")) return "Frisky";
   return provider || "OAuth";
 }
 

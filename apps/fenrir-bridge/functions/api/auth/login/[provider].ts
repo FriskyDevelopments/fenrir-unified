@@ -9,11 +9,24 @@ import {
   type OAuthEnv
 } from "../../../_lib/oauth";
 import { authOrigin } from "../../../_lib/billing-env";
+import { friskyAuthEnabled } from "../../../_lib/frisky-auth";
+import { FRISKY_AUTH_BASE_PATH } from "@frisky/auth";
 
 export const onRequestGet: PagesFunction<OAuthEnv> = async (context) => {
   const provider = context.params.provider;
   if (!isOAuthProvider(provider)) {
     return noStoreJson({ ok: false, error: "unsupported_provider" }, { status: 404 });
+  }
+
+  if (friskyAuthEnabled(context.env)) {
+    return noStoreJson(
+      {
+        ok: false,
+        error: "use_frisky_auth",
+        detail: `App login uses Better Auth at ${FRISKY_AUTH_BASE_PATH}. Direct /api/auth/login/* is leftover and not the identity plane.`,
+      },
+      { status: 410 },
+    );
   }
 
   if (!isDirectOAuthAvailable(provider, context.env)) {

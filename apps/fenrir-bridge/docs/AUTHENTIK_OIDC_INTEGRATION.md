@@ -1,8 +1,18 @@
 # Authentik OIDC for Community Bridge
 
-Status: **written, not deployed.** Branch `feat/authentik-oidc-community-bridge`.
-Nothing here is reachable in production until `AUTHENTIK_ENABLED=true` is bound AND a
-community adds `authentik` to `enabled_auth_providers`.
+Status: **DEAD leftover. Do not deploy. Do not enable.**
+
+The Authentik VM was destroyed 2026-08-28. Fenrir app login is Better Auth
+(`@frisky/auth`, Neon `app_auth_*`). Community membership stays on `fenrir_*`
+and `fenrir_community_session`. `AUTHENTIK_ENABLED=true` is a no-op.
+`authentik.friskydev.com` is a stale hostname; DNS takedown is a human ops step.
+
+The rest of this file is historical and must not be treated as a runbook.
+
+---
+
+Status (historical, do not follow): written against a VM that no longer exists.
+`AUTHENTIK_ENABLED=true` is a no-op. This is not a cutover runbook.
 
 ## Where the login actually lives
 

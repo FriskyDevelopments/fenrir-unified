@@ -12,6 +12,8 @@ const allowedAudiences = new Set([
   // allowed https://quality.communities.myfenrir.com instead.
   "https://quality.communities.myfenrir.com",
   "https://www.myfenrir.com",
+  // Stale leftover hostname (Authentik VM destroyed 2026-08-28). Kept only so
+  // already-issued challenge tokens can still verify. Not Fenrir app identity.
   "https://authentik.friskydev.com",
   "https://authentik.tailab8146.ts.net:9443",
 ]);

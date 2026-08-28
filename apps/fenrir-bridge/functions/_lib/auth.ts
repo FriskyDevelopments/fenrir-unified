@@ -1,10 +1,13 @@
 type OAuthProvider = "google" | "microsoft" | "apple" | "telegram";
 
-/** OAuth or passkey — session cookie may reference either after sign-in. */
-export type SessionProvider = OAuthProvider | "passkey";
+/** OAuth, passkey, or Better Auth (`frisky`) — session cookie may reference any after sign-in. */
+export type SessionProvider = OAuthProvider | "passkey" | "frisky";
 
 export type AuthEnv = {
   SESSION_SECRET?: string;
+  BETTER_AUTH_SECRET?: string;
+  FRISKY_AUTH_SECRET?: string;
+  FRISKY_AUTH_ENABLED?: string;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
   SUPABASE_ADMIN_EMAILS?: string;
@@ -55,7 +58,7 @@ export async function signSession(payload: SessionPayload, env: AuthEnv) {
   return `${encoded}.${signature}`;
 }
 
-export async function readSession(request: Request, env: AuthEnv) {
+export async function readFenrirCookieSession(request: Request, env: AuthEnv) {
   const token = readCookie(request, sessionCookie);
   if (!token) return null;
   const [encoded, signature] = token.split(".");
@@ -65,6 +68,14 @@ export async function readSession(request: Request, env: AuthEnv) {
   const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as SessionPayload;
   if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
   return payload;
+}
+
+export async function readSession(request: Request, env: AuthEnv) {
+  const cookieSession = await readFenrirCookieSession(request, env);
+  if (cookieSession) return cookieSession;
+  const { friskyAuthEnabled, readFriskyAuthSession } = await import("./frisky-auth");
+  if (!friskyAuthEnabled(env)) return null;
+  return readFriskyAuthSession(request, env);
 }
 
 export function sessionSetCookie(token: string, domain?: string) {
