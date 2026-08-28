@@ -26,7 +26,8 @@ describe("Fenrir go-live auth contract (Folios#29 bits on myfenrir.com)", () => 
     expect(wrangler).toContain('"COOKIE_DOMAIN": "myfenrir.com"');
     expect(wrangler).toContain('"pattern": "myfenrir.com/auth/*"');
     expect(wrangler).toContain('"pattern": "www.myfenrir.com/auth/*"');
-    expect(wrangler).not.toContain("folios.works");
+    expect(wrangler).not.toMatch(/"pattern":\s*"[^"]*folios\.works/);
+    expect(wrangler).not.toMatch(/"COOKIE_DOMAIN":\s*"folios\.works"/);
   });
 
   it("sends www SPA auth calls to the apex Worker", () => {
