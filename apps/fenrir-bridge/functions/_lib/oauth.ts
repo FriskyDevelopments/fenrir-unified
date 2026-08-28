@@ -10,6 +10,9 @@ export type OAuthEnv = BillingEnv & {
   APPLE_TEAM_ID?: string;
   APPLE_KEY_ID?: string;
   APPLE_PRIVATE_KEY?: string;
+  /** JWT ES256 que consume better-auth. Sin esto Apple NO funciona, por mucho
+   *  que estén los otros cuatro: ver isDirectOAuthAvailable. */
+  APPLE_CLIENT_SECRET?: string;
   /**
    * Authentik broker (https://authentik.friskydev.com). The issuer is per-application and
    * ends with a slash, e.g. `https://authentik.friskydev.com/application/o/<app-slug>/`.
@@ -111,11 +114,25 @@ export function isDirectOAuthAvailable(
     );
   }
   if (provider === "apple") {
+    // APPLE_CLIENT_SECRET es lo que better-auth consume de verdad: el JWT ES256
+    // firmado con la .p8. El trío TEAM_ID/KEY_ID/PRIVATE_KEY es material de la
+    // arquitectura anterior y su presencia NO significa que Apple funcione.
+    //
+    // Sin esta condición, /api/auth/providers anunciaba "apple" y el usuario lo
+    // elegía, fallaba en el intercambio de código con invalid_client, y se
+    // llevaba la impresión de que el login está roto. Anunciar un proveedor que
+    // revienta es peor que no anunciarlo.
+    //
+    // Se comprueba el secreto, no un flag manual: Apple reaparece sola en
+    // cuanto se ate APPLE_CLIENT_SECRET, sin que nadie tenga que acordarse de
+    // quitar un interruptor. Hoy no existe —falta registrar el Services ID en
+    // Apple Developer— y por eso no debe aparecer.
     return Boolean(
       env.APPLE_CLIENT_ID?.trim() &&
         env.APPLE_TEAM_ID?.trim() &&
         env.APPLE_KEY_ID?.trim() &&
-        env.APPLE_PRIVATE_KEY?.trim()
+        env.APPLE_PRIVATE_KEY?.trim() &&
+        env.APPLE_CLIENT_SECRET?.trim()
     );
   }
   if (provider === "authentik") {
