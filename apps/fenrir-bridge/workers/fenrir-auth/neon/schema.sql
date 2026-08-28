@@ -26,3 +26,11 @@ create table if not exists sessions (
 );
 create index if not exists sessions_user_idx    on sessions (user_id);
 create index if not exists sessions_expires_idx on sessions (expires_at);
+
+create extension if not exists pg_cron;
+
+select cron.schedule(
+  'fenrir-auth-purge-expired-sessions',
+  '17 * * * *',
+  $$delete from public.sessions where expires_at <= now()$$
+);

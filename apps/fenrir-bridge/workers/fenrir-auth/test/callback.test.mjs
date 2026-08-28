@@ -12,8 +12,12 @@ function b64url(obj) {
     .replace(/=+$/, "");
 }
 
-function stubFetch(routes) {
+function stubFetch(t, routes) {
   const calls = [];
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
   globalThis.fetch = async (url, opts = {}) => {
     calls.push({ url: String(url), opts });
     const handler = routes[String(url)];
@@ -23,7 +27,7 @@ function stubFetch(routes) {
   return calls;
 }
 
-test("google: exchangeCode posts PKCE verifier + Fenrir callback", async () => {
+test("google: exchangeCode posts PKCE verifier + Fenrir callback", async (t) => {
   const p = getProvider("google");
   const env = {
     BASE_URL: "https://myfenrir.com",
@@ -31,7 +35,7 @@ test("google: exchangeCode posts PKCE verifier + Fenrir callback", async () => {
     GOOGLE_CLIENT_SECRET: "gsecret",
   };
 
-  const calls = stubFetch({
+  const calls = stubFetch(t, {
     "https://oauth2.googleapis.com/token": () =>
       new Response(JSON.stringify({ access_token: "AT", id_token: "IT", token_type: "Bearer" }), {
         status: 200,
@@ -54,8 +58,10 @@ test("google: exchangeCode posts PKCE verifier + Fenrir callback", async () => {
   assert.match(body, /client_id=gid/);
   assert.match(body, /client_secret=gsecret/);
   assert.match(body, /redirect_uri=https%3A%2F%2Fmyfenrir.com%2Fauth%2Fgoogle%2Fcallback/);
+  assert.ok(calls[0].opts.signal instanceof AbortSignal);
 
   const profile = await fetchProfile(p, "google", env, tokens, null);
+  assert.ok(calls[1].opts.signal instanceof AbortSignal);
   assert.deepEqual(profile, {
     provider: "google",
     sub: "google-sub-1",

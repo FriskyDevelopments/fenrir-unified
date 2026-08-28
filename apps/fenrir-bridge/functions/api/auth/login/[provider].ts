@@ -1,5 +1,5 @@
 import { noStoreJson } from "../../../_lib/responses";
-import { isOAuthProvider, type OAuthEnv } from "../../../_lib/oauth";
+import { isOAuthProvider, safeReturnPath, type OAuthEnv } from "../../../_lib/oauth";
 import { siteOrigin } from "../../../_lib/billing-env";
 
 export const onRequestGet: PagesFunction<OAuthEnv> = async (context) => {
@@ -10,7 +10,7 @@ export const onRequestGet: PagesFunction<OAuthEnv> = async (context) => {
 
   const origin = siteOrigin(context.request, context.env);
   const requestUrl = new URL(context.request.url);
-  const returnTo = requestUrl.searchParams.get("return_to") || requestUrl.searchParams.get("redirect") || "/main";
+  const returnTo = safeReturnPath(requestUrl.searchParams.get("return_to") || requestUrl.searchParams.get("redirect"));
   const target = new URL(`/auth/${provider}`, origin);
   target.searchParams.set("redirect", returnTo);
   return Response.redirect(target.toString(), 302);

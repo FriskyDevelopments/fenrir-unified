@@ -33,7 +33,6 @@ export function createFenrirBetterAuth(env) {
     socialProviders,
     session: {
       cookieName: c.cookieName,
-      cookieDomain: c.cookieDomain,
       expiresIn: c.sessionTtl,
       httpOnly: true,
       secure: true,

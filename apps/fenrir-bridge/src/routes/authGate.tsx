@@ -73,11 +73,11 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
             ))}
             {enabledProviders === null ? <small className="muted">Checking available sign-in…</small> : null}
             {enabledProviders?.length === 0 ? (
-              <small className="muted">No OAuth provider is available right now. Apple, Google, and Microsoft are the Fenrir sign-in options.</small>
+              <small className="muted">{c.authNoProvider}</small>
             ) : null}
           </div>
           {authNote ? <small className="muted" role="alert">{authNote}</small> : null}
-          <p className="muted">After sign-in, Fenrir opens the Telegram gate so you can link the same admin account. No extra dens are created from this screen.</p>
+          <p className="muted">{c.authTelegramGuidance}</p>
           <div className="auth-2fa-recommend">
             <p className="label">{c.twoFactorRecommendTitle}</p>
             <p className="muted">{c.twoFactorRecommendBody}</p>

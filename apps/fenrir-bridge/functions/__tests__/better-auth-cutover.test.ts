@@ -15,6 +15,19 @@ describe("retired Pages login paths", () => {
     expect(response.headers.get("Location")).toBe("https://myfenrir.com/auth/google?redirect=%2Fmain");
   });
 
+  it.each([
+    "https://evil.example/phish",
+    "//evil.example/phish",
+  ])("falls back to /main for a non-local return path: %s", async (returnTo) => {
+    const response = await onRequestGet({
+      params: { provider: "google" },
+      request: new Request(`https://myfenrir.com/api/auth/login/google?return_to=${encodeURIComponent(returnTo)}`),
+      env: { PUBLIC_SITE_URL: "https://myfenrir.com" },
+    });
+
+    expect(response.headers.get("Location")).toBe("https://myfenrir.com/auth/google?redirect=%2Fmain");
+  });
+
   it("returns 410 for the Authentic/Supabase session exchange", async () => {
     const response = await supabaseSession();
     expect(response.status).toBe(410);

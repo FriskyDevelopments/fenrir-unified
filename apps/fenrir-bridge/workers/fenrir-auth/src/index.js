@@ -1,6 +1,6 @@
 // Fenrir Better Auth identity Worker.
 // Public contract copied from folios-auth-worker (behavior/endpoints, not a Folios merge).
-// Cookie domain is myfenrir.com. Do not serve Fenrir login on folios.works.
+// The host-only cookie is issued on canonical myfenrir.com. Never serve Fenrir login on Folios.
 // One fetch handler, isolate per request. Hosts: myfenrir.com + www.myfenrir.com.
 import {
   getProvider,
@@ -17,6 +17,9 @@ import { createPkce, randomToken } from "./crypto.js";
 import { createSession, getSession, destroySession } from "./identity.js";
 import { checkDatabase } from "./neon.js";
 import { saveOAuthState, consumeOAuthState } from "./session.js";
+import { decodeJwtPayload } from "./apple.js";
+
+export { OAuthStateStore } from "./oauth-state.js";
 
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -97,6 +100,19 @@ function isFenrirHost(request) {
   );
 }
 
+function canonicalLoginRequest(request, env) {
+  const requestUrl = new URL(request.url);
+  const canonical = new URL(cfg(env).baseUrl);
+  if (requestUrl.hostname === canonical.hostname) return null;
+  if (!cfg(env).allowedRedirectHosts.includes(requestUrl.hostname)) return null;
+  requestUrl.protocol = canonical.protocol;
+  requestUrl.host = canonical.host;
+  return new Response(null, {
+    status: request.method === "GET" ? 302 : 307,
+    headers: { Location: requestUrl.toString(), "Cache-Control": "no-store" },
+  });
+}
+
 export function safeReturnTo(env, raw) {
   const c = cfg(env);
   const fallback = c.postLoginRedirect;
@@ -114,6 +130,8 @@ export function safeReturnTo(env, raw) {
 async function handleStart(request, env, providerName) {
   const provider = getProvider(providerName);
   if (!provider) return json({ error: "unknown_provider", provider: providerName }, 404);
+  const canonical = canonicalLoginRequest(request, env);
+  if (canonical) return canonical;
   const c = cfg(env);
   if (!c.sessionSecret) return json({ error: "server_not_configured", missing: ["SESSION_SECRET"] }, 503);
 
@@ -157,6 +175,8 @@ async function handleStart(request, env, providerName) {
 async function handleCallback(request, env, providerName) {
   const provider = getProvider(providerName);
   if (!provider) return json({ error: "unknown_provider", provider: providerName }, 404);
+  const canonical = canonicalLoginRequest(request, env);
+  if (canonical) return canonical;
 
   let params;
   let applePostedUser = null;
@@ -184,6 +204,13 @@ async function handleCallback(request, env, providerName) {
     tokens = await exchangeCode(provider, providerName, env, { code, codeVerifier: saved.codeVerifier });
   } catch (e) {
     return authFailure(request, env, "token_exchange_failed", 502, { detail: String(e.message || e) });
+  }
+
+  if (providerName === "apple") {
+    const claims = typeof tokens.id_token === "string" ? decodeJwtPayload(tokens.id_token) : null;
+    if (!claims?.nonce || claims.nonce !== saved.nonce) {
+      return authFailure(request, env, "invalid_oidc_nonce");
+    }
   }
 
   let profile;
@@ -234,8 +261,8 @@ async function handleMe(request, env) {
 async function handleLogout(request, env) {
   const cookie = await destroySession(env, request);
   const url = new URL(request.url);
-  const to = safeReturnTo(env, url.searchParams.get("redirect")) || cfg(env).logoutRedirect;
-  const dest = url.searchParams.get("redirect") ? to : cfg(env).logoutRedirect;
+  const requestedRedirect = url.searchParams.get("redirect");
+  const dest = requestedRedirect ? safeReturnTo(env, requestedRedirect) : cfg(env).logoutRedirect;
   return redirect(dest, { "Set-Cookie": cookie });
 }
 
@@ -265,13 +292,15 @@ async function handleReady(env) {
   const database = await checkDatabase(env);
   const sessionSecret = Boolean(identity.secret);
   const kv = Boolean(env.SESSIONS);
-  const loginReady = sessionSecret && Object.values(providers).every(Boolean) && (database.ok || kv);
+  const oauthState = Boolean(env.OAUTH_STATE);
+  const loginReady = sessionSecret && oauthState && Object.values(providers).every(Boolean) && (database.ok || kv);
   return json({
     ready: loginReady,
     database: database.ok,
     session_backend: database.ok ? "neon" : "kv",
     degraded: !database.ok,
     session_secret: sessionSecret,
+    oauth_state: oauthState,
     providers,
   }, loginReady ? 200 : 503);
 }
@@ -281,9 +310,6 @@ export default {
     if (!isFenrirHost(request)) {
       return json({ error: "not_found", hint: "Fenrir Better Auth only serves myfenrir.com" }, 404);
     }
-
-    // Per-request identity isolate — do not store auth on the module.
-    createFenrirBetterAuth(env);
 
     if (request.method === "OPTIONS") {
       return withCors(new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } }), request, env);

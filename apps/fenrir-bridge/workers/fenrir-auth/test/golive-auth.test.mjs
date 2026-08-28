@@ -16,6 +16,30 @@ function kv(initial = {}) {
   };
 }
 
+function oauthStateStore() {
+  const values = new Map();
+  return {
+    values,
+    idFromName: (name) => name,
+    get: (id) => ({
+      async fetch(_url, init = {}) {
+        if (init.method === "PUT") {
+          values.set(id, JSON.parse(init.body));
+          return new Response(null, { status: 204 });
+        }
+        if (init.method === "DELETE") {
+          const record = values.get(id);
+          values.delete(id);
+          return record && record.expiresAt > Date.now()
+            ? Response.json(record.payload)
+            : new Response(null, { status: 404 });
+        }
+        return new Response(null, { status: 405 });
+      },
+    }),
+  };
+}
+
 function configuredEnv(extra = {}) {
   return {
     SESSION_SECRET: "test-secret",
@@ -28,6 +52,7 @@ function configuredEnv(extra = {}) {
     APPLE_KEY_ID: "key",
     APPLE_PRIVATE_KEY: "private",
     SESSIONS: kv(),
+    OAUTH_STATE: oauthStateStore(),
     ...extra,
   };
 }
@@ -41,6 +66,7 @@ test("readiness stays login-ready on KV when Neon is not configured", async () =
   assert.equal(body.session_backend, "kv");
   assert.equal(body.degraded, true);
   assert.equal(body.session_secret, true);
+  assert.equal(body.oauth_state, true);
   assert.equal(body.data_api, undefined);
   assert.deepEqual(body.providers, { google: true, microsoft: true, apple: true });
 });
@@ -67,7 +93,9 @@ test("KV sessions mint and resolve without DATABASE_URL", async () => {
   const user = { id: "google:abc", provider: "google", sub: "abc", email: "ada@myfenrir.com", name: "Ada" };
   const { cookie, token } = await createSession(env, user);
   assert.match(cookie, /^fenrir_session=/);
-  assert.match(cookie, /Domain=myfenrir.com/);
+  assert.doesNotMatch(cookie, /Domain=/);
+  assert.match(cookie, /Secure/);
+  assert.match(cookie, /SameSite=Lax/);
   assert.doesNotMatch(cookie, /folios\.works/);
   assert.equal(typeof token, "string");
   const request = new Request("https://myfenrir.com/auth/me", { headers: { Cookie: cookie } });
