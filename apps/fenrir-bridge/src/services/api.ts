@@ -11,7 +11,7 @@ import { copy } from "../i18n";
 import { resolveAuthOrigin } from "./authOrigin";
 import { addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
 import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TrialPublic, TrialStatusPayload } from "./types";
-import { isFenrirAuthWorkerDocument, preservedLoginNext } from "../../functions/_lib/fenrir-login";
+import { fenrirAuthWorkerCanStartLogin, preservedLoginNext } from "../../functions/_lib/fenrir-login";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
 export const defaultBillingCheckoutErrorMessage = copy.en.checkoutErrorGeneric;
@@ -43,9 +43,13 @@ function workerAuthUrl(path: string) {
 
 async function workerAuthIsLive(): Promise<boolean> {
   try {
-    const response = await fetch(workerAuthUrl("/auth/health"), { credentials: "include" });
+    const response = await fetch(workerAuthUrl("/auth/ready"), { credentials: "include" });
     const body = await response.json().catch(() => null);
-    return isFenrirAuthWorkerDocument(response.headers.get("content-type"), body);
+    return fenrirAuthWorkerCanStartLogin(
+      response.status,
+      response.headers.get("content-type"),
+      body,
+    );
   } catch {
     return false;
   }
@@ -432,7 +436,7 @@ export const authService = {
     try {
       const response = await fetch(workerAuthUrl("/auth/providers"), { credentials: "include" });
       const advertised = workerProviderList(await response.json().catch(() => null));
-      if (advertised) return advertised;
+      if (advertised && advertised.length > 0) return advertised;
     } catch {
       // Fall back to Pages capability metadata when the Worker is not local.
     }

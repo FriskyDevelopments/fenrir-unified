@@ -30,6 +30,8 @@ const checks = [
       apiSource.includes('workerAuthUrl("/auth/providers")') &&
       apiSource.includes("/api/auth/login/${provider}") &&
       apiSource.includes("workerAuthIsLive") &&
+      apiSource.includes('workerAuthUrl("/auth/ready")') &&
+      !apiSource.includes('workerAuthUrl("/auth/health")') &&
       !apiSource.includes("signInWithSupabase(provider)") &&
       providersSource.includes("isDirectOAuthAvailable(provider, context.env)")
   },
