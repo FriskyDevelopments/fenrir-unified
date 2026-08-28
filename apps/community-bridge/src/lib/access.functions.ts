@@ -25,18 +25,21 @@ export type GateAccessOutcome = {
   emailSent?: boolean;
 };
 
+/**
+ * Lo ÚNICO que sale hacia el cliente es el veredicto agregado.
+ *
+ * Antes viajaban `checks[]` (con `label` y `status` por control) e `identity`.
+ * Eso le enseñaba a quien intenta colarse exactamente qué señales miramos y
+ * cuál falló —"Telegram photo signal: review"—, que es justo el mapa que
+ * necesita para evadirlas al siguiente intento; y en el caso de la pantalla de
+ * seguridad infantil, confirmaba su existencia y su comportamiento.
+ *
+ * El desglose NO desaparece: `gateSecuritySummary().note` se sigue guardando en
+ * `cb_gate_access_requests.decision_note` y el owner lo lee en /access. Detalle
+ * del lado del servidor, veredicto del lado del cliente.
+ */
 export type GateSecurityPreflight = {
   status: "ok" | "sso_required" | "review" | "blocked";
-  identity: {
-    telegramId: string | null;
-    telegramUsername: string | null;
-    telegramFirstName: string | null;
-  };
-  checks: Array<{
-    key: "username" | "photo" | "blacklist" | "cp";
-    label: string;
-    status: "pass" | "missing" | "review" | "blocked";
-  }>;
 };
 
 /**
@@ -164,35 +167,12 @@ export const runGateSecurityPreflight = createServerFn({ method: "POST" })
       .eq("status", "linked")
       .maybeSingle();
 
-    if (error || !identity?.telegram_id) {
-      return {
-        status: "sso_required",
-        identity: { telegramId: null, telegramUsername: null, telegramFirstName: null },
-        checks: [
-          { key: "username", label: "Telegram username", status: "missing" },
-          { key: "photo", label: "Telegram photo signal", status: "missing" },
-          { key: "blacklist", label: "Blacklist screen", status: "missing" },
-          { key: "cp", label: "CP safety screen", status: "missing" },
-        ],
-      };
-    }
+    if (error || !identity?.telegram_id) return { status: "sso_required" };
 
     const summary = await gateSecuritySummary(identity);
-
-    return {
-      status: summary.overall,
-      identity: {
-        telegramId: String(identity.telegram_id),
-        telegramUsername: identity.telegram_username ?? null,
-        telegramFirstName: identity.telegram_first_name ?? null,
-      },
-      checks: [
-        { key: "username", label: "Telegram username", status: summary.usernameStatus },
-        { key: "photo", label: "Telegram photo signal", status: summary.photoStatus },
-        { key: "blacklist", label: "Blacklist screen", status: summary.usernameStatus },
-        { key: "cp", label: "CP safety screen", status: summary.usernameStatus },
-      ],
-    };
+    // `summary.note` (el desglose por control) NO se devuelve: se persiste en
+    // decision_note desde requestGateAccess y sólo lo ve el owner en /access.
+    return { status: summary.overall };
   });
 
 export type CommunityAccessStatus = {

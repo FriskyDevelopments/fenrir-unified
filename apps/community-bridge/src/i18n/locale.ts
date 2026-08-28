@@ -73,9 +73,39 @@ export function normalizeLocale(value: string | null | undefined): Locale {
  * DEFAULT_LOCALE en SSR para que el HTML servido y la primera pintura del
  * cliente coincidan; sin esto React reporta hydration mismatch.
  */
+export const LOCALE_STORAGE_KEY = "fenrir.locale";
+
 export function detectLocale(): Locale {
   if (typeof window === "undefined") return DEFAULT_LOCALE;
+
+  // 1) Preferencia explícita en la URL.
   const requested = new URLSearchParams(window.location.search).get("lang");
   if (requested) return normalizeLocale(requested);
-  return normalizeLocale(window.navigator.language);
+
+  // 2) Preferencia explícita anterior, elegida en el switcher.
+  try {
+    const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (stored) return normalizeLocale(stored);
+  } catch {
+    // localStorage puede lanzar (Safari privado, cookies bloqueadas). No poder
+    // recordar el idioma no es motivo para romper el Gate.
+  }
+
+  // 3) Inglés. NO miramos `navigator.language`: reporta el idioma del sistema
+  // operativo, no una decisión del visitante sobre este producto. En vivo eso
+  // resolvía a `de` y pintaba "Gate-Sicherheit abgeschlossen" a quien nunca
+  // pidió alemán —y de/fr no están revisados por nativo (ver i18n/gate.ts)—.
+  // Un idioma equivocado en la pantalla de seguridad es peor que un inglés
+  // correcto: el switcher sigue a un clic, y esa elección sí se recuerda.
+  return DEFAULT_LOCALE;
+}
+
+/** Persiste la elección explícita del switcher. Nunca lanza. */
+export function rememberLocale(locale: Locale): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+  } catch {
+    /* ver detectLocale */
+  }
 }
