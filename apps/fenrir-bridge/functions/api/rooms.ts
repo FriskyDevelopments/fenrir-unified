@@ -32,22 +32,35 @@ export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
   const provider = typeof body?.provider === "string" && providers.has(body.provider) ? body.provider : "other";
   const title = typeof body?.title === "string" && body.title.trim() ? body.title.trim() : `${slug} Live Room`;
   const requestedCoverImageUrl = typeof body?.coverImageUrl === "string" ? body.coverImageUrl.trim() : "";
-  const coverImageUrl = requestedCoverImageUrl ? await signedMediaProxyPath(requestedCoverImageUrl, context.env) : "";
-  if (requestedCoverImageUrl && !coverImageUrl) {
-    return noStoreJson({ ok: false, error: "invalid_cover_image_url" }, { status: 400 });
+  // Preset logos (Wikimedia SVGs, relative /assets) must never block room create.
+  // Proxy only https hosts on MEDIA_PROXY_ALLOWED_HOSTS; otherwise keep a same-origin
+  // path or store an empty cover.
+  let coverImageUrl = "";
+  if (requestedCoverImageUrl.startsWith("/") && !requestedCoverImageUrl.startsWith("//")) {
+    coverImageUrl = requestedCoverImageUrl;
+  } else if (requestedCoverImageUrl) {
+    coverImageUrl = await signedMediaProxyPath(requestedCoverImageUrl, context.env);
   }
   const roomId = createProductId("room", slug);
   const ts = new Date().toISOString();
 
-  await context.env.DB
-    .prepare(
-      `INSERT INTO frisky_live_rooms (
-        id, org_id, domain_id, slug, title, provider, target_url, public_url,
-        cover_image_url, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`
-    )
-    .bind(roomId, session.frisky_org_id, domain.id, slug, title, provider, targetUrl, publicUrl(domain.domain, slug), coverImageUrl, ts)
-    .run();
+  try {
+    await context.env.DB
+      .prepare(
+        `INSERT INTO frisky_live_rooms (
+          id, org_id, domain_id, slug, title, provider, target_url, public_url,
+          cover_image_url, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`
+      )
+      .bind(roomId, session.frisky_org_id, domain.id, slug, title, provider, targetUrl, publicUrl(domain.domain, slug), coverImageUrl, ts)
+      .run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (/UNIQUE|already exists|constraint/i.test(message)) {
+      return noStoreJson({ ok: false, error: "slug_taken" }, { status: 409 });
+    }
+    throw error;
+  }
 
   await addAudit(context.env.DB, session, "live_room_created", "FriskyLiveRoom", roomId, { provider, slug });
   const row = await context.env.DB.prepare(`SELECT * FROM frisky_live_rooms WHERE id = ?`).bind(roomId).first<any>();

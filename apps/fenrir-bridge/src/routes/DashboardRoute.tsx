@@ -438,28 +438,52 @@ export function DashboardRoute() {
 
   async function createLiveRoom() {
     const domainId = selectedDomainRecord?.id;
-    if (!domainId || !roomTargetInput.trim()) return;
+    if (!domainId) {
+      setNotice(c.chooseDomain);
+      return;
+    }
+    if (!roomTargetInput.trim()) {
+      setNotice(ui.liveRoomUrlHint + ".");
+      return;
+    }
     const targetUrl = safeHttpUrl(roomTargetInput);
     if (!targetUrl) {
       setNotice(ui.liveRoomUrlHint + ".");
       return;
     }
-    const coverImageUrl = safeHttpUrl(roomCoverInput);
-    if (roomCoverInput.trim() && !coverImageUrl) {
+    const slug = roomSlugInput.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "call";
+    const requestedCover = roomCoverInput.trim();
+    const coverImageUrl = requestedCover.startsWith("/") ? requestedCover : safeHttpUrl(requestedCover);
+    if (requestedCover && !coverImageUrl) {
       setNotice(ui.roomCoverImageInvalid);
       return;
     }
-    const result = await liveRoomService.create({
-      domainId,
-      slug: roomSlugInput.trim() || "call",
-      title: roomTitleInput.trim(),
-      provider: roomProviderInput,
-      targetUrl,
-      coverImageUrl: coverImageUrl || providerLogoPresets[roomProviderInput]
-    });
-    setNotice(`Live Room ${result.data.publicUrl} ${ui.routePrivateViaFenrir}`);
-    triggerCelebration("Live Room ready", `${result.data.title} is now behind your domain.`, "dns");
-    await refresh();
+    try {
+      const result = await liveRoomService.create({
+        domainId,
+        slug,
+        title: roomTitleInput.trim(),
+        provider: roomProviderInput,
+        targetUrl,
+        coverImageUrl
+      });
+      if (!result?.ok || !result.data) {
+        setNotice((result as { error?: string } | null)?.error ?? copy[locale].checkoutErrorGeneric);
+        return;
+      }
+      setRoomSlugInput(slug);
+      setNotice(`Live Room ${result.data.publicUrl} ${ui.routePrivateViaFenrir}`);
+      triggerCelebration("Live Room ready", `${result.data.title} is now behind your domain.`, "dns");
+      await refresh();
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      if (code === "invalid_target_url") setNotice(ui.liveRoomUrlHint + ".");
+      else if (code === "domain_not_found") setNotice(c.chooseDomain);
+      else if (code === "slug_taken") setNotice("That room slug is already in use. Pick another one.");
+      else if (code === "invalid_cover_image_url") setNotice(ui.roomCoverImageInvalid);
+      else if (code === "authentication_required") setNotice(c.signedOut);
+      else setNotice(code || copy[locale].checkoutErrorGeneric);
+    }
   }
 
   async function pauseRoom(room: FriskyLiveRoom) {
