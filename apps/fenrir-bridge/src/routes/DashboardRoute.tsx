@@ -354,12 +354,26 @@ export function DashboardRoute() {
   async function addNewDomain() {
     if (!domainInput.trim()) return;
     const tags = parseDomainTags(domainTagsInput);
-    const result = await domainService.create(domainInput.trim());
-    if (result.ok) {
+    try {
+      const result = await domainService.create(domainInput.trim());
+      if (!result?.ok || !result.data) {
+        const fail = result as { error?: string; message?: string } | null;
+        setNotice(fail?.message || fail?.error || "Connect failed.");
+        return;
+      }
       setDomainTagsById((current) => ({ ...current, [result.data.id]: tags }));
-      setNotice(`Telegram Lock domain ${result.data.domain} added with tags: ${tags.join(", ")}.`);
+      const ssl = result.data.certificateStatus === "active" ? "Live." : "SSL is provisioning.";
+      setNotice(`${result.data.domain} connected. ${ssl}`);
       setDomainInput("");
       await refresh();
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      if (code === "zone_not_in_account") setNotice("That domain is not in this Cloudflare account. Add the zone, then click Connect.");
+      else if (code === "connect_not_configured") setNotice("Connect is not configured on this Worker yet.");
+      else if (code === "authentication_required") setNotice(c.signedOut);
+      else if (code === "invalid_domain") setNotice("Enter a domain like pupfrisky.com.");
+      else if (code === "pages_domain_attach_failed") setNotice("Cloudflare could not attach that hostname.");
+      else setNotice(code || "Connect failed.");
     }
   }
 
@@ -380,9 +394,14 @@ export function DashboardRoute() {
   async function checkDns(domain: FriskyDomain) {
     setNotice("Checking live DNS propagation...");
     const result = await domainService.checkDns(domain.id);
-    setNotice(result.ok ? `${domain.domain} verified.` : result.error?.message ?? "DNS check failed.");
-    if (result.ok) {
-      triggerCelebration("DNS verified", `${domain.domain} is ready for Telegram Lock traffic.`, "dns");
+    if (!result.ok) {
+      setNotice(result.error?.message ?? "Connect check failed.");
+      return;
+    }
+    const live = result.data.certificateStatus === "active";
+    setNotice(live ? `${domain.domain} is live.` : `${domain.domain} attached. SSL ${result.data.certificateStatus}.`);
+    if (live) {
+      triggerCelebration("Domain live", `${domain.domain} is serving on this Cloudflare account.`, "dns");
     }
     await refresh();
   }
