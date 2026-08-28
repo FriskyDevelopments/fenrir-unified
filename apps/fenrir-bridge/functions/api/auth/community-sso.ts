@@ -48,11 +48,11 @@ function fallbackResponse(next: string) {
 }
 
 /**
- * A visitor arriving from a public Gate has no MyFenrir session yet — that is
- * the normal case, not an error. Sending them to the community's own login
- * strands them: the button promised SSO and delivered a local email form.
- * Park them on the MyFenrir sign-in surface instead, carrying this endpoint in
- * `?next=` so the handoff resumes the moment they have an identity.
+ * Redirects a visitor to the canonical MyFenrir sign-in page with a community SSO handoff.
+ *
+ * @param requestUrl - The current request URL used to determine the handoff origin
+ * @param next - The destination to resume after sign-in
+ * @returns A no-cache redirect response that sets a short-lived SSO attempt cookie
  */
 function signInRedirect(requestUrl: URL, next: string) {
   const handoff = new URL("/api/auth/community-sso", requestUrl.origin);

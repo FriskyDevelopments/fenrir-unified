@@ -13,6 +13,11 @@ import { authOrigin, siteOrigin } from "../../../_lib/billing-env";
 import { ensureDefaultWorkspace } from "../../../_lib/workspaces";
 import { upsertProfileForSession } from "../../../_lib/supabase-profiles";
 
+/**
+ * Processes an OAuth callback and redirects the user after authentication.
+ *
+ * @returns An HTTP response indicating provider availability or redirecting to the login or completion page.
+ */
 async function handleCallback(context: EventContext<OAuthEnv, "provider", unknown>) {
   const provider = context.params.provider;
 
@@ -98,6 +103,14 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
 export const onRequestGet: PagesFunction<OAuthEnv> = handleCallback;
 export const onRequestPost: PagesFunction<OAuthEnv> = handleCallback;
 
+/**
+ * Redirects the user to the login page with OAuth error details.
+ *
+ * @param siteBase - The base URL of the site.
+ * @param error - The authentication error code.
+ * @param detail - Additional error information, when available.
+ * @returns A redirect response that clears the OAuth transaction cookie.
+ */
 function redirectWithAuthError(siteBase: string, error: string, detail: string | null) {
   const params = new URLSearchParams({ auth_error: error });
   if (detail) params.set("auth_error_detail", detail);
