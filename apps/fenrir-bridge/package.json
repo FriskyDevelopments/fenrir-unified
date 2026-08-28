@@ -13,7 +13,7 @@
     "test:auth-redirect": "bash scripts/run-with-node-lts.sh node scripts/test-auth-redirect.mjs",
     "deploy": "npm run build && bash scripts/guard-wrangler-deploy.sh env -u CLOUDFLARE_API_TOKEN deno run -A npm:wrangler@4.90.0 pages deploy dist --project-name fenrir-bridge --branch main",
     "deploy:gcloud": "bash scripts/deploy-gcloud.sh",
-    "deploy:workers": "bash scripts/guard-wrangler-deploy.sh env -u CLOUDFLARE_API_TOKEN deno run -A npm:wrangler@4.90.0 deploy --config wrangler.fenrir-mcp-beta.toml && bash scripts/guard-wrangler-deploy.sh env -u CLOUDFLARE_API_TOKEN deno run -A npm:wrangler@4.90.0 deploy --config wrangler.fenrir-gate-router.toml && bash scripts/guard-wrangler-deploy.sh env -u CLOUDFLARE_API_TOKEN deno run -A npm:wrangler@4.90.0 deploy --config wrangler.fenrir-stars.toml && bash scripts/guard-wrangler-deploy.sh env -u CLOUDFLARE_API_TOKEN deno run -A npm:wrangler@4.90.0 deploy --config wrangler.fenrir-auth.jsonc && bash scripts/guard-wrangler-deploy.sh env -u CLOUDFLARE_API_TOKEN deno run -A npm:wrangler@4.90.0 deploy --config wrangler.fenrir-auth-proxy.toml",
+    "deploy:workers": "bash scripts/deploy-workers.sh",
     "deploy:ci": "npm run build && bash scripts/guard-wrangler-deploy.sh deno run -A npm:wrangler@4.90.0 pages deploy dist --project-name fenrir-bridge --branch main --commit-dirty=true",
     "wrangler:check": "bash scripts/check-cloudflare-tooling.sh",
     "cloudflare:whoami": "env -u CLOUDFLARE_API_TOKEN WRANGLER_SEND_METRICS=false deno run -A npm:wrangler@4.90.0 whoami",

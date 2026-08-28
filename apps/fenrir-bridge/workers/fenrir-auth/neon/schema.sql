@@ -2,6 +2,7 @@
 -- No KYC/KYB, CFDI, invoices, MCP, or Folios billing tables.
 
 create extension if not exists pgcrypto;
+create extension if not exists pg_cron;
 
 create table if not exists users (
   id             text primary key,             -- "<provider>:<sub>"
@@ -26,3 +27,17 @@ create table if not exists sessions (
 );
 create index if not exists sessions_user_idx    on sessions (user_id);
 create index if not exists sessions_expires_idx on sessions (expires_at);
+
+do $$
+begin
+  if not exists (
+    select 1 from cron.job where jobname = 'fenrir_auth_purge_expired_sessions'
+  ) then
+    perform cron.schedule(
+      'fenrir_auth_purge_expired_sessions',
+      '*/15 * * * *',
+      'delete from sessions where expires_at <= now()'
+    );
+  end if;
+end
+$$;

@@ -3,7 +3,7 @@
 Fenrir **Better Auth** identity on a Cloudflare Worker. Public HTTP copies the
 `folios-auth-worker` contract (endpoints, HMAC cookie, PKCE S256, Apple
 `form_post` + ES256 client-secret JWT). This is **not** a Folios product merge:
-cookie domain is `myfenrir.com`, Worker origin is `myfenrir.com/auth/*` and
+the session cookie is host-only, and the Worker origin is `myfenrir.com/auth/*` and
 `www.myfenrir.com/auth/*`. Fenrir login is never served on `folios.works`.
 
 Authentic / the `fenrir-auth-proxy` Supabase broker on `auth.myfenrir.com` is
@@ -34,10 +34,11 @@ are allowed for `https://www.myfenrir.com` so the www SPA can call apex `/auth/m
 ## Session
 
 Cookie `fenrir_session` = `<sessionId>.<HMAC-SHA256(sessionId, SESSION_SECRET)>`,
-`HttpOnly; Secure; SameSite=Lax; Domain=myfenrir.com; Path=/`.
+`HttpOnly; Secure; SameSite=Lax; Path=/` (host-only).
 
-- **KV** (`SESSIONS`) holds short-lived OAuth state (PKCE verifier + returnTo)
-  and is the **session fallback** when Neon is unset or unreachable.
+- **Durable Objects** (`OAUTH_STATE`) hold short-lived OAuth state (PKCE verifier
+  + returnTo) with strongly consistent, single-use consumption.
+- **KV** (`SESSIONS`) is the **session fallback** when Neon is unset or unreachable.
 - **Neon** holds `users` and `sessions` when `DATABASE_URL` is healthy. Apply
   `neon/schema.sql`. Login stays up on KV until then (`degraded: true`).
 
@@ -90,5 +91,5 @@ cd apps/fenrir-bridge
 npx wrangler kv namespace create FENRIR_AUTH_SESSIONS --config wrangler.fenrir-auth.jsonc
 ```
 
-Paste the id into `wrangler.fenrir-auth.jsonc` (`kv_namespaces[0].id`) before
-the first production deploy.
+Wrangler automatically provisions the namespace on deploy and writes the generated id
+back to `wrangler.fenrir-auth.jsonc`.

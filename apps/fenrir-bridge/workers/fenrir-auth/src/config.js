@@ -1,6 +1,6 @@
 // Provider catalog + per-request config derived from env.
-// Secret names match existing Fenrir Pages vars and the folios-auth-worker
-// contract. Do not invent credentials — map the OAuth apps you already have
+// Secret names match the existing fenrir-auth-worker vars and the
+// folios-auth-worker contract. Do not invent credentials — map the OAuth apps you already have
 // onto https://myfenrir.com/auth/{provider}/callback.
 
 export const PROVIDERS = {
@@ -83,7 +83,6 @@ export function cfg(env) {
   return {
     baseUrl: (env.BASE_URL || "https://myfenrir.com").replace(/\/$/, ""),
     cookieName: env.SESSION_COOKIE_NAME || "fenrir_session",
-    cookieDomain: env.COOKIE_DOMAIN || "myfenrir.com",
     postLoginRedirect: env.POST_LOGIN_REDIRECT || "https://myfenrir.com/main",
     logoutRedirect: env.LOGOUT_REDIRECT || "https://myfenrir.com/login",
     sessionTtl: parseInt(env.SESSION_TTL_SECONDS || "604800", 10),

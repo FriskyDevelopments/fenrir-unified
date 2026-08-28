@@ -1,11 +1,11 @@
-// Signed-cookie sessions in Workers KV, plus short-lived OAuth state.
+// Signed-cookie sessions in Workers KV. Short-lived OAuth state uses a
+// Durable Object so a callback can consume state immediately from any edge.
 // Persistent users/sessions prefer Neon (see identity.js); KV is the login
 // fallback when DATABASE_URL is missing or Neon is unreachable.
 import { cfg } from "./config.js";
 import { randomToken, signValue, verifySignedValue } from "./crypto.js";
 
 const SESSION_PREFIX = "session:";
-const STATE_PREFIX = "oauthstate:";
 
 export function parseCookies(request) {
   const header = request.headers.get("Cookie") || "";
@@ -20,11 +20,10 @@ export function parseCookies(request) {
   return out;
 }
 
-export function serializeCookie(name, value, { domain, maxAge, expired = false }) {
+export function serializeCookie(name, value, { maxAge, expired = false }) {
   const parts = [
     `${name}=${value}`,
     "Path=/",
-    `Domain=${domain}`,
     "HttpOnly",
     "Secure",
     "SameSite=Lax",
@@ -54,7 +53,6 @@ export async function createSession(env, user) {
   });
   const signed = await signValue(c.sessionSecret, sessionId);
   const cookie = serializeCookie(c.cookieName, signed, {
-    domain: c.cookieDomain,
     maxAge: c.sessionTtl,
   });
   return { sessionId, token: signed, cookie, record };
@@ -92,24 +90,62 @@ export async function destroySession(env, request) {
 }
 
 export async function saveOAuthState(env, state, payload, ttlSeconds = 600) {
-  await env.SESSIONS.put(STATE_PREFIX + state, JSON.stringify(payload), {
-    expirationTtl: ttlSeconds,
+  const stub = oauthStateStub(env, state);
+  const response = await stub.fetch("https://oauth-state.internal/state", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ payload, expiresAt: Date.now() + ttlSeconds * 1000 }),
   });
+  if (!response.ok) throw new Error("oauth_state_store_failed");
 }
 
 export async function consumeOAuthState(env, state) {
   if (!state) return null;
-  const data = await env.SESSIONS.get(STATE_PREFIX + state);
-  if (!data) return null;
-  await env.SESSIONS.delete(STATE_PREFIX + state);
-  try {
-    return JSON.parse(data);
-  } catch {
-    return null;
-  }
+  const response = await oauthStateStub(env, state).fetch("https://oauth-state.internal/state", {
+    method: "DELETE",
+  });
+  return response.ok ? response.json() : null;
 }
 
 export function emptySessionCookie(env) {
   const c = cfg(env);
-  return serializeCookie(c.cookieName, "", { domain: c.cookieDomain, expired: true });
+  return serializeCookie(c.cookieName, "", { expired: true });
+}
+
+function oauthStateStub(env, state) {
+  if (!env.OAUTH_STATE) throw new Error("oauth_state_store_unavailable");
+  return env.OAUTH_STATE.get(env.OAUTH_STATE.idFromName(state));
+}
+
+export class OAuthState {
+  constructor(ctx) {
+    this.storage = ctx.storage;
+  }
+
+  async fetch(request) {
+    if (request.method === "PUT") {
+      const record = await request.json();
+      await this.storage.put("state", record);
+      await this.storage.setAlarm(record.expiresAt);
+      return new Response(null, { status: 204 });
+    }
+
+    if (request.method === "DELETE") {
+      let record = null;
+      await this.storage.transaction(async (txn) => {
+        record = await txn.get("state");
+        if (record) await txn.delete("state");
+      });
+      if (!record || record.expiresAt <= Date.now()) {
+        return new Response(null, { status: 404 });
+      }
+      return Response.json(record.payload);
+    }
+
+    return new Response(null, { status: 405 });
+  }
+
+  async alarm() {
+    await this.storage.deleteAll();
+  }
 }

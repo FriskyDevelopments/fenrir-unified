@@ -28,7 +28,27 @@ function configuredEnv(extra = {}) {
     APPLE_KEY_ID: "key",
     APPLE_PRIVATE_KEY: "private",
     SESSIONS: kv(),
+    OAUTH_STATE: oauthState(),
     ...extra,
+  };
+}
+
+function oauthState() {
+  const records = new Map();
+  return {
+    idFromName: (name) => name,
+    get: (id) => ({
+      fetch: async (_input, init = {}) => {
+        if (init.method === "PUT") {
+          records.set(id, JSON.parse(init.body));
+          return new Response(null, { status: 204 });
+        }
+        const record = records.get(id);
+        records.delete(id);
+        if (!record || record.expiresAt <= Date.now()) return new Response(null, { status: 404 });
+        return Response.json(record.payload);
+      },
+    }),
   };
 }
 
@@ -39,6 +59,7 @@ test("readiness stays login-ready on KV when Neon is not configured", async () =
   assert.equal(body.ready, true);
   assert.equal(body.database, false);
   assert.equal(body.session_backend, "kv");
+  assert.equal(body.oauth_state_backend, "durable_object");
   assert.equal(body.degraded, true);
   assert.equal(body.session_secret, true);
   assert.equal(body.data_api, undefined);
@@ -67,7 +88,9 @@ test("KV sessions mint and resolve without DATABASE_URL", async () => {
   const user = { id: "google:abc", provider: "google", sub: "abc", email: "ada@myfenrir.com", name: "Ada" };
   const { cookie, token } = await createSession(env, user);
   assert.match(cookie, /^fenrir_session=/);
-  assert.match(cookie, /Domain=myfenrir.com/);
+  assert.doesNotMatch(cookie, /Domain=/i);
+  assert.match(cookie, /Secure/);
+  assert.match(cookie, /SameSite=Lax/);
   assert.doesNotMatch(cookie, /folios\.works/);
   assert.equal(typeof token, "string");
   const request = new Request("https://myfenrir.com/auth/me", { headers: { Cookie: cookie } });

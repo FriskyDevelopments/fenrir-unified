@@ -43,3 +43,28 @@ test("apple authorize URL uses form_post and no PKCE", () => {
   assert.equal(u.searchParams.get("scope"), "name email");
   assert.equal(u.searchParams.get("code_challenge"), null);
 });
+
+test("provider extras cannot override authorization security parameters", () => {
+  const provider = {
+    ...getProvider("google"),
+    extraAuthParams: {
+      client_id: "attacker",
+      redirect_uri: "https://evil.example/callback",
+      state: "attacker-state",
+      nonce: "attacker-nonce",
+      code_challenge: "attacker-challenge",
+      code_challenge_method: "plain",
+    },
+  };
+  const u = new URL(buildAuthorizeUrl(provider, "google", env, {
+    state: "trusted-state",
+    codeChallenge: "trusted-challenge",
+    nonce: "trusted-nonce",
+  }));
+  assert.equal(u.searchParams.get("client_id"), env.GOOGLE_CLIENT_ID);
+  assert.equal(u.searchParams.get("redirect_uri"), "https://myfenrir.com/auth/google/callback");
+  assert.equal(u.searchParams.get("state"), "trusted-state");
+  assert.equal(u.searchParams.get("nonce"), "trusted-nonce");
+  assert.equal(u.searchParams.get("code_challenge"), "trusted-challenge");
+  assert.equal(u.searchParams.get("code_challenge_method"), "S256");
+});

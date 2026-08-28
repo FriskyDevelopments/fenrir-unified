@@ -42,7 +42,8 @@ test("PKCE rejects an intercepted code without its verifier", async () => {
   assert.equal(validPkceValue(verifier), true);
   assert.equal(validPkceChallenge(challenge), true);
   assert.equal(await verifyPkceS256(verifier, challenge), true);
-  assert.equal(await verifyPkceS256(`${verifier.slice(0, -1)}x`, challenge), false);
+  const replacement = verifier.endsWith("A") ? "B" : "A";
+  assert.equal(await verifyPkceS256(`${verifier.slice(0, -1)}${replacement}`, challenge), false);
   assert.equal(await verifyPkceS256("short", challenge), false);
 });
 

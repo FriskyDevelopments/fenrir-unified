@@ -21,13 +21,12 @@ describe("Fenrir go-live auth contract (Folios#29 bits on myfenrir.com)", () => 
     expect(worker).not.toMatch(/url\.hostname === "myfenrir\.com"[\s\S]*www\.myfenrir\.com/);
   });
 
-  it("keeps Fenrir cookie domain off folios.works", () => {
+  it("keeps Fenrir session cookies host-only and routes off folios.works", () => {
     const wrangler = readFileSync(path.join(root, "wrangler.fenrir-auth.jsonc"), "utf8");
-    expect(wrangler).toContain('"COOKIE_DOMAIN": "myfenrir.com"');
+    expect(wrangler).not.toContain('"COOKIE_DOMAIN"');
     expect(wrangler).toContain('"pattern": "myfenrir.com/auth/*"');
     expect(wrangler).toContain('"pattern": "www.myfenrir.com/auth/*"');
     expect(wrangler).not.toMatch(/"pattern":\s*"[^"]*folios\.works/);
-    expect(wrangler).not.toMatch(/"COOKIE_DOMAIN":\s*"folios\.works"/);
   });
 
   it("sends www SPA auth calls to the apex Worker", () => {

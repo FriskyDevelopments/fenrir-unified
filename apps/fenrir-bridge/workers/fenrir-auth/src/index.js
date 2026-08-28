@@ -1,6 +1,6 @@
 // Fenrir Better Auth identity Worker.
 // Public contract copied from folios-auth-worker (behavior/endpoints, not a Folios merge).
-// Cookie domain is myfenrir.com. Do not serve Fenrir login on folios.works.
+// Session cookies are host-only. Do not serve Fenrir login on folios.works.
 // One fetch handler, isolate per request. Hosts: myfenrir.com + www.myfenrir.com.
 import {
   getProvider,
@@ -17,6 +17,9 @@ import { createPkce, randomToken } from "./crypto.js";
 import { createSession, getSession, destroySession } from "./identity.js";
 import { checkDatabase } from "./neon.js";
 import { saveOAuthState, consumeOAuthState } from "./session.js";
+import { decodeJwtPayload } from "./apple.js";
+
+export { OAuthState } from "./session.js";
 
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -115,6 +118,8 @@ async function handleStart(request, env, providerName) {
   const provider = getProvider(providerName);
   if (!provider) return json({ error: "unknown_provider", provider: providerName }, 404);
   const c = cfg(env);
+  const canonical = canonicalAuthRedirect(request, c.baseUrl);
+  if (canonical) return canonical;
   if (!c.sessionSecret) return json({ error: "server_not_configured", missing: ["SESSION_SECRET"] }, 503);
 
   const url = new URL(request.url);
@@ -157,6 +162,8 @@ async function handleStart(request, env, providerName) {
 async function handleCallback(request, env, providerName) {
   const provider = getProvider(providerName);
   if (!provider) return json({ error: "unknown_provider", provider: providerName }, 404);
+  const canonical = canonicalAuthRedirect(request, cfg(env).baseUrl);
+  if (canonical) return canonical;
 
   let params;
   let applePostedUser = null;
@@ -184,6 +191,13 @@ async function handleCallback(request, env, providerName) {
     tokens = await exchangeCode(provider, providerName, env, { code, codeVerifier: saved.codeVerifier });
   } catch (e) {
     return authFailure(request, env, "token_exchange_failed", 502, { detail: String(e.message || e) });
+  }
+
+  if (providerName === "apple") {
+    const claims = decodeJwtPayload(tokens.id_token);
+    if (!claims?.nonce || claims.nonce !== saved.nonce) {
+      return authFailure(request, env, "invalid_or_expired_state");
+    }
   }
 
   let profile;
@@ -234,8 +248,8 @@ async function handleMe(request, env) {
 async function handleLogout(request, env) {
   const cookie = await destroySession(env, request);
   const url = new URL(request.url);
-  const to = safeReturnTo(env, url.searchParams.get("redirect")) || cfg(env).logoutRedirect;
-  const dest = url.searchParams.get("redirect") ? to : cfg(env).logoutRedirect;
+  const redirectParam = url.searchParams.get("redirect");
+  const dest = redirectParam ? safeReturnTo(env, redirectParam) : cfg(env).logoutRedirect;
   return redirect(dest, { "Set-Cookie": cookie });
 }
 
@@ -265,11 +279,13 @@ async function handleReady(env) {
   const database = await checkDatabase(env);
   const sessionSecret = Boolean(identity.secret);
   const kv = Boolean(env.SESSIONS);
-  const loginReady = sessionSecret && Object.values(providers).every(Boolean) && (database.ok || kv);
+  const oauthState = Boolean(env.OAUTH_STATE);
+  const loginReady = sessionSecret && oauthState && Object.values(providers).every(Boolean) && (database.ok || kv);
   return json({
     ready: loginReady,
     database: database.ok,
     session_backend: database.ok ? "neon" : "kv",
+    oauth_state_backend: oauthState ? "durable_object" : "unavailable",
     degraded: !database.ok,
     session_secret: sessionSecret,
     providers,
@@ -281,9 +297,6 @@ export default {
     if (!isFenrirHost(request)) {
       return json({ error: "not_found", hint: "Fenrir Better Auth only serves myfenrir.com" }, 404);
     }
-
-    // Per-request identity isolate — do not store auth on the module.
-    createFenrirBetterAuth(env);
 
     if (request.method === "OPTIONS") {
       return withCors(new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } }), request, env);
@@ -302,6 +315,18 @@ export default {
     }
   },
 };
+
+function canonicalAuthRedirect(request, baseUrl) {
+  const requestUrl = new URL(request.url);
+  const canonicalUrl = new URL(baseUrl);
+  if (requestUrl.origin === canonicalUrl.origin) return null;
+  requestUrl.protocol = canonicalUrl.protocol;
+  requestUrl.host = canonicalUrl.host;
+  return new Response(null, {
+    status: 307,
+    headers: { Location: requestUrl.toString(), "Cache-Control": "no-store" },
+  });
+}
 
 async function handleRequest(request, env) {
   const url = new URL(request.url);

@@ -4,19 +4,17 @@ import { createAppleClientSecret, decodeJwtPayload } from "./apple.js";
 
 export function buildAuthorizeUrl(provider, providerName, env, { state, codeChallenge, nonce }) {
   const clientId = readSecret(env, provider.clientIdEnv);
-  const params = new URLSearchParams({
-    response_type: "code",
-    client_id: clientId || "",
-    redirect_uri: redirectUri(env, providerName),
-    scope: provider.scope,
-    state,
-  });
+  const params = new URLSearchParams(provider.extraAuthParams || {});
+  params.set("response_type", "code");
+  params.set("client_id", clientId || "");
+  params.set("redirect_uri", redirectUri(env, providerName));
+  params.set("scope", provider.scope);
+  params.set("state", state);
   if (nonce) params.set("nonce", nonce);
   if (provider.usesPkce && codeChallenge) {
     params.set("code_challenge", codeChallenge);
     params.set("code_challenge_method", "S256");
   }
-  for (const [k, v] of Object.entries(provider.extraAuthParams || {})) params.set(k, v);
   return `${provider.authorizeUrl}?${params.toString()}`;
 }
 
@@ -30,7 +28,7 @@ export async function exchangeCode(provider, providerName, env, { code, codeVeri
 
   if (provider.usesPkce && codeVerifier) body.set("code_verifier", codeVerifier);
 
-  if (provider.label === "Apple") {
+  if (providerName === "apple") {
     body.set("client_secret", await createAppleClientSecret(env));
   } else if (provider.clientSecretEnv) {
     body.set("client_secret", readSecret(env, provider.clientSecretEnv) || "");
@@ -43,6 +41,7 @@ export async function exchangeCode(provider, providerName, env, { code, codeVeri
       Accept: "application/json",
     },
     body: body.toString(),
+    signal: AbortSignal.timeout(10_000),
   });
 
   const text = await resp.text();
@@ -62,6 +61,7 @@ export async function fetchProfile(provider, providerName, env, tokens, applePos
   if (provider.profileSource === "userinfo") {
     const resp = await fetch(provider.userInfoUrl, {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!resp.ok) {
       const t = await resp.text();

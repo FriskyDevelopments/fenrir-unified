@@ -8,9 +8,12 @@
 ## Quick Context
 This is the **production monorepo** for Fenrir Bridge. The app is deployed to Cloudflare Pages
 (`fenrir-bridge` project) at `myfenrir.com`. Fenrir login is the Better Auth Worker
-`fenrir-auth-worker` on `myfenrir.com/auth/*` (cookie domain `myfenrir.com`). Authentic /
-the Supabase proxy on `auth.myfenrir.com` is retired. Remaining Pages secrets include
-SESSION_SECRET, TELEGRAM_BOT_TOKEN, and optional profile-storage keys.
+`fenrir-auth-worker` on `myfenrir.com/auth/*` (host-only session cookie). Authentic /
+the Supabase proxy on `auth.myfenrir.com` is retired. Cloudflare Pages owns its own
+`SESSION_SECRET`, Telegram bot tokens, `NEON_DATABASE_URL`, and optional Supabase
+profile-storage keys. The auth Worker separately owns `SESSION_SECRET`, `DATABASE_URL`,
+and the Google, Microsoft, and Apple provider credentials listed in
+`docs/OAUTH_PROVIDER_WIRING.md`.
 
 ## Setup
 ```bash
@@ -67,11 +70,15 @@ npm run build && wrangler pages deploy dist/ --project-name fenrir-bridge
 - Confirm Google / Microsoft / Apple redirect URIs are `https://myfenrir.com/auth/{provider}/callback`
 - Wire `CommunitySecurityReport` component into admin UI (API + service + types ready)
 - Monitor Telegram Stars entitlements and community gate review flows in prod
-- Keep secrets only in Cloudflare Pages env (never in git)
+- Configure secrets in the runtime that consumes them: Pages secrets on `fenrir-bridge`
+  and auth secrets on `fenrir-auth-worker`. `SESSION_SECRET` is required in both runtimes
+  and must be configured in each; Cloudflare does not copy it between them.
 
 ## Working Rules
 - Keep changes minimal and scoped
 - Never commit secrets or .env files
+- Do not put auth-Worker `DATABASE_URL` or OAuth provider credentials in Pages unless a
+  separate Pages feature explicitly consumes them
 - Prefer existing patterns in `functions/_lib/`
 - Validate with `npm run build` before deploying
 - The D1 binding name is `DB` — use `context.env.DB` in Functions

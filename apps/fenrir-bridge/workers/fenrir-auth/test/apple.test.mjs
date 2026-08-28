@@ -58,3 +58,17 @@ test("decodeJwtPayload extracts claims", () => {
   assert.equal(claims.sub, "x");
   assert.equal(claims.email, "a@b.com");
 });
+
+test("createAppleClientSecret rejects missing secret material", async () => {
+  await assert.rejects(
+    createAppleClientSecret({ APPLE_CLIENT_ID: "com.myfenrir.signin" }),
+    /Apple secret material missing/,
+  );
+});
+
+test("decodeJwtPayload returns null for malformed tokens", () => {
+  assert.equal(decodeJwtPayload(null), null);
+  assert.equal(decodeJwtPayload("not-a-jwt"), null);
+  assert.equal(decodeJwtPayload("header.%%%.signature"), null);
+  assert.equal(decodeJwtPayload("header.bm90LWpzb24.signature"), null);
+});

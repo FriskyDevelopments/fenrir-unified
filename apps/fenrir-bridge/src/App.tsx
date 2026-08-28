@@ -3322,9 +3322,9 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
                   onClick={() => void signInWithProvider(provider)}
                 />
               ))}
-              {enabledProviders === null ? <small className="muted">Checking available sign-in…</small> : null}
+              {enabledProviders === null ? <small className="muted">{c.authCheckingProviders}</small> : null}
             {enabledProviders?.length === 0 ? (
-              <small className="muted">No OAuth provider is available right now. Apple, Google, and Microsoft are the Fenrir sign-in options.</small>
+              <small className="muted">{c.authNoProviders}</small>
             ) : null}
             </div>
 
@@ -3335,7 +3335,7 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
               <b>Encrypted sign-in</b>
               <span />
             </div>
-            <p className="lovable-auth-new-user">New here? Your account is created automatically on first sign-in. Telegram linking happens after login — Fenrir never invents a group for you.</p>
+            <p className="lovable-auth-new-user">{c.authTelegramGuidance}</p>
           </div>
         </section>
 

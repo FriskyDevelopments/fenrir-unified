@@ -2,7 +2,7 @@
 
 Fenrir login is a Cloudflare Worker (`fenrir-auth-worker`) on
 `https://myfenrir.com/auth/*`. It copies the **folios-auth-worker** HTTP
-contract. Cookie domain is **myfenrir.com**. Do not put Fenrir login on
+contract. The session cookie is host-only on the canonical **myfenrir.com** host. Do not put Fenrir login on
 folios.works.
 
 Authentic / the `fenrir-auth-proxy` Supabase broker on `auth.myfenrir.com` is
@@ -47,6 +47,10 @@ Apple posts the callback (`form_post`). The Worker already accepts POST.
 
 ## Worker secrets (existing names)
 
+These values belong to `fenrir-auth-worker`, not the Cloudflare Pages project.
+Pages also requires its own `SESSION_SECRET`; configure the secret in both runtimes
+because Worker secrets are not inherited by Pages.
+
 ```bash
 SESSION_SECRET=
 # alias: BETTER_AUTH_SECRET
@@ -67,8 +71,8 @@ APPLE_KEY_ID=
 APPLE_PRIVATE_KEY=
 ```
 
-Apply `workers/fenrir-auth/neon/schema.sql` on the Fenrir Neon database. Create
-the KV namespace and paste its id into `wrangler.fenrir-auth.jsonc`.
+Apply `workers/fenrir-auth/neon/schema.sql` on the Fenrir Neon database. Wrangler
+automatically provisions the `SESSIONS` KV namespace when its id is omitted.
 
 ## Out of scope
 
