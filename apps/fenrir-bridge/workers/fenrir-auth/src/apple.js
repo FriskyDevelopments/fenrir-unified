@@ -4,6 +4,11 @@ import { b64urlEncode, b64urlDecodeToBytes } from "./crypto.js";
 
 const enc = new TextEncoder();
 
+/**
+ * Converts a PEM-encoded value to DER-encoded bytes.
+ * @param {string} pem - The PEM-encoded value.
+ * @return {Uint8Array} The decoded DER bytes.
+ */
 function pemToDer(pem) {
   const body = pem
     .replace(/-----BEGIN [^-]+-----/g, "")
@@ -16,6 +21,11 @@ function pemToDer(pem) {
   return der;
 }
 
+/**
+ * Imports a PEM-encoded PKCS#8 Apple private key for ECDSA signing.
+ * @param {string} pem - The PEM-encoded private key.
+ * @returns {Promise<CryptoKey>} The non-extractable P-256 signing key.
+ */
 async function importApplePrivateKey(pem) {
   const der = pemToDer(pem);
   return crypto.subtle.importKey(
@@ -27,6 +37,13 @@ async function importApplePrivateKey(pem) {
   );
 }
 
+/**
+ * Creates a signed ES256 client-secret JWT for Apple authentication.
+ * @param {Object} env - Environment values containing the Apple team, key, client, and private-key credentials.
+ * @param {number} [ttlSeconds=300] - Token lifetime in seconds.
+ * @return {Promise<string>} The compact signed JWT.
+ * @throws {Error} If required Apple credential values are missing.
+ */
 export async function createAppleClientSecret(env, ttlSeconds = 300) {
   const teamId = env.APPLE_TEAM_ID;
   const keyId = env.APPLE_KEY_ID;
@@ -58,6 +75,11 @@ export async function createAppleClientSecret(env, ttlSeconds = 300) {
   return `${signingInput}.${b64urlEncode(new Uint8Array(sig))}`;
 }
 
+/**
+ * Decodes the payload from a JSON Web Token.
+ * @param {string} jwt - The compact JSON Web Token to decode.
+ * @return {Object|null} The decoded payload, or `null` when the token payload is missing or invalid.
+ */
 export function decodeJwtPayload(jwt) {
   const parts = jwt.split(".");
   if (parts.length < 2) return null;

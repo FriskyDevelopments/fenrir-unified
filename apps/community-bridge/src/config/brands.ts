@@ -224,7 +224,11 @@ export function brandLoginCopy(brand: BrandConfig): {
   };
 }
 
-/** "Activate your account" (Telegram linking) copy for a brand, with fallbacks. */
+/**
+ * Builds Telegram account-activation copy for a brand.
+ *
+ * @returns The configured or default activation headline, instructions, labels, and success message
+ */
 export function brandActivateCopy(brand: BrandConfig): {
   headline: string;
   subheadline: string;

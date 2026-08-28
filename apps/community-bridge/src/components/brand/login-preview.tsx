@@ -20,6 +20,12 @@ const PROVIDER_NAME: Record<string, string> = {
 
 type PreviewScreen = "login" | "activate";
 
+/**
+ * Renders a branded preview of the sign-in and account-activation screens.
+ *
+ * @param brand - Branding, provider, copy, host, and redirect configuration used in the preview
+ * @returns The branded login preview element
+ */
 export function LoginPreview({ brand }: { brand: BrandConfig }) {
   const [screen, setScreen] = useState<PreviewScreen>("login");
   const copy = brandLoginCopy(brand);

@@ -11,11 +11,24 @@ import { BrandSignature } from "./routeCommon";
 import { HumanVerificationGate } from "../components/HumanVerificationGate";
 import { loginPageErrorMessage } from "../services/authErrors";
 
+/**
+ * Determines the destination to use after login.
+ *
+ * @returns The requested single-slash-relative path, or `managedDashboardPath` when the request is invalid or absent.
+ */
 function postLoginDestination() {
   const requested = new URLSearchParams(window.location.search).get("next");
   return requested?.startsWith("/") && !requested.startsWith("//") ? requested : managedDashboardPath;
 }
 
+/**
+ * Renders the Fenrir authentication gate with localized branding and OAuth sign-in options.
+ *
+ * @param c - Localized copy used throughout the authentication interface
+ * @param locale - Current interface locale
+ * @param onLocale - Callback invoked when the user selects a different locale
+ * @returns The Fenrir authentication gate
+ */
 export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
   const theme = brandThemes.fenrir;
   const [authNote, setAuthNote] = useState<string | null>(() => authErrorMessage());
@@ -115,12 +128,24 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
   );
 }
 
+/**
+ * Gets the localized sign-in button label for an authentication provider.
+ *
+ * @param provider - The authentication provider whose label is needed
+ * @param c - The localized copy containing provider labels
+ * @returns The localized label for Apple, Google, or Microsoft sign-in
+ */
 function providerLabel(provider: AuthProvider, c: Copy) {
   if (provider === "apple") return c.continueApple;
   if (provider === "google") return c.continueGoogle;
   return c.continueMicrosoft;
 }
 
+/**
+ * Derives the initial authentication error message from the current URL query string.
+ *
+ * @returns The authentication error message represented by the URL, if present.
+ */
 function authErrorMessage() {
   return loginPageErrorMessage(window.location.search);
 }

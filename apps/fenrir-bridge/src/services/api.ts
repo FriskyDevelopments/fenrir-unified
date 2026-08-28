@@ -28,6 +28,11 @@ const workerAuthOrigin = (import.meta.env.VITE_FENRIR_AUTH_ORIGIN ?? "").trim().
 
 export { PRODUCTION_AUTH_ORIGIN, isWwwHostname, resolveAuthOrigin } from "./authOrigin";
 
+/**
+ * Resolves the authentication origin for the current browser host.
+ *
+ * @returns The configured authentication origin.
+ */
 function browserAuthOrigin(): string {
   return resolveAuthOrigin(
     workerAuthOrigin,
@@ -35,6 +40,12 @@ function browserAuthOrigin(): string {
   );
 }
 
+/**
+ * Builds an authentication endpoint URL using the configured browser origin.
+ *
+ * @param path - The authentication endpoint path
+ * @returns The endpoint path prefixed with the configured origin when available
+ */
 function workerAuthUrl(path: string) {
   const origin = browserAuthOrigin();
   return origin ? `${origin}${path}` : path;
@@ -42,6 +53,12 @@ function workerAuthUrl(path: string) {
 
 type WorkerAuthProvider = "google" | "microsoft" | "apple";
 
+/**
+ * Identifies OAuth providers that the authentication worker can start.
+ *
+ * @param body - The worker response containing provider capabilities.
+ * @returns The enabled OAuth providers, or `null` when provider data is unavailable.
+ */
 function workerProviderList(body: {
   providers?: Record<string, { can_start?: boolean }>;
 } | null): WorkerAuthProvider[] | null {
@@ -183,6 +200,11 @@ function cloneStore(): AppState {
   return JSON.parse(JSON.stringify(store)) as AppState;
 }
 
+/**
+ * Creates a development authentication session for the configured mock user and organization.
+ *
+ * @returns An authenticated session containing the mock user's identity and organization plan.
+ */
 function devAuthSession(): AuthSession & { ok: true } {
   return {
     ok: true,
@@ -200,6 +222,11 @@ function devAuthSession(): AuthSession & { ok: true } {
   };
 }
 
+/**
+ * Determines whether the login `next` query parameter is an allowed internal destination.
+ *
+ * @returns The approved destination, or `null` when the destination is missing or unsafe.
+ */
 function safeLoginNextPath() {
   if (typeof window === "undefined") return null;
   const next = new URLSearchParams(window.location.search).get("next");
@@ -210,6 +237,11 @@ function safeLoginNextPath() {
   return null;
 }
 
+/**
+ * Determines the safe path to return to after authentication.
+ *
+ * @returns A validated login destination, or `/main` when the current location is not a safe destination.
+ */
 function safeCurrentAuthReturnPath() {
   const loginNext = safeLoginNextPath();
   if (loginNext) return loginNext;

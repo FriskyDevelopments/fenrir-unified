@@ -49,6 +49,13 @@ export function sessionCookieName() {
   return sessionCookie;
 }
 
+/**
+ * Signs a session payload for use as an authenticated session token.
+ *
+ * @param payload - The session data to encode and sign
+ * @param env - The environment containing the session secret
+ * @returns A Base64URL-encoded payload and HMAC signature separated by a period
+ */
 export async function signSession(payload: SessionPayload, env: AuthEnv) {
   const secret = requireSecret(env.SESSION_SECRET, "SESSION_SECRET");
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(payload)));
@@ -56,6 +63,11 @@ export async function signSession(payload: SessionPayload, env: AuthEnv) {
   return `${encoded}.${signature}`;
 }
 
+/**
+ * Resolves a session from the authentication service or a signed session cookie.
+ *
+ * @returns The authenticated session payload, or `null` when no valid session is available.
+ */
 export async function readSession(request: Request, env: AuthEnv) {
   if (env.AUTH?.fetch) {
     try {
@@ -97,6 +109,12 @@ export function sessionSetCookie(token: string, domain?: string) {
   return cookieHeader(sessionCookie, token, week, domain);
 }
 
+/**
+ * Creates a session payload with session timestamps and deterministic Frisky identifiers.
+ *
+ * @param input - Identity details and optional Frisky user and organization identifiers
+ * @returns A session payload valid for one week
+ */
 export function createSessionPayload(input: {
   email: string;
   name: string;
@@ -118,6 +136,12 @@ export function createSessionPayload(input: {
   };
 }
 
+/**
+ * Normalizes an identity provider name to a supported session provider.
+ *
+ * @param provider - The identity provider name to normalize
+ * @returns The supported provider name, defaulting to `google`
+ */
 function sessionProviderFromIdentity(provider: string | undefined): SessionProvider {
   switch (provider) {
     case "google":
@@ -131,6 +155,14 @@ function sessionProviderFromIdentity(provider: string | undefined): SessionProvi
   }
 }
 
+/**
+ * Requires an environment secret to be present.
+ *
+ * @param value - The secret value to check
+ * @param name - The environment variable name used in the error message
+ * @returns The provided secret value
+ * @throws If `value` is empty or undefined
+ */
 function requireSecret(value: string | undefined, name: string) {
   if (!value) throw new Error(`missing_env:${name}`);
   return value;
