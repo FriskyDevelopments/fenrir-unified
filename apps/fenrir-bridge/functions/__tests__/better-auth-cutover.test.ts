@@ -1,14 +1,30 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { onRequestGet } from "../api/auth/login/[provider]";
 import { onRequestPost as supabaseSession } from "../api/auth/supabase-session";
 import { readSession } from "../_lib/auth";
 
 describe("retired Pages login paths", () => {
-  it("redirects /api/auth/login/:provider onto the Fenrir Better Auth Worker", async () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+  it("redirects /api/auth/login/:provider onto the Fenrir Better Auth Worker when that Worker is publicly routed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ ok: true, service: "fenrir-auth-worker" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
     const response = await onRequestGet({
       params: { provider: "google" },
       request: new Request("https://myfenrir.com/api/auth/login/google?return_to=/main"),
-      env: { PUBLIC_SITE_URL: "https://myfenrir.com" },
+      env: {
+        PUBLIC_SITE_URL: "https://myfenrir.com",
+      },
     });
 
     expect(response.status).toBe(302);

@@ -10,9 +10,10 @@ describe("FriskyDev Telegram link-start", () => {
 
     expect(response.status).toBe(302);
     const location = response.headers.get("Location") ?? "";
-    expect(location).toContain("https://www.myfenrir.com/login?");
+    expect(location).toContain("https://myfenrir.com/login?");
     expect(location).toContain("next=%2Fapi%2Ftelegram%2Flink%2Fstart");
     expect(location).not.toContain("/main");
+    expect(location).not.toContain("www.myfenrir.com");
   });
 
   it("mints a bot deep-link when Better Auth session is present", async () => {

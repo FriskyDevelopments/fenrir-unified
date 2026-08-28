@@ -1,5 +1,6 @@
-// Guard: MyFenrir sign-in is the Fenrir Better Auth Worker on /auth/{provider}.
-// Authentic/Supabase proxy and /api/auth/login are retired. WorkOS stays banned.
+// Guard: MyFenrir sign-in prefers the Fenrir Better Auth Worker on /auth/{provider}.
+// Until that Worker is publicly routed, Pages /api/auth/login stays as the live
+// Google/Microsoft fallback. Authentic/Supabase proxy stays retired. WorkOS stays banned.
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -24,11 +25,12 @@ function workosMatches() {
 const offenders = workosMatches();
 const checks = [
   {
-    name: "new social login uses Fenrir Better Auth Worker /auth/{provider}",
+    name: "new social login prefers Fenrir Better Auth Worker /auth/{provider}, Pages OAuth until that Worker is live",
     pass: apiSource.includes("/auth/${provider}") &&
       apiSource.includes('workerAuthUrl("/auth/providers")') &&
+      apiSource.includes("/api/auth/login/${provider}") &&
+      apiSource.includes("workerAuthIsLive") &&
       !apiSource.includes("signInWithSupabase(provider)") &&
-      !apiSource.includes("/api/auth/login/${provider}") &&
       providersSource.includes("isDirectOAuthAvailable(provider, context.env)")
   },
   {
@@ -75,7 +77,8 @@ const checks = [
   },
   {
     name: "Better Auth login preserves FriskyDev Telegram link-start next",
-    pass: apiSource.includes('pathname === "/api/telegram/link/start"') &&
+    pass: apiSource.includes('from "../../functions/_lib/fenrir-login"') &&
+      apiSource.includes("preservedLoginNext") &&
       apiSource.includes("safeLoginNextPath")
   }
 ];

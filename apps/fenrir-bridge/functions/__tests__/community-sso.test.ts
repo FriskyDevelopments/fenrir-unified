@@ -65,9 +65,8 @@ describe("community SSO", () => {
 
     expect(response.status).toBe(302);
     // The visitor authenticates on MyFenrir, not on the community's local form.
-    expect(location.origin).toBe("https://www.myfenrir.com");
-    // Parked on an app route: safeReturnPath() refuses OAuth return_to at /api/auth/*.
-    expect(location.pathname).toBe("/main");
+    expect(location.origin).toBe("https://myfenrir.com");
+    expect(location.pathname).toBe("/login");
     const resume = new URL(location.searchParams.get("next")!, "https://www.myfenrir.com");
     expect(resume.pathname).toBe("/api/auth/community-sso");
     expect(resume.searchParams.get("next")).toBe("https://communities.myfenrir.com/gate?onboarding=1");

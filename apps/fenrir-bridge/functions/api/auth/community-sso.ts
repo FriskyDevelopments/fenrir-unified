@@ -1,4 +1,5 @@
 import { readCookie, readSession } from "../../_lib/auth";
+import { canonicalFenrirLoginUrl } from "../../_lib/fenrir-login";
 
 type Env = {
   SESSION_SECRET?: string;
@@ -8,10 +9,6 @@ type Env = {
 };
 
 const COMMUNITY_ORIGIN = "https://communities.myfenrir.com";
-// Where a signed-out visitor is parked to authenticate. It has to be an app
-// route rather than this endpoint, because safeReturnPath() refuses to send an
-// OAuth `return_to` at /api/auth/* — that guard stays exactly as it is.
-const SIGN_IN_PATH = "/main";
 const ATTEMPT_COOKIE = "fenrir_community_sso_attempted";
 const STORAGE_CHUNK_SIZE = 3000;
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 400;
@@ -60,12 +57,10 @@ function fallbackResponse(next: string) {
 function signInRedirect(requestUrl: URL, next: string) {
   const handoff = new URL("/api/auth/community-sso", requestUrl.origin);
   handoff.searchParams.set("next", next);
-  const signIn = new URL(SIGN_IN_PATH, requestUrl.origin);
-  signIn.searchParams.set("next", `${handoff.pathname}${handoff.search}`);
   return new Response(null, {
     status: 302,
     headers: {
-      Location: signIn.toString(),
+      Location: canonicalFenrirLoginUrl(`${handoff.pathname}${handoff.search}`),
       "Cache-Control": "no-store",
       // Doubles as the loop guard: if we land back here still signed out, the
       // sign-in round trip did not take and we stop bouncing.
