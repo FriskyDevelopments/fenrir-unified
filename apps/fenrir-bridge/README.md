@@ -6,7 +6,7 @@ Fenrir is Telegram-only in this MVP. The domain bridge is infrastructure: admins
 
 ## What Works Now
 
-- Logged-in admin product shell with real Google, Microsoft, and Apple OAuth entrypoints on Cloudflare Pages Functions
+- Logged-in admin product shell with Google, Microsoft, and Apple OAuth via the Fenrir Better Auth Worker on `myfenrir.com/auth/*`
 - Frisky IDs for users, orgs, domains, Telegram locks, invites, and audit logs
 - Domain management and DNS wizard
 - Cloudflare-first DNS/certificate flow mock
@@ -111,68 +111,44 @@ Current Cloud Run service URL:
 https://fenrir-bridge-5nznlsxd7a-uc.a.run.app
 ```
 
-Recommended auth setup for real admin login:
-
-```sh
-SESSION_SECRET=
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
-SUPABASE_ADMIN_EMAILS=
-```
+Fenrir admin login is the **Better Auth Worker** `fenrir-auth-worker` (cookie domain `myfenrir.com`). Authentic / the Supabase proxy on `auth.myfenrir.com` is retired. Do not put Fenrir login on `folios.works`.
 
 Vite client variables:
 
 ```sh
-VITE_DIRECT_AUTH_ORIGIN=https://auth.myfenrir.com
 VITE_FENRIR_MANAGED_URL=https://www.myfenrir.com/main
 VITE_CUSTOM_DOMAIN_URL=
 ```
 
-Direct OAuth is handled by Fenrir Pages Functions. Cloudflare stores the provider client IDs/secrets, validates OIDC ID tokens, and mints Fenrir's HttpOnly session cookie. `SUPABASE_ADMIN_EMAILS` is optional but recommended; use a comma-separated allowlist for dashboard admins.
-
-Supabase can still be used for profile storage with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, but browser login no longer starts with Supabase Auth.
-
-Required provider callback URLs:
+Required provider callback URLs (map the existing OAuth apps — do not invent new client IDs):
 
 ```text
-https://auth.myfenrir.com/api/auth/callback/google
-https://auth.myfenrir.com/api/auth/callback/microsoft
-https://auth.myfenrir.com/api/auth/callback/apple
+https://myfenrir.com/auth/google/callback
+https://myfenrir.com/auth/microsoft/callback
+https://myfenrir.com/auth/apple/callback
 ```
 
-```text
-PUBLIC_SITE_URL=https://www.myfenrir.com
-PUBLIC_AUTH_URL=https://auth.myfenrir.com
-```
+Worker secrets (`wrangler secret put … --config wrangler.fenrir-auth.jsonc`):
 
-Route `auth.myfenrir.com` to the same Cloudflare Pages project as Fenrir Bridge, then register callbacks on that host.
-
-Required Cloudflare auth variables:
 ```sh
 SESSION_SECRET=
-VITE_DIRECT_AUTH_ORIGIN=https://auth.myfenrir.com
+# alias: BETTER_AUTH_SECRET
+DATABASE_URL=
+# alias: NEON_DATABASE_URL
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 MICROSOFT_CLIENT_ID=
 MICROSOFT_CLIENT_SECRET=
+# aliases: MS_CLIENT_ID / MS_CLIENT_SECRET
 APPLE_CLIENT_ID=
 APPLE_TEAM_ID=
 APPLE_KEY_ID=
 APPLE_PRIVATE_KEY=
-SUPABASE_URL=https://yqevglppbhuoxxfsfnih.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=
-SUPABASE_ADMIN_EMAILS=
-FENRIR_CANONICAL_ORIGIN=https://www.myfenrir.com
-PUBLIC_SITE_URL=https://www.myfenrir.com
-PUBLIC_AUTH_URL=https://auth.myfenrir.com
 ```
 
-The service-role key is server-only. It is used for profile storage and must never be exposed as a Vite variable.
+Apple posts callbacks with `response_mode=form_post`; the Worker accepts GET and POST. Session cookie: `fenrir_session` (`HttpOnly; Secure; SameSite=Lax; Domain=myfenrir.com`).
 
-Apple notes:
-
-- Apple provider secrets live in Cloudflare Pages variables.
-- Apple posts callbacks with `response_mode=form_post`; Fenrir's callback supports both GET and POST.
+See `workers/fenrir-auth/README.md` and `docs/OAUTH_PROVIDER_WIRING.md`.
 
 ## Cursor Stripe Handoff
 

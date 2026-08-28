@@ -90,31 +90,34 @@ export function authentikEndpoints(issuer: string) {
 }
 
 export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): boolean {
-  if (provider === "google") {
-    return Boolean(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim());
-  }
-  if (provider === "microsoft") {
-    return Boolean(env.MICROSOFT_CLIENT_ID?.trim() && env.MICROSOFT_CLIENT_SECRET?.trim());
-  }
-  if (provider === "apple") {
-    return Boolean(env.APPLE_CLIENT_ID?.trim() && env.APPLE_TEAM_ID?.trim() && env.APPLE_KEY_ID?.trim() && env.APPLE_PRIVATE_KEY?.trim());
-  }
-  if (provider === "authentik") {
-    // Flag first: an unset/false AUTHENTIK_ENABLED means the provider does not exist,
-    // no matter what credentials are bound.
-    if (env.AUTHENTIK_ENABLED?.trim().toLowerCase() !== "true") return false;
-    if (!env.AUTHENTIK_ISSUER?.trim() || !env.AUTHENTIK_CLIENT_ID?.trim() || !env.AUTHENTIK_CLIENT_SECRET?.trim()) {
+  switch (provider) {
+    case "google":
+      return Boolean(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim());
+    case "microsoft":
+      return Boolean(env.MICROSOFT_CLIENT_ID?.trim() && env.MICROSOFT_CLIENT_SECRET?.trim());
+    case "apple":
+      return Boolean(env.APPLE_CLIENT_ID?.trim() && env.APPLE_TEAM_ID?.trim() && env.APPLE_KEY_ID?.trim() && env.APPLE_PRIVATE_KEY?.trim());
+    case "authentik": {
+      // Flag first: an unset/false AUTHENTIK_ENABLED means the provider does not exist,
+      // no matter what credentials are bound.
+      if (env.AUTHENTIK_ENABLED?.trim().toLowerCase() !== "true") return false;
+      if (!env.AUTHENTIK_ISSUER?.trim() || !env.AUTHENTIK_CLIENT_ID?.trim() || !env.AUTHENTIK_CLIENT_SECRET?.trim()) {
+        return false;
+      }
+      // A malformed issuer would blow up later inside the redirect; fail closed here.
+      try {
+        authentikEndpoints(env.AUTHENTIK_ISSUER);
+      } catch {
+        return false;
+      }
+      return true;
+    }
+    default: {
+      const _exhaustive: never = provider;
+      void _exhaustive;
       return false;
     }
-    // A malformed issuer would blow up later inside the redirect; fail closed here.
-    try {
-      authentikEndpoints(env.AUTHENTIK_ISSUER);
-    } catch {
-      return false;
-    }
-    return true;
   }
-    return false;
 }
 
 export async function createOAuthTransaction(provider: OAuthProvider, env: OAuthEnv, returnTo: string): Promise<OAuthTransaction> {

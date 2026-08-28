@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Copy, Locale } from "../i18n";
-import { authService, webauthnService } from "../services/api";
+import { authService } from "../services/api";
 import { friskyClientAuthEngine, type AuthProvider } from "../services/authGateway";
 import { AuthProviderButton } from "../components/AuthProviderButton";
 import { AuthSurface } from "../components/AuthSurface";
@@ -17,7 +17,7 @@ function postLoginDestination() {
 
 export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
   const theme = brandThemes.fenrir;
-  const [passkeyNote, setPasskeyNote] = useState<string | null>(() => authErrorMessage());
+  const [authNote, setAuthNote] = useState<string | null>(() => authErrorMessage());
   const [humanVerified, setHumanVerified] = useState(false);
   const [enabledProviders, setEnabledProviders] = useState<AuthProvider[] | null>(null);
 
@@ -34,33 +34,18 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
   const onHumanVerified = useCallback((verified: boolean) => {
     setHumanVerified(verified);
     if (!verified) return;
-    setPasskeyNote(null);
+    setAuthNote(null);
     void authService.me().then((result) => {
       if (result.data.authenticated) window.location.assign(postLoginDestination());
     });
   }, []);
 
-  async function signInWithPasskey() {
-    setPasskeyNote(null);
-    try {
-      const { optionsJSON } = await webauthnService.loginOptions();
-      // Carga diferida: @simplewebauthn/browser sale del chunk inicial y sólo
-      // se descarga al usar el passkey para entrar.
-      const { startAuthentication } = await import("@simplewebauthn/browser");
-      const assertion = await startAuthentication({ optionsJSON });
-      await webauthnService.loginVerify(assertion);
-      window.location.assign(postLoginDestination());
-    } catch {
-      setPasskeyNote(c.passkeyError);
-    }
-  }
-
   async function signInWithProvider(provider: AuthProvider) {
-    setPasskeyNote(null);
+    setAuthNote(null);
     try {
       await friskyClientAuthEngine.signInWithProvider(provider);
     } catch {
-      setPasskeyNote(c.authProviderError);
+      setAuthNote(c.authProviderError);
     }
   }
 
@@ -87,15 +72,11 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
             ))}
             {enabledProviders === null ? <small className="muted">Checking available sign-in…</small> : null}
             {enabledProviders?.length === 0 ? (
-              <small className="muted">No OAuth provider is available right now. Existing passkeys remain available.</small>
+              <small className="muted">No OAuth provider is available right now. Apple, Google, and Microsoft are the Fenrir sign-in options.</small>
             ) : null}
           </div>
-          <div className="auth-passkey-row">
-            <button type="button" className="secondary" disabled={!humanVerified} onClick={() => void signInWithPasskey()}>
-              {c.passkeySignIn}
-            </button>
-            {passkeyNote ? <small className="muted">{passkeyNote}</small> : null}
-          </div>
+          {authNote ? <small className="muted">{authNote}</small> : null}
+          <p className="muted">After sign-in, Fenrir opens the Telegram gate so you can link the same admin account. No extra dens are created from this screen.</p>
           <div className="auth-2fa-recommend">
             <p className="label">{c.twoFactorRecommendTitle}</p>
             <p className="muted">{c.twoFactorRecommendBody}</p>
