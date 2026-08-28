@@ -92,6 +92,7 @@ const telegramLaunchLabels = [
 ] as const;
 
 export function CommunityBotWalkthrough({
+  id,
   communityId,
   communityLabel,
   owner,
@@ -100,7 +101,7 @@ export function CommunityBotWalkthrough({
   mappingVerified,
   mappings = [],
   linkedTelegram,
-}: Props) {
+}: Props & { id?: string }) {
   const [telegramPreviewOpen, setTelegramPreviewOpen] = useState(false);
   const [telegramPreviewStep, setTelegramPreviewStep] = useState(0);
   const [selectedCommunityId, setSelectedCommunityId] = useState(communityId);
@@ -140,7 +141,10 @@ export function CommunityBotWalkthrough({
     setTelegramPreviewStep(index);
   }
   return (
-    <Card className="relative mb-8 overflow-hidden border-primary/30 bg-[radial-gradient(circle_at_15%_0%,hsl(var(--primary)/0.18),transparent_30%),linear-gradient(135deg,hsl(var(--card)/0.96),hsl(var(--background)/0.9))] p-0">
+    <Card
+      id={id}
+      className="relative mb-8 scroll-mt-24 overflow-hidden border-primary/30 bg-[radial-gradient(circle_at_15%_0%,hsl(var(--primary)/0.18),transparent_30%),linear-gradient(135deg,hsl(var(--card)/0.96),hsl(var(--background)/0.9))] p-0"
+    >
       <motion.div
         aria-hidden="true"
         className="absolute -right-16 -top-20 h-64 w-64 rounded-full border border-primary/25"

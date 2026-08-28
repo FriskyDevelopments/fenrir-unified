@@ -255,6 +255,10 @@ function MyGatesPage() {
 
         {quota && (
           <CommunityBotWalkthrough
+            // Ancla: la tarjeta de cada Gate necesita poder mandarte aquí.
+            // Antes el texto decía "abre el walkthrough de arriba" y no daba
+            // camino: el usuario leía qué hacer y se quedaba donde estaba.
+            id="telegram-walkthrough"
             communityId={brand.community.id}
             communityLabel={brand.community.label}
             owner={isOwner}
@@ -436,14 +440,30 @@ function MyGatesPage() {
                               </SelectContent>
                             </Select>
                           ) : (
+                            /* Antes esto era sólo texto: le decía al owner qué
+                               hacer y lo dejaba donde estaba. El siguiente paso
+                               existe y está en la misma página, así que la
+                               tarjeta ahora lo lleva hasta él en vez de
+                               describírselo. */
                             <div className="rounded-md border border-dashed border-amber-400/30 bg-amber-400/5 px-3 py-2 text-[10px] leading-relaxed text-muted-foreground">
-                              No verified group yet. Open the Telegram launch walkthrough above, add
-                              @Myfenrir_bot as an admin, then run{" "}
+                              No verified group yet. Add @Myfenrir_bot as an admin of your group,
+                              then run{" "}
                               <span className="font-mono text-foreground">
                                 /connect@Myfenrir_bot
                               </span>{" "}
-                              in the protected group. This selector will unlock only after Fenrir
-                              verifies that mapping.
+                              inside it. This selector unlocks once Fenrir verifies that mapping.
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="fenrir"
+                                className="mt-2 w-full"
+                                onClick={() => {
+                                  const target = document.getElementById("telegram-walkthrough");
+                                  target?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                }}
+                              >
+                                Take me to the next step
+                              </Button>
                             </div>
                           )}
                         </div>
