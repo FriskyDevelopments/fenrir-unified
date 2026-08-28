@@ -890,8 +890,8 @@ const BRIDGE_TARGET = "managed MyFenrir Gate";
 // /activate 6-character paste is not the production linker — use link-start.
 const FRISKY_TELEGRAM_LINK_START = "https://www.myfenrir.com/api/telegram/link/start";
 const COMMUNITY_BRIDGE_CONTINUE_URL = "https://communities.myfenrir.com/gate?onboarding=1";
-const MYFENRIR_APP_URL = "https://www.myfenrir.com/gate/miniapp";
-const MYFENRIR_FRONTEND_URL = "https://fenrir-bridge.pages.dev/gate/app";
+const MYFENRIR_APP_URL = "https://communities.myfenrir.com/gate";
+const MYFENRIR_FRONTEND_URL = "https://communities.myfenrir.com/gate";
 const BOT_OS_WELCOME_VIDEO_URL = "https://www.myfenrir.com/bot-os/media/fenrir-welcome.mp4";
 // Approved no-audio celebration clip for a successful Telegram-identity link.
 // Sent via sendAnimation (autoplay GIF). Reuses an existing approved bot-os clip.
