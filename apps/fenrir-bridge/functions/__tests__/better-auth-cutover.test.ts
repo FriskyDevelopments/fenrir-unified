@@ -12,7 +12,7 @@ describe("retired Pages login paths", () => {
     });
 
     expect(response.status).toBe(302);
-    expect(response.headers.get("Location")).toBe("https://myfenrir.com/auth/google?redirect=/main");
+    expect(response.headers.get("Location")).toBe("https://myfenrir.com/auth/google?redirect=%2Fmain");
   });
 
   it("returns 410 for the Authentic/Supabase session exchange", async () => {
