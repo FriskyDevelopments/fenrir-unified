@@ -28,11 +28,15 @@ export const Route = createFileRoute("/login")({
     brand?: unknown;
     gate?: unknown;
     sso?: unknown;
+    force?: unknown;
+    switch?: unknown;
   }): {
     next?: string;
     brand?: string;
     gate?: string;
     sso?: string;
+    force?: boolean;
+    switch?: boolean;
   } => ({
     next: typeof s.next === "string" ? s.next : undefined,
     brand:
@@ -42,6 +46,10 @@ export const Route = createFileRoute("/login")({
         ? s.gate
         : undefined,
     sso: typeof s.sso === "string" ? s.sso : undefined,
+    // `?force` / `?switch` are flags: present with any value — including the
+    // empty string a bare `?force` produces — means "show me the providers".
+    force: isFlagPresent(s.force),
+    switch: isFlagPresent(s.switch),
   }),
 
   head: () => ({
@@ -119,18 +127,36 @@ const PROVIDERS: ProviderConfig[] = [
   },
 ];
 
+/** A query flag counts as set when present, even as a bare `?force`. */
+function isFlagPresent(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value !== "string") return false;
+  return value !== "false" && value !== "0";
+}
+
 function safeNext(next: unknown): string | null {
   if (typeof next !== "string" || !next.startsWith("/") || next.startsWith("//")) return null;
   return next;
 }
 
 function LoginPage() {
-  const { session, loading } = useAuth();
+  const { session, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const loadPublicGate = useServerFn(getPublicGate);
   const brand = useBrand();
-  const search = Route.useSearch() as { next?: string; gate?: string; sso?: string };
+  const search = Route.useSearch() as {
+    next?: string;
+    gate?: string;
+    sso?: string;
+    force?: boolean;
+    switch?: boolean;
+  };
   const next = safeNext(search.next);
+  // Arriving with `next` means the visitor came through community-sso and is
+  // explicitly asking to sign in — possibly as somebody else. `?force` and
+  // `?switch` say the same thing outright.
+  const explicitSignIn = Boolean(next) || Boolean(search.force) || Boolean(search.switch);
+  const [switching, setSwitching] = useState(false);
   const [pending, setPending] = useState<ProviderId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [configIssues, setConfigIssues] = useState<RedirectIssue[]>([]);
@@ -190,18 +216,38 @@ function LoginPage() {
     .map((id) => PROVIDERS.find((p) => p.id === id))
     .filter((p): p is ProviderConfig => Boolean(p));
 
+  function continueToNext() {
+    const target = new URL(next ?? brand.redirect.afterLogin, window.location.origin);
+    target.searchParams.set("brand", brand.id);
+    window.location.replace(`${target.pathname}${target.search}${target.hash}`);
+  }
+
+  async function useAnotherAccount() {
+    setSwitching(true);
+    setError(null);
+    try {
+      await signOut();
+    } catch {
+      setError("Could not sign you out. Try again, or clear this site's cookies.");
+    } finally {
+      setSwitching(false);
+    }
+  }
+
   useEffect(() => {
     // In demo mode the mock session already exists — stay here so the sign-in
     // screen (and its simulated actions) can be reviewed.
     if (demo) return;
-    if (!loading && session) {
-      if (next) {
-        const target = new URL(next, window.location.origin);
-        target.searchParams.set("brand", brand.id);
-        window.location.replace(`${target.pathname}${target.search}${target.hash}`);
-      } else navigate({ to: brand.redirect.afterLogin });
-    }
-  }, [demo, loading, session, navigate, next, brand]);
+    // Never silently swallow an explicit sign-in request. A visitor sent here
+    // by community-sso (`next`), or asking outright (`?force` / `?switch`),
+    // must see the provider list even when a session is already live —
+    // otherwise the screen never paints and it looks like there is no login
+    // page at all. `g.$slug.tsx` stopped bouncing for the same reason; this
+    // route kept its own shortcut.
+    if (explicitSignIn) return;
+    // A bare /login with a live session has nothing to ask, so send it on.
+    if (!loading && session) navigate({ to: brand.redirect.afterLogin });
+  }, [demo, loading, session, navigate, brand, explicitSignIn]);
 
   async function signIn(provider: ProviderId) {
     if (blocked) return;
@@ -354,6 +400,44 @@ function LoginPage() {
               <li key={issue.field + issue.message}>{issue.message}</li>
             ))}
           </ul>
+        </div>
+      ) : null}
+
+      {!demo && !loading && session && explicitSignIn ? (
+        <div className="mb-4 rounded-xl border border-border bg-muted/40 p-4 text-left">
+          <p className="text-sm text-foreground/90">
+            You are already signed in
+            {session.user?.email ? (
+              <>
+                {" as "}
+                <span className="font-medium">{session.user.email}</span>
+              </>
+            ) : null}
+            .
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={continueToNext}
+              disabled={switching || pending !== null}
+            >
+              Continue as this account
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="surface"
+              loading={switching}
+              disabled={switching || pending !== null}
+              onClick={useAnotherAccount}
+            >
+              Use another account
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Choosing another account signs this one out of the portal first.
+          </p>
         </div>
       ) : null}
 
