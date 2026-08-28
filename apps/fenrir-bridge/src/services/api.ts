@@ -189,7 +189,19 @@ function devAuthSession(): AuthSession & { ok: true } {
   };
 }
 
+function safeLoginNextPath() {
+  if (typeof window === "undefined") return null;
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (!next?.startsWith("/") || next.startsWith("//")) return null;
+  const pathname = next.split(/[?#]/, 1)[0];
+  if (pathname === "/api/telegram/link/start") return pathname;
+  if (pathname === "/main" || pathname.startsWith("/main/")) return next;
+  return null;
+}
+
 function safeCurrentAuthReturnPath() {
+  const loginNext = safeLoginNextPath();
+  if (loginNext) return loginNext;
   const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   if (!path.startsWith("/") || path.startsWith("//")) return "/main";
   const pathname = window.location.pathname || "/";

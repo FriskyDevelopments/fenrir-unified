@@ -57,6 +57,11 @@ const checks = [
   {
     name: "SPA no longer completes Authentic/Supabase sessions",
     pass: !apiSource.includes("completeSupabaseSession") && !apiSource.includes("signOutSupabase")
+  },
+  {
+    name: "Better Auth login preserves FriskyDev Telegram link-start next",
+    pass: apiSource.includes('pathname === "/api/telegram/link/start"') &&
+      apiSource.includes("safeLoginNextPath")
   }
 ];
 

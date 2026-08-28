@@ -108,19 +108,19 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
         ? [
             "🐺 *MyFenrir* · Telegram linked",
             "",
-            "Your Telegram identity is connected to this workspace.",
-            "Stable lock URLs, invite rotation, and Stars unlock now follow this account.",
+            "Your Telegram identity is connected to this Frisky Dev account.",
+            "Continue Community Gate setup on communities.myfenrir.com — not the FriskyDev /main dashboard.",
             "",
-            "_One verified link, every product._"
+            "_One verified link, then the Community Bridge walkthrough._"
           ].join("\n")
         : [
             "⚠️ That link code expired or is invalid.",
             "",
-            "Open MyFenrir → *Settings → Link Telegram* and generate a fresh code."
+            "Open the FriskyDev link-start URL and generate a fresh one-time Telegram link."
           ].join("\n"),
       reply_markup: result.ok
-        ? { inline_keyboard: [[{ text: "Open dashboard", url: origin.replace(/\/$/, "") }]] }
-        : { inline_keyboard: startActionButtons(env, origin) }
+        ? { inline_keyboard: [[{ text: "Continue Community Gate", url: COMMUNITY_BRIDGE_CONTINUE_URL }]] }
+        : { inline_keyboard: [[{ text: "Link FriskyDev ID", url: FRISKY_TELEGRAM_LINK_START }]] }
     }, channel);
     return;
   }
@@ -139,15 +139,19 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
             "✅ *Account linked with Frisky Dev*",
             `MyFenrir account · ${escapeMd(maskEmail(account.email))}`,
             "",
-            "Your identity is confirmed. Next, add Fenrir to the protected group and map it before the Gate can go live."
+            "Your identity is confirmed. Next, add Fenrir to the protected group and map it on communities.myfenrir.com."
           ].join("\n")
         : [
             `🐺 *Welcome, ${name}*`,
             "",
-            "Your Telegram account is not linked to MyFenrir yet.",
-            "Open MyFenrir and generate the secure one-time Telegram link."
+            "Your Telegram account is not linked to Frisky Dev yet.",
+            "Open the FriskyDev one-time link. There is no code to copy."
           ].join("\n"),
-      reply_markup: { inline_keyboard: startActionButtons(env, origin) }
+      reply_markup: {
+        inline_keyboard: account
+          ? [[{ text: "Continue Community Gate", url: COMMUNITY_BRIDGE_CONTINUE_URL }]]
+          : [[{ text: "Link FriskyDev ID", url: FRISKY_TELEGRAM_LINK_START }]]
+      }
     }, channel);
     return;
   }
@@ -231,6 +235,9 @@ function isCommandForBot(text: string, command: string, env: BillingEnv) {
   return !target || target === (env.FENRIR_TELEGRAM_BOT_USERNAME ?? "").replace(/^@/, "").toLowerCase();
 }
 
+const FRISKY_TELEGRAM_LINK_START = "https://www.myfenrir.com/api/telegram/link/start";
+const COMMUNITY_BRIDGE_CONTINUE_URL = "https://communities.myfenrir.com/gate?onboarding=1";
+
 async function handleLinkCommand(env: BillingEnv, message: TelegramMessage, channel: string) {
   if (message.chat.type && message.chat.type !== "private") {
     await telegramApi(env, "sendMessage", {
@@ -240,15 +247,10 @@ async function handleLinkCommand(env: BillingEnv, message: TelegramMessage, chan
     return;
   }
 
-  const appUrl = "https://www.myfenrir.com/main";
-  const menuButton = { type: "web_app", text: "Open MyFenrir", web_app: { url: appUrl } };
-  await telegramApi(env, "setChatMenuButton", { menu_button: menuButton }, channel).catch((error) => {
-    console.error("telegram_menu_button_failed", error);
-  });
   await telegramApi(env, "sendMessage", {
     chat_id: message.chat.id,
-    text: "Open MyFenrir, then tap Link Telegram ID. Telegram confirms automatically — there is no code to copy.",
-    reply_markup: { inline_keyboard: [[{ text: "Open MyFenrir", url: appUrl }]] }
+    text: "Link your FriskyDev ID first. Telegram confirms automatically — there is no code to copy. After that, Community Gate setup continues on communities.myfenrir.com.",
+    reply_markup: { inline_keyboard: [[{ text: "Link FriskyDev ID", url: FRISKY_TELEGRAM_LINK_START }]] }
   }, channel);
 }
 

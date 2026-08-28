@@ -46,7 +46,7 @@ function postLoginDestination() {
 // where the Gate's "Proceed to SSO" used to die. Keep the allowlist to the one
 // endpoint that needs it: a same-origin GET redirect is not an open redirect,
 // but an unbounded list invites /main?next=/api/auth/logout links.
-const postAuthHandoffPaths = ["/api/auth/community-sso"];
+const postAuthHandoffPaths = ["/api/auth/community-sso", "/api/telegram/link/start"];
 function postAuthHandoffTarget() {
   const requested = new URLSearchParams(window.location.search).get("next");
   if (!requested?.startsWith("/") || requested.startsWith("//")) return null;

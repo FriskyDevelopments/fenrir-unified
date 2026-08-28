@@ -22,7 +22,7 @@ import {
 export const onRequestGet: PagesFunction<BillingEnv> = async (context) => {
   const session = await readSession(context.request, context.env);
   if (!session) {
-    const login = new URL("/main", context.request.url);
+    const login = new URL("/login", context.request.url);
     login.searchParams.set("next", "/api/telegram/link/start");
     return Response.redirect(login.toString(), 302);
   }
