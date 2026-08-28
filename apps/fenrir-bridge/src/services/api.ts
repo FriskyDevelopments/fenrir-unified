@@ -36,11 +36,22 @@ function browserAuthOrigin(): string {
   );
 }
 
+/**
+ * Builds an authentication Worker URL when a configured origin is available.
+ *
+ * @param path - The authentication path to append to the Worker origin
+ * @returns The absolute Worker URL, or the original path when no origin is configured
+ */
 function workerAuthUrl(path: string) {
   const origin = browserAuthOrigin();
   return origin ? `${origin}${path}` : path;
 }
 
+/**
+ * Checks whether the authentication Worker is available and serving the expected response.
+ *
+ * @returns `true` if the Worker responds with a recognized authentication document, `false` otherwise.
+ */
 async function workerAuthIsLive(): Promise<boolean> {
   try {
     const response = await fetch(workerAuthUrl("/auth/health"), { credentials: "include" });
@@ -53,6 +64,12 @@ async function workerAuthIsLive(): Promise<boolean> {
 
 type WorkerAuthProvider = "google" | "microsoft" | "apple";
 
+/**
+ * Extracts the enabled OAuth providers from worker authentication metadata.
+ *
+ * @param body - Authentication metadata containing provider availability.
+ * @returns The enabled Apple, Google, and Microsoft providers, or `null` when provider metadata is unavailable.
+ */
 function workerProviderList(body: {
   providers?: Record<string, { can_start?: boolean }>;
 } | null): WorkerAuthProvider[] | null {
@@ -211,11 +228,21 @@ function devAuthSession(): AuthSession & { ok: true } {
   };
 }
 
+/**
+ * Determines the safe post-login destination from the current URL.
+ *
+ * @returns The validated login destination, or `null` when no safe destination is available.
+ */
 function safeLoginNextPath() {
   if (typeof window === "undefined") return null;
   return preservedLoginNext(new URLSearchParams(window.location.search).get("next"));
 }
 
+/**
+ * Determines the safe path to use when returning from authentication.
+ *
+ * @returns A validated login destination, or `/main` when the current path is unsuitable.
+ */
 function safeCurrentAuthReturnPath() {
   const loginNext = safeLoginNextPath();
   if (loginNext) return loginNext;

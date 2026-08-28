@@ -394,6 +394,12 @@ export async function exchangeCodeForSession(
   };
 }
 
+/**
+ * Sanitizes an OAuth return path and preserves approved login destinations.
+ *
+ * @param value - Candidate return path
+ * @returns The approved return path, or `/main` when the value is invalid or restricted
+ */
 export function safeReturnPath(value: string | null | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/main";
   const preserved = preservedLoginNext(value);
