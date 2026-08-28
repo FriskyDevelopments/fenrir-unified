@@ -3,7 +3,8 @@
 Fenrir **Better Auth** identity on a Cloudflare Worker. Public HTTP copies the
 `folios-auth-worker` contract (endpoints, HMAC cookie, PKCE S256, Apple
 `form_post` + ES256 client-secret JWT). This is **not** a Folios product merge:
-cookie domain is `myfenrir.com`, Worker origin is `myfenrir.com/auth/*` and
+the host-only cookie is issued on canonical `myfenrir.com`, and the Worker
+origin is `myfenrir.com/auth/*` and
 `www.myfenrir.com/auth/*`. Fenrir login is never served on `folios.works`.
 
 Authentic / the `fenrir-auth-proxy` Supabase broker on `auth.myfenrir.com` is
@@ -21,7 +22,7 @@ retired (410).
 | GET | `https://myfenrir.com/auth/logout` | Clears session + cookie, 302 to `/login` |
 | GET | `https://myfenrir.com/auth/providers` | Which providers can start |
 | GET | `https://myfenrir.com/auth/health` | Liveness |
-| GET | `https://myfenrir.com/auth/ready` | Session secret + all three providers + (Neon **or** KV); 503 only when login cannot mint a session |
+| GET | `https://myfenrir.com/auth/ready` | Session secret + OAuth-state Durable Object + all three providers + (Neon **or** KV); 503 only when login cannot mint a session |
 
 `?redirect=` is allow-listed to `myfenrir.com` / `www.myfenrir.com` (open-redirect
 protection). `/auth/api/*`, KYC, passkeys, and extra providers are out.
@@ -34,10 +35,13 @@ are allowed for `https://www.myfenrir.com` so the www SPA can call apex `/auth/m
 ## Session
 
 Cookie `fenrir_session` = `<sessionId>.<HMAC-SHA256(sessionId, SESSION_SECRET)>`,
-`HttpOnly; Secure; SameSite=Lax; Domain=myfenrir.com; Path=/`.
+`HttpOnly; Secure; SameSite=Lax; Path=/`. It is host-only on the canonical
+`myfenrir.com` host.
 
-- **KV** (`SESSIONS`) holds short-lived OAuth state (PKCE verifier + returnTo)
-  and is the **session fallback** when Neon is unset or unreachable.
+- **Durable Objects** (`OAUTH_STATE`) hold short-lived, strongly consistent
+  OAuth state (PKCE verifier + returnTo).
+- **KV** (`SESSIONS`) is the **session fallback** when Neon is unset or
+  unreachable.
 - **Neon** holds `users` and `sessions` when `DATABASE_URL` is healthy. Apply
   `neon/schema.sql`. Login stays up on KV until then (`degraded: true`).
 
@@ -74,7 +78,7 @@ npm test
 curl -sS https://myfenrir.com/auth/health
 curl -sS https://myfenrir.com/auth/providers
 curl -sS https://myfenrir.com/auth/ready
-curl -sI "https://myfenrir.com/auth/google?redirect=/main"
+curl -sS -o /dev/null -D - "https://myfenrir.com/auth/google?redirect=/main"
 ```
 
 Google/Microsoft should 302 to the IdP with `redirect_uri=https://myfenrir.com/auth/{provider}/callback`
@@ -83,12 +87,12 @@ https://myfenrir.com/login (private-access gate) and confirm `GET /auth/me` with
 credentials returns `authenticated: true`. Telegram linking is the post-login
 gate in the dashboard — this Worker does not create dens or chat IDs.
 
-## KV namespace (human)
+## Storage bindings
 
 ```bash
 cd apps/fenrir-bridge
-npx wrangler kv namespace create FENRIR_AUTH_SESSIONS --config wrangler.fenrir-auth.jsonc
+npm run deploy:workers
 ```
 
-Paste the id into `wrangler.fenrir-auth.jsonc` (`kv_namespaces[0].id`) before
-the first production deploy.
+Wrangler provisions the `SESSIONS` binding from `wrangler.fenrir-auth.jsonc`;
+the OAuth-state Durable Object is provisioned by the same Worker deployment.

@@ -2,7 +2,7 @@
 
 Fenrir login is a Cloudflare Worker (`fenrir-auth-worker`) on
 `https://myfenrir.com/auth/*`. It copies the **folios-auth-worker** HTTP
-contract. Cookie domain is **myfenrir.com**. Do not put Fenrir login on
+contract. Its host-only cookie is issued on canonical **myfenrir.com**. Do not put Fenrir login on
 folios.works.
 
 Authentic / the `fenrir-auth-proxy` Supabase broker on `auth.myfenrir.com` is
@@ -67,8 +67,9 @@ APPLE_KEY_ID=
 APPLE_PRIVATE_KEY=
 ```
 
-Apply `workers/fenrir-auth/neon/schema.sql` on the Fenrir Neon database. Create
-the KV namespace and paste its id into `wrangler.fenrir-auth.jsonc`.
+Apply `workers/fenrir-auth/neon/schema.sql` on the Fenrir Neon database. Wrangler
+provisions the Worker's KV session fallback and OAuth-state Durable Object from
+`wrangler.fenrir-auth.jsonc`.
 
 ## Out of scope
 

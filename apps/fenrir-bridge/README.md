@@ -111,7 +111,7 @@ Current Cloud Run service URL:
 https://fenrir-bridge-5nznlsxd7a-uc.a.run.app
 ```
 
-Fenrir admin login is the **Better Auth Worker** `fenrir-auth-worker` (cookie domain `myfenrir.com`). Authentic / the Supabase proxy on `auth.myfenrir.com` is retired. Do not put Fenrir login on `folios.works`.
+Fenrir admin login is the **Better Auth Worker** `fenrir-auth-worker` (host-only cookie on canonical `myfenrir.com`). Authentic / the Supabase proxy on `auth.myfenrir.com` is retired. Do not put Fenrir login on `folios.works`.
 
 Vite client variables:
 
@@ -146,7 +146,7 @@ APPLE_KEY_ID=
 APPLE_PRIVATE_KEY=
 ```
 
-Apple posts callbacks with `response_mode=form_post`; the Worker accepts GET and POST. Session cookie: `fenrir_session` (`HttpOnly; Secure; SameSite=Lax; Domain=myfenrir.com`).
+Apple posts callbacks with `response_mode=form_post`; the Worker accepts GET and POST. Session cookie: `fenrir_session` (`HttpOnly; Secure; SameSite=Lax`; host-only on `myfenrir.com`).
 
 See `workers/fenrir-auth/README.md` and `docs/OAUTH_PROVIDER_WIRING.md`.
 
@@ -252,14 +252,16 @@ Business logic is separated under `src/services`. The UI says Telegram Lock, whi
 - `aiOpsService`
 - `mockStore`
 
-The first backend layer now exists under `functions/api`:
+The surviving Pages compatibility APIs under `functions/api` are:
 
-- `POST /api/auth/supabase-session`
-- `GET /api/auth/me`
-- `POST /api/auth/logout`
+- `GET /api/auth/login/{provider}` — redirects to the Fenrir auth Worker
+- `GET /api/auth/providers` — public provider capability metadata
+- `GET /api/auth/me` — reads the Worker session through the `AUTH` service binding
+- `POST /api/auth/logout` — clears the compatibility cookie
 - `GET /api/app-state`
 
-Legacy direct OAuth routes return `410 direct_oauth_disabled`; provider login must start from Supabase Auth in the frontend.
+Provider login starts at `https://myfenrir.com/auth/{google|microsoft|apple}`.
+The retired Supabase session exchange is not part of the active login flow.
 
 ## Next Real Backend Step
 

@@ -10,14 +10,12 @@
     "logs": { "head_sampling_rate": 1 }
   },
   // Worker as origin for /auth/* only. Pages keeps the rest of myfenrir.com.
-  // Do not attach this Worker to folios.works.
   "routes": [
     { "pattern": "myfenrir.com/auth/*", "zone_name": "myfenrir.com" },
     { "pattern": "www.myfenrir.com/auth/*", "zone_name": "myfenrir.com" }
   ],
   "vars": {
     "BASE_URL": "https://myfenrir.com",
-    "COOKIE_DOMAIN": "myfenrir.com",
     "POST_LOGIN_REDIRECT": "https://myfenrir.com/main",
     "LOGOUT_REDIRECT": "https://myfenrir.com/login",
     "SESSION_TTL_SECONDS": "604800",
@@ -25,8 +23,15 @@
     "ALLOWED_REDIRECT_HOSTS": "myfenrir.com,www.myfenrir.com",
     "TRUSTED_ORIGINS": "https://myfenrir.com,https://www.myfenrir.com"
   },
-  // Replace id after: wrangler kv namespace create FENRIR_AUTH_SESSIONS
   "kv_namespaces": [
-    { "binding": "SESSIONS", "id": "fenrir-auth-sessions-pending" }
+    { "binding": "SESSIONS" }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "OAUTH_STATE", "class_name": "OAuthStateStore" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["OAuthStateStore"] }
   ]
 }

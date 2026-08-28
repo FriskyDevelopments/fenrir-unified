@@ -71,7 +71,6 @@ export async function createSession(env, user, meta = {}) {
 
   const signed = await signValue(c.sessionSecret, sessionId);
   const cookie = serializeCookie(c.cookieName, signed, {
-    domain: c.cookieDomain,
     maxAge: c.sessionTtl,
   });
   return { sessionId, token: signed, cookie, record: { id: sessionId, user, expiresAt: expiresAt.getTime() } };

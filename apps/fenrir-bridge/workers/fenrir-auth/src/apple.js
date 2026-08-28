@@ -58,10 +58,13 @@ export async function createAppleClientSecret(env, ttlSeconds = 300) {
   return `${signingInput}.${b64urlEncode(new Uint8Array(sig))}`;
 }
 
+// Decodes claims only; it does not verify the JWT signature. Callers must use a
+// token from a trusted source such as Apple's HTTPS token endpoint.
 export function decodeJwtPayload(jwt) {
-  const parts = jwt.split(".");
-  if (parts.length < 2) return null;
   try {
+    if (typeof jwt !== "string") return null;
+    const parts = jwt.split(".");
+    if (parts.length < 2) return null;
     return JSON.parse(new TextDecoder().decode(b64urlDecodeToBytes(parts[1])));
   } catch {
     return null;

@@ -39,7 +39,7 @@ const checks = [
       !appSource.includes('(["apple", "google", "microsoft"] as AuthProvider[]).map')
   },
   {
-    name: "Fenrir Worker copies folios-auth-worker endpoints on myfenrir.com",
+    name: "Fenrir auth worker exposes the expected endpoints on myfenrir.com",
     pass: workerIndex.includes("fenrir-auth-worker") &&
       workerIndex.includes("myfenrir.com") &&
       workerIndex.includes("safeReturnTo") &&
