@@ -7,8 +7,10 @@
 
 ## Quick Context
 This is the **production monorepo** for Fenrir Bridge. The app is deployed to Cloudflare Pages
-(`fenrir-bridge` project) at `myfenrir.com`. All secrets are already set in Cloudflare Pages
-production environment (SUPABASE_URL, SUPABASE_ANON_KEY, SESSION_SECRET, TELEGRAM_BOT_TOKEN, etc.).
+(`fenrir-bridge` project) at `myfenrir.com`. Fenrir login is the Better Auth Worker
+`fenrir-auth-worker` on `myfenrir.com/auth/*` (cookie domain `myfenrir.com`). Authentic /
+the Supabase proxy on `auth.myfenrir.com` is retired. Remaining Pages secrets include
+SESSION_SECRET, TELEGRAM_BOT_TOKEN, and optional profile-storage keys.
 
 ## Setup
 ```bash
@@ -26,16 +28,17 @@ npm run build && wrangler pages deploy dist/ --project-name fenrir-bridge
 ```
 
 ## Code Map
-- `src/App.tsx` — root component, Supabase auth session management
+- `src/App.tsx` — root component, Fenrir Better Auth session via `/auth/me`
 - `src/components/` — UI components (sections, shared)
 - `src/services/` — API client layer
 - `functions/` — Cloudflare Pages Functions (edge API)
 - `functions/_lib/` — shared utilities: auth.ts, billing-env.ts, readiness.ts, responses.ts
-- `functions/api/` — API routes: auth/, billing/, bridges/, domains/, telegram/, stripe/, webauthn/
+- `functions/api/` — API routes: auth/ (login redirects to the Worker; `/api/auth/me` reads the Worker session), billing/, bridges/, domains/, telegram/, stripe/, webauthn/
 - `public/` — static assets (SVG icons, webmanifest, brand assets)
-- `workers/` — standalone Cloudflare Workers (fenrir-gate-router, fenrir-stars-payments)
+- `workers/` — standalone Cloudflare Workers (`fenrir-auth` on `myfenrir.com/auth/*`, fenrir-gate-router, fenrir-stars-payments)
 - `database/` — D1 schema SQL files
-- `wrangler.jsonc` — Pages + D1 binding config
+- `wrangler.jsonc` — Pages + D1 + AUTH service binding to `fenrir-auth-worker`
+- `wrangler.fenrir-auth.jsonc` — Better Auth Worker on `myfenrir.com/auth/*`
 - `wrangler.fenrir-gate-router.toml` — Worker route config for `myfenrir.com/gate/*` and `www.myfenrir.com/gate/*`
 
 ## D1 Database
@@ -61,7 +64,7 @@ npm run build && wrangler pages deploy dist/ --project-name fenrir-bridge
 
 ## Immediate / Post-Deploy Tasks
 - Verify authenticated `/api/readiness` (with valid session) reports `readyForPaidUsers: true`
-- Confirm Google OAuth redirect URIs registered for production
+- Confirm Google / Microsoft / Apple redirect URIs are `https://myfenrir.com/auth/{provider}/callback`
 - Wire `CommunitySecurityReport` component into admin UI (API + service + types ready)
 - Monitor Telegram Stars entitlements and community gate review flows in prod
 - Keep secrets only in Cloudflare Pages env (never in git)

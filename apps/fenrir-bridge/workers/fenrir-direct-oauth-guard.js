@@ -1,5 +1,3 @@
-const pagesOrigin = "https://fenrir-bridge.pages.dev";
-
 const jsonHeaders = {
   "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
   "Content-Type": "application/json; charset=utf-8",
@@ -16,45 +14,26 @@ function json(body, init = {}) {
   });
 }
 
-function disabledDirectOauth(pathname) {
+function retiredDirectOauth(pathname) {
   const route = pathname.includes("/callback/") ? "callback" : "login";
   return json(
     {
       ok: false,
       error: "direct_oauth_disabled",
-      detail: `Register OAuth callbacks in Supabase and use the SPA callback route instead of /api/auth/${route}/:provider.`
+      detail: `Use https://myfenrir.com/auth/{provider} instead of /api/auth/${route}/:provider. Fenrir Better Auth is the Worker on myfenrir.com/auth/*.`
     },
     { status: 410 }
   );
-}
-
-async function proxyPagesRoot(request) {
-  const incoming = new URL(request.url);
-  const target = new URL(incoming.pathname + incoming.search, pagesOrigin);
-  const proxied = new Request(target, request);
-  return fetch(proxied);
 }
 
 export default {
   async fetch(request) {
     const url = new URL(request.url);
 
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: {
-          ...jsonHeaders,
-          "Access-Control-Allow-Origin": url.origin,
-          "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization"
-        }
-      });
-    }
-
     if (url.pathname.startsWith("/api/auth/login/") || url.pathname.startsWith("/api/auth/callback/")) {
-      return disabledDirectOauth(url.pathname);
+      return retiredDirectOauth(url.pathname);
     }
 
-    return proxyPagesRoot(request);
+    return json({ ok: false, error: "not_found" }, { status: 404 });
   }
 };

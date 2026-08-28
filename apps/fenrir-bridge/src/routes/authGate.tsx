@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Copy, Locale } from "../i18n";
-import { authService, webauthnService } from "../services/api";
+import { authService } from "../services/api";
 import { friskyClientAuthEngine, type AuthProvider } from "../services/authGateway";
 import { AuthProviderButton } from "../components/AuthProviderButton";
 import { AuthSurface } from "../components/AuthSurface";
@@ -9,6 +9,7 @@ import { brandThemes } from "../theme/brandThemes";
 import { managedDashboardPath, twoFactorHelpLinks } from "../app/shared";
 import { BrandSignature } from "./routeCommon";
 import { HumanVerificationGate } from "../components/HumanVerificationGate";
+import { loginPageErrorMessage } from "../services/authErrors";
 
 function postLoginDestination() {
   const requested = new URLSearchParams(window.location.search).get("next");
@@ -17,7 +18,7 @@ function postLoginDestination() {
 
 export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
   const theme = brandThemes.fenrir;
-  const [passkeyNote, setPasskeyNote] = useState<string | null>(() => authErrorMessage());
+  const [authNote, setAuthNote] = useState<string | null>(() => authErrorMessage());
   const [humanVerified, setHumanVerified] = useState(false);
   const [enabledProviders, setEnabledProviders] = useState<AuthProvider[] | null>(null);
 
@@ -34,33 +35,18 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
   const onHumanVerified = useCallback((verified: boolean) => {
     setHumanVerified(verified);
     if (!verified) return;
-    setPasskeyNote(null);
+    setAuthNote(null);
     void authService.me().then((result) => {
       if (result.data.authenticated) window.location.assign(postLoginDestination());
     });
   }, []);
 
-  async function signInWithPasskey() {
-    setPasskeyNote(null);
-    try {
-      const { optionsJSON } = await webauthnService.loginOptions();
-      // Carga diferida: @simplewebauthn/browser sale del chunk inicial y sólo
-      // se descarga al usar el passkey para entrar.
-      const { startAuthentication } = await import("@simplewebauthn/browser");
-      const assertion = await startAuthentication({ optionsJSON });
-      await webauthnService.loginVerify(assertion);
-      window.location.assign(postLoginDestination());
-    } catch {
-      setPasskeyNote(c.passkeyError);
-    }
-  }
-
   async function signInWithProvider(provider: AuthProvider) {
-    setPasskeyNote(null);
+    setAuthNote(null);
     try {
       await friskyClientAuthEngine.signInWithProvider(provider);
     } catch {
-      setPasskeyNote(c.authProviderError);
+      setAuthNote(c.authProviderError);
     }
   }
 
@@ -87,15 +73,11 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
             ))}
             {enabledProviders === null ? <small className="muted">Checking available sign-in…</small> : null}
             {enabledProviders?.length === 0 ? (
-              <small className="muted">No OAuth provider is available right now. Existing passkeys remain available.</small>
+              <small className="muted">No OAuth provider is available right now. Apple, Google, and Microsoft are the Fenrir sign-in options.</small>
             ) : null}
           </div>
-          <div className="auth-passkey-row">
-            <button type="button" className="secondary" disabled={!humanVerified} onClick={() => void signInWithPasskey()}>
-              {c.passkeySignIn}
-            </button>
-            {passkeyNote ? <small className="muted">{passkeyNote}</small> : null}
-          </div>
+          {authNote ? <small className="muted" role="alert">{authNote}</small> : null}
+          <p className="muted">After sign-in, Fenrir opens the Telegram gate so you can link the same admin account. No extra dens are created from this screen.</p>
           <div className="auth-2fa-recommend">
             <p className="label">{c.twoFactorRecommendTitle}</p>
             <p className="muted">{c.twoFactorRecommendBody}</p>
@@ -140,35 +122,5 @@ function providerLabel(provider: AuthProvider, c: Copy) {
 }
 
 function authErrorMessage() {
-  const error = new URLSearchParams(window.location.search).get("auth_error");
-  if (!error) return null;
-  const [errorCode, errorDetail] = error.split(":", 2);
-  const detail = errorDetail ? decodeURIComponent(errorDetail) : "";
-
-  if (error.startsWith("missing_env:")) {
-    return "This provider is not live yet. Use an enabled sign-in option, or refresh to return to the clean Fenrir gate.";
-  }
-  if (error === "direct_oauth_disabled") {
-    return "That old sign-in route was retired. Use the provider buttons on this Fenrir gate.";
-  }
-  if (errorCode === "oauth_access_denied") {
-    return "The provider denied access. Try again and confirm consent to continue with this account.";
-  }
-  if (errorCode === "oauth_callback_error") {
-    return `Provider error while returning from sign-in.${detail ? ` ${detail}` : ""}`;
-  }
-  if (errorCode === "code_exchange_failed") {
-    return `Could not exchange the OAuth callback code. ${detail ? `(${detail})` : "Please try again."}`;
-  }
-  if (errorCode === "session_lookup_failed") {
-    return `Could not read the Frisky login session after login. ${detail ? `(${detail})` : "Please retry from the sign-in screen."}`;
-  }
-  if (errorCode === "supabase_session_failed") {
-    if (detail === "human_verification_required") return null;
-    return `Could not open a Fenrir admin session.${detail ? ` (${detail})` : ""}`;
-  }
-  if (errorCode === "missing_code") {
-    return "The provider did not return a sign-in code. Please try again.";
-  }
-  return "Sign-in could not finish. Try another provider or refresh the page.";
+  return loginPageErrorMessage(window.location.search);
 }

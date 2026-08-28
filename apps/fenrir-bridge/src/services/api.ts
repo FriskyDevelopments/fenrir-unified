@@ -8,8 +8,8 @@ import {
   type DomainSearchResult
 } from "../../shared/domain-search";
 import { copy } from "../i18n";
+import { resolveAuthOrigin } from "./authOrigin";
 import { addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
-import { completeSupabaseSession, hasSupabaseCallbackInLocation, signOutSupabase } from "./supabaseAuth";
 import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TrialPublic, TrialStatusPayload } from "./types";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
@@ -24,7 +24,30 @@ const telegramBotUsername = () =>
     .replace(/^@/, "")
     .trim();
 
-const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? "").trim().replace(/\/$/, "");
+const workerAuthOrigin = (import.meta.env.VITE_FENRIR_AUTH_ORIGIN ?? "").trim().replace(/\/$/, "");
+
+export { PRODUCTION_AUTH_ORIGIN, isWwwHostname, resolveAuthOrigin } from "./authOrigin";
+
+function browserAuthOrigin(): string {
+  return resolveAuthOrigin(
+    workerAuthOrigin,
+    typeof window === "undefined" ? "" : window.location.hostname,
+  );
+}
+
+function workerAuthUrl(path: string) {
+  const origin = browserAuthOrigin();
+  return origin ? `${origin}${path}` : path;
+}
+
+type WorkerAuthProvider = "google" | "microsoft" | "apple";
+
+function workerProviderList(body: {
+  providers?: Record<string, { can_start?: boolean }>;
+} | null): WorkerAuthProvider[] | null {
+  if (!body?.providers) return null;
+  return (["apple", "google", "microsoft"] as const).filter((provider) => body.providers?.[provider]?.can_start);
+}
 
 export type PaidPlan = Exclude<Plan, "free">;
 
@@ -177,7 +200,19 @@ function devAuthSession(): AuthSession & { ok: true } {
   };
 }
 
+function safeLoginNextPath() {
+  if (typeof window === "undefined") return null;
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (!next?.startsWith("/") || next.startsWith("//")) return null;
+  const pathname = next.split(/[?#]/, 1)[0];
+  if (pathname === "/api/telegram/link/start") return pathname;
+  if (pathname === "/main" || pathname.startsWith("/main/")) return next;
+  return null;
+}
+
 function safeCurrentAuthReturnPath() {
+  const loginNext = safeLoginNextPath();
+  if (loginNext) return loginNext;
   const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   if (!path.startsWith("/") || path.startsWith("//")) return "/main";
   const pathname = window.location.pathname || "/";
@@ -336,37 +371,61 @@ export const webauthnService = {
 
 export const authService = {
   async me() {
-    // Supabase Auth is the login broker: after the provider redirects back to
-    // /auth/callback, exchange the Supabase session for the Fenrir cookie.
-    if (hasSupabaseCallbackInLocation()) {
-      const completed = await completeSupabaseSession();
-      if (completed) {
-        return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
+    try {
+      const worker = await fetch(workerAuthUrl("/auth/me"), { credentials: "include" });
+      const identity = await worker.json().catch(() => null) as {
+        authenticated?: boolean;
+        user?: { id: string; email?: string | null; name?: string | null; provider?: WorkerAuthProvider };
+      } | null;
+      if (identity?.authenticated && identity.user) {
+        try {
+          const app = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
+          if (app.authenticated) return { ok: true as const, data: app };
+        } catch {
+          // Worker cookie is enough to enter; org/plan hydrates when Pages can read it.
+        }
+        return {
+          ok: true as const,
+          data: {
+            authenticated: true,
+            user: {
+              id: identity.user.id,
+              email: identity.user.email || "",
+              name: identity.user.name || identity.user.email || "",
+              authProvider: identity.user.provider === "microsoft" || identity.user.provider === "apple" || identity.user.provider === "google"
+                ? identity.user.provider
+                : "google"
+            },
+            org: {
+              id: `org:${identity.user.id}`,
+              plan: "free" as Plan
+            }
+          } satisfies AuthSession
+        };
       }
+    } catch {
+      // Local Vite without the Worker falls through to Pages /api/auth/me.
     }
 
     try {
       const result = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
-      if (!result.authenticated) {
-        const completed = await completeSupabaseSession();
-        if (completed) {
-          return { ok: true as const, data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me") };
-        }
-      }
       return { ok: true as const, data: result };
     } catch {
       return { ok: true as const, data: { authenticated: false } as AuthSession };
     }
   },
   async login(provider: "google" | "microsoft" | "apple") {
-    // New sign-ins use only the direct provider stack whose runtime credentials
-    // are advertised by /api/auth/providers. The Supabase project still accepts
-    // existing sessions and callbacks, but its social providers are not assumed
-    // to be enabled merely because its public URL/key exist.
     const returnTo = safeCurrentAuthReturnPath();
-    window.location.assign(`${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
+    window.location.assign(`${workerAuthUrl(`/auth/${provider}`)}?redirect=${encodeURIComponent(returnTo)}`);
   },
   async enabledProviders() {
+    try {
+      const response = await fetch(workerAuthUrl("/auth/providers"), { credentials: "include" });
+      const advertised = workerProviderList(await response.json().catch(() => null));
+      if (advertised) return advertised;
+    } catch {
+      // Fall back to Pages capability metadata when the Worker is not local.
+    }
     const result = await apiRequest<{
       ok: true;
       providers: Array<"google" | "microsoft" | "apple">;
@@ -385,7 +444,7 @@ export const authService = {
     } catch {
       // Optional cleanup only.
     }
-    await signOutSupabase();
+    await fetch(workerAuthUrl("/auth/logout"), { credentials: "include" }).catch(() => null);
     await apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }).catch(() => null);
   }
 };

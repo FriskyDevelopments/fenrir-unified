@@ -1,0 +1,32 @@
+{
+  "name": "fenrir-auth-worker",
+  "main": "workers/fenrir-auth/src/index.js",
+  "compatibility_date": "2026-08-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "e2a7eccb24c4836847fd14d08c499bd0",
+  "workers_dev": false,
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 }
+  },
+  // Worker as origin for /auth/* only. Pages keeps the rest of myfenrir.com.
+  // Do not attach this Worker to folios.works.
+  "routes": [
+    { "pattern": "myfenrir.com/auth/*", "zone_name": "myfenrir.com" },
+    { "pattern": "www.myfenrir.com/auth/*", "zone_name": "myfenrir.com" }
+  ],
+  "vars": {
+    "BASE_URL": "https://myfenrir.com",
+    "COOKIE_DOMAIN": "myfenrir.com",
+    "POST_LOGIN_REDIRECT": "https://myfenrir.com/main",
+    "LOGOUT_REDIRECT": "https://myfenrir.com/login",
+    "SESSION_TTL_SECONDS": "604800",
+    "SESSION_COOKIE_NAME": "fenrir_session",
+    "ALLOWED_REDIRECT_HOSTS": "myfenrir.com,www.myfenrir.com",
+    "TRUSTED_ORIGINS": "https://myfenrir.com,https://www.myfenrir.com"
+  },
+  // Replace id after: wrangler kv namespace create FENRIR_AUTH_SESSIONS
+  "kv_namespaces": [
+    { "binding": "SESSIONS", "id": "fenrir-auth-sessions-pending" }
+  ]
+}

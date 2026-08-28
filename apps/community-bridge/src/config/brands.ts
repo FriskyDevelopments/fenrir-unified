@@ -238,7 +238,7 @@ export function brandActivateCopy(brand: BrandConfig): {
     subheadline:
       brand.activate?.subheadline?.trim() ||
       `Link your ${brand.name} portal to your Telegram account.`,
-    stepsTitle: brand.activate?.stepsTitle?.trim() || "Get your linking code",
+    stepsTitle: brand.activate?.stepsTitle?.trim() || "Link your FriskyDev ID",
     botLabel: brand.activate?.botLabel?.trim() || "Open Telegram bot",
     submitLabel: brand.activate?.submitLabel?.trim() || "Activate account",
     successHeadline: brand.activate?.successHeadline?.trim() || "Account activated",
