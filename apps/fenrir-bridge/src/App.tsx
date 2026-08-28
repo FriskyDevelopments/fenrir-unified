@@ -48,6 +48,11 @@ function postLoginDestination() {
 // endpoint that needs it: a same-origin GET redirect is not an open redirect,
 // but an unbounded list invites /main?next=/api/auth/logout links.
 const postAuthHandoffPaths = ["/api/auth/community-sso", "/api/telegram/link/start"];
+/**
+ * Determines whether the requested post-authentication destination is allowed.
+ *
+ * @returns The validated relative destination, or `null` when the request is missing or unsupported.
+ */
 function postAuthHandoffTarget() {
   const requested = new URLSearchParams(window.location.search).get("next");
   if (!requested?.startsWith("/") || requested.startsWith("//")) return null;
@@ -3255,6 +3260,13 @@ function communityBrandAdminErrorMessage(error: unknown) {
   return `Community Gate load failed: ${error.error || `HTTP ${error.status}`}.`;
 }
 
+/**
+ * Renders the Fenrir sign-in page with human verification and available OAuth providers.
+ *
+ * @param c - Localized authentication copy
+ * @param locale - Current interface locale
+ * @param onLocale - Handles locale changes
+ */
 function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
   const [authNote, setAuthNote] = useState<string | null>(() => authErrorMessage());
   const [pendingProvider, setPendingProvider] = useState<AuthProvider | null>(null);
@@ -3354,6 +3366,11 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
   );
 }
 
+/**
+ * Displays an animated authentication terminal with the available sign-in providers.
+ *
+ * @param providers - Available authentication providers, or `null` while they are loading.
+ */
 function LovableAuthTerminal({ providers }: { providers: AuthProvider[] | null }) {
   const providerSignal = providers === null ? "checking..." : providers.length > 0 ? providers.join(" · ") : "none";
   const lines = ["fenrir --login", "establishing secure channel...", `› providers: ${providerSignal}`, "awaiting identity_"];
@@ -3387,10 +3404,21 @@ function LovableAuthTerminal({ providers }: { providers: AuthProvider[] | null }
   );
 }
 
+/**
+ * Resolves the authentication error message from the current URL.
+ *
+ * @returns The authentication error message, if one is present.
+ */
 function authErrorMessage() {
   return loginPageErrorMessage(window.location.search);
 }
 
+/**
+ * Displays the Community Gate authentication configuration status and localized explanatory text.
+ *
+ * @param proposal - The authentication configuration proposal, or `null` when unavailable.
+ * @param locale - The locale used to select displayed text.
+ */
 function CommunityAuthProposalPanel({ proposal, locale }: { proposal: CommunityAuthProposal | null; locale: Locale }) {
   const text = {
     en: {

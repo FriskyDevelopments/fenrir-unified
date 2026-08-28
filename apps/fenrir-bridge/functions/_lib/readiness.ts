@@ -37,6 +37,13 @@ export type ManagedTelegramRail = {
   webhookConfigured: boolean;
 };
 
+/**
+ * Computes authentication, billing, infrastructure, and paid-user readiness from the environment and managed Telegram configuration.
+ *
+ * @param env - Environment values used to assess service configuration
+ * @param managedRail - Externally managed Telegram Stars and webhook readiness
+ * @returns A readiness snapshot containing component status and overall paid-user readiness
+ */
 export function computeReadiness(
   env: OAuthEnv,
   managedRail: ManagedTelegramRail = { starsConfigured: false, webhookConfigured: false }

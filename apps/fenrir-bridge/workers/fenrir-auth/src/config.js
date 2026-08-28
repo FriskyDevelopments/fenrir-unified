@@ -49,6 +49,12 @@ const SECRET_ALIASES = {
   MS_CLIENT_SECRET: ["MS_CLIENT_SECRET", "MICROSOFT_CLIENT_SECRET"],
 };
 
+/**
+ * Reads the first configured non-empty secret value for a setting.
+ * @param {Object} env - Environment variables containing the secret.
+ * @param {string} name - Secret name or alias group to read.
+ * @return {string} The configured secret value, or an empty string when none is available.
+ */
 export function readSecret(env, name) {
   const aliases = SECRET_ALIASES[name] || [name];
   for (const key of aliases) {
@@ -58,14 +64,31 @@ export function readSecret(env, name) {
   return "";
 }
 
+/**
+ * Looks up OAuth provider metadata by name.
+ * @param {string} name - The provider name.
+ * @return {Object|null} The provider metadata, or `null` when no matching provider exists.
+ */
 export function getProvider(name) {
   return PROVIDERS[name] || null;
 }
 
+/**
+ * Determines whether authentication can begin for a provider.
+ * @param {Object} provider - The OAuth provider metadata.
+ * @param {Object} env - The environment settings containing provider credentials.
+ * @returns {boolean} `true` if the provider's client ID is configured, `false` otherwise.
+ */
 export function canStartAuth(provider, env) {
   return Boolean(readSecret(env, provider.clientIdEnv));
 }
 
+/**
+ * Determines whether an OAuth provider has all required credentials configured.
+ * @param {Object} provider - The OAuth provider metadata.
+ * @param {Object} env - Environment variables containing provider credentials.
+ * @returns {boolean} `true` if the provider is fully configured, `false` otherwise.
+ */
 export function providerConfigured(provider, env) {
   const hasId = canStartAuth(provider, env);
   if (provider.clientSecretEnv) return hasId && Boolean(readSecret(env, provider.clientSecretEnv));
@@ -75,10 +98,21 @@ export function providerConfigured(provider, env) {
   return hasId;
 }
 
+/**
+ * Builds the OAuth callback URL for a provider.
+ * @param {Object} env - Environment containing the configured base URL.
+ * @param {string} providerName - Name of the OAuth provider.
+ * @returns {string} The provider callback URL.
+ */
 export function redirectUri(env, providerName) {
   return `${cfg(env).baseUrl}/auth/${providerName}/callback`;
 }
 
+/**
+ * Builds application configuration from environment settings and defaults.
+ * @param {Object} env - Environment settings used to configure the application.
+ * @returns {Object} The normalized application configuration.
+ */
 export function cfg(env) {
   return {
     baseUrl: (env.BASE_URL || "https://myfenrir.com").replace(/\/$/, ""),
@@ -100,6 +134,12 @@ export function cfg(env) {
   };
 }
 
+/**
+ * Identifies credentials that are missing from the environment for an OAuth provider.
+ * @param {Object} provider - The OAuth provider metadata.
+ * @param {Object} env - The environment containing provider credentials.
+ * @returns {string[]} The names of missing credential variables.
+ */
 export function missingSecrets(provider, env) {
   const missing = [];
   if (!readSecret(env, provider.clientIdEnv)) missing.push(provider.clientIdEnv);

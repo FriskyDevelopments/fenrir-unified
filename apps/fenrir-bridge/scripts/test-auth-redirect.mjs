@@ -13,6 +13,10 @@ const workerIndex = readFileSync(join(root, "workers/fenrir-auth/src/index.js"),
 const appCallbackPathMatcher = appSource.match(/function isAuthCallbackPath[\s\S]*?\n}/)?.[0] ?? "";
 const routingCallbackPathMatcher = routingSource.match(/export function isAuthCallbackPath[\s\S]*?\n}/)?.[0] ?? "";
 
+/**
+ * Finds tracked files containing references to WorkOS.
+ * @return {string} A newline-separated list of matching file paths, or an empty string if the search fails.
+ */
 function workosMatches() {
   try {
     return execSync("git grep -li workos -- . \":(exclude)scripts/test-auth-redirect.mjs\" \":(exclude)functions/__tests__/community-oauth.test.ts\"", { cwd: root, encoding: "utf8" }).trim();

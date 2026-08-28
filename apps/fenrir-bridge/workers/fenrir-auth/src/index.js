@@ -18,6 +18,13 @@ import { createSession, getSession, destroySession } from "./identity.js";
 import { checkDatabase } from "./neon.js";
 import { saveOAuthState, consumeOAuthState } from "./session.js";
 
+/**
+ * Creates a JSON response with no-store caching.
+ * @param {*} data - The value to serialize as JSON.
+ * @param {number} [status=200] - The HTTP response status.
+ * @param {Object} [extraHeaders={}] - Additional response headers.
+ * @return {Response} The JSON response.
+ */
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
@@ -29,6 +36,12 @@ function json(data, status = 200, extraHeaders = {}) {
   });
 }
 
+/**
+ * Create a no-store redirect response.
+ * @param {string} location - The destination URL.
+ * @param {Object} [extraHeaders={}] - Additional response headers.
+ * @return {Response} The redirect response.
+ */
 function redirect(location, extraHeaders = {}) {
   return new Response(null, {
     status: 302,
@@ -36,6 +49,12 @@ function redirect(location, extraHeaders = {}) {
   });
 }
 
+/**
+ * Determines the CORS headers for an approved request origin.
+ * @param {Request} request - The request whose origin is evaluated.
+ * @param {Object} env - The worker environment containing allowed redirect hosts.
+ * @returns {Object} CORS headers for an approved origin, or an empty object otherwise.
+ */
 function corsHeaders(request, env) {
   const origin = request.headers.get("Origin");
   if (!origin) return {};
@@ -54,6 +73,13 @@ function corsHeaders(request, env) {
   }
 }
 
+/**
+ * Adds configured CORS headers to a response when the request is eligible.
+ * @param {Response} response - The response to update.
+ * @param {Request} request - The request used to determine CORS eligibility.
+ * @param {Object} env - The Worker environment containing CORS configuration.
+ * @return {Response} The response with applicable CORS headers.
+ */
 function withCors(response, request, env) {
   const extra = corsHeaders(request, env);
   if (!Object.keys(extra).length) return response;
@@ -62,11 +88,25 @@ function withCors(response, request, env) {
   return new Response(response.body, { status: response.status, headers });
 }
 
+/**
+ * Determines whether the request accepts HTML responses.
+ * @param {Request} request - The incoming request.
+ * @returns {boolean} `true` if the request accepts HTML, `false` otherwise.
+ */
 function wantsHtml(request) {
   const accept = request.headers.get("Accept") || "";
   return accept.includes("text/html");
 }
 
+/**
+ * Creates an authentication failure response in HTML-friendly or JSON format.
+ * @param {Request} request - The incoming request.
+ * @param {object} env - The Worker environment containing authentication configuration.
+ * @param {string} error - The authentication error code.
+ * @param {number} [status=400] - The HTTP status code for JSON responses.
+ * @param {object} [extra={}] - Additional properties to include in the JSON response.
+ * @return {Response} A redirect to the login page or a JSON error response.
+ */
 function authFailure(request, env, error, status = 400, extra = {}) {
   if (wantsHtml(request)) {
     const dest = new URL("/login", cfg(env).baseUrl);
@@ -76,6 +116,11 @@ function authFailure(request, env, error, status = 400, extra = {}) {
   return json({ error, ...extra }, status);
 }
 
+/**
+ * Extract the hostname from a request URL.
+ * @param {Request} request - The request whose URL to inspect.
+ * @return {string} The URL hostname, or an empty string when the URL is invalid.
+ */
 function hostnameOf(request) {
   try {
     return new URL(request.url).hostname;
@@ -84,6 +129,11 @@ function hostnameOf(request) {
   }
 }
 
+/**
+ * Determines whether a request targets an approved Fenrir host.
+ * @param {Request} request - The request whose hostname is checked.
+ * @return {boolean} `true` if the hostname is approved, `false` otherwise.
+ */
 function isFenrirHost(request) {
   const host = hostnameOf(request);
   if (!host) return false;
@@ -97,6 +147,12 @@ function isFenrirHost(request) {
   );
 }
 
+/**
+ * Resolves a post-authentication redirect destination.
+ * @param {Object} env - Worker environment containing redirect configuration.
+ * @param {string} raw - Candidate redirect destination.
+ * @return {string} An approved redirect URL, or the configured post-login fallback.
+ */
 export function safeReturnTo(env, raw) {
   const c = cfg(env);
   const fallback = c.postLoginRedirect;
@@ -111,6 +167,11 @@ export function safeReturnTo(env, raw) {
   }
 }
 
+/**
+ * Initiate an OAuth authorization flow for a provider.
+ * @param {string} providerName - The identifier of the OAuth provider to use.
+ * @return {Promise<Response>} A redirect response to the provider, or a JSON error response when the provider or server configuration is unavailable.
+ */
 async function handleStart(request, env, providerName) {
   const provider = getProvider(providerName);
   if (!provider) return json({ error: "unknown_provider", provider: providerName }, 404);
@@ -154,6 +215,13 @@ async function handleStart(request, env, providerName) {
   return redirect(authorizeUrl);
 }
 
+/**
+ * Completes an OAuth callback and establishes a session for the authenticated user.
+ * @param {Request} request - The OAuth callback request.
+ * @param {Object} env - The Worker environment configuration.
+ * @param {string} providerName - The OAuth provider associated with the callback.
+ * @return {Promise<Response>} A redirect response on success or an authentication error response.
+ */
 async function handleCallback(request, env, providerName) {
   const provider = getProvider(providerName);
   if (!provider) return json({ error: "unknown_provider", provider: providerName }, 404);
@@ -231,6 +299,12 @@ async function handleMe(request, env) {
   }
 }
 
+/**
+ * Destroys the current session and redirects to the requested or configured logout destination.
+ * @param {Request} request - The logout request, including an optional redirect destination.
+ * @param {Object} env - The Worker environment containing authentication configuration.
+ * @returns {Promise<Response>} A redirect response that clears the session cookie.
+ */
 async function handleLogout(request, env) {
   const cookie = await destroySession(env, request);
   const url = new URL(request.url);
@@ -239,6 +313,11 @@ async function handleLogout(request, env) {
   return redirect(dest, { "Set-Cookie": cookie });
 }
 
+/**
+ * Builds the provider configuration response for the authentication API.
+ * @param {Object} env - Worker environment configuration.
+ * @returns {Response} A JSON response containing provider metadata and identity information.
+ */
 function handleProviders(env) {
   const identity = createFenrirBetterAuth(env);
   const out = {};
@@ -257,6 +336,10 @@ function handleProviders(env) {
   return json({ providers: out, identity: identity.identity });
 }
 
+/**
+ * Reports whether authentication services are ready to accept login requests.
+ * @returns {Response} A JSON response containing readiness, database, session backend, secret, and provider configuration status.
+ */
 async function handleReady(env) {
   const identity = createFenrirBetterAuth(env);
   const providers = Object.fromEntries(
@@ -303,6 +386,12 @@ export default {
   },
 };
 
+/**
+ * Dispatches requests to Fenrir authentication endpoints.
+ * @param {Request} request - The incoming HTTP request.
+ * @param {Object} env - Worker environment bindings and configuration.
+ * @returns {Response} The endpoint response, including a not-found response for unsupported paths.
+ */
 async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "") || "/";

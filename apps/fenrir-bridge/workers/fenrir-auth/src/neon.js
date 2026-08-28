@@ -5,10 +5,21 @@ import { cfg } from "./config.js";
 import { randomToken, signValue, verifySignedValue } from "./crypto.js";
 import { emptySessionCookie, parseCookies, serializeCookie } from "./session.js";
 
+/**
+ * Resolves the database connection URL from configured settings or Hyperdrive.
+ * @param {Object} env - The environment containing database configuration and optional Hyperdrive settings.
+ * @return {string} The database connection URL, or an empty string when none is configured.
+ */
 function databaseUrl(env) {
   return cfg(env).databaseUrl || (env.HYPERDRIVE && env.HYPERDRIVE.connectionString) || "";
 }
 
+/**
+ * Creates a database query client from the configured database URL.
+ * @param {object} env - Environment containing the database configuration.
+ * @returns {Function} A Neon database query function.
+ * @throws {Error} If the database URL is not configured.
+ */
 function db(env) {
   const url = databaseUrl(env);
   if (!url) throw new Error("DATABASE_URL not set");
@@ -21,6 +32,11 @@ export function getDb(env) {
   return db(env);
 }
 
+/**
+ * Checks whether the configured database is available.
+ * @param {object} env - The environment containing the database configuration.
+ * @return {{ok: boolean, error?: string}} The database status, including an error code when configuration is missing or the database is unreachable.
+ */
 export async function checkDatabase(env) {
   if (!databaseUrl(env)) return { ok: false, error: "DATABASE_URL_missing" };
   try {
@@ -31,11 +47,21 @@ export async function checkDatabase(env) {
   }
 }
 
+/**
+ * Extracts bearer credentials from an HTTP authorization header.
+ * @param {Request} request - The request containing the authorization header.
+ * @return {string|null} The trimmed bearer token, or `null` when the header does not contain bearer credentials.
+ */
 function bearerToken(request) {
   const header = request.headers.get("Authorization") || "";
   return header.startsWith("Bearer ") ? header.slice(7).trim() : null;
 }
 
+/**
+ * Creates or updates a user record and refreshes its last-login timestamp.
+ * @param {Object} user - The user identity and profile data to persist.
+ * @returns {Object} The persisted user fields.
+ */
 export async function upsertUser(env, user) {
   const sql = db(env);
   const rows = await sql`
@@ -53,6 +79,12 @@ export async function upsertUser(env, user) {
   return rows[0];
 }
 
+/**
+ * Creates a persistent authenticated session for a user.
+ * @param {Object} user - The user identity to associate with the session.
+ * @param {Object} [meta] - Optional request metadata, such as the user agent and IP address.
+ * @returns {Promise<Object>} The session identifier, signed token, serialized cookie, and session record.
+ */
 export async function createSession(env, user, meta = {}) {
   const c = cfg(env);
   const sql = db(env);
@@ -77,6 +109,12 @@ export async function createSession(env, user, meta = {}) {
   return { sessionId, token: signed, cookie, record: { id: sessionId, user, expiresAt: expiresAt.getTime() } };
 }
 
+/**
+ * Retrieves the authenticated session associated with a bearer token or session cookie.
+ * @param {Object} env - The environment containing session and database configuration.
+ * @param {Request} request - The request containing the session credential.
+ * @returns {Object|null} The session and associated user details, or `null` if the credential is invalid, the session is unavailable, or the session has expired.
+ */
 export async function getSession(env, request) {
   const c = cfg(env);
   if (!c.sessionSecret) return null;
@@ -118,6 +156,11 @@ export async function getSession(env, request) {
   };
 }
 
+/**
+ * Destroys the session associated with the request credential and creates an expired session cookie.
+ * @param {Request} request - The request containing a bearer token or session cookie.
+ * @return {string} An expired session cookie.
+ */
 export async function destroySession(env, request) {
   const c = cfg(env);
   const raw = bearerToken(request) || parseCookies(request)[c.cookieName];

@@ -1,5 +1,10 @@
 import { noStoreJson } from "../../../_lib/responses";
 
+/**
+ * Reports that direct OAuth callbacks are retired and directs login through the Better Auth Worker.
+ *
+ * @returns A cache-disabled response with HTTP status 410 and details for the replacement callback.
+ */
 export async function onRequestGet() {
   return noStoreJson(
     {

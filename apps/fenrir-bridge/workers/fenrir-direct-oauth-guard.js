@@ -4,6 +4,12 @@ const jsonHeaders = {
   "X-Fenrir-Edge": "direct-oauth-guard"
 };
 
+/**
+ * Creates a JSON response with standard response headers.
+ * @param {*} body - The value to serialize as JSON.
+ * @param {ResponseInit} [init] - Optional response initialization settings and custom headers.
+ * @return {Response} The JSON response.
+ */
 function json(body, init = {}) {
   return new Response(JSON.stringify(body), {
     ...init,
@@ -14,6 +20,11 @@ function json(body, init = {}) {
   });
 }
 
+/**
+ * Create a response indicating that a direct OAuth route is permanently unavailable.
+ * @param {string} pathname - The request path used to identify the OAuth route.
+ * @return {Response} An HTTP 410 response directing clients to the supported authentication URL.
+ */
 function retiredDirectOauth(pathname) {
   const route = pathname.includes("/callback/") ? "callback" : "login";
   return json(

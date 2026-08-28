@@ -2462,6 +2462,12 @@ function maskEmail(email) {
   return `${local.slice(0, 2)}${"•".repeat(Math.max(2, Math.min(6, local.length - 2)))}@${domain}`;
 }
 
+/**
+ * Sends a welcome message that reflects the user's FriskyDev account-linking status.
+ * @param {Object} env - The worker environment containing the database and Telegram configuration.
+ * @param {string} channel - The Telegram channel used to send the message.
+ * @param {Object} message - The Telegram message containing the user and chat details.
+ */
 async function sendIdentityWelcome(env, channel, message) {
   const telegramUserId = String(message.from?.id || message.chat.id);
   const linked = await env.DB.prepare(
@@ -2681,6 +2687,12 @@ function commandForThisBot(text, command, env) {
   return !target || target === botUsername(env).toLowerCase();
 }
 
+/**
+ * Sends account-linking guidance for private and group Telegram chats.
+ * @param {Object} env - The Worker environment containing configuration and database bindings.
+ * @param {string} channel - The Telegram channel identifier used for the API request.
+ * @param {Object} message - The Telegram message containing chat and sender details.
+ */
 async function sendTelegramLinkStart(env, channel, message) {
   if (message.chat?.type && message.chat.type !== "private") {
     await telegramApi(env, channel, "sendMessage", {
@@ -3089,7 +3101,13 @@ async function sendBotMenu(env, channel, message, entitlement) {
 // Celebratory render for a successful Telegram-identity link: an approved
 // no-audio clip autoplayed as a GIF via sendAnimation, with the upgraded copy
 // and an "Open MyFenrir" CTA. Falls back to a plain message if the animation
-// cannot be delivered (mirrors the sendBotMenu fallback pattern).
+/**
+ * Sends a Telegram animation confirming that the account was linked and provides a Community Gate continuation link.
+ * Falls back to a text confirmation if the animation cannot be delivered.
+ * @param {Object} env - Worker environment and configuration.
+ * @param {string} channel - Telegram API channel or bot identifier.
+ * @param {Object} message - Telegram message containing the destination chat.
+ */
 async function sendLinkLinkedAnimation(env, channel, message) {
   const reply_markup = {
     inline_keyboard: [[{ text: "Continue Community Gate →", url: COMMUNITY_BRIDGE_CONTINUE_URL }]]
@@ -3308,6 +3326,13 @@ async function geminiMind(env, input, entitlement) {
   return answer || fallbackMind(input.text, entitlement);
 }
 
+/**
+ * Processes authenticated Telegram webhook updates for payments, callbacks, community registration, account linking, commands, and bot conversations.
+ * @param {Request} request - The incoming Telegram webhook request.
+ * @param {Object} env - Worker bindings and configuration.
+ * @param {URL} url - Request URL used to select the production or development bot.
+ * @return {Response} A successful JSON response acknowledging the update.
+ */
 async function handleTelegramWebhook(request, env, url) {
   // Config problems on OUR side must never answer non-200, or Telegram retries the
   // same update forever and the bot re-sends the same reply (the spam loop).

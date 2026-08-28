@@ -13,16 +13,34 @@ export const AUTH_ERROR_CODES = [
 
 export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
 
+/**
+ * Determines whether a value is a supported authentication error code.
+ *
+ * @param value - The value to check
+ * @returns `true` if the value is a supported authentication error code, `false` otherwise.
+ */
 function isAuthErrorCode(value: string): value is AuthErrorCode {
   return (AUTH_ERROR_CODES as readonly string[]).includes(value);
 }
 
+/**
+ * Parses a raw authentication error value into a supported error code.
+ *
+ * @param raw - The raw authentication error value
+ * @returns The recognized authentication error code, `unknown` for unsupported or explicitly unknown values, or `null` when no value is provided
+ */
 export function parseAuthError(raw: string | null | undefined): AuthErrorCode | null {
   if (!raw) return null;
   if (isAuthErrorCode(raw) && raw !== "unknown") return raw;
   return "unknown";
 }
 
+/**
+ * Maps an authentication error code to a user-facing message.
+ *
+ * @param code - The authentication error code to describe
+ * @returns A user-facing message for the error code
+ */
 export function authErrorCopy(code: AuthErrorCode): string {
   switch (code) {
     case "provider_error":
@@ -52,6 +70,12 @@ export function authErrorCopy(code: AuthErrorCode): string {
   }
 }
 
+/**
+ * Converts a legacy authentication error into a user-facing message.
+ *
+ * @param error - A legacy colon-delimited authentication error, if present
+ * @returns The corresponding message, or `null` when no message should be shown
+ */
 export function legacyAuthErrorMessage(error: string | null | undefined): string | null {
   if (!error) return null;
   const [errorCode, errorDetail] = error.split(":", 2);
@@ -85,6 +109,12 @@ export function legacyAuthErrorMessage(error: string | null | undefined): string
   return "Sign-in could not finish. Try another provider or refresh the page.";
 }
 
+/**
+ * Resolves the user-facing authentication error message from login-page query parameters.
+ *
+ * @param search - The login-page query string, with or without a leading question mark
+ * @returns The message for the recognized authentication error, or `null` when no error is present
+ */
 export function loginPageErrorMessage(search: string): string | null {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const workerError = parseAuthError(params.get("error"));

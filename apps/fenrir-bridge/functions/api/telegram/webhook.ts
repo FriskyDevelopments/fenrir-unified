@@ -78,6 +78,12 @@ export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
   return Response.json({ ok: true });
 };
 
+/**
+ * Handles incoming Telegram messages and responds to supported commands, account-link requests, and subscription starts.
+ *
+ * @param channel - The Telegram bot channel used to send the response.
+ * @param origin - The request origin used to build action buttons.
+ */
 async function handleMessage(env: BillingEnv, message: TelegramMessage, channel: string, origin: string) {
   const text = (message.text ?? "").trim();
   const textLower = text.toLowerCase();
@@ -228,6 +234,14 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
   }, channel);
 }
 
+/**
+ * Determines whether a message contains a command addressed to this bot.
+ *
+ * @param text - The message text to inspect
+ * @param command - The command name without the leading slash
+ * @param env - The environment containing the configured bot username
+ * @returns `true` if the message targets this bot or has no bot username, `false` otherwise
+ */
 function isCommandForBot(text: string, command: string, env: BillingEnv) {
   const match = text.match(new RegExp(`^/${command}(?:@([A-Za-z0-9_]+))?(?:\\s|$)`, "i"));
   if (!match) return false;
@@ -238,6 +252,13 @@ function isCommandForBot(text: string, command: string, env: BillingEnv) {
 const FRISKY_TELEGRAM_LINK_START = "https://www.myfenrir.com/api/telegram/link/start";
 const COMMUNITY_BRIDGE_CONTINUE_URL = "https://communities.myfenrir.com/gate?onboarding=1";
 
+/**
+ * Guides users through linking their FriskyDev ID from a private Telegram chat.
+ *
+ * @param env - The billing environment used to send Telegram messages
+ * @param message - The Telegram message that triggered the command
+ * @param channel - The bot channel used for the response
+ */
 async function handleLinkCommand(env: BillingEnv, message: TelegramMessage, channel: string) {
   if (message.chat.type && message.chat.type !== "private") {
     await telegramApi(env, "sendMessage", {

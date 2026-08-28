@@ -2,6 +2,17 @@
 import { redirectUri, readSecret } from "./config.js";
 import { createAppleClientSecret, decodeJwtPayload } from "./apple.js";
 
+/**
+ * Builds an OAuth authorization URL for the specified provider.
+ * @param {Object} provider - Provider configuration containing authorization settings.
+ * @param {string} providerName - Provider name used to determine the redirect URI.
+ * @param {Object} env - Environment containing provider secrets and configuration.
+ * @param {Object} options - Authorization request parameters.
+ * @param {string} options.state - State value used to correlate the authorization request.
+ * @param {string} [options.codeChallenge] - PKCE code challenge.
+ * @param {string} [options.nonce] - Value used to associate the request with an ID token.
+ * @return {string} The provider authorization URL with encoded request parameters.
+ */
 export function buildAuthorizeUrl(provider, providerName, env, { state, codeChallenge, nonce }) {
   const clientId = readSecret(env, provider.clientIdEnv);
   const params = new URLSearchParams({
@@ -20,6 +31,13 @@ export function buildAuthorizeUrl(provider, providerName, env, { state, codeChal
   return `${provider.authorizeUrl}?${params.toString()}`;
 }
 
+/**
+ * Exchanges an authorization code for an OAuth token response.
+ * @param {string} code - The authorization code issued by the provider.
+ * @param {string} [codeVerifier] - The PKCE verifier associated with the authorization request.
+ * @return {Object} The parsed token response.
+ * @throws {Error} If the provider response is unsuccessful or contains invalid JSON.
+ */
 export async function exchangeCode(provider, providerName, env, { code, codeVerifier }) {
   const body = new URLSearchParams({
     grant_type: "authorization_code",
@@ -58,6 +76,16 @@ export async function exchangeCode(provider, providerName, env, { code, codeVeri
   return json;
 }
 
+/**
+ * Retrieves and normalizes a user's profile from the configured OAuth profile source.
+ * @param {Object} provider - Provider configuration containing the profile source and user-info URL.
+ * @param {string} providerName - Name assigned to the provider in the normalized profile.
+ * @param {Object} env - Runtime environment configuration.
+ * @param {Object} tokens - OAuth tokens containing the access token or ID token.
+ * @param {Object|string} [applePostedUser] - Optional Apple user payload containing name information.
+ * @returns {Object} The normalized profile with provider, subject, email, verification status, name, and picture.
+ * @throws {Error} If the user-info request fails or the profile source is unsupported.
+ */
 export async function fetchProfile(provider, providerName, env, tokens, applePostedUser) {
   if (provider.profileSource === "userinfo") {
     const resp = await fetch(provider.userInfoUrl, {

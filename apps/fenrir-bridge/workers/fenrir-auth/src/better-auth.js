@@ -9,6 +9,11 @@
 
 import { cfg, PROVIDERS, canStartAuth, providerConfigured, redirectUri, readSecret } from "./config.js";
 
+/**
+ * Creates the Better Auth configuration for the request environment.
+ * @param {object} env - Environment bindings and secrets used to configure authentication.
+ * @returns {object} The Better Auth identity, provider, origin, and session configuration.
+ */
 export function createFenrirBetterAuth(env) {
   const c = cfg(env);
   const socialProviders = {};

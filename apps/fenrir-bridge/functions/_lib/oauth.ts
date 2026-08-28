@@ -74,8 +74,10 @@ export function isCommunityOAuthProvider(value: unknown): value is OAuthProvider
 }
 
 /**
- * Authentik exposes ONE global authorize/token/userinfo triple and a per-application
- * JWKS + issuer. Derived from AUTHENTIK_ISSUER so a single env var configures the lot.
+ * Builds the Authentik OAuth endpoint URLs from an issuer URL.
+ *
+ * @param issuer - The Authentik issuer URL.
+ * @returns The normalized issuer and its authorization, token, user-info, and JWKS endpoints.
  */
 export function authentikEndpoints(issuer: string) {
   const normalizedIssuer = issuer.trim().replace(/\/*$/, "/");
@@ -89,6 +91,15 @@ export function authentikEndpoints(issuer: string) {
   };
 }
 
+/**
+ * Determines whether direct OAuth authentication is available for a provider.
+ *
+ * Authentik is available only when enabled, fully configured, and configured with a valid issuer.
+ *
+ * @param provider - The OAuth provider to check
+ * @param env - The environment containing provider configuration
+ * @returns `true` if the provider has valid required configuration, `false` otherwise
+ */
 export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): boolean {
   switch (provider) {
     case "google":
@@ -120,6 +131,14 @@ export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): 
   }
 }
 
+/**
+ * Creates a short-lived OAuth transaction for a provider and return destination.
+ *
+ * @param provider - The OAuth provider for the transaction
+ * @param env - The OAuth environment configuration
+ * @param returnTo - The destination to use after authentication
+ * @returns The OAuth transaction data
+ */
 export async function createOAuthTransaction(provider: OAuthProvider, env: OAuthEnv, returnTo: string): Promise<OAuthTransaction> {
   return {
     provider,
