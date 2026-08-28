@@ -32,18 +32,48 @@ export function isFenrirAuthWorkerDocument(contentType: string | null | undefine
 
 /**
  * Browser login must follow the public /auth/* zone routes, not the Pages
- * AUTH service binding. The binding can succeed while myfenrir.com/auth/health
- * still serves SPA HTML, which would 302 the visitor into a dead Worker URL.
+ * AUTH service binding. /auth/health is liveness only (200 while secrets are
+ * missing). Cut over only when /auth/ready is 200 and at least one provider
+ * can start — otherwise keep Pages Google/Microsoft OAuth.
  */
+export function fenrirAuthWorkerCanStartLogin(
+  status: number,
+  contentType: string | null | undefined,
+  body: unknown,
+): boolean {
+  if (status !== 200) return false;
+  if (!isFenrirAuthWorkerDocument(contentType, body)) return false;
+  const doc = body as Record<string, unknown>;
+  if (doc.ready === true) return true;
+  const providers = doc.providers;
+  if (!providers || typeof providers !== "object") return false;
+  for (const name of ["google", "microsoft", "apple"] as const) {
+    const entry = (providers as Record<string, unknown>)[name];
+    if (entry === true) return true;
+    if (
+      entry &&
+      typeof entry === "object" &&
+      (entry as { can_start?: boolean }).can_start === true
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export async function publicFenrirAuthWorkerIsLive(
   origin: string = FENRIR_LOGIN_ORIGIN,
 ): Promise<boolean> {
   try {
-    const response = await fetch(new URL("/auth/health", origin).toString(), {
+    const response = await fetch(new URL("/auth/ready", origin).toString(), {
       headers: { Accept: "application/json" },
     });
     const body = await response.json().catch(() => null);
-    return isFenrirAuthWorkerDocument(response.headers.get("content-type"), body);
+    return fenrirAuthWorkerCanStartLogin(
+      response.status,
+      response.headers.get("content-type"),
+      body,
+    );
   } catch {
     return false;
   }

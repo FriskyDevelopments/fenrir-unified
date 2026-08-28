@@ -76,7 +76,7 @@ describe("Better Auth Worker vs live Pages OAuth", () => {
     vi.restoreAllMocks();
   });
 
-  it("starts Google via Pages OAuth when public /auth/health is still SPA HTML", async () => {
+  it("starts Google via Pages OAuth when public /auth/ready is still SPA HTML", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -108,14 +108,64 @@ describe("Better Auth Worker vs live Pages OAuth", () => {
     expect(location).not.toContain("/auth/google");
   });
 
-  it("starts Google on the Better Auth Worker when public /auth/health is Worker JSON", async () => {
+  it("keeps Pages Google OAuth when /auth/health is Worker JSON but /auth/ready is 503", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.includes("/auth/ready")) {
+          return new Response(
+            JSON.stringify({
+              ready: false,
+              service: "fenrir-auth-worker",
+              providers: { google: false, microsoft: false, apple: false },
+            }),
+            {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        return new Response(JSON.stringify({ ok: true, service: "fenrir-auth-worker" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    const response = await startProviderLogin({
+      params: { provider: "google" },
+      request: new Request("https://myfenrir.com/api/auth/login/google?return_to=/api/telegram/link/start"),
+      env: {
+        PUBLIC_SITE_URL: "https://myfenrir.com",
+        ALLOWED_REDIRECT_URIS: "https://myfenrir.com,https://www.myfenrir.com",
+        SESSION_SECRET: "test-session-secret",
+        GOOGLE_CLIENT_ID: "placeholder-google-client-id",
+        GOOGLE_CLIENT_SECRET: "placeholder-google-client-secret",
+      },
+    });
+
+    expect(response.status).toBe(302);
+    const location = response.headers.get("Location") ?? "";
+    expect(location).toContain("https://accounts.google.com/o/oauth2/v2/auth");
+    expect(location).not.toContain("/auth/google");
+  });
+
+  it("starts Google on the Better Auth Worker when /auth/ready is 200 with a provider", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
-        new Response(JSON.stringify({ ok: true, service: "fenrir-auth-worker" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
+        new Response(
+          JSON.stringify({
+            ready: true,
+            service: "fenrir-auth-worker",
+            providers: { google: true, microsoft: false, apple: false },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
       ),
     );
 
