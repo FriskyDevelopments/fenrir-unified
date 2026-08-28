@@ -87,6 +87,7 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
   }
   const linkCode = linkCodeFromStart(textLower);
   if (linkCode) {
+    await enableMyFenrirMiniApp(env, channel, message.chat.id);
     const result = await consumeTelegramAccountLinkCode(env, env.DB!, linkCode, {
       telegramUserId: String(message.from?.id ?? message.chat.id),
       telegramChatId: String(message.chat.id),
@@ -109,23 +110,24 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
             "🐺 *MyFenrir* · Telegram linked",
             "",
             "Your Telegram identity is connected to this Frisky Dev account.",
-            "Continue Community Gate setup on communities.myfenrir.com — not the FriskyDev /main dashboard.",
+            "Open MyFenrir from this chat — there is no code to copy.",
             "",
-            "_One verified link, then the Community Bridge walkthrough._"
+            "_One verified link. Tap Link Telegram ID on /main if you ever need to reconnect._"
           ].join("\n")
         : [
             "⚠️ That link code expired or is invalid.",
             "",
-            "Open the FriskyDev link-start URL and generate a fresh one-time Telegram link."
+            "Open MyFenrir, tap Link Telegram ID, and generate a fresh one-time Telegram link."
           ].join("\n"),
       reply_markup: result.ok
-        ? { inline_keyboard: [[{ text: "Continue Community Gate", url: COMMUNITY_BRIDGE_CONTINUE_URL }]] }
-        : { inline_keyboard: [[{ text: "Link FriskyDev ID", url: FRISKY_TELEGRAM_LINK_START }]] }
+        ? myFenrirOpenKeyboard()
+        : myFenrirOpenKeyboard({ miniApp: true })
     }, channel);
     return;
   }
 
   if (/^\/start\s+link$/i.test(text)) {
+    await enableMyFenrirMiniApp(env, channel, message.chat.id);
     const telegramId = String(message.from?.id ?? message.chat.id);
     const account = await getAccountLinkByTelegramUser(env, telegramId);
     const name = escapeMd(message.from?.first_name?.trim() || "there");
@@ -139,19 +141,17 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
             "✅ *Account linked with Frisky Dev*",
             `MyFenrir account · ${escapeMd(maskEmail(account.email))}`,
             "",
-            "Your identity is confirmed. Next, add Fenrir to the protected group and map it on communities.myfenrir.com."
+            "Your identity is confirmed. Open MyFenrir from this chat whenever you need the dashboard."
           ].join("\n")
         : [
             `🐺 *Welcome, ${name}*`,
             "",
             "Your Telegram account is not linked to Frisky Dev yet.",
-            "Open the FriskyDev one-time link. There is no code to copy."
+            "Open MyFenrir, sign in, then tap Link Telegram ID. There is no code to copy."
           ].join("\n"),
-      reply_markup: {
-        inline_keyboard: account
-          ? [[{ text: "Continue Community Gate", url: COMMUNITY_BRIDGE_CONTINUE_URL }]]
-          : [[{ text: "Link FriskyDev ID", url: FRISKY_TELEGRAM_LINK_START }]]
-      }
+      reply_markup: account
+        ? myFenrirOpenKeyboard()
+        : myFenrirOpenKeyboard({ miniApp: true })
     }, channel);
     return;
   }
@@ -172,7 +172,7 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
         "",
         "The Pack is $14.99/month. Card, Stars, or crypto — same price.",
         "",
-        "Link Telegram from the MyFenrir dashboard (Settings → Link Telegram), then manage locks there.",
+        "Link Telegram from the MyFenrir dashboard (Link Telegram ID). Telegram opens automatically — there is no code to copy.",
         "",
         "_One verified link, every product._"
       ].join("\n"),
@@ -185,6 +185,7 @@ async function handleMessage(env: BillingEnv, message: TelegramMessage, channel:
 
   if (!textLower.startsWith("/subscribe") && !textLower.startsWith("/unlock") && !textLower.startsWith("/start fenrir_stars")) {
     if (textLower.startsWith("/start")) {
+      await enableMyFenrirMiniApp(env, channel, message.chat.id);
       const name = escapeMd(message.from?.first_name?.trim() || "there");
       await telegramApi(env, "sendMessage", {
         chat_id: message.chat.id,
@@ -235,8 +236,26 @@ function isCommandForBot(text: string, command: string, env: BillingEnv) {
   return !target || target === (env.FENRIR_TELEGRAM_BOT_USERNAME ?? "").replace(/^@/, "").toLowerCase();
 }
 
-const FRISKY_TELEGRAM_LINK_START = "https://www.myfenrir.com/api/telegram/link/start";
-const COMMUNITY_BRIDGE_CONTINUE_URL = "https://communities.myfenrir.com/gate?onboarding=1";
+const MYFENRIR_APP_URL = "https://www.myfenrir.com/main";
+
+function myFenrirOpenKeyboard(options: { miniApp?: boolean } = {}) {
+  const rows: Array<Array<Record<string, unknown>>> = [[{ text: "Open MyFenrir", url: MYFENRIR_APP_URL }]];
+  if (options.miniApp) {
+    rows.push([{ text: "Open MyFenrir Mini App", web_app: { url: MYFENRIR_APP_URL } }]);
+  }
+  return { inline_keyboard: rows };
+}
+
+async function enableMyFenrirMiniApp(env: BillingEnv, channel: string, chatId?: number) {
+  await telegramApi(env, "setChatMenuButton", {
+    ...(chatId ? { chat_id: chatId } : {}),
+    menu_button: {
+      type: "web_app",
+      text: "Open MyFenrir",
+      web_app: { url: MYFENRIR_APP_URL }
+    }
+  }, channel).catch((error) => console.error("set_chat_menu_button_failed", String(error)));
+}
 
 async function handleLinkCommand(env: BillingEnv, message: TelegramMessage, channel: string) {
   if (message.chat.type && message.chat.type !== "private") {
@@ -247,10 +266,19 @@ async function handleLinkCommand(env: BillingEnv, message: TelegramMessage, chan
     return;
   }
 
+  await enableMyFenrirMiniApp(env, channel, message.chat.id);
   await telegramApi(env, "sendMessage", {
     chat_id: message.chat.id,
-    text: "Link your FriskyDev ID first. Telegram confirms automatically — there is no code to copy. After that, Community Gate setup continues on communities.myfenrir.com.",
-    reply_markup: { inline_keyboard: [[{ text: "Link FriskyDev ID", url: FRISKY_TELEGRAM_LINK_START }]] }
+    text: [
+      "MyFenrir account linking",
+      "",
+      "1. Open MyFenrir and sign in.",
+      "2. In your dashboard, tap \"Link Telegram ID\".",
+      "3. Telegram opens automatically to confirm — there is no code to copy.",
+      "",
+      "The Open MyFenrir Mini App button is now enabled in this chat."
+    ].join("\n"),
+    reply_markup: myFenrirOpenKeyboard({ miniApp: true })
   }, channel);
 }
 
@@ -271,10 +299,10 @@ function linkCodeFromStart(text: string) {
 }
 
 function startActionButtons(env: BillingEnv, origin: string) {
-  const baseUrl = origin.replace(/\/$/, "");
+  const loginUrl = `${origin.replace(/\/$/, "")}/login`;
   const buttons = [
-    [{ text: "🐺 Open MyFenrir", url: baseUrl }],
-    [{ text: "🔐 Sign in", url: `${baseUrl}/login` }]
+    [{ text: "🐺 Open MyFenrir", url: MYFENRIR_APP_URL }],
+    [{ text: "🔐 Sign in", url: loginUrl }]
   ];
 
   if (hasStarsBotUsername(env)) {
@@ -338,7 +366,7 @@ async function handleSuccessfulPayment(env: BillingEnv, message: TelegramMessage
 
   const linkHint = entitlement.applied
     ? `Workspace plan: *${entitlement.plan}*`
-    : "Next: open MyFenrir → *Settings → Link Telegram* so Stars unlock this workspace.";
+    : "Next: open MyFenrir → tap Link Telegram ID so Stars unlock this workspace.";
 
   await telegramApi(env, "sendMessage", {
     chat_id: message.chat.id,

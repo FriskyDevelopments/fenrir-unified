@@ -886,11 +886,10 @@ async function handleCommunityBillingStatus(request, env) {
 
 const normalizeText = (value) => (value || "").trim();
 const BRIDGE_TARGET = "managed MyFenrir Gate";
-// Account linking is owned by Fenrir Bridge (FriskyDev). Community Bridge's
-// /activate 6-character paste is not the production linker — use link-start.
-const FRISKY_TELEGRAM_LINK_START = "https://www.myfenrir.com/api/telegram/link/start";
-const COMMUNITY_BRIDGE_CONTINUE_URL = "https://communities.myfenrir.com/gate?onboarding=1";
-const MYFENRIR_APP_URL = "https://www.myfenrir.com/gate/miniapp";
+// MyFenrir 360 identity loop lives on Fenrir Bridge /main (D1 deep-link).
+// Community Bridge's dashboard paste-code screen is a dead end — no live bot
+// issues those 6-character codes.
+const MYFENRIR_APP_URL = "https://www.myfenrir.com/main";
 const MYFENRIR_FRONTEND_URL = "https://fenrir-bridge.pages.dev/gate/app";
 const BOT_OS_WELCOME_VIDEO_URL = "https://www.myfenrir.com/bot-os/media/fenrir-welcome.mp4";
 // Approved no-audio celebration clip for a successful Telegram-identity link.
@@ -899,7 +898,7 @@ const BOT_OS_LINK_SUCCESS_ANIM_URL = "https://www.myfenrir.com/bot-os/media/fenr
 const LINK_SUCCESS_CAPTION = [
   "🐺 *Linked in.* Your Telegram is now bound to your Frisky ID.",
   "",
-  "Next: continue the Community Gate walkthrough on communities.myfenrir.com — add @Myfenrir_bot as admin, map with /connect, then readiness.",
+  "Open MyFenrir anytime from this chat. There is no code to copy.",
 ].join("\n");
 
 const FENRIR_BOT_BRIEF = [
@@ -2456,6 +2455,29 @@ async function memberProfileText(env, telegramUserId, from) {
   ].join("\n");
 }
 
+function myFenrirOpenKeyboard({ miniApp = false } = {}) {
+  const rows = [[{ text: "Open MyFenrir", url: MYFENRIR_APP_URL }]];
+  if (miniApp) {
+    rows.push([{ text: "Open MyFenrir Mini App", web_app: { url: MYFENRIR_APP_URL } }]);
+  }
+  return { inline_keyboard: rows };
+}
+
+async function enableMyFenrirMiniApp(env, channel, chatId) {
+  try {
+    await telegramApi(env, channel, "setChatMenuButton", {
+      ...(chatId ? { chat_id: chatId } : {}),
+      menu_button: {
+        type: "web_app",
+        text: "Open MyFenrir",
+        web_app: { url: MYFENRIR_APP_URL }
+      }
+    });
+  } catch (error) {
+    console.error("set_chat_menu_button_failed", String(error));
+  }
+}
+
 function maskEmail(email) {
   const [local, domain] = normalizeText(email).split("@");
   if (!local || !domain) return "MyFenrir account";
@@ -2463,6 +2485,7 @@ function maskEmail(email) {
 }
 
 async function sendIdentityWelcome(env, channel, message) {
+  await enableMyFenrirMiniApp(env, channel, message.chat.id);
   const telegramUserId = String(message.from?.id || message.chat.id);
   const linked = await env.DB.prepare(
     `SELECT email FROM telegram_identity_links WHERE telegram_user_id = ? LIMIT 1`
@@ -2478,11 +2501,11 @@ async function sendIdentityWelcome(env, channel, message) {
         "✅ Account linked with Frisky Dev",
         `MyFenrir account · ${maskEmail(linked.email)}`,
         "",
-        "Your verified Telegram identity is ready for Community Gates.",
+        "Your verified Telegram identity is ready.",
         "",
-        "Continue on communities.myfenrir.com — add @Myfenrir_bot as admin, then map the group."
+        "Open MyFenrir from this chat whenever you need the dashboard."
       ].join("\n"),
-      reply_markup: { inline_keyboard: [[{ text: "Continue Community Gate", url: COMMUNITY_BRIDGE_CONTINUE_URL }]] }
+      reply_markup: myFenrirOpenKeyboard()
     });
     return;
   }
@@ -2493,9 +2516,9 @@ async function sendIdentityWelcome(env, channel, message) {
       `🐺 Welcome, ${name}.`,
       "",
       "Your Telegram identity is not linked yet.",
-      "Link your FriskyDev ID first. There is no code to copy — Telegram confirms the one-time link automatically."
+      "Open MyFenrir, sign in, then tap Link Telegram ID. There is no code to copy."
     ].join("\n"),
-    reply_markup: { inline_keyboard: [[{ text: "Link FriskyDev ID", url: FRISKY_TELEGRAM_LINK_START }]] }
+    reply_markup: myFenrirOpenKeyboard({ miniApp: true })
   });
 }
 
@@ -2700,6 +2723,8 @@ async function sendTelegramLinkStart(env, channel, message) {
     return;
   }
 
+  await enableMyFenrirMiniApp(env, channel, message.chat.id);
+
   const telegramUserId = String(message.from?.id || message.chat.id);
   const linked = await env.DB.prepare(
     `SELECT email FROM telegram_identity_links WHERE telegram_user_id = ? LIMIT 1`
@@ -2709,19 +2734,12 @@ async function sendTelegramLinkStart(env, channel, message) {
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
       text: [
-        "✅ FriskyDev identity is already linked.",
+        "✅ Your Telegram identity is already linked.",
         "",
-        "Continue the Community Gate walkthrough on communities.myfenrir.com.",
-        "Add @Myfenrir_bot as admin with Invite Users, then map the group."
+        `MyFenrir account · ${maskEmail(linked.email)}`,
+        "Open MyFenrir from this chat whenever you need the dashboard."
       ].join("\n"),
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "Continue Community Gate", url: COMMUNITY_BRIDGE_CONTINUE_URL }],
-          botUsername(env)
-            ? [{ text: "Add bot to a group", url: `https://t.me/${botUsername(env)}?startgroup=discover` }]
-            : []
-        ].filter((row) => row.length)
-      }
+      reply_markup: myFenrirOpenKeyboard()
     });
     return;
   }
@@ -2729,15 +2747,15 @@ async function sendTelegramLinkStart(env, channel, message) {
   await telegramApi(env, channel, "sendMessage", {
     chat_id: message.chat.id,
     text: [
-      "Link your FriskyDev ID first.",
+      "MyFenrir account linking",
       "",
-      "1. Open the secure one-time link (sign in on www.myfenrir.com if asked).",
-      "2. Press Start here — Telegram confirms automatically. There is no code to copy.",
-      "3. Then continue Community Gate setup on communities.myfenrir.com."
+      "1. Open MyFenrir and sign in.",
+      "2. In your dashboard, tap \"Link Telegram ID\".",
+      "3. Telegram opens automatically to confirm — there is no code to copy.",
+      "",
+      "The Open MyFenrir Mini App button is now enabled in this chat."
     ].join("\n"),
-    reply_markup: {
-      inline_keyboard: [[{ text: "Link FriskyDev ID", url: FRISKY_TELEGRAM_LINK_START }]]
-    }
+    reply_markup: myFenrirOpenKeyboard({ miniApp: true })
   });
 }
 
@@ -3091,9 +3109,7 @@ async function sendBotMenu(env, channel, message, entitlement) {
 // and an "Open MyFenrir" CTA. Falls back to a plain message if the animation
 // cannot be delivered (mirrors the sendBotMenu fallback pattern).
 async function sendLinkLinkedAnimation(env, channel, message) {
-  const reply_markup = {
-    inline_keyboard: [[{ text: "Continue Community Gate →", url: COMMUNITY_BRIDGE_CONTINUE_URL }]]
-  };
+  const reply_markup = myFenrirOpenKeyboard();
   try {
     await telegramApi(env, channel, "sendAnimation", {
       chat_id: message.chat.id,
@@ -3106,7 +3122,7 @@ async function sendLinkLinkedAnimation(env, channel, message) {
     console.error("link_success_animation_failed", String(error));
     await telegramApi(env, channel, "sendMessage", {
       chat_id: message.chat.id,
-      text: "🐺 Linked in. Your Telegram is now bound to your Frisky ID. Continue Community Gate setup on communities.myfenrir.com.",
+      text: "🐺 Linked in. Your Telegram is now bound to your Frisky ID. Open MyFenrir from this chat — there is no code to copy.",
       reply_markup
     });
   }
@@ -3678,7 +3694,8 @@ async function handleTelegramWebhook(request, env, url) {
     } else {
       await telegramApi(env, channel, "sendMessage", {
         chat_id: message.chat.id,
-        text: "This Fenrir link code is expired or invalid. Open MyFenrir and generate a fresh Telegram link."
+        text: "This Fenrir link code is expired or invalid. Open MyFenrir, tap Link Telegram ID, and generate a fresh Telegram link.",
+        reply_markup: myFenrirOpenKeyboard({ miniApp: true })
       });
     }
     return json({ ok: true });

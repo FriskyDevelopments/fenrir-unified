@@ -41,11 +41,9 @@ import {
 const BOT_USERNAME =
   (import.meta.env["VITE_TELEGRAM_BOT_USERNAME"] as string | undefined) ?? "Myfenrir_bot";
 const BOT_URL = `https://t.me/${BOT_USERNAME}`;
-// Top-level navigation is intentional: the MyFenrir session cookie is scoped to
-// www.myfenrir.com, where this endpoint mints the single-use Telegram deep link
-// and immediately redirects to the bot. A cross-origin fetch from Community
-// Bridge would not reliably carry that session.
-const MYFENRIR_LINK_URL = "https://www.myfenrir.com/api/telegram/link/start";
+// Top-level navigation to Fenrir Bridge /main, where Link Telegram ID mints
+// the D1 deep-link. A cross-origin fetch would not carry the MyFenrir cookie.
+const MYFENRIR_LINK_URL = "https://www.myfenrir.com/main";
 const CODE_LENGTH = 6;
 
 const FAILURE_COPY: Record<DemoRedeemFailure, string> = {
@@ -288,9 +286,9 @@ function ActivatePage() {
             <div className="text-sm">
               <p className="font-medium text-foreground">Secure Telegram linking</p>
               <ol className="mt-2 space-y-1.5 text-muted-foreground">
-              <li>1. Open a private, single-use Telegram link.</li>
-              <li>2. Press Start in the MyFenrir bot.</li>
-              <li>3. Return here and confirm the connection.</li>
+              <li>1. Open MyFenrir and sign in.</li>
+              <li>2. In your dashboard, tap Link Telegram ID.</li>
+              <li>3. Telegram opens automatically — there is no code to copy.</li>
               </ol>
             </div>
           </div>

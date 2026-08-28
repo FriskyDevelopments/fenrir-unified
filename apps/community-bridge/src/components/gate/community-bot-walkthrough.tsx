@@ -46,7 +46,7 @@ const telegramPreviewSteps = [
     label: "Link ID",
     title: "Link your FriskyDev ID",
     message: "Connect this Telegram account to your FriskyDev identity.",
-    detail: "Opens www.myfenrir.com/api/telegram/link/start. Sign in with Better Auth if needed. There is no 6-character paste code.",
+    detail: "Opens www.myfenrir.com/main. Sign in with Better Auth, then tap Link Telegram ID. There is no 6-character paste code.",
   },
   {
     label: "Account",
@@ -65,7 +65,7 @@ const telegramPreviewSteps = [
     title: "Map the destination",
     message: "Run /connect@Myfenrir_bot in the protected group.",
     detail:
-      "The public Gate remains pending until this mapping is verified on Community Bridge — not www.myfenrir.com/main.",
+      "The public Gate remains pending until this mapping is verified on Community Bridge. Identity linking stays on www.myfenrir.com/main.",
   },
   {
     label: "Access",
@@ -77,9 +77,9 @@ const telegramPreviewSteps = [
 ] as const;
 
 const telegramStepLinks = [
-  // Step 1 is FriskyDev identity on www.myfenrir.com. Steps 2–5 stay on
-  // Community Bridge + @Myfenrir_bot. Never send this walkthrough to /main.
-  "https://www.myfenrir.com/api/telegram/link/start",
+  // Step 1 is Fenrir Bridge identity on /main (Link Telegram ID → D1 deep-link).
+  // Steps 2–5 stay on Community Bridge + @Myfenrir_bot for group mapping.
+  "https://www.myfenrir.com/main",
   "https://t.me/Myfenrir_bot?start=account",
   "https://t.me/Myfenrir_bot?startgroup=discover",
   "https://t.me/Myfenrir_bot?start=mapping",
@@ -87,7 +87,7 @@ const telegramStepLinks = [
 ] as const;
 
 const telegramLaunchLabels = [
-  "Link FriskyDev ID",
+  "Open MyFenrir",
   "Open MyFenrir Bot",
   "Link a Telegram group",
   "Open mapping in Telegram",
