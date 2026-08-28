@@ -38,8 +38,21 @@ export type GateAccessOutcome = {
  * `cb_gate_access_requests.decision_note` y el owner lo lee en /access. Detalle
  * del lado del servidor, veredicto del lado del cliente.
  */
+export type GateStageKey = "identity" | "safety";
+export type GateStageStatus = "pass" | "review" | "blocked";
+
 export type GateSecurityPreflight = {
   status: "ok" | "sso_required" | "review" | "blocked";
+  /**
+   * Progreso por ETAPA, no por control. El miembro ve que el Gate hace un
+   * trabajo serio y en qué punto va; nunca qué señal se examinó ni cuál falló.
+   *
+   * Sólo viaja la `key` —"identity" / "safety"—; la etiqueta legible la pone el
+   * cliente desde i18n/gate.ts, así que ningún nombre real de control sale de
+   * este proceso. `blacklist` y la pantalla de seguridad infantil quedan
+   * absorbidas dentro de "safety", que no las nombra ni las insinúa.
+   */
+  stages: Array<{ key: GateStageKey; status: GateStageStatus }>;
 };
 
 /**
@@ -167,12 +180,35 @@ export const runGateSecurityPreflight = createServerFn({ method: "POST" })
       .eq("status", "linked")
       .maybeSingle();
 
-    if (error || !identity?.telegram_id) return { status: "sso_required" };
+    if (error || !identity?.telegram_id) return { status: "sso_required", stages: [] };
 
     const summary = await gateSecuritySummary(identity);
-    // `summary.note` (el desglose por control) NO se devuelve: se persiste en
-    // decision_note desde requestGateAccess y sólo lo ve el owner en /access.
-    return { status: summary.overall };
+
+    // Dos etapas genéricas. `identity` agrega las señales de la cuenta;
+    // `safety` agrega el resto —incluida la pantalla que no se nombra—. Un
+    // bloqueo manda a ambas a "blocked" para no señalar cuál disparó.
+    const identityStage: GateStageStatus =
+      summary.usernameStatus === "blocked"
+        ? "blocked"
+        : summary.usernameStatus === "review" || summary.photoStatus === "review"
+          ? "review"
+          : "pass";
+    const safetyStage: GateStageStatus =
+      summary.usernameStatus === "blocked"
+        ? "blocked"
+        : summary.usernameStatus === "review"
+          ? "review"
+          : "pass";
+
+    // `summary.note` (el desglose real por control) NO se devuelve: se persiste
+    // en decision_note desde requestGateAccess y sólo lo ve el owner en /access.
+    return {
+      status: summary.overall,
+      stages: [
+        { key: "identity", status: identityStage },
+        { key: "safety", status: safetyStage },
+      ],
+    };
   });
 
 export type CommunityAccessStatus = {

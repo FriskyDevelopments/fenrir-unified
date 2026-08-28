@@ -180,6 +180,11 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
   const [handoffPending, setHandoffPending] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [accessRequested, setAccessRequested] = useState(false);
+  // La UI prometía "Confirmation sent" siempre. sendGateConfirmationEmail
+  // devuelve false en silencio si la identidad de Telegram no trae correo o si
+  // MYFENRIR_EMAILS_URL no está configurada (access.functions.ts:109-111), así
+  // que sólo prometemos el correo cuando el envío lo confirmó.
+  const [emailSent, setEmailSent] = useState(false);
   const [securityPreflight, setSecurityPreflight] = useState<GateSecurityPreflight | null>(null);
   const [gateOutcome, setGateOutcome] = useState<
     "granted" | "review" | "pending" | "blocked" | null
@@ -235,10 +240,12 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
       if (preflight.status === "review") {
         const result = await requestAccess({ data: { slug: params.slug } });
         setAccessRequested(true);
+        setEmailSent(result.emailSent === true);
         setGateOutcome(result.status === "granted" ? "granted" : "review");
         return;
       }
       const result = await requestAccess({ data: { slug: params.slug } });
+      setEmailSent(result.emailSent === true);
       setGateOutcome(
         result.status === "granted"
           ? "granted"
@@ -316,6 +323,7 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
         <GateOutcomeCelebration
           outcome={gateOutcome}
           email={session?.user.email ?? null}
+          emailSent={emailSent}
           copy={copy}
         />
       ) : null}
@@ -329,10 +337,12 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
 function GateOutcomeCelebration({
   outcome,
   email,
+  emailSent,
   copy,
 }: {
   outcome: "granted" | "review" | "pending" | "blocked";
   email: string | null;
+  emailSent: boolean;
   copy: GateCopy;
 }) {
   const outcomeCopy =
@@ -355,10 +365,13 @@ function GateOutcomeCelebration({
         </p>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight">{outcomeCopy.title}</h2>
         <p className="mt-2 text-sm leading-relaxed text-white/68">{outcomeCopy.body}</p>
-        {email ? (
+        {/* Sólo se nombra el correo cuando el servidor confirmó el envío. */}
+        {emailSent && email ? (
           <p className="mt-3 text-xs text-white/42">
             {copy.emailPrefix}: {email}
           </p>
+        ) : outcome !== "blocked" ? (
+          <p className="mt-3 text-xs text-white/42">{copy.emailNotSent}</p>
         ) : null}
       </div>
     </aside>
@@ -372,26 +385,45 @@ function GateSecurityPanel({
   preflight: GateSecurityPreflight;
   copy: GateCopy;
 }) {
-  // Un solo veredicto. NUNCA el desglose por control: enseñarle al visitante
-  // qué señales miramos y cuál falló es entregarle el mapa para evadirlas, y
-  // en el caso de la pantalla de seguridad infantil, confirmar que existe y
-  // cómo se comporta. El detalle vive en decision_note y lo ve el owner.
-  const verdict =
-    preflight.status === "blocked"
-      ? { label: copy.blockedTitle, tone: "border-rose-400/25 bg-rose-400/10 text-rose-200" }
-      : preflight.status === "review"
-        ? { label: copy.reviewTitle, tone: "border-amber-400/25 bg-amber-400/10 text-amber-200" }
-        : { label: copy.grantedTitle, tone: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200" };
+  // Se ve el PROGRESO, no el criterio. Etapas genéricas con etiqueta puesta
+  // aquí desde i18n —el servidor sólo manda la `key`—, así que nunca sale el
+  // nombre real de un control ni qué señal concreta falló. La pantalla de
+  // seguridad infantil va absorbida en "safety" y no se nombra ni se insinúa.
+  // El desglose real vive en decision_note y sólo lo ve el owner en /access.
+  const STAGE_LABEL: Record<(typeof preflight.stages)[number]["key"], string> = {
+    identity: copy.stageIdentity,
+    safety: copy.stageSafety,
+  };
+  const STATUS_LABEL = {
+    pass: copy.stagePass,
+    review: copy.stageReview,
+    blocked: copy.stageBlocked,
+  } as const;
+  const STATUS_TONE = {
+    pass: "text-emerald-300",
+    review: "text-amber-300",
+    blocked: "text-rose-300",
+  } as const;
 
   return (
     <aside className="absolute inset-x-0 bottom-24 z-10 mx-auto w-[min(92vw,430px)] rounded-3xl border border-white/12 bg-black/70 p-4 text-white shadow-2xl backdrop-blur-xl">
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/45">
         {copy.securityComplete}
       </p>
-      <div
-        className={`mt-3 flex items-center justify-center rounded-2xl border px-3 py-3 text-sm font-medium ${verdict.tone}`}
-      >
-        {verdict.label}
+      <div className="mt-3 grid gap-2">
+        {preflight.stages.map((stage) => (
+          <div
+            key={stage.key}
+            className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs"
+          >
+            <span>{STAGE_LABEL[stage.key]}</span>
+            <span
+              className={`font-mono uppercase tracking-[0.16em] ${STATUS_TONE[stage.status]}`}
+            >
+              {STATUS_LABEL[stage.status]}
+            </span>
+          </div>
+        ))}
       </div>
     </aside>
   );
