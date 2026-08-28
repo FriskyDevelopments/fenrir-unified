@@ -11,6 +11,8 @@ retired.
 ## Production URLs
 
 - App / private-access gate: `https://myfenrir.com/login`
+- `www.myfenrir.com` 301s to the apex (Pages `_redirects` + `fenrir-redirects`).
+  Worker routes remain on both hosts; the www SPA calls apex `/auth/*`.
 - Google start: `https://myfenrir.com/auth/google`
 - Microsoft start: `https://myfenrir.com/auth/microsoft`
 - Apple start: `https://myfenrir.com/auth/apple`

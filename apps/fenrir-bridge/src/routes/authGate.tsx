@@ -9,6 +9,7 @@ import { brandThemes } from "../theme/brandThemes";
 import { managedDashboardPath, twoFactorHelpLinks } from "../app/shared";
 import { BrandSignature } from "./routeCommon";
 import { HumanVerificationGate } from "../components/HumanVerificationGate";
+import { loginPageErrorMessage } from "../services/authErrors";
 
 function postLoginDestination() {
   const requested = new URLSearchParams(window.location.search).get("next");
@@ -75,7 +76,7 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
               <small className="muted">No OAuth provider is available right now. Apple, Google, and Microsoft are the Fenrir sign-in options.</small>
             ) : null}
           </div>
-          {authNote ? <small className="muted">{authNote}</small> : null}
+          {authNote ? <small className="muted" role="alert">{authNote}</small> : null}
           <p className="muted">After sign-in, Fenrir opens the Telegram gate so you can link the same admin account. No extra dens are created from this screen.</p>
           <div className="auth-2fa-recommend">
             <p className="label">{c.twoFactorRecommendTitle}</p>
@@ -121,35 +122,5 @@ function providerLabel(provider: AuthProvider, c: Copy) {
 }
 
 function authErrorMessage() {
-  const error = new URLSearchParams(window.location.search).get("auth_error");
-  if (!error) return null;
-  const [errorCode, errorDetail] = error.split(":", 2);
-  const detail = errorDetail ? decodeURIComponent(errorDetail) : "";
-
-  if (error.startsWith("missing_env:")) {
-    return "This provider is not live yet. Use an enabled sign-in option, or refresh to return to the clean Fenrir gate.";
-  }
-  if (error === "direct_oauth_disabled") {
-    return "That old sign-in route was retired. Use the provider buttons on this Fenrir gate.";
-  }
-  if (errorCode === "oauth_access_denied") {
-    return "The provider denied access. Try again and confirm consent to continue with this account.";
-  }
-  if (errorCode === "oauth_callback_error") {
-    return `Provider error while returning from sign-in.${detail ? ` ${detail}` : ""}`;
-  }
-  if (errorCode === "code_exchange_failed") {
-    return `Could not exchange the OAuth callback code. ${detail ? `(${detail})` : "Please try again."}`;
-  }
-  if (errorCode === "session_lookup_failed") {
-    return `Could not read the Frisky login session after login. ${detail ? `(${detail})` : "Please retry from the sign-in screen."}`;
-  }
-  if (errorCode === "supabase_session_failed") {
-    if (detail === "human_verification_required") return null;
-    return `Could not open a Fenrir admin session.${detail ? ` (${detail})` : ""}`;
-  }
-  if (errorCode === "missing_code") {
-    return "The provider did not return a sign-in code. Please try again.";
-  }
-  return "Sign-in could not finish. Try another provider or refresh the page.";
+  return loginPageErrorMessage(window.location.search);
 }

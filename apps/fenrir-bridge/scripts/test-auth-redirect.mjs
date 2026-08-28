@@ -43,7 +43,22 @@ const checks = [
     pass: workerIndex.includes("fenrir-auth-worker") &&
       workerIndex.includes("myfenrir.com") &&
       workerIndex.includes("safeReturnTo") &&
+      workerIndex.includes("withCors") &&
+      workerIndex.includes("authFailure") &&
+      workerIndex.includes('from "./identity.js"') &&
       !workerIndex.includes("handleDataApi")
+  },
+  {
+    name: "www.myfenrir.com canonicalizes to apex for login (not apex→www)",
+    pass: (() => {
+      const redirects = readFileSync(join(root, "public/_redirects"), "utf8");
+      const hops = readFileSync(join(root, "workers/fenrir-redirects/worker.js"), "utf8");
+      return /https:\/\/www\.myfenrir\.com\/\*\s+https:\/\/myfenrir\.com\/:splat\s+301/.test(redirects)
+        && hops.includes('url.hostname === "www.myfenrir.com"')
+        && hops.includes('url.hostname = "myfenrir.com"')
+        && apiSource.includes('from "./authOrigin"')
+        && apiSource.includes("resolveAuthOrigin");
+    })()
   },
   {
     name: `no WorkOS reference exists anywhere in the app (banned)${offenders ? ` — found in: ${offenders.replaceAll("\n", ", ")}` : ""}`,

@@ -30,6 +30,7 @@ import { knowledgeBaseLabel, knowledgeBaseUrl } from "./services/knowledgeBase";
 import { CinematicLanding } from "./components/CinematicLanding";
 import { GlowCard } from "./components/GlowCard";
 import { TelegramLoginWidget } from "./components/TelegramLoginWidget";
+import { loginPageErrorMessage } from "./services/authErrors";
 import { brandThemes, themeClassName, themeCssVars } from "./theme/brandThemes";
 
 const defaultServiceOrg = (import.meta.env.VITE_DEFAULT_SERVICE_ORG ?? "Frisky Dev Workspace").trim();
@@ -3387,37 +3388,7 @@ function LovableAuthTerminal({ providers }: { providers: AuthProvider[] | null }
 }
 
 function authErrorMessage() {
-  const error = new URLSearchParams(window.location.search).get("auth_error");
-  if (!error) return null;
-  const [errorCode, errorDetail] = error.split(":", 2);
-  const detail = errorDetail ? decodeURIComponent(errorDetail) : "";
-
-  if (error.startsWith("missing_env:")) {
-    return "This provider is not live yet. Use an enabled sign-in option, or refresh to return to the clean Fenrir gate.";
-  }
-  if (error === "direct_oauth_disabled") {
-    return "That old sign-in route was retired. Use the provider buttons on this Fenrir gate.";
-  }
-  if (errorCode === "oauth_access_denied") {
-    return "The provider denied access. Try again and confirm consent to continue with this account.";
-  }
-  if (errorCode === "oauth_callback_error") {
-    return `Provider error while returning from sign-in.${detail ? ` ${detail}` : ""}`;
-  }
-  if (errorCode === "code_exchange_failed") {
-    return `Could not exchange the OAuth callback code. ${detail ? `(${detail})` : "Please try again."}`;
-  }
-  if (errorCode === "session_lookup_failed") {
-    return `Could not read the Frisky login session after login. ${detail ? `(${detail})` : "Please retry from the sign-in screen."}`;
-  }
-  if (errorCode === "supabase_session_failed") {
-    if (detail === "human_verification_required") return null;
-    return `Could not open a Fenrir admin session.${detail ? ` (${detail})` : ""}`;
-  }
-  if (errorCode === "missing_code") {
-    return "The provider did not return a sign-in code. Please try again.";
-  }
-  return "Sign-in could not finish. Try another provider or refresh the page.";
+  return loginPageErrorMessage(window.location.search);
 }
 
 function CommunityAuthProposalPanel({ proposal, locale }: { proposal: CommunityAuthProposal | null; locale: Locale }) {

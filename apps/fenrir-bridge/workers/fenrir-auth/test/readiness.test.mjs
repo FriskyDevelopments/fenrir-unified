@@ -18,7 +18,7 @@ test("health remains a liveness endpoint", async () => {
   assert.deepEqual(await response.json(), { ok: true, service: "fenrir-auth-worker" });
 });
 
-test("readiness fails closed when Neon is not configured", async () => {
+test("readiness fails closed when neither Neon nor KV can hold a session", async () => {
   const readyEnv = {
     SESSION_SECRET: "test-secret",
     GOOGLE_CLIENT_ID: "gid",
@@ -32,12 +32,11 @@ test("readiness fails closed when Neon is not configured", async () => {
   };
   const response = await worker.fetch(new Request("https://myfenrir.com/auth/ready"), readyEnv);
   assert.equal(response.status, 503);
-  assert.deepEqual(await response.json(), {
-    ready: false,
-    database: false,
-    session_secret: true,
-    providers: { google: true, microsoft: true, apple: true },
-  });
+  const body = await response.json();
+  assert.equal(body.ready, false);
+  assert.equal(body.database, false);
+  assert.equal(body.session_backend, "kv");
+  assert.equal(body.degraded, true);
 });
 
 test("me without cookie is unauthenticated", async () => {

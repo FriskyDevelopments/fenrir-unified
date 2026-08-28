@@ -8,6 +8,7 @@ import {
   type DomainSearchResult
 } from "../../shared/domain-search";
 import { copy } from "../i18n";
+import { resolveAuthOrigin } from "./authOrigin";
 import { addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
 import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TrialPublic, TrialStatusPayload } from "./types";
 
@@ -25,8 +26,18 @@ const telegramBotUsername = () =>
 
 const workerAuthOrigin = (import.meta.env.VITE_FENRIR_AUTH_ORIGIN ?? "").trim().replace(/\/$/, "");
 
+export { PRODUCTION_AUTH_ORIGIN, isWwwHostname, resolveAuthOrigin } from "./authOrigin";
+
+function browserAuthOrigin(): string {
+  return resolveAuthOrigin(
+    workerAuthOrigin,
+    typeof window === "undefined" ? "" : window.location.hostname,
+  );
+}
+
 function workerAuthUrl(path: string) {
-  return `${workerAuthOrigin}${path}`;
+  const origin = browserAuthOrigin();
+  return origin ? `${origin}${path}` : path;
 }
 
 type WorkerAuthProvider = "google" | "microsoft" | "apple";

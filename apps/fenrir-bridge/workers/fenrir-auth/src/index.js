@@ -1,6 +1,7 @@
 // Fenrir Better Auth identity Worker.
 // Public contract copied from folios-auth-worker (behavior/endpoints, not a Folios merge).
 // Cookie domain is myfenrir.com. Do not serve Fenrir login on folios.works.
+// One fetch handler, isolate per request. Hosts: myfenrir.com + www.myfenrir.com.
 import {
   getProvider,
   providerConfigured,
@@ -13,7 +14,8 @@ import {
 import { createFenrirBetterAuth } from "./better-auth.js";
 import { buildAuthorizeUrl, exchangeCode, fetchProfile } from "./oauth.js";
 import { createPkce, randomToken } from "./crypto.js";
-import { createSession, getSession, destroySession, checkDatabase } from "./neon.js";
+import { createSession, getSession, destroySession } from "./identity.js";
+import { checkDatabase } from "./neon.js";
 import { saveOAuthState, consumeOAuthState } from "./session.js";
 
 function json(data, status = 200, extraHeaders = {}) {
@@ -32,6 +34,46 @@ function redirect(location, extraHeaders = {}) {
     status: 302,
     headers: { Location: location, "Cache-Control": "no-store", ...extraHeaders },
   });
+}
+
+function corsHeaders(request, env) {
+  const origin = request.headers.get("Origin");
+  if (!origin) return {};
+  try {
+    const host = new URL(origin).hostname;
+    if (!cfg(env).allowedRedirectHosts.includes(host)) return {};
+    return {
+      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Credentials": "true",
+      Vary: "Origin",
+      "Access-Control-Allow-Headers": "Accept, Content-Type, Authorization",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    };
+  } catch {
+    return {};
+  }
+}
+
+function withCors(response, request, env) {
+  const extra = corsHeaders(request, env);
+  if (!Object.keys(extra).length) return response;
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(extra)) headers.set(key, value);
+  return new Response(response.body, { status: response.status, headers });
+}
+
+function wantsHtml(request) {
+  const accept = request.headers.get("Accept") || "";
+  return accept.includes("text/html");
+}
+
+function authFailure(request, env, error, status = 400, extra = {}) {
+  if (wantsHtml(request)) {
+    const dest = new URL("/login", cfg(env).baseUrl);
+    dest.searchParams.set("error", error);
+    return redirect(dest.toString());
+  }
+  return json({ error, ...extra }, status);
 }
 
 function hostnameOf(request) {
@@ -127,31 +169,31 @@ async function handleCallback(request, env, providerName) {
   }
 
   const err = params.get("error");
-  if (err) return json({ error: "provider_error", detail: err, description: params.get("error_description") }, 400);
+  if (err) return authFailure(request, env, "provider_error", 400, { detail: err, description: params.get("error_description") });
 
   const code = params.get("code");
   const state = params.get("state");
-  if (!code || !state) return json({ error: "missing_code_or_state" }, 400);
+  if (!code || !state) return authFailure(request, env, "missing_code_or_state");
 
   const saved = await consumeOAuthState(env, state);
-  if (!saved) return json({ error: "invalid_or_expired_state" }, 400);
-  if (saved.provider !== providerName) return json({ error: "state_provider_mismatch" }, 400);
+  if (!saved) return authFailure(request, env, "invalid_or_expired_state");
+  if (saved.provider !== providerName) return authFailure(request, env, "state_provider_mismatch");
 
   let tokens;
   try {
     tokens = await exchangeCode(provider, providerName, env, { code, codeVerifier: saved.codeVerifier });
   } catch (e) {
-    return json({ error: "token_exchange_failed", detail: String(e.message || e) }, 502);
+    return authFailure(request, env, "token_exchange_failed", 502, { detail: String(e.message || e) });
   }
 
   let profile;
   try {
     profile = await fetchProfile(provider, providerName, env, tokens, applePostedUser);
   } catch (e) {
-    return json({ error: "profile_fetch_failed", detail: String(e.message || e) }, 502);
+    return authFailure(request, env, "profile_fetch_failed", 502, { detail: String(e.message || e) });
   }
 
-  if (!profile.sub) return json({ error: "no_subject_in_profile" }, 502);
+  if (!profile.sub) return authFailure(request, env, "no_subject_in_profile", 502);
 
   const user = {
     id: `${providerName}:${profile.sub}`,
@@ -163,10 +205,15 @@ async function handleCallback(request, env, providerName) {
     picture: profile.picture,
   };
 
-  const { cookie } = await createSession(env, user, {
-    userAgent: request.headers.get("User-Agent"),
-    ip: request.headers.get("CF-Connecting-IP"),
-  });
+  let cookie;
+  try {
+    ({ cookie } = await createSession(env, user, {
+      userAgent: request.headers.get("User-Agent"),
+      ip: request.headers.get("CF-Connecting-IP"),
+    }));
+  } catch (e) {
+    return authFailure(request, env, "session_create_failed", 503, { detail: String(e.message || e) });
+  }
   return redirect(saved.returnTo || cfg(env).postLoginRedirect, { "Set-Cookie": cookie });
 }
 
@@ -217,58 +264,33 @@ async function handleReady(env) {
   );
   const database = await checkDatabase(env);
   const sessionSecret = Boolean(identity.secret);
-  const ready = database.ok && sessionSecret && Object.values(providers).every(Boolean);
-  return json({ ready, database: database.ok, session_secret: sessionSecret, providers }, ready ? 200 : 503);
+  const kv = Boolean(env.SESSIONS);
+  const loginReady = sessionSecret && Object.values(providers).every(Boolean) && (database.ok || kv);
+  return json({
+    ready: loginReady,
+    database: database.ok,
+    session_backend: database.ok ? "neon" : "kv",
+    degraded: !database.ok,
+    session_secret: sessionSecret,
+    providers,
+  }, loginReady ? 200 : 503);
 }
 
 export default {
   async fetch(request, env) {
+    if (!isFenrirHost(request)) {
+      return json({ error: "not_found", hint: "Fenrir Better Auth only serves myfenrir.com" }, 404);
+    }
+
+    // Per-request identity isolate — do not store auth on the module.
+    createFenrirBetterAuth(env);
+
+    if (request.method === "OPTIONS") {
+      return withCors(new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } }), request, env);
+    }
+
     try {
-      if (!isFenrirHost(request)) {
-        return json({ error: "not_found", hint: "Fenrir Better Auth only serves myfenrir.com" }, 404);
-      }
-
-      // Per-request identity isolate — do not store auth on the module.
-      createFenrirBetterAuth(env);
-
-      const url = new URL(request.url);
-      const path = url.pathname.replace(/\/+$/, "") || "/";
-      const parts = path.split("/").filter(Boolean);
-
-      if (parts[0] !== "auth") {
-        return json({ error: "not_found", hint: "This Worker only serves /auth/*" }, 404);
-      }
-
-      if (parts[1] === "api") {
-        return json({ error: "not_found", hint: "Fenrir identity has no /auth/api data plane" }, 404);
-      }
-
-      if (parts.length === 2) {
-        switch (parts[1]) {
-          case "health":
-            return json({ ok: true, service: "fenrir-auth-worker" });
-          case "ready":
-            return handleReady(env);
-          case "me":
-            return handleMe(request, env);
-          case "logout":
-            return handleLogout(request, env);
-          case "providers":
-            return handleProviders(env);
-          default:
-            if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
-            return handleStart(request, env, parts[1]);
-        }
-      }
-
-      if (parts.length === 3 && parts[2] === "callback") {
-        if (request.method !== "GET" && request.method !== "POST") {
-          return json({ error: "method_not_allowed" }, 405);
-        }
-        return handleCallback(request, env, parts[1]);
-      }
-
-      return json({ error: "not_found", path }, 404);
+      return withCors(await handleRequest(request, env), request, env);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       console.error(JSON.stringify({
@@ -276,7 +298,48 @@ export default {
         error: message,
         path: new URL(request.url).pathname,
       }));
-      return json({ error: "internal_server_error" }, 500);
+      return withCors(json({ error: "internal_server_error" }, 500), request, env);
     }
   },
 };
+
+async function handleRequest(request, env) {
+  const url = new URL(request.url);
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+  const parts = path.split("/").filter(Boolean);
+
+  if (parts[0] !== "auth") {
+    return json({ error: "not_found", hint: "This Worker only serves /auth/*" }, 404);
+  }
+
+  if (parts[1] === "api") {
+    return json({ error: "not_found", hint: "Fenrir identity has no /auth/api data plane" }, 404);
+  }
+
+  if (parts.length === 2) {
+    switch (parts[1]) {
+      case "health":
+        return json({ ok: true, service: "fenrir-auth-worker" });
+      case "ready":
+        return handleReady(env);
+      case "me":
+        return handleMe(request, env);
+      case "logout":
+        return handleLogout(request, env);
+      case "providers":
+        return handleProviders(env);
+      default:
+        if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
+        return handleStart(request, env, parts[1]);
+    }
+  }
+
+  if (parts.length === 3 && parts[2] === "callback") {
+    if (request.method !== "GET" && request.method !== "POST") {
+      return json({ error: "method_not_allowed" }, 405);
+    }
+    return handleCallback(request, env, parts[1]);
+  }
+
+  return json({ error: "not_found", path }, 404);
+}

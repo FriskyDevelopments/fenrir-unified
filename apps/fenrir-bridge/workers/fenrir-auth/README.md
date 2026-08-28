@@ -21,18 +21,25 @@ retired (410).
 | GET | `https://myfenrir.com/auth/logout` | Clears session + cookie, 302 to `/login` |
 | GET | `https://myfenrir.com/auth/providers` | Which providers can start |
 | GET | `https://myfenrir.com/auth/health` | Liveness |
-| GET | `https://myfenrir.com/auth/ready` | Neon + session signing + all three providers; 503 until complete |
+| GET | `https://myfenrir.com/auth/ready` | Session secret + all three providers + (Neon **or** KV); 503 only when login cannot mint a session |
 
 `?redirect=` is allow-listed to `myfenrir.com` / `www.myfenrir.com` (open-redirect
 protection). `/auth/api/*`, KYC, passkeys, and extra providers are out.
+
+`www.myfenrir.com` 301s to the apex (Pages `_redirects` + `fenrir-redirects`).
+Worker routes remain on both hosts. Browser OAuth failures 302 to
+`/login?error=…` (HTML Accept); API clients still get JSON. CORS credentials
+are allowed for `https://www.myfenrir.com` so the www SPA can call apex `/auth/me`.
 
 ## Session
 
 Cookie `fenrir_session` = `<sessionId>.<HMAC-SHA256(sessionId, SESSION_SECRET)>`,
 `HttpOnly; Secure; SameSite=Lax; Domain=myfenrir.com; Path=/`.
 
-- **KV** (`SESSIONS`) holds short-lived OAuth state (PKCE verifier + returnTo).
-- **Neon** holds `users` and `sessions`. Apply `neon/schema.sql`.
+- **KV** (`SESSIONS`) holds short-lived OAuth state (PKCE verifier + returnTo)
+  and is the **session fallback** when Neon is unset or unreachable.
+- **Neon** holds `users` and `sessions` when `DATABASE_URL` is healthy. Apply
+  `neon/schema.sql`. Login stays up on KV until then (`degraded: true`).
 
 ## Secrets (existing names — do not invent credentials)
 

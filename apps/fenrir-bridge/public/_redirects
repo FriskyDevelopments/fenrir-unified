@@ -12,4 +12,8 @@
 /privacy /privacy/index.html 200
 /terms /terms/index.html 200
 /legal /legal/index.html 200
+# Canonical host: www historically had no auth Worker route, so /auth/* hit the
+# SPA catch-all and login looked broken. Send www to the apex before the splat.
+# More-specific Workers (auth/*, gate/*) still win over this Pages file.
+https://www.myfenrir.com/*    https://myfenrir.com/:splat    301
 /* /index.html 200
