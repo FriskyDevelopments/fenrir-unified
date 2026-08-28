@@ -27,6 +27,6 @@
   },
   // Replace id after: wrangler kv namespace create FENRIR_AUTH_SESSIONS
   "kv_namespaces": [
-    { "binding": "SESSIONS", "id": "fenrir-auth-sessions-pending" }
+    { "binding": "SESSIONS", "id": "9e3b6917e8354d66aa3f4375f345e440" }
   ]
 }
