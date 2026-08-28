@@ -1,5 +1,6 @@
 import { createSessionPayload, readCookie, type SessionPayload } from "./auth";
 import { requireEnv, type BillingEnv } from "./billing-env";
+import { preservedLoginNext } from "./fenrir-login";
 
 export type OAuthEnv = BillingEnv & {
   GOOGLE_CLIENT_ID?: string;
@@ -395,6 +396,8 @@ export async function exchangeCodeForSession(
 
 export function safeReturnPath(value: string | null | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/main";
+  const preserved = preservedLoginNext(value);
+  if (preserved) return preserved;
   const pathname = value.split(/[?#]/, 1)[0] || "/";
   if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) return "/main";
   return value;

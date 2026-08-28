@@ -22,6 +22,14 @@ const apiSource = readFileSync(
   fileURLToPath(new URL("../../src/services/api.ts", import.meta.url)),
   "utf8",
 );
+const fenrirLogin = readFileSync(
+  fileURLToPath(new URL("../_lib/fenrir-login.ts", import.meta.url)),
+  "utf8",
+);
+const appSource = readFileSync(
+  fileURLToPath(new URL("../../src/App.tsx", import.meta.url)),
+  "utf8",
+);
 
 describe("Community Bridge Telegram chain (after FriskyDev link)", () => {
   it("keeps walkthrough step 1 on FriskyDev link-start", () => {
@@ -45,7 +53,11 @@ describe("Community Bridge Telegram chain (after FriskyDev link)", () => {
   });
 
   it("preserves login ?next= for FriskyDev link-start", () => {
-    expect(apiSource).toContain('pathname === "/api/telegram/link/start"');
+    expect(fenrirLogin).toContain('export const TELEGRAM_LINK_START_PATH = "/api/telegram/link/start"');
+    expect(fenrirLogin).toContain("preservedLoginNext");
+    expect(apiSource).toContain("preservedLoginNext");
+    expect(apiSource).toContain("safeLoginNextPath");
+    expect(appSource).toContain('"/api/telegram/link/start"');
   });
 
   it("Bot OS continues on communities.myfenrir.com after FriskyDev is linked", () => {

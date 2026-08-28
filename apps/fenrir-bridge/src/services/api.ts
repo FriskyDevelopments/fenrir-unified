@@ -11,6 +11,7 @@ import { copy } from "../i18n";
 import { resolveAuthOrigin } from "./authOrigin";
 import { addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
 import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TrialPublic, TrialStatusPayload } from "./types";
+import { isFenrirAuthWorkerDocument, preservedLoginNext } from "../../functions/_lib/fenrir-login";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
 export const defaultBillingCheckoutErrorMessage = copy.en.checkoutErrorGeneric;
@@ -38,6 +39,16 @@ function browserAuthOrigin(): string {
 function workerAuthUrl(path: string) {
   const origin = browserAuthOrigin();
   return origin ? `${origin}${path}` : path;
+}
+
+async function workerAuthIsLive(): Promise<boolean> {
+  try {
+    const response = await fetch(workerAuthUrl("/auth/health"), { credentials: "include" });
+    const body = await response.json().catch(() => null);
+    return isFenrirAuthWorkerDocument(response.headers.get("content-type"), body);
+  } catch {
+    return false;
+  }
 }
 
 type WorkerAuthProvider = "google" | "microsoft" | "apple";
@@ -202,12 +213,7 @@ function devAuthSession(): AuthSession & { ok: true } {
 
 function safeLoginNextPath() {
   if (typeof window === "undefined") return null;
-  const next = new URLSearchParams(window.location.search).get("next");
-  if (!next?.startsWith("/") || next.startsWith("//")) return null;
-  const pathname = next.split(/[?#]/, 1)[0];
-  if (pathname === "/api/telegram/link/start") return pathname;
-  if (pathname === "/main" || pathname.startsWith("/main/")) return next;
-  return null;
+  return preservedLoginNext(new URLSearchParams(window.location.search).get("next"));
 }
 
 function safeCurrentAuthReturnPath() {
@@ -416,7 +422,11 @@ export const authService = {
   },
   async login(provider: "google" | "microsoft" | "apple") {
     const returnTo = safeCurrentAuthReturnPath();
-    window.location.assign(`${workerAuthUrl(`/auth/${provider}`)}?redirect=${encodeURIComponent(returnTo)}`);
+    if (await workerAuthIsLive()) {
+      window.location.assign(`${workerAuthUrl(`/auth/${provider}`)}?redirect=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+    window.location.assign(`/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
   },
   async enabledProviders() {
     try {
