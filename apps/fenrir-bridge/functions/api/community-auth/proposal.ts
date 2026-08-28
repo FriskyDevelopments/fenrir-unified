@@ -2,6 +2,11 @@ import { communityAuthConfigured, communityBrandConfigured, communitySessionCook
 import { communityGateAuthConfigured } from "../../_lib/community-gate";
 import { noStoreJson } from "../../_lib/responses";
 
+/**
+ * Reports the community gate's authentication, configuration, isolation, environment, schema, and table details.
+ *
+ * @returns A no-store status object for the `fenrir-community-gate` product.
+ */
 export async function onRequestGet(context: any) {
   const brandConfigured = await communityBrandConfigured(context.env);
   return noStoreJson({

@@ -5,6 +5,11 @@ import { appleConfigured, enabledSocialProviders } from "@frisky/auth";
 
 const CLIENT_AUTH_PROVIDERS = ["apple", "google", "microsoft"] as const satisfies readonly OAuthProvider[];
 
+/**
+ * Reports the authentication capabilities available for the current environment.
+ *
+ * @returns Authentication engine, identity mode, Authentik status, Apple OAuth availability, and supported providers.
+ */
 export async function onRequestGet(context: { env: OAuthEnv & { FRISKY_AUTH_ENABLED?: string } }) {
   const betterAuthOn = friskyAuthEnabled(context.env);
   const providers = betterAuthOn

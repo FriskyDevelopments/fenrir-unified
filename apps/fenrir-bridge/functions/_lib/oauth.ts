@@ -66,16 +66,20 @@ export function isOAuthProvider(value: unknown): value is OAuthProvider {
 }
 
 /**
- * Providers offered by the Community Gate. Deliberately narrower than isOAuthProvider():
+ * Determines whether a value identifies an OAuth provider supported by Community Gate, including the legacy Authentik identifier.
+ *
+ * @param value - The value to evaluate
+ * @returns `true` if the value is a supported Community Gate OAuth provider, `false` otherwise.
  */
 export function isCommunityOAuthProvider(value: unknown): value is OAuthProvider {
   return value === "google" || value === "microsoft" || value === "apple" || value === "authentik";
 }
 
 /**
- * Authentik OIDC endpoints for the destroyed Identity Core hostname.
- * Kept only so leftover docs and tests can name the stale URLs. Never call these
- * for live login — `isDirectOAuthAvailable("authentik")` is always false.
+ * Constructs legacy Authentik OIDC endpoint URLs from an issuer URL.
+ *
+ * @param issuer - The Authentik issuer URL
+ * @returns The normalized issuer and its authorization, token, userinfo, and JWKS endpoints
  */
 export function authentikEndpoints(issuer: string) {
   const normalizedIssuer = issuer.trim().replace(/\/*$/, "/");
@@ -89,6 +93,13 @@ export function authentikEndpoints(issuer: string) {
   };
 }
 
+/**
+ * Determines whether the specified OAuth provider has the credentials required for direct authentication.
+ *
+ * @param provider - The OAuth provider to check
+ * @param env - Environment configuration containing provider credentials
+ * @returns `true` if the provider's required credentials are configured, `false` otherwise.
+ */
 export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): boolean {
   if (provider === "google") {
     return Boolean(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim());
@@ -138,6 +149,16 @@ export async function createCommunityOAuthTransaction(
   };
 }
 
+/**
+ * Builds a provider-specific OAuth authorization URL.
+ *
+ * @param provider - The OAuth provider to authorize with
+ * @param env - Environment configuration containing the provider credentials
+ * @param redirectUri - Callback URI for the authorization response
+ * @param tx - OAuth transaction containing the state, nonce, and PKCE verifier
+ * @returns The authorization URL
+ * @throws If the provider credentials are missing or the provider is unsupported or retired
+ */
 export async function getAuthorizationUrl(provider: OAuthProvider, env: OAuthEnv, redirectUri: string, tx: OAuthTransaction): Promise<string> {
   const codeChallenge = await pkceChallenge(tx.verifier);
 
@@ -328,10 +349,10 @@ export function validateOAuthTransaction(tx: OAuthTransaction | null, provider: 
 }
 
 /**
- * Verify the provider round trip and return the raw identity, WITHOUT minting an
- * operator session or applying the operator admin allow-list. The Community Gate
- * bridge builds its own Neon session from this; exchangeCodeForSession() is the
- * operator path and keeps the allow-list check.
+ * Exchanges an OAuth authorization code for a verified provider identity without creating a session or applying an administrator allowlist.
+ *
+ * @returns The verified OAuth identity associated with the authorization code.
+ * @throws An error if the provider is retired or unsupported.
  */
 export async function exchangeCodeForIdentity(
   provider: OAuthProvider,
@@ -440,6 +461,14 @@ async function exchangeMicrosoftCode(env: OAuthEnv, code: string, redirectUri: s
   };
 }
 
+/**
+ * Exchanges an Apple authorization code for a verified OAuth identity.
+ *
+ * @param code - The authorization code issued by Apple
+ * @param redirectUri - The redirect URI used during authorization
+ * @param tx - The OAuth transaction containing the PKCE verifier and nonce
+ * @returns The verified Apple identity
+ */
 async function exchangeAppleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
   const clientId = requireEnv(env.APPLE_CLIENT_ID, "APPLE_CLIENT_ID");
   const clientSecret = await createAppleClientSecret(env);

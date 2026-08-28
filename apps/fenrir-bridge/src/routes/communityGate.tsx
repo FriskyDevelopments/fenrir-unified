@@ -26,6 +26,12 @@ function readableCommunityError(detail: unknown, fallback?: string) {
   return fallback || "Community Gate is not ready yet.";
 }
 
+/**
+ * Converts a Community Gate administration request error into a user-facing message.
+ *
+ * @param error - The error produced by the Community Gate administration request
+ * @returns A descriptive message for the error condition
+ */
 function communityBrandAdminErrorMessage(error: unknown) {
   if (!(error instanceof CommunityBrandRequestError)) {
     return "Network/API failure. The brand workspace could not be loaded.";

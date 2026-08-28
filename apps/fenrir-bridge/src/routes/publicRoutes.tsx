@@ -107,6 +107,12 @@ function planLabel(plan: Plan) {
   return labels[plan];
 }
 
+/**
+ * Converts an authentication provider identifier into a display label.
+ *
+ * @param provider - The provider identifier to normalize
+ * @returns The corresponding provider label, the original identifier, or `"OAuth"` when empty
+ */
 function authProviderLabel(provider: string) {
   const value = provider.toLowerCase();
   if (value.includes("apple")) return "Apple";

@@ -8,6 +8,12 @@ import {
 } from "../../../_lib/community-gate";
 import { noStoreJson } from "../../../_lib/responses";
 
+/**
+ * Handles GET requests for Community Gate authentication and profile access.
+ *
+ * @param context - Request context containing the incoming request and environment configuration
+ * @returns A response describing authentication status, configuration requirements, or the authenticated user's profile
+ */
 export async function onRequestGet(context: any) {
   if (!communityGateAuthConfigured(context.env)) return communityGateNotConfigured(context.env);
 

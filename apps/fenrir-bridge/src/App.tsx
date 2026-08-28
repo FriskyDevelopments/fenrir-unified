@@ -2174,6 +2174,12 @@ function planLabel(plan: Plan) {
   return labels[plan];
 }
 
+/**
+ * Resolves a provider identifier to its display label.
+ *
+ * @param provider - The provider identifier to label
+ * @returns A recognized provider label, the original identifier, or `OAuth` when no identifier is provided
+ */
 function authProviderLabel(provider: string) {
   const value = provider.toLowerCase();
   if (value.includes("apple")) return "Apple";
@@ -2461,6 +2467,12 @@ const accessStateHelp: Record<DefaultAccessState, string> = {
   disabled: "The gate stays closed while you finish setup."
 };
 
+/**
+ * Converts a community authentication provider identifier into a display label.
+ *
+ * @param provider - The authentication provider identifier
+ * @returns The provider's display label
+ */
 function communityAuthProviderLabel(provider: string) {
   if (provider === "magic_link") return "Magic link";
   if (provider === "microsoft") return "Microsoft";
@@ -2475,6 +2487,13 @@ function communityAuthProviderLabel(provider: string) {
  */
 const communityOAuthProviders = ["google", "microsoft", "apple"] as const;
 
+/**
+ * Builds the OAuth authentication URL for a community.
+ *
+ * @param provider - The OAuth provider to authenticate with
+ * @param slug - The community slug
+ * @returns The provider-specific community OAuth URL
+ */
 function communityOAuthStartUrl(provider: string, slug: string) {
   const params = new URLSearchParams({ slug, return_to: `/community/${slug}` });
   return `/api/community-auth/oauth/${provider}?${params.toString()}`;
@@ -3243,6 +3262,12 @@ function readableCommunityError(detail: unknown, fallback?: string) {
   return fallback || "Community Gate is not ready yet.";
 }
 
+/**
+ * Maps a Community Gate branding request error to a user-facing message.
+ *
+ * @param error - The error raised while loading Community Gate branding.
+ * @returns A descriptive message for the authentication, authorization, configuration, schema, or network failure.
+ */
 function communityBrandAdminErrorMessage(error: unknown) {
   if (!(error instanceof CommunityBrandRequestError)) {
     return "Network/API failure. The brand workspace could not be loaded.";
