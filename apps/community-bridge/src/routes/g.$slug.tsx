@@ -197,7 +197,18 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
   const ssoHref = communitySsoUrl(params.slug, config.brand_id);
   // A visitor starts with MyFenrir SSO. Once SSO has returned a session, the
   // Gate runs its security preflight instead of bouncing back to SSO.
-  const needsSso = checkingAccess || !session;
+  // "Todavía no sé" NO es "hace falta iniciar sesión".
+  //
+  // Antes esto era `checkingAccess || !session`, así que durante la ventana de
+  // carga el botón se pintaba como "Continue to SSO" CON su enlace vivo. Quien
+  // lo pulsaba en ese momento —y es el instante en que más se pulsa, porque es
+  // lo primero que aparece— iba al SSO, que veía una sesión ya válida y lo
+  // devolvía a /gates. Un botón que te deja donde estabas es un botón roto a
+  // ojos de cualquiera, aunque cada salto por separado sea correcto.
+  //
+  // Ahora sólo es `needsSso` cuando de verdad NO hay sesión. Mientras se
+  // comprueba, `checkingAccess` deja el botón en un estado neutro y sin enlace.
+  const needsSso = !checkingAccess && !session;
   // `isStaff` can hydrate from a cached role result before an SSO session is
   // available. Public visitors must never see the internal Gates shortcut in
   // that transient state; it strands them at a second login wall instead of
