@@ -45,7 +45,14 @@ function generateId(): string {
     const parts: string[] = [];
     for (let i = 0; i < 3; i++) {
         let s = "";
-        for (let j = 0; j < 4; j++) s += chars[Math.floor(Math.random() * chars.length)];
+        // crypto.getRandomValues, NO Math.random. Math.random no es
+        // criptográfico: su estado se puede reconstruir observando salidas, y
+        // estos ids son la única credencial de un candado. Con ids adivinables,
+        // copiar/rotar/revocar ajeno pasa de "hace falta el id" a "hace falta
+        // paciencia". Los ids ya emitidos se conservan; sólo cambian los nuevos.
+        const buf = new Uint8Array(4);
+        crypto.getRandomValues(buf);
+        for (let j = 0; j < 4; j++) s += chars[buf[j] % chars.length];
         parts.push(s);
     }
     return `fnr-${parts.join("-")}`;
@@ -147,6 +154,12 @@ export async function rotateLock(
 ): Promise<{ old: InviteLock; fresh: InviteLock } | null> {
     const existing = await getLock(lockId, env);
     if (!existing || existing.revoked) return null;
+    // Acotado por dueño. `chatId` llegaba pero sólo se usaba para ESCRIBIR la
+    // fila nueva, nunca para comprobar quién pedía la rotación: con el id de
+    // otro se le quemaba su candado y el nuevo quedaba a nombre de quien
+    // rotaba. La versión standalone (fenrir-lock-bot/src/services/locks.ts) sí
+    // comparaba; la unificada perdió la comprobación al portarse.
+    if (existing.chatId !== chatId) return null;
 
     const now = new Date().toISOString();
 
@@ -161,8 +174,12 @@ export async function rotateLock(
             try {
                 await db.batch([
                     db
-                        .prepare("UPDATE invite_locks SET revoked = 1 WHERE id = ?")
-                        .bind(lockId),
+                        // chat_id en el WHERE, no sólo en la comprobación de
+                        // arriba: defensa en profundidad. Si alguien añade otro
+                        // camino a esta función, la propia sentencia no puede
+                        // tocar un candado ajeno.
+                        .prepare("UPDATE invite_locks SET revoked = 1 WHERE id = ? AND chat_id = ?")
+                        .bind(lockId, chatId),
                     db
                         .prepare(
                             "INSERT INTO invite_locks (id, domain, chat_id, created_at, revoked, rotated_from) VALUES (?, ?, ?, ?, 0, ?)",
@@ -213,16 +230,20 @@ export async function rotateLock(
 /** Revoke (soft-delete) a lock. Returns the updated lock or null. */
 export async function revokeLock(
     lockId: string,
+    chatId: number,
     env?: EnvMaybe,
 ): Promise<InviteLock | null> {
     const existing = await getLock(lockId, env);
     if (!existing || existing.revoked) return null;
+    // Esta función ni siquiera RECIBÍA chatId: era imposible comprobar el dueño.
+    // Con el id de otro se le quemaba el candado. Ahora es obligatorio.
+    if (existing.chatId !== chatId) return null;
 
     if (hasDB(env)) {
         const db = env.DB as any;
         await db
-            .prepare("UPDATE invite_locks SET revoked = 1 WHERE id = ?")
-            .bind(lockId)
+            .prepare("UPDATE invite_locks SET revoked = 1 WHERE id = ? AND chat_id = ?")
+            .bind(lockId, chatId)
             .run();
     }
 
