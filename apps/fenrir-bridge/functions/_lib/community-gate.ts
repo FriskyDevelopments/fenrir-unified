@@ -34,6 +34,12 @@ export function communityGateDataConfigured(env: CommunityGateEnv) {
   return Boolean(env.NEON_DATABASE_URL?.trim());
 }
 
+/**
+ * Creates a 503 response describing missing Community Gate configuration.
+ *
+ * @param env - Environment values used to check authentication and database configuration
+ * @returns A no-store JSON response listing the missing configuration values
+ */
 export function communityGateNotConfigured(env: CommunityGateEnv = {}) {
   const missing = [] as string[];
   if (!env.FIREBASE_PROJECT_ID?.trim() && !env.FENRIR_COMMUNITY_AUTH_SECRET?.trim()) {

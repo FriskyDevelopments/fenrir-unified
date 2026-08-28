@@ -63,6 +63,11 @@ export function planLabel(plan: Plan) {
   return labels[plan];
 }
 
+/**
+ * Normalizes an authentication provider name to a user-facing label.
+ *
+ * @returns A recognized provider label, the original provider name, or `"OAuth"` when no provider is supplied.
+ */
 export function authProviderLabel(provider: string) {
   const value = provider.toLowerCase();
   if (value.includes("apple")) return "Apple";

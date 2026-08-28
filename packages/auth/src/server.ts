@@ -16,6 +16,12 @@ export {
 } from "./env";
 export type { FriskyAuthEnv, FriskyAuthOptions, FriskySocialProvider, QueryableDatabase } from "./types";
 
+/**
+ * Creates a Fenrir Better Auth instance from the supplied authentication configuration.
+ *
+ * @param options - Authentication settings, including credentials, database, trusted origins, and optional social providers
+ * @returns A configured Better Auth instance
+ */
 export function createFriskyAuth(options: FriskyAuthOptions) {
   const google = options.socialProviders.google;
   const microsoft = options.socialProviders.microsoft;

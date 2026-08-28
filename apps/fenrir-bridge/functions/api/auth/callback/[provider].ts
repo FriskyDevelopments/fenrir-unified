@@ -14,6 +14,11 @@ import { authOrigin, siteOrigin } from "../../../_lib/billing-env";
 import { ensureDefaultWorkspace } from "../../../_lib/workspaces";
 import { upsertProfileForSession } from "../../../_lib/supabase-profiles";
 
+/**
+ * Handles OAuth callback requests for supported providers.
+ *
+ * @returns A response that completes authentication, redirects to the login page on failure, or reports an unavailable or unsupported provider.
+ */
 async function handleCallback(context: EventContext<OAuthEnv, "provider", unknown>) {
   const provider = context.params.provider;
 
