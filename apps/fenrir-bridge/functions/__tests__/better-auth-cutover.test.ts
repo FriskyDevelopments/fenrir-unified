@@ -8,15 +8,22 @@ describe("retired Pages login paths", () => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
-  it("redirects /api/auth/login/:provider onto the Fenrir Better Auth Worker when that Worker is publicly routed", async () => {
+  it("redirects /api/auth/login/:provider onto the Fenrir Better Auth Worker when public /auth/ready is 200 with a social provider", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(JSON.stringify({ ok: true, service: "fenrir-auth-worker" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      ),
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (!url.includes("/auth/ready")) {
+          throw new Error(`unexpected fetch ${url}`);
+        }
+        return new Response(
+          JSON.stringify({
+            ready: true,
+            providers: { google: true, microsoft: false, apple: false },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }),
     );
 
     const response = await onRequestGet({

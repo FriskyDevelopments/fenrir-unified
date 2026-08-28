@@ -11,7 +11,7 @@ import { copy } from "../i18n";
 import { resolveAuthOrigin } from "./authOrigin";
 import { addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
 import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TrialPublic, TrialStatusPayload } from "./types";
-import { isFenrirAuthWorkerDocument, preservedLoginNext } from "../../functions/_lib/fenrir-login";
+import { preservedLoginNext, publicFenrirAuthWorkerIsLive } from "../../functions/_lib/fenrir-login";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
 export const defaultBillingCheckoutErrorMessage = copy.en.checkoutErrorGeneric;
@@ -42,13 +42,7 @@ function workerAuthUrl(path: string) {
 }
 
 async function workerAuthIsLive(): Promise<boolean> {
-  try {
-    const response = await fetch(workerAuthUrl("/auth/health"), { credentials: "include" });
-    const body = await response.json().catch(() => null);
-    return isFenrirAuthWorkerDocument(response.headers.get("content-type"), body);
-  } catch {
-    return false;
-  }
+  return publicFenrirAuthWorkerIsLive();
 }
 
 type WorkerAuthProvider = "google" | "microsoft" | "apple";

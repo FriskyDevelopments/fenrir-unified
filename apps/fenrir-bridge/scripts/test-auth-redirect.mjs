@@ -30,6 +30,8 @@ const checks = [
       apiSource.includes('workerAuthUrl("/auth/providers")') &&
       apiSource.includes("/api/auth/login/${provider}") &&
       apiSource.includes("workerAuthIsLive") &&
+      apiSource.includes("publicFenrirAuthWorkerIsLive") &&
+      !apiSource.includes('workerAuthUrl("/auth/health")') &&
       !apiSource.includes("signInWithSupabase(provider)") &&
       providersSource.includes("isDirectOAuthAvailable(provider, context.env)")
   },
@@ -80,6 +82,16 @@ const checks = [
     pass: apiSource.includes('from "../../functions/_lib/fenrir-login"') &&
       apiSource.includes("preservedLoginNext") &&
       apiSource.includes("safeLoginNextPath")
+  },
+  {
+    name: "Worker login follows public /auth/ready, not /auth/health liveness",
+    pass: (() => {
+      const fenrirLogin = readFileSync(join(root, "functions/_lib/fenrir-login.ts"), "utf8");
+      return fenrirLogin.includes('new URL("/auth/ready"') &&
+        fenrirLogin.includes("isFenrirAuthWorkerReady") &&
+        !fenrirLogin.includes('new URL("/auth/health"') &&
+        apiSource.includes("publicFenrirAuthWorkerIsLive");
+    })()
   }
 ];
 

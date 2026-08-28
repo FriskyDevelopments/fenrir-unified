@@ -5,10 +5,60 @@ import { onRequestGet as oauthCallback } from "../api/auth/callback/[provider]";
 import { safeReturnPath } from "../_lib/oauth";
 import {
   canonicalFenrirLoginUrl,
-  isFenrirAuthWorkerDocument,
+  isFenrirAuthWorkerReady,
   preservedLoginNext,
   TELEGRAM_LINK_START_PATH,
 } from "../_lib/fenrir-login";
+
+const liveHealthJson = { ok: true, service: "fenrir-auth-worker" };
+const liveReady503 = {
+  ready: false,
+  database: false,
+  session_backend: "kv",
+  degraded: true,
+  session_secret: false,
+  providers: { google: false, microsoft: false, apple: false },
+};
+const readyGoogleOnly = {
+  ready: false,
+  database: true,
+  providers: { google: true, microsoft: false, apple: false },
+};
+
+function jsonResponse(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function stubAuthFetch(ready: { status: number; body: unknown }, healthBody = liveHealthJson) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/auth/ready")) return jsonResponse(ready.status, ready.body);
+      if (url.includes("/auth/health")) return jsonResponse(200, healthBody);
+      throw new Error(`unexpected fetch ${url}`);
+    }),
+  );
+}
+
+const pagesGoogleEnv = {
+  PUBLIC_SITE_URL: "https://www.myfenrir.com",
+  ALLOWED_REDIRECT_URIS: "https://myfenrir.com,https://www.myfenrir.com",
+  SESSION_SECRET: "test-session-secret",
+  GOOGLE_CLIENT_ID: "placeholder-google-client-id",
+  GOOGLE_CLIENT_SECRET: "placeholder-google-client-secret",
+};
+
+const pagesMicrosoftEnv = {
+  PUBLIC_SITE_URL: "https://www.myfenrir.com",
+  ALLOWED_REDIRECT_URIS: "https://myfenrir.com,https://www.myfenrir.com",
+  SESSION_SECRET: "test-session-secret",
+  MICROSOFT_CLIENT_ID: "placeholder-microsoft-client-id",
+  MICROSOFT_CLIENT_SECRET: "placeholder-microsoft-client-secret",
+};
 
 describe("fenrir login helpers", () => {
   it("builds the apex Better Auth login URL", () => {
@@ -24,17 +74,13 @@ describe("fenrir login helpers", () => {
     expect(preservedLoginNext("/main")).toBeNull();
   });
 
-  it("accepts Worker health JSON and rejects SPA HTML", () => {
-    expect(
-      isFenrirAuthWorkerDocument("application/json", {
-        service: "fenrir-auth-worker",
-        ready: true,
-      }),
-    ).toBe(true);
-    expect(isFenrirAuthWorkerDocument("application/json; charset=utf-8", { ready: true })).toBe(true);
-    expect(isFenrirAuthWorkerDocument("text/html", { service: "fenrir-auth-worker" })).toBe(false);
-    expect(isFenrirAuthWorkerDocument("application/json", { ok: true })).toBe(false);
-    expect(isFenrirAuthWorkerDocument("text/html", "<!doctype html>")).toBe(false);
+  it("treats /auth/ready 200 with ready true or one social provider as live, not health liveness", () => {
+    expect(isFenrirAuthWorkerReady(200, "application/json", { ready: true, providers: liveReady503.providers })).toBe(true);
+    expect(isFenrirAuthWorkerReady(200, "application/json; charset=utf-8", readyGoogleOnly)).toBe(true);
+    expect(isFenrirAuthWorkerReady(503, "application/json", liveReady503)).toBe(false);
+    expect(isFenrirAuthWorkerReady(200, "application/json", liveReady503)).toBe(false);
+    expect(isFenrirAuthWorkerReady(200, "application/json", liveHealthJson)).toBe(false);
+    expect(isFenrirAuthWorkerReady(200, "text/html", { ready: true })).toBe(false);
   });
 });
 
@@ -76,29 +122,15 @@ describe("Better Auth Worker vs live Pages OAuth", () => {
     vi.restoreAllMocks();
   });
 
-  it("starts Google via Pages OAuth when public /auth/health is still SPA HTML", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        new Response("<!doctype html><title>MyFenrir</title>", {
-          status: 200,
-          headers: { "Content-Type": "text/html; charset=utf-8" },
-        }),
-      ),
-    );
+  it("starts Google via Pages OAuth when /auth/health is 200 but /auth/ready is 503 with all providers false", async () => {
+    stubAuthFetch({ status: 503, body: liveReady503 });
 
     const response = await startProviderLogin({
       params: { provider: "google" },
       request: new Request(
         "https://www.myfenrir.com/api/auth/login/google?return_to=/api/telegram/link/start",
       ),
-      env: {
-        PUBLIC_SITE_URL: "https://www.myfenrir.com",
-        ALLOWED_REDIRECT_URIS: "https://myfenrir.com,https://www.myfenrir.com",
-        SESSION_SECRET: "test-session-secret",
-        GOOGLE_CLIENT_ID: "placeholder-google-client-id",
-        GOOGLE_CLIENT_SECRET: "placeholder-google-client-secret",
-      },
+      env: pagesGoogleEnv,
     });
 
     expect(response.status).toBe(302);
@@ -108,16 +140,60 @@ describe("Better Auth Worker vs live Pages OAuth", () => {
     expect(location).not.toContain("/auth/google");
   });
 
-  it("starts Google on the Better Auth Worker when public /auth/health is Worker JSON", async () => {
+  it("keeps Pages OAuth if www /auth/ready is unready even when apex is ready", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(JSON.stringify({ ok: true, service: "fenrir-auth-worker" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      ),
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.startsWith("https://myfenrir.com/auth/ready")) return jsonResponse(200, readyGoogleOnly);
+        if (url.startsWith("https://www.myfenrir.com/auth/ready")) return jsonResponse(503, liveReady503);
+        if (url.includes("/auth/health")) return jsonResponse(200, liveHealthJson);
+        throw new Error(`unexpected fetch ${url}`);
+      }),
     );
+
+    const response = await startProviderLogin({
+      params: { provider: "google" },
+      request: new Request("https://www.myfenrir.com/api/auth/login/google?return_to=/main"),
+      env: pagesGoogleEnv,
+    });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location") ?? "").toContain("https://accounts.google.com/o/oauth2/v2/auth");
+    expect(response.headers.get("Location") ?? "").not.toContain("/auth/google");
+  });
+
+  it("starts Microsoft via Pages OAuth on the same unready Worker", async () => {
+    stubAuthFetch({ status: 503, body: liveReady503 });
+
+    const response = await startProviderLogin({
+      params: { provider: "microsoft" },
+      request: new Request("https://www.myfenrir.com/api/auth/login/microsoft?return_to=/main"),
+      env: pagesMicrosoftEnv,
+    });
+
+    expect(response.status).toBe(302);
+    const location = response.headers.get("Location") ?? "";
+    expect(location).toContain("https://login.microsoftonline.com/common/oauth2/v2.0/authorize");
+    expect(location).toContain("redirect_uri=https%3A%2F%2Fwww.myfenrir.com%2Fapi%2Fauth%2Fcallback%2Fmicrosoft");
+    expect(location).not.toContain("/auth/microsoft");
+  });
+
+  it("keeps Apple 410 on Pages while the Worker is unready", async () => {
+    stubAuthFetch({ status: 503, body: liveReady503 });
+
+    const response = await startProviderLogin({
+      params: { provider: "apple" },
+      request: new Request("https://www.myfenrir.com/api/auth/login/apple"),
+      env: pagesGoogleEnv,
+    });
+
+    expect(response.status).toBe(410);
+    await expect(response.json()).resolves.toMatchObject({ error: "direct_oauth_retired" });
+  });
+
+  it("starts Google on the Better Auth Worker when /auth/ready is 200 with one provider true", async () => {
+    stubAuthFetch({ status: 200, body: readyGoogleOnly });
 
     const response = await startProviderLogin({
       params: { provider: "google" },
