@@ -11,6 +11,7 @@ export type AuthEnv = {
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
   SUPABASE_ADMIN_EMAILS?: string;
+  AUTH?: { fetch: (request: Request) => Promise<Response> };
 };
 
 export type SessionPayload = {
@@ -91,6 +92,31 @@ export async function readFenrirCookieSession(request: Request, env: AuthEnv) {
  * @returns The authenticated session, or `null` when no valid session is available
  */
 export async function readSession(request: Request, env: AuthEnv) {
+  if (env.AUTH?.fetch) {
+    try {
+      const forwarded = await env.AUTH.fetch(new Request("https://myfenrir.com/auth/me", {
+        headers: {
+          Cookie: request.headers.get("Cookie") ?? "",
+          Authorization: request.headers.get("Authorization") ?? ""
+        }
+      }));
+      const body = await forwarded.json().catch(() => null) as {
+        authenticated?: boolean;
+        user?: { id: string; email?: string | null; name?: string | null; provider?: SessionProvider };
+      } | null;
+      if (body?.authenticated && body.user) {
+        return createSessionPayload({
+          email: body.user.email || "",
+          name: body.user.name || body.user.email || "",
+          provider: sessionProviderFromIdentity(body.user.provider),
+          identityId: body.user.id
+        });
+      }
+    } catch {
+      // Fall through to the legacy payload cookie.
+    }
+  }
+
   const cookieSession = await readFenrirCookieSession(request, env);
   if (cookieSession) return cookieSession;
   const { friskyAuthEnabled, readFriskyAuthSession } = await import("./frisky-auth");
@@ -128,6 +154,19 @@ export function createSessionPayload(input: {
     iat: now,
     exp: now + week
   };
+}
+
+function sessionProviderFromIdentity(provider: string | undefined): SessionProvider {
+  switch (provider) {
+    case "google":
+    case "microsoft":
+    case "apple":
+    case "telegram":
+    case "passkey":
+      return provider;
+    default:
+      return "google";
+  }
 }
 
 function requireSecret(value: string | undefined, name: string) {

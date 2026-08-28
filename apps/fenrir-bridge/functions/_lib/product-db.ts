@@ -346,3 +346,100 @@ function mapAudit(row: AuditRow) {
     createdAt: row.created_at
   };
 }
+
+export async function getDomainByHostname(db: D1Database, orgId: string, domain: string) {
+  const row = await db
+    .prepare(`SELECT * FROM frisky_domains WHERE org_id = ? AND lower(domain) = ?`)
+    .bind(orgId, domain.toLowerCase())
+    .first<DomainRow>();
+  return row ? mapDomain(row) : null;
+}
+
+export async function insertDomain(
+  db: D1Database,
+  input: {
+    id: string;
+    orgId: string;
+    domain: string;
+    status: string;
+    certificateStatus: string;
+    cloudflareHostnameId: string;
+    cloudflareNameservers: string;
+    createdAt: string;
+    verifiedAt: string | null;
+  }
+) {
+  await db
+    .prepare(
+      `INSERT INTO frisky_domains (
+        id, org_id, domain, verification_token, txt_record_name, txt_record_value,
+        cname_host, cname_target, status, dns_provider, certificate_status,
+        cloudflare_hostname_id, cloudflare_nameservers, created_at, verified_at
+      ) VALUES (?, ?, ?, '', '', '', '@', '', ?, 'cloudflare', ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      input.id,
+      input.orgId,
+      input.domain,
+      input.status,
+      input.certificateStatus,
+      input.cloudflareHostnameId,
+      input.cloudflareNameservers,
+      input.createdAt,
+      input.verifiedAt
+    )
+    .run();
+  const row = await db.prepare(`SELECT * FROM frisky_domains WHERE id = ?`).bind(input.id).first<DomainRow>();
+  if (!row) throw new Error("domain_insert_failed");
+  return mapDomain(row);
+}
+
+export async function updateDomainAttach(
+  db: D1Database,
+  orgId: string,
+  domainId: string,
+  input: {
+    status: string;
+    certificateStatus: string;
+    cloudflareHostnameId: string;
+    cloudflareNameservers?: string;
+    verifiedAt: string | null;
+  }
+) {
+  if (input.cloudflareNameservers !== undefined) {
+    await db
+      .prepare(
+        `UPDATE frisky_domains
+         SET status = ?, certificate_status = ?, cloudflare_hostname_id = ?,
+             cloudflare_nameservers = ?, verified_at = ?,
+             verification_token = '', txt_record_name = '', txt_record_value = '',
+             cname_host = '@', cname_target = '', dns_provider = 'cloudflare'
+         WHERE id = ? AND org_id = ?`
+      )
+      .bind(
+        input.status,
+        input.certificateStatus,
+        input.cloudflareHostnameId,
+        input.cloudflareNameservers,
+        input.verifiedAt,
+        domainId,
+        orgId
+      )
+      .run();
+  } else {
+    await db
+      .prepare(
+        `UPDATE frisky_domains
+         SET status = ?, certificate_status = ?, cloudflare_hostname_id = ?, verified_at = ?
+         WHERE id = ? AND org_id = ?`
+      )
+      .bind(input.status, input.certificateStatus, input.cloudflareHostnameId, input.verifiedAt, domainId, orgId)
+      .run();
+  }
+  const row = await db
+    .prepare(`SELECT * FROM frisky_domains WHERE id = ? AND org_id = ?`)
+    .bind(domainId, orgId)
+    .first<DomainRow>();
+  if (!row) throw new Error("domain_update_failed");
+  return mapDomain(row);
+}

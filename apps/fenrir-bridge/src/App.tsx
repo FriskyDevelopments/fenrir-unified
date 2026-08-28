@@ -30,6 +30,7 @@ import { knowledgeBaseLabel, knowledgeBaseUrl } from "./services/knowledgeBase";
 import { CinematicLanding } from "./components/CinematicLanding";
 import { GlowCard } from "./components/GlowCard";
 import { TelegramLoginWidget } from "./components/TelegramLoginWidget";
+import { loginPageErrorMessage } from "./services/authErrors";
 import { brandThemes, themeClassName, themeCssVars } from "./theme/brandThemes";
 
 const defaultServiceOrg = (import.meta.env.VITE_DEFAULT_SERVICE_ORG ?? "Frisky Dev Workspace").trim();
@@ -46,7 +47,7 @@ function postLoginDestination() {
 // where the Gate's "Proceed to SSO" used to die. Keep the allowlist to the one
 // endpoint that needs it: a same-origin GET redirect is not an open redirect,
 // but an unbounded list invites /main?next=/api/auth/logout links.
-const postAuthHandoffPaths = ["/api/auth/community-sso"];
+const postAuthHandoffPaths = ["/api/auth/community-sso", "/api/telegram/link/start"];
 function postAuthHandoffTarget() {
   const requested = new URLSearchParams(window.location.search).get("next");
   if (!requested?.startsWith("/") || requested.startsWith("//")) return null;
@@ -3347,9 +3348,9 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
                 />
               ))}
               {enabledProviders === null ? <small className="muted">Checking available sign-in…</small> : null}
-              {enabledProviders?.length === 0 ? (
-                <small className="muted">No OAuth provider is available right now.</small>
-              ) : null}
+            {enabledProviders?.length === 0 ? (
+              <small className="muted">No OAuth provider is available right now. Apple, Google, and Microsoft are the Fenrir sign-in options.</small>
+            ) : null}
             </div>
 
             {authNote ? <div className="lovable-auth-error" role="alert">{authNote}</div> : null}
@@ -3359,7 +3360,7 @@ function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: 
               <b>Encrypted sign-in</b>
               <span />
             </div>
-            <p className="lovable-auth-new-user">New here? Your account is created automatically on first sign-in.</p>
+            <p className="lovable-auth-new-user">New here? Your account is created automatically on first sign-in. Telegram linking happens after login — Fenrir never invents a group for you.</p>
           </div>
         </section>
 
@@ -3412,37 +3413,7 @@ function LovableAuthTerminal({ providers }: { providers: AuthProvider[] | null }
 }
 
 function authErrorMessage() {
-  const error = new URLSearchParams(window.location.search).get("auth_error");
-  if (!error) return null;
-  const [errorCode, errorDetail] = error.split(":", 2);
-  const detail = errorDetail ? decodeURIComponent(errorDetail) : "";
-
-  if (error.startsWith("missing_env:")) {
-    return "This provider is not live yet. Use an enabled sign-in option, or refresh to return to the clean Fenrir gate.";
-  }
-  if (error === "direct_oauth_disabled") {
-    return "That old sign-in route was retired. Use the provider buttons on this Fenrir gate.";
-  }
-  if (errorCode === "oauth_access_denied") {
-    return "The provider denied access. Try again and confirm consent to continue with this account.";
-  }
-  if (errorCode === "oauth_callback_error") {
-    return `Provider error while returning from sign-in.${detail ? ` ${detail}` : ""}`;
-  }
-  if (errorCode === "code_exchange_failed") {
-    return `Could not exchange the OAuth callback code. ${detail ? `(${detail})` : "Please try again."}`;
-  }
-  if (errorCode === "session_lookup_failed") {
-    return `Could not read the Frisky login session after login. ${detail ? `(${detail})` : "Please retry from the sign-in screen."}`;
-  }
-  if (errorCode === "supabase_session_failed") {
-    if (detail === "human_verification_required") return null;
-    return `Could not open a Fenrir admin session.${detail ? ` (${detail})` : ""}`;
-  }
-  if (errorCode === "missing_code") {
-    return "The provider did not return a sign-in code. Please try again.";
-  }
-  return "Sign-in could not finish. Try another provider or refresh the page.";
+  return loginPageErrorMessage(window.location.search);
 }
 
 function CommunityAuthProposalPanel({ proposal, locale }: { proposal: CommunityAuthProposal | null; locale: Locale }) {

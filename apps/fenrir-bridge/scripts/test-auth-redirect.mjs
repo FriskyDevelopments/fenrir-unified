@@ -1,6 +1,7 @@
-// Guard: new MyFenrir sign-ins prefer Better Auth (@frisky/auth) when
-// /api/auth/providers reports engine=better-auth. Direct OAuth remains a
-// cutover fallback. WorkOS is banned from this repo (same treatment as Vercel).
+// Guard: new MyFenrir sign-ins prefer the Fenrir Better Auth Worker on /auth/{provider}
+// when it is live, then Better Auth (@frisky/auth) when /api/auth/providers reports
+// engine=better-auth, and finally fall back to direct OAuth as the cutover fallback.
+// Authentik/Supabase proxy stays retired. WorkOS is banned from this repo (same as Vercel).
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -8,16 +9,14 @@ import { join } from "node:path";
 const root = new URL("..", import.meta.url).pathname;
 const apiSource = readFileSync(join(root, "src/services/api.ts"), "utf8");
 const providersSource = readFileSync(join(root, "functions/api/auth/providers.ts"), "utf8");
-const supabaseAuthSource = readFileSync(join(root, "src/services/supabaseAuth.ts"), "utf8");
 const appSource = readFileSync(join(root, "src/App.tsx"), "utf8");
 const routingSource = readFileSync(join(root, "src/app/routing.ts"), "utf8");
-const callbackPathMatcher = supabaseAuthSource.match(/function isAuthCallbackPath[\s\S]*?\n}/)?.[0] ?? "";
+const workerIndex = readFileSync(join(root, "workers/fenrir-auth/src/index.js"), "utf8");
 const appCallbackPathMatcher = appSource.match(/function isAuthCallbackPath[\s\S]*?\n}/)?.[0] ?? "";
 const routingCallbackPathMatcher = routingSource.match(/export function isAuthCallbackPath[\s\S]*?\n}/)?.[0] ?? "";
 
 function workosMatches() {
   try {
-    // Tracked files only; -i catches every casing. git grep exits 1 on zero hits.
     return execSync("git grep -li workos -- . \":(exclude)scripts/test-auth-redirect.mjs\" \":(exclude)functions/__tests__/community-oauth.test.ts\"", { cwd: root, encoding: "utf8" }).trim();
   } catch {
     return "";
@@ -35,6 +34,17 @@ const checks = [
       providersSource.includes("better-auth")
   },
   {
+    name: "new social login prefers Fenrir Better Auth Worker /auth/{provider}, Pages OAuth until that Worker is live",
+    pass: apiSource.includes("/auth/${provider}") &&
+      apiSource.includes('workerAuthUrl("/auth/providers")') &&
+      apiSource.includes("/api/auth/login/${provider}") &&
+      apiSource.includes("workerAuthIsLive") &&
+      apiSource.includes('workerAuthUrl("/auth/ready")') &&
+      !apiSource.includes('workerAuthUrl("/auth/health")') &&
+      !apiSource.includes("signInWithSupabase(provider)") &&
+      providersSource.includes("better-auth")
+  },
+  {
     name: "the production App auth surface renders only advertised providers",
     pass: appSource.includes("friskyClientAuthEngine") &&
       appSource.includes(".enabledProviders()") &&
@@ -42,8 +52,26 @@ const checks = [
       !appSource.includes('(["apple", "google", "microsoft"] as AuthProvider[]).map')
   },
   {
-    name: "legacy Supabase callback support remains available for existing sessions only",
-    pass: supabaseAuthSource.includes("signInWithOAuth")
+    name: "Fenrir Worker copies folios-auth-worker endpoints on myfenrir.com",
+    pass: workerIndex.includes("fenrir-auth-worker") &&
+      workerIndex.includes("myfenrir.com") &&
+      workerIndex.includes("safeReturnTo") &&
+      workerIndex.includes("withCors") &&
+      workerIndex.includes("authFailure") &&
+      workerIndex.includes('from "./identity.js"') &&
+      !workerIndex.includes("handleDataApi")
+  },
+  {
+    name: "www.myfenrir.com canonicalizes to apex for login (not apex→www)",
+    pass: (() => {
+      const redirects = readFileSync(join(root, "public/_redirects"), "utf8");
+      const hops = readFileSync(join(root, "workers/fenrir-redirects/worker.js"), "utf8");
+      return /https:\/\/www\.myfenrir\.com\/\*\s+https:\/\/myfenrir\.com\/:splat\s+301/.test(redirects)
+        && hops.includes('url.hostname === "www.myfenrir.com"')
+        && hops.includes('url.hostname = "myfenrir.com"')
+        && apiSource.includes('from "./authOrigin"')
+        && apiSource.includes("resolveAuthOrigin");
+    })()
   },
   {
     name: `no WorkOS reference exists anywhere in the app (banned)${offenders ? ` — found in: ${offenders.replaceAll("\n", ", ")}` : ""}`,
@@ -51,9 +79,18 @@ const checks = [
   },
   {
     name: "plain /login is not treated as an OAuth callback in any client route",
-    pass: !callbackPathMatcher.includes('normalizedPath === "/login"') &&
-      !appCallbackPathMatcher.includes('normalizedPath === "/login"') &&
+    pass: !appCallbackPathMatcher.includes('normalizedPath === "/login"') &&
       !routingCallbackPathMatcher.includes('normalizedPath === "/login"')
+  },
+  {
+    name: "SPA no longer completes Authentic/Supabase sessions",
+    pass: !apiSource.includes("completeSupabaseSession") && !apiSource.includes("signOutSupabase")
+  },
+  {
+    name: "Better Auth login preserves FriskyDev Telegram link-start next",
+    pass: apiSource.includes('from "../../functions/_lib/fenrir-login"') &&
+      apiSource.includes("preservedLoginNext") &&
+      apiSource.includes("safeLoginNextPath")
   }
 ];
 

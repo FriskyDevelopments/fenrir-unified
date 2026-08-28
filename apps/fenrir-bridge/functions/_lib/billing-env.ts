@@ -38,6 +38,12 @@ export type BillingEnv = AuthEnv & {
   FENRIR_APPLE_OAUTH_CONFIGURED?: string;
   NEON_DATABASE_URL?: string;
   MEDIA_PROXY_ALLOWED_HOSTS?: string;
+  /** Token used to attach same-account zones as Pages custom domains. Not committed. */
+  CLOUDFLARE_API_TOKEN?: string;
+  /** Cloudflare account that owns fenrir-bridge Pages. Defaults in code if unset. */
+  CLOUDFLARE_ACCOUNT_ID?: string;
+  /** Pages project to attach custom domains to. Defaults to fenrir-bridge. */
+  CLOUDFLARE_PAGES_PROJECT?: string;
   /** Base URL for Stripe success/cancel/portal returns (no trailing slash). Falls back to request origin. */
   PUBLIC_SITE_URL?: string;
   /** Base URL for Authentication (e.g. auth.myfenrir.com). Falls back to PUBLIC_SITE_URL or request origin. */

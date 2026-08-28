@@ -239,7 +239,7 @@ function NewGatePage() {
                 </a>
               </Button>
               <Button asChild variant="outline">
-                <a href="https://myfenrir.com/main">Link Telegram account</a>
+                <a href={MYFENRIR_LINK_URL}>Link Telegram account</a>
               </Button>
               <Button asChild variant="ghost">
                 <Link to="/dashboard">

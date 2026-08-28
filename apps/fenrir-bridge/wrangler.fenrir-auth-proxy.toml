@@ -1,13 +1,13 @@
 name = "fenrir-auth-proxy"
-main = "workers/fenrir-direct-oauth-guard.js"
-compatibility_date = "2026-05-15"
+main = "workers/fenrir-auth-proxy-retired.js"
+compatibility_date = "2026-08-28"
+
+# RETIRED. Authentic/Supabase proxy on auth.myfenrir.com is stopped.
+# Fenrir Better Auth lives on myfenrir.com/auth/* (wrangler.fenrir-auth.jsonc).
+# Keep this Worker on auth.myfenrir.com so leftover OAuth apps get a 410, not a
+# silent Supabase proxy.
 
 [vars]
-SUPABASE_AUTH_ORIGIN = "https://yqevglppbhuoxxfsfnih.supabase.co"
-AUTH_PROXY_ALLOWED_ORIGINS = "https://www.myfenrir.com,https://myfenrir.com,https://beta.fenrir-bridge.pages.dev,http://localhost:4173,http://127.0.0.1:4173,http://localhost:5173,http://127.0.0.1:5173"
+AUTH_PROXY_RETIRED_HINT = "https://myfenrir.com/login"
 
-# Route this Worker only after auth.myfenrir.com exists in the same
-# Cloudflare account as a proxied DNS record. Do not CNAME it directly to
-# *.supabase.co with orange-cloud proxy enabled, because that triggers 1014.
-#
 route = { pattern = "auth.myfenrir.com/*", zone_name = "myfenrir.com" }

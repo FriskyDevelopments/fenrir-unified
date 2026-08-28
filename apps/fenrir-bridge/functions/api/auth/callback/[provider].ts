@@ -5,10 +5,9 @@ import {
   isDirectOAuthAvailable,
   isOAuthProvider,
   readOAuthTransaction,
-  safeReturnPath,
   signSessionTransfer,
   validateOAuthTransaction,
-  type OAuthEnv
+  type OAuthEnv,
 } from "../../../_lib/oauth";
 import { authOrigin, siteOrigin } from "../../../_lib/billing-env";
 import { ensureDefaultWorkspace } from "../../../_lib/workspaces";
@@ -22,16 +21,14 @@ import { upsertProfileForSession } from "../../../_lib/supabase-profiles";
 async function handleCallback(context: EventContext<OAuthEnv, "provider", unknown>) {
   const provider = context.params.provider;
 
-  // Apple direct OAuth retired in favor of Supabase-brokered sign-in.
-  // Always return 410 Gone for the legacy path (matches audit intent).
   if (provider === "apple") {
     return noStoreJson(
       {
         ok: false,
         error: "direct_oauth_retired",
-        detail: "Apple direct OAuth is disabled. App login uses Better Auth at /api/frisky-auth when FRISKY_AUTH_ENABLED=1. Marketing still lists Apple; it is not live until Apple env + Better Auth callbacks are set."
+        detail: "Apple direct OAuth is disabled. Use the Fenrir Better Auth Worker at /auth/apple when it is live, or Better Auth at /api/frisky-auth when FRISKY_AUTH_ENABLED=1 (marketing may still list Apple; it is not live until Apple env + callbacks are set)."
       },
-      { status: 410 }
+      { status: 410 },
     );
   }
 
@@ -45,9 +42,9 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
       {
         ok: false,
         error: "direct_oauth_disabled",
-        detail: "Set the direct OAuth client ID/secret environment variables for this provider."
+        detail: "Set the direct OAuth client ID/secret environment variables for this provider.",
       },
-      { status: 410 }
+      { status: 410 },
     );
   }
 
@@ -91,12 +88,12 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
     await upsertProfileForSession(context.env, sessionPayload, result.identityId);
 
     const headers = new Headers({
-      Location: `${siteBase}/api/auth/complete?token=${encodeURIComponent(await signSessionTransfer(sessionPayload, tx?.returnTo ?? "/main", context.env))}`
+      Location: `${siteBase}/api/auth/complete?token=${encodeURIComponent(await signSessionTransfer(sessionPayload, tx?.returnTo ?? "/main", context.env))}`,
     });
     headers.append("Set-Cookie", clearTransactionCookie());
     return new Response(null, {
       status: 302,
-      headers
+      headers,
     });
   } catch (error) {
     return redirectWithAuthError(siteBase, error instanceof Error ? error.message : "oauth_exchange_failed", null);
@@ -113,7 +110,7 @@ function redirectWithAuthError(siteBase: string, error: string, detail: string |
     status: 302,
     headers: {
       Location: `${siteBase}/login?${params.toString()}`,
-      "Set-Cookie": clearTransactionCookie()
-    }
+      "Set-Cookie": clearTransactionCookie(),
+    },
   });
 }

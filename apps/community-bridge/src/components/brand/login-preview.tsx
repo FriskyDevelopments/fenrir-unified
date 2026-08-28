@@ -166,21 +166,20 @@ export function LoginPreview({ brand }: { brand: BrandConfig }) {
                 <div className="mt-4 rounded-xl border border-border/60 bg-muted/40 p-3 text-left">
                   <p className="text-xs font-medium text-foreground">{activate.stepsTitle}</p>
                   <ol className="mt-1.5 space-y-1 text-[10px] leading-relaxed text-muted-foreground">
-                    <li>1. Open the {brand.name || "brand"} bot in Telegram.</li>
+                    <li>1. Link your FriskyDev ID on www.myfenrir.com.</li>
                     <li>
-                      2. Send{" "}
-                      <code className="rounded bg-background px-1 py-0.5 font-mono">/link</code> to
-                      receive a 6-character code.
+                      2. Press Start in the bot — Telegram confirms automatically. There is no
+                      code to copy.
                     </li>
-                    <li>3. Paste it below within 15 minutes.</li>
+                    <li>3. Continue this Community Gate walkthrough.</li>
                   </ol>
                   <div className="mt-2 inline-flex h-7 items-center rounded-lg border border-border bg-card/70 px-2 text-[10px] font-medium text-foreground">
                     {activate.botLabel}
                   </div>
                 </div>
 
-                <div className="mt-3 flex h-9 items-center justify-center rounded-lg border border-border bg-background font-mono text-xs tracking-[0.4em] text-muted-foreground">
-                  ABC123
+                <div className="mt-3 flex h-9 items-center justify-center rounded-lg border border-border bg-background px-2 text-center text-[10px] leading-tight text-muted-foreground">
+                  Continue securely → FriskyDev link-start
                 </div>
 
                 <div className="mt-2 flex h-9 items-center justify-center rounded-lg border border-transparent bg-primary text-xs font-medium text-primary-foreground">

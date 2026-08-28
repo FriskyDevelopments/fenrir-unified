@@ -1,5 +1,6 @@
 import { createSessionPayload, readCookie, type SessionPayload } from "./auth";
 import { requireEnv, type BillingEnv } from "./billing-env";
+import { preservedLoginNext } from "./fenrir-login";
 
 export type OAuthEnv = BillingEnv & {
   GOOGLE_CLIENT_ID?: string;
@@ -101,21 +102,23 @@ export function authentikEndpoints(issuer: string) {
  * @returns `true` if the provider's required credentials are configured, `false` otherwise.
  */
 export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): boolean {
-  if (provider === "google") {
-    return Boolean(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim());
+  switch (provider) {
+    case "google":
+      return Boolean(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim());
+    case "microsoft":
+      return Boolean(env.MICROSOFT_CLIENT_ID?.trim() && env.MICROSOFT_CLIENT_SECRET?.trim());
+    case "apple":
+      return Boolean(env.APPLE_CLIENT_ID?.trim() && env.APPLE_TEAM_ID?.trim() && env.APPLE_KEY_ID?.trim() && env.APPLE_PRIVATE_KEY?.trim());
+    case "authentik":
+      // Authentik VM destroyed 2026-08-28. Never offer it as live identity,
+      // even if leftover AUTHENTIK_* secrets or AUTHENTIK_ENABLED are still bound.
+      return false;
+    default: {
+      const _exhaustive: never = provider;
+      void _exhaustive;
+      return false;
+    }
   }
-  if (provider === "microsoft") {
-    return Boolean(env.MICROSOFT_CLIENT_ID?.trim() && env.MICROSOFT_CLIENT_SECRET?.trim());
-  }
-  if (provider === "apple") {
-    return Boolean(env.APPLE_CLIENT_ID?.trim() && env.APPLE_TEAM_ID?.trim() && env.APPLE_KEY_ID?.trim() && env.APPLE_PRIVATE_KEY?.trim());
-  }
-  if (provider === "authentik") {
-    // Authentik VM destroyed 2026-08-28. Never offer it as live identity,
-    // even if leftover AUTHENTIK_* secrets are still bound.
-    return false;
-  }
-    return false;
 }
 
 export async function createOAuthTransaction(provider: OAuthProvider, env: OAuthEnv, returnTo: string): Promise<OAuthTransaction> {
@@ -390,6 +393,8 @@ export async function exchangeCodeForSession(
 
 export function safeReturnPath(value: string | null | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/main";
+  const preserved = preservedLoginNext(value);
+  if (preserved) return preserved;
   const pathname = value.split(/[?#]/, 1)[0] || "/";
   if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) return "/main";
   return value;

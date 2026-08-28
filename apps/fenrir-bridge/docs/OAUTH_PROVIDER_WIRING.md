@@ -1,9 +1,18 @@
-# Direct / leftover OAuth Provider Wiring
+# App Login OAuth Provider Wiring (myfenrir.com)
 
-MyFenrir **app login** is Better Auth (`@frisky/auth`) at `/api/frisky-auth/*`
-once `FRISKY_AUTH_ENABLED=1`. See `docs/FRISKY_AUTH_MIGRATION.md`.
+MyFenrir app login (who is this user?) is layered, in this order of precedence:
 
-The SPA must not treat Authentik or Firebase as the app IdP.
+1. **Fenrir Better Auth Worker** — a Cloudflare Worker (`fenrir-auth-worker`) on
+   `https://myfenrir.com/auth/*`. It copies the **folios-auth-worker** HTTP
+   contract. Cookie domain is **myfenrir.com**. This is the current production
+   identity plane when the Worker is live.
+2. **Better Auth (`@frisky/auth`)** at `/api/frisky-auth/*`, once
+   `FRISKY_AUTH_ENABLED=1`. See `docs/FRISKY_AUTH_MIGRATION.md`.
+3. **Leftover direct OAuth** under `/api/auth/*` — the pre-Worker, pre-Better-Auth
+   operator fallback path. Used only when neither of the above is live.
+
+The SPA must not treat Authentik or Firebase as the app IdP. Authentik / the
+Supabase broker on `auth.myfenrir.com` is retired.
 
 Community Gate (Neon) OAuth endpoints remain a **separate** membership plane:
 
@@ -14,100 +23,78 @@ Community Gate (Neon) OAuth endpoints remain a **separate** membership plane:
 The Fenrir MCP beta worker authenticates with a static bearer token
 (`FRISKY_BOT_API_TOKEN`); it has no OAuth discovery endpoints.
 
-Leftover direct `/api/auth/callback/*` routes below are the pre-Better-Auth
-operator path. Prefer the Better Auth callbacks in the migration doc.
-
 ## Production URLs
 
-Use these values for the production app:
-
-- App origin: `https://myfenrir.com`
-- WWW origin: `https://www.myfenrir.com`
-- Auth origin: `https://auth.myfenrir.com`
-- Better Auth (app login, once `FRISKY_AUTH_ENABLED=1`):
+- App / private-access gate: `https://myfenrir.com/login`
+- `www.myfenrir.com` 301s to the apex (Pages `_redirects` + `fenrir-redirects`).
+  Worker routes remain on both hosts; the www SPA calls apex `/auth/*`.
+- Fenrir Better Auth Worker:
+  - Google start: `https://myfenrir.com/auth/google`
+  - Microsoft start: `https://myfenrir.com/auth/microsoft`
+  - Apple start: `https://myfenrir.com/auth/apple`
+  - Callbacks: `https://myfenrir.com/auth/{google|microsoft|apple}/callback`
+- Better Auth (`@frisky/auth`, once `FRISKY_AUTH_ENABLED=1`):
   - `https://www.myfenrir.com/api/frisky-auth/callback/google`
   - `https://www.myfenrir.com/api/frisky-auth/callback/microsoft`
   - `https://www.myfenrir.com/api/frisky-auth/callback/apple` (not live until `APPLE_CLIENT_SECRET`)
-- Leftover direct OAuth (cutover fallback only):
+- Leftover direct OAuth (final fallback only):
   - Google callback: `https://auth.myfenrir.com/api/auth/callback/google`
   - Microsoft callback: `https://auth.myfenrir.com/api/auth/callback/microsoft`
   - Apple callback: `https://auth.myfenrir.com/api/auth/callback/apple`
 
 ## Google
 
-In Google Auth Platform, create or edit the web OAuth client.
+In Google Auth Platform, edit the existing web OAuth client (do not invent a new
+client id). Authorized redirect URI — add exactly:
 
-- Authorized JavaScript origins:
-  - `https://myfenrir.com`
-  - `https://www.myfenrir.com`
-  - `https://auth.myfenrir.com`
-- Authorized redirect URI:
-  - `https://auth.myfenrir.com/api/auth/callback/google`
+- `https://myfenrir.com/auth/google/callback`
+
+Authorized JavaScript origins (optional for this server-side code flow):
+
+- `https://myfenrir.com`
+- `https://www.myfenrir.com`
 
 ## Microsoft
 
-In Microsoft Entra, configure the web redirect URI:
+In Entra ID, edit the existing app registration. Web redirect URI — add exactly:
 
-- `https://auth.myfenrir.com/api/auth/callback/microsoft`
-
-The publisher-domain verification files are hosted from `public/.well-known/`
-and must be reachable on `https://auth.myfenrir.com/.well-known/`:
-
-- `microsoft-identity-association.json`
-- `microsoft-identity-association`
-
-Both must include application ID `bd7f4392-853c-4c41-89e7-443691424188`.
+- `https://myfenrir.com/auth/microsoft/callback`
 
 ## Apple
 
-For Sign in with Apple on the web, configure a Services ID and add:
+Sign in with Apple Services ID — add:
 
-- Web domain: `myfenrir.com`
-- Web domain: `auth.myfenrir.com`
-- Return URLs:
-  - `https://auth.myfenrir.com/api/auth/callback/apple`
+- Domains: `myfenrir.com`
+- Return URL: `https://myfenrir.com/auth/apple/callback`
 
-Apple's current web Sign in with Apple setup does not require uploading a static
-domain-association file for this Services ID flow.
+Apple posts the callback (`form_post`). The Worker already accepts POST.
 
-## Fenrir Readiness Flags
-
-Set these Cloudflare Pages production variables:
+## Worker secrets (existing names)
 
 ```bash
 SESSION_SECRET=
-VITE_DIRECT_AUTH_ORIGIN=https://auth.myfenrir.com
-PUBLIC_SITE_URL=https://www.myfenrir.com
-PUBLIC_AUTH_URL=https://auth.myfenrir.com
+# alias: BETTER_AUTH_SECRET
+
+DATABASE_URL=
+# alias: NEON_DATABASE_URL
+
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+
 MICROSOFT_CLIENT_ID=
 MICROSOFT_CLIENT_SECRET=
+# aliases: MS_CLIENT_ID / MS_CLIENT_SECRET
+
 APPLE_CLIENT_ID=
 APPLE_TEAM_ID=
 APPLE_KEY_ID=
 APPLE_PRIVATE_KEY=
 ```
 
-After each provider is configured in the provider console, set:
+Apply `workers/fenrir-auth/neon/schema.sql` on the Fenrir Neon database. Create
+the KV namespace and paste its id into `wrangler.fenrir-auth.jsonc`.
 
-```bash
-FENRIR_GOOGLE_OAUTH_CONFIGURED=true
-FENRIR_MICROSOFT_OAUTH_CONFIGURED=true
-FENRIR_APPLE_OAUTH_CONFIGURED=true
-```
+## Out of scope
 
-`/api/readiness` treats the direct provider credentials as readiness signals.
-
-## Neon Community Gate
-
-The Community Gate uses a separate Neon Postgres database. Set this Cloudflare
-Pages production variable after the Neon schema is applied:
-
-```bash
-NEON_DATABASE_URL=<pooled Neon connection string>
-```
-
-`/api/readiness` reports this as `billing.neonConfigured`. The paid-user launch
-gate remains Telegram Stars + D1; Neon readiness is tracked separately for
-Community Gate operations.
+`/auth/api/*`, KYC/KYB, CFDI, timbrado, passkeys, extra providers, Telegram dens.
+Telegram linking stays the post-login gate in the Fenrir dashboard.
