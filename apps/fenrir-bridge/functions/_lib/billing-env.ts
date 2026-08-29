@@ -20,6 +20,8 @@ export type BillingEnv = AuthEnv & {
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_PROD_BOT_TOKEN?: string;
   TELEGRAM_DEV_BOT_TOKEN?: string;
+  /** Must be the literal "true" to allow the dev bot token outside production. */
+  TELEGRAM_ALLOW_DEV_BOT_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
   TELEGRAM_LINK_CONFIRM_SECRET?: string;
   FENRIR_LINK_CONFIRM_URL?: string;
