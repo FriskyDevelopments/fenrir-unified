@@ -1,7 +1,7 @@
 // Provider catalog + per-request config derived from env.
 // Secret names match existing Fenrir Pages vars and the folios-auth-worker
 // contract. Do not invent credentials — map the OAuth apps you already have
-// onto https://myfenrir.com/auth/{provider}/callback.
+// onto https://{host}/auth/{provider}/callback.
 
 export const PROVIDERS = {
   google: {
@@ -26,7 +26,7 @@ export const PROVIDERS = {
     clientIdEnv: "MS_CLIENT_ID",
     clientSecretEnv: "MS_CLIENT_SECRET",
     profileSource: "userinfo",
-    extraAuthParams: { response_mode: "query" },
+    extraAuthParams: { response_mode: "query", prompt: "select_account" },
   },
   apple: {
     label: "Apple",
@@ -49,6 +49,12 @@ const SECRET_ALIASES = {
   MS_CLIENT_SECRET: ["MS_CLIENT_SECRET", "MICROSOFT_CLIENT_SECRET"],
 };
 
+export const FRISKYDEV_APP_HOSTS = [
+  "forge.friskydev.com",
+  "paperclip.friskydev.com",
+  "mcp.friskydev.com",
+];
+
 export function readSecret(env, name) {
   const aliases = SECRET_ALIASES[name] || [name];
   for (const key of aliases) {
@@ -56,6 +62,67 @@ export function readSecret(env, name) {
     if (typeof value === "string" && value.trim()) return value;
   }
   return "";
+}
+
+export function hostnameOf(request) {
+  try {
+    return new URL(request.url).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+export function isMyFenrirHost(host) {
+  const h = String(host || "").toLowerCase();
+  return h === "myfenrir.com" || h.endsWith(".myfenrir.com");
+}
+
+export function isFriskyDevHost(host) {
+  const h = String(host || "").toLowerCase();
+  return h === "friskydev.com" || h.endsWith(".friskydev.com");
+}
+
+export function isAllowedAuthHost(host) {
+  const h = String(host || "").toLowerCase();
+  if (!h) return false;
+  if (h === "folios.works" || h.endsWith(".folios.works")) return false;
+  return (
+    isMyFenrirHost(h) ||
+    isFriskyDevHost(h) ||
+    h === "localhost" ||
+    h === "127.0.0.1" ||
+    h.endsWith(".workers.dev")
+  );
+}
+
+export function cookieDomainForHost(host, fallback = "myfenrir.com") {
+  const h = String(host || "").toLowerCase();
+  if (isMyFenrirHost(h)) return "myfenrir.com";
+  if (isFriskyDevHost(h)) return "friskydev.com";
+  if (h === "localhost" || h === "127.0.0.1" || h.endsWith(".workers.dev")) return "";
+  return fallback;
+}
+
+export function requestOrigin(request) {
+  try {
+    const url = new URL(request.url);
+    const host = url.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1") {
+      return `${url.protocol}//${url.host}`;
+    }
+    return `https://${host}`;
+  } catch {
+    return "";
+  }
+}
+
+export function bindRequest(env, request) {
+  const host = hostnameOf(request);
+  return {
+    ...env,
+    AUTH_REQUEST_HOST: host,
+    AUTH_REQUEST_ORIGIN: requestOrigin(request),
+  };
 }
 
 export function getProvider(name) {
@@ -80,23 +147,49 @@ export function redirectUri(env, providerName) {
 }
 
 export function cfg(env) {
+  const requestHost = String(env?.AUTH_REQUEST_HOST || "").toLowerCase();
+  const requestOriginValue = String(env?.AUTH_REQUEST_ORIGIN || "").replace(/\/$/, "");
+  const defaultBase = (env.BASE_URL || "https://myfenrir.com").replace(/\/$/, "");
+  const hostOk = requestHost && isAllowedAuthHost(requestHost);
+  const baseUrl = hostOk
+    ? (requestOriginValue || `https://${requestHost}`)
+    : defaultBase;
+  const cookieDomain = requestHost
+    ? cookieDomainForHost(requestHost, env.COOKIE_DOMAIN || "myfenrir.com")
+    : (env.COOKIE_DOMAIN || "myfenrir.com");
+
+  const extraHosts = [];
+  if (requestHost) extraHosts.push(requestHost);
+  extraHosts.push(...FRISKYDEV_APP_HOSTS);
+
+  const allowedRedirectHosts = Array.from(new Set([
+    ...(env.ALLOWED_REDIRECT_HOSTS || "myfenrir.com,www.myfenrir.com")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    ...extraHosts,
+  ]));
+
+  const trustedOrigins = Array.from(new Set([
+    ...(env.TRUSTED_ORIGINS || "https://myfenrir.com,https://www.myfenrir.com")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    ...allowedRedirectHosts.map((h) => `https://${h}`),
+  ]));
+
+  const friskyApp = requestHost && isFriskyDevHost(requestHost);
   return {
-    baseUrl: (env.BASE_URL || "https://myfenrir.com").replace(/\/$/, ""),
+    baseUrl,
     cookieName: env.SESSION_COOKIE_NAME || "fenrir_session",
-    cookieDomain: env.COOKIE_DOMAIN || "myfenrir.com",
-    postLoginRedirect: env.POST_LOGIN_REDIRECT || "https://myfenrir.com/main",
-    logoutRedirect: env.LOGOUT_REDIRECT || "https://myfenrir.com/login",
+    cookieDomain,
+    postLoginRedirect: friskyApp ? `${baseUrl}/` : (env.POST_LOGIN_REDIRECT || "https://myfenrir.com/main"),
+    logoutRedirect: friskyApp ? `${baseUrl}/login` : (env.LOGOUT_REDIRECT || "https://myfenrir.com/login"),
     sessionTtl: parseInt(env.SESSION_TTL_SECONDS || "604800", 10),
     sessionSecret: readSecret(env, "SESSION_SECRET"),
     databaseUrl: readSecret(env, "DATABASE_URL"),
-    allowedRedirectHosts: (env.ALLOWED_REDIRECT_HOSTS || "myfenrir.com,www.myfenrir.com")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-    trustedOrigins: (env.TRUSTED_ORIGINS || "https://myfenrir.com,https://www.myfenrir.com")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
+    allowedRedirectHosts,
+    trustedOrigins,
   };
 }
 
