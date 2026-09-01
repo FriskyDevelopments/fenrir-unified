@@ -99,8 +99,21 @@ export function cookieDomainForHost(host, fallback = "myfenrir.com") {
   const h = String(host || "").toLowerCase();
   if (isMyFenrirHost(h)) return "myfenrir.com";
   if (isFriskyDevHost(h)) return "friskydev.com";
-  if (h === "localhost" || h === "127.0.0.1") return "";
+  if (h === "localhost" || h === "127.0.0.1" || h.endsWith(".workers.dev")) return "";
   return fallback;
+}
+
+export function requestOrigin(request) {
+  try {
+    const url = new URL(request.url);
+    const host = url.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1") {
+      return `${url.protocol}//${url.host}`;
+    }
+    return `https://${host}`;
+  } catch {
+    return "";
+  }
 }
 
 export function bindRequest(env, request) {
@@ -108,7 +121,7 @@ export function bindRequest(env, request) {
   return {
     ...env,
     AUTH_REQUEST_HOST: host,
-    AUTH_REQUEST_ORIGIN: host ? `https://${host}` : "",
+    AUTH_REQUEST_ORIGIN: requestOrigin(request),
   };
 }
 
@@ -135,9 +148,12 @@ export function redirectUri(env, providerName) {
 
 export function cfg(env) {
   const requestHost = String(env?.AUTH_REQUEST_HOST || "").toLowerCase();
+  const requestOriginValue = String(env?.AUTH_REQUEST_ORIGIN || "").replace(/\/$/, "");
   const defaultBase = (env.BASE_URL || "https://myfenrir.com").replace(/\/$/, "");
   const hostOk = requestHost && isAllowedAuthHost(requestHost);
-  const baseUrl = hostOk ? `https://${requestHost}` : defaultBase;
+  const baseUrl = hostOk
+    ? (requestOriginValue || `https://${requestHost}`)
+    : defaultBase;
   const cookieDomain = requestHost
     ? cookieDomainForHost(requestHost, env.COOKIE_DOMAIN || "myfenrir.com")
     : (env.COOKIE_DOMAIN || "myfenrir.com");

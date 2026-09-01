@@ -48,6 +48,7 @@ test("cookie domain is friskydev.com on Forge/Paperclip and myfenrir.com on Fenr
   assert.equal(cookieDomainForHost("paperclip.friskydev.com"), "friskydev.com");
   assert.equal(cookieDomainForHost("myfenrir.com"), "myfenrir.com");
   assert.equal(cookieDomainForHost("www.myfenrir.com"), "myfenrir.com");
+  assert.equal(cookieDomainForHost("fenrir-auth-worker.example.workers.dev"), "");
 });
 
 test("folios.works is rejected by the Worker", async () => {
