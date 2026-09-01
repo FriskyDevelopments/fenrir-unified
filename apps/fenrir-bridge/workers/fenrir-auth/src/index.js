@@ -23,6 +23,17 @@ import { createSession, getSession, destroySession } from "./identity.js";
 import { checkDatabase } from "./neon.js";
 import { saveOAuthState, consumeOAuthState } from "./session.js";
 
+const LOGIN_ERRORS = {
+  provider_error: "The identity provider rejected the sign-in.",
+  missing_code_or_state: "The sign-in response was incomplete. Try again.",
+  invalid_or_expired_state: "That sign-in expired. Start again.",
+  state_provider_mismatch: "That sign-in could not be matched. Start again.",
+  token_exchange_failed: "Could not finish the sign-in with that provider.",
+  profile_fetch_failed: "Could not read the account profile. Try again.",
+  no_subject_in_profile: "The provider did not return an account id.",
+  session_create_failed: "Signed in at the provider, but the session could not be stored.",
+};
+
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
@@ -97,17 +108,23 @@ function isFenrirHost(request) {
 }
 
 function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&")
-    .replaceAll("<", "<")
-    .replaceAll(">", ">")
-    .replaceAll('"', """);
+  return String(value || "").replace(/[&<>"']/g, (ch) => {
+    if (ch === "&") return "\u0026amp;";
+    if (ch === "<") return "\u0026lt;";
+    if (ch === ">") return "\u0026gt;";
+    if (ch === '"') return "\u0026quot;";
+    if (ch === "'") return "\u0026#39;";
+    return ch;
+  });
+}
+
+function loginErrorMessage(code) {
+  return LOGIN_ERRORS[String(code || "")] || "";
 }
 
 function loginPage(env, { error = "", user = null } = {}) {
-  const err = error
-    ? `<div class="err">${escapeHtml(error)}</div>`
-    : "";
+  const message = loginErrorMessage(error);
+  const err = message ? `<div class="err">${escapeHtml(message)}</div>` : "";
   const signedIn = user
     ? `<p class="sub">Signed in as ${escapeHtml(user.email || user.name || user.id)}. This session is a Better Auth cookie on this host.</p>
   <div class="stack">
@@ -166,7 +183,9 @@ export function safeReturnTo(env, raw) {
   try {
     if (raw.startsWith("/") && !raw.startsWith("//")) return `${c.baseUrl}${raw}`;
     const u = new URL(raw);
-    if (u.protocol === "https:" && c.allowedRedirectHosts.includes(u.hostname)) return u.toString();
+    if ((u.protocol === "https:" || u.hostname === "localhost" || u.hostname === "127.0.0.1") && c.allowedRedirectHosts.includes(u.hostname)) {
+      return u.toString();
+    }
     return fallback;
   } catch {
     return fallback;
