@@ -1,7 +1,8 @@
 // Fenrir Better Auth identity Worker.
 // Public contract copied from folios-auth-worker (behavior/endpoints, not a Folios merge).
-// Cookie domain is myfenrir.com. Do not serve Fenrir login on folios.works.
-// One fetch handler, isolate per request. Hosts: myfenrir.com + www.myfenrir.com.
+// Cookie domain is myfenrir.com on Fenrir hosts and friskydev.com on Forge/Paperclip/MCP.
+// Do not serve Fenrir login on folios.works.
+// One fetch handler, isolate per request.
 import {
   getProvider,
   providerConfigured,
@@ -10,6 +11,10 @@ import {
   PROVIDERS,
   redirectUri,
   missingSecrets,
+  hostnameOf,
+  isAllowedAuthHost,
+  isFriskyDevHost,
+  bindRequest,
 } from "./config.js";
 import { createFenrirBetterAuth } from "./better-auth.js";
 import { buildAuthorizeUrl, exchangeCode, fetchProfile } from "./oauth.js";
@@ -33,6 +38,17 @@ function redirect(location, extraHeaders = {}) {
   return new Response(null, {
     status: 302,
     headers: { Location: location, "Cache-Control": "no-store", ...extraHeaders },
+  });
+}
+
+function html(body, status = 200, extraHeaders = {}) {
+  return new Response(body, {
+    status,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      ...extraHeaders,
+    },
   });
 }
 
@@ -76,25 +92,71 @@ function authFailure(request, env, error, status = 400, extra = {}) {
   return json({ error, ...extra }, status);
 }
 
-function hostnameOf(request) {
-  try {
-    return new URL(request.url).hostname;
-  } catch {
-    return "";
-  }
+function isFenrirHost(request) {
+  return isAllowedAuthHost(hostnameOf(request));
 }
 
-function isFenrirHost(request) {
-  const host = hostnameOf(request);
-  if (!host) return false;
-  if (host === "folios.works" || host.endsWith(".folios.works")) return false;
-  return (
-    host === "myfenrir.com" ||
-    host.endsWith(".myfenrir.com") ||
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    host.endsWith(".workers.dev")
-  );
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&")
+    .replaceAll("<", "<")
+    .replaceAll(">", ">")
+    .replaceAll('"', """);
+}
+
+function loginPage(env, { error = "", user = null } = {}) {
+  const err = error
+    ? `<div class="err">${escapeHtml(error)}</div>`
+    : "";
+  const signedIn = user
+    ? `<p class="sub">Signed in as ${escapeHtml(user.email || user.name || user.id)}. This session is a Better Auth cookie on this host.</p>
+  <div class="stack">
+          <a class="btn btn-google" href="/auth/logout?redirect=%2Flogin">Sign out</a>
+  </div>`
+    : `<p class="sub">Better Auth for Paperclip and Forge. Pick Google, Microsoft, or Apple. This is not Cloudflare Access.</p>
+  ${err}
+  <div class="stack">
+          <a class="btn btn-google" href="/auth/google?redirect=%2F">Continue with Google</a>
+          <a class="btn btn-microsoft" href="/auth/microsoft?redirect=%2F">Continue with Microsoft</a>
+          <a class="btn btn-apple" href="/auth/apple?redirect=%2F">Continue with Apple</a>
+  </div>`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Sign in — Frisky</title>
+<meta name="robots" content="noindex"/>
+<style>
+:root{--bg:#09090b;--card:#18181b;--text:#fafafa;--muted:#a1a1aa;--line:#27272a;--accent:#f97316}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
+body{min-height:100svh;display:grid;place-items:center;padding:32px 16px;background:
+  radial-gradient(900px 480px at 90% -10%, rgba(249,115,22,.18), transparent 55%),
+  radial-gradient(700px 420px at 0% 110%, rgba(14,165,233,.14), transparent 50%), var(--bg)}
+.card{width:min(420px,100%);background:rgba(24,24,27,.92);border:1px solid var(--line);border-radius:20px;padding:28px 24px 24px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.brand{font-weight:800;letter-spacing:-.04em;font-size:22px}
+.brand span{color:var(--accent)}
+h1{font-size:1.45rem;margin:18px 0 6px;letter-spacing:-.03em}
+.sub{color:var(--muted);font-size:14px;line-height:1.5;margin:0 0 22px}
+.stack{display:grid;gap:10px}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:12px 16px;border-radius:12px;border:1px solid var(--line);background:#fff;color:#111;font-weight:650;text-decoration:none;font-size:14.5px}
+.btn-google{background:#fff}
+.btn-microsoft{background:#fff}
+.btn-apple{background:#111;color:#fff;border-color:#111}
+.err{background:#3f1d20;color:#fecaca;border:1px solid #7f1d1d;border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:14px}
+.foot{margin-top:18px;color:#71717a;font-size:11px;text-align:center;letter-spacing:.08em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="brand">Frisky<span>Dev</span></div>
+  <h1>${user ? "Signed in — Frisky" : "Sign in — Frisky"}</h1>
+  ${signedIn}
+  <div class="foot">Frisky Better Auth</div>
+</main>
+</body>
+</html>`;
 }
 
 export function safeReturnTo(env, raw) {
@@ -276,13 +338,21 @@ async function handleReady(env) {
   }, loginReady ? 200 : 503);
 }
 
+async function handleAppShell(request, env) {
+  const url = new URL(request.url);
+  const error = url.searchParams.get("error") || "";
+  const session = await getSession(env, request);
+  return html(loginPage(env, { error, user: session?.user || null }));
+}
+
 export default {
   async fetch(request, env) {
+    env = bindRequest(env, request);
+
     if (!isFenrirHost(request)) {
-      return json({ error: "not_found", hint: "Fenrir Better Auth only serves myfenrir.com" }, 404);
+      return json({ error: "not_found", hint: "Fenrir Better Auth only serves myfenrir.com and friskydev.com apps" }, 404);
     }
 
-    // Per-request identity isolate — do not store auth on the module.
     createFenrirBetterAuth(env);
 
     if (request.method === "OPTIONS") {
@@ -307,6 +377,19 @@ async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "") || "/";
   const parts = path.split("/").filter(Boolean);
+  const host = hostnameOf(request);
+
+  if (parts.length === 0 || parts[0] === "login") {
+    if (isFriskyDevHost(host) || host === "localhost" || host === "127.0.0.1" || host.endsWith(".workers.dev")) {
+      if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "method_not_allowed" }, 405);
+      return handleAppShell(request, env);
+    }
+    if (parts[0] === "login") {
+      if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "method_not_allowed" }, 405);
+      return handleAppShell(request, env);
+    }
+    return json({ error: "not_found", hint: "This Worker only serves /auth/*" }, 404);
+  }
 
   if (parts[0] !== "auth") {
     return json({ error: "not_found", hint: "This Worker only serves /auth/*" }, 404);
