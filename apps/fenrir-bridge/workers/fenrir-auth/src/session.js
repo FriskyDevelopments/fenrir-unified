@@ -24,11 +24,11 @@ export function serializeCookie(name, value, { domain, maxAge, expired = false }
   const parts = [
     `${name}=${value}`,
     "Path=/",
-    `Domain=${domain}`,
     "HttpOnly",
     "Secure",
     "SameSite=Lax",
   ];
+  if (domain) parts.splice(2, 0, `Domain=${domain}`);
   if (expired) parts.push("Max-Age=0");
   else if (maxAge != null) parts.push(`Max-Age=${maxAge}`);
   return parts.join("; ");
