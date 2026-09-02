@@ -11,13 +11,14 @@ import {
   SessionStoreUnavailable,
   SESSION_PREFIX,
   STATE_PREFIX,
-  USER_INDEX_PREFIX,
 } from "../src/session.js";
+import { memorySessionAuthority } from "./session-authority.mock.mjs";
 
 function kv(initial = {}) {
   const values = new Map(Object.entries(initial));
-  return {
+  const store = {
     values,
+    ignoreSessionDeletes: false,
     async get(key) {
       return values.get(key) ?? null;
     },
@@ -26,10 +27,12 @@ function kv(initial = {}) {
       values.set(`${key}::ttl`, options.expirationTtl ?? null);
     },
     async delete(key) {
+      if (store.ignoreSessionDeletes && key.startsWith(SESSION_PREFIX)) return;
       values.delete(key);
       values.delete(`${key}::ttl`);
     },
   };
+  return store;
 }
 
 function env(extra = {}) {
@@ -38,6 +41,7 @@ function env(extra = {}) {
     COOKIE_DOMAIN: "myfenrir.com",
     SESSION_TTL_SECONDS: "604800",
     SESSIONS: kv(),
+    SESSION_AUTHORITY: memorySessionAuthority(),
     ...extra,
   };
 }
@@ -64,8 +68,15 @@ test("createSession writes session + user index with TTL", async () => {
   assert.equal(typeof token, "string");
   assert.ok(e.SESSIONS.values.has(SESSION_PREFIX + sessionId));
   assert.equal(e.SESSIONS.values.get(`${SESSION_PREFIX + sessionId}::ttl`), 604800);
-  const index = JSON.parse(e.SESSIONS.values.get(USER_INDEX_PREFIX + user.id));
-  assert.deepEqual(index, [sessionId]);
+  assert.deepEqual((await listSessionsForUser(e, user.id)).map((row) => row.id), [sessionId]);
+});
+
+test("createSession clamps a finite sub-minimum TTL to 60 seconds", async () => {
+  const e = env({ SESSION_TTL_SECONDS: "30" });
+  const { sessionId, cookie, record } = await createSession(e, user);
+  assert.equal(e.SESSIONS.values.get(`${SESSION_PREFIX + sessionId}::ttl`), 60);
+  assert.match(cookie, /(?:^|; )Max-Age=60(?:;|$)/);
+  assert.equal(record.expiresAt - record.createdAt, 60_000);
 });
 
 test("getSession resolves cookie and Bearer token", async () => {
@@ -95,6 +106,16 @@ test("destroySession deletes KV row and clears cookie", async () => {
   assert.equal(again, null);
 });
 
+test("malformed session cookie is ignored during read and destroy", async () => {
+  const e = env();
+  const request = new Request("https://myfenrir.com/auth/me", {
+    headers: { Cookie: "fenrir_session=%E0%A4%A; theme=dark" },
+  });
+  assert.equal(await getSession(e, request), null);
+  const cleared = await destroySession(e, request);
+  assert.match(cleared, /Max-Age=0/);
+});
+
 test("OAuth state is single-use", async () => {
   const e = env();
   await saveOAuthState(e, "st_1", { provider: "google", returnTo: "/main" }, 600);
@@ -116,9 +137,58 @@ test("revokeSessionsForUser wipes every ticket for that identity", async () => {
   assert.equal((await listSessionsForUser(e, user.id)).length, 0);
 });
 
+test("revokeSessionsForUser retains and revokes all 21 session ids", async () => {
+  const e = env();
+  for (let i = 0; i < 21; i += 1) await createSession(e, user);
+  assert.equal((await listSessionsForUser(e, user.id)).length, 21);
+  assert.equal(await revokeSessionsForUser(e, user.id), 21);
+  assert.equal((await listSessionsForUser(e, user.id)).length, 0);
+});
+
+test("concurrent session creation does not lose user index entries", async () => {
+  const e = env();
+  const created = await Promise.all(Array.from({ length: 21 }, () => createSession(e, user)));
+  const listedIds = new Set((await listSessionsForUser(e, user.id)).map((row) => row.id));
+  assert.equal(listedIds.size, 21);
+  for (const { sessionId } of created) assert.ok(listedIds.has(sessionId));
+});
+
+test("destroySession revocation rejects an eventually stale KV record", async () => {
+  const e = env();
+  const created = await createSession(e, user);
+  e.SESSIONS.ignoreSessionDeletes = true;
+  await destroySession(e, new Request("https://myfenrir.com/auth/logout", {
+    headers: { Cookie: created.cookie },
+  }));
+  assert.ok(e.SESSIONS.values.has(SESSION_PREFIX + created.sessionId));
+  assert.equal(await getSession(e, new Request("https://myfenrir.com/auth/me", {
+    headers: { Cookie: created.cookie },
+  })), null);
+});
+
+test("user revocation rejects all eventually stale KV records", async () => {
+  const e = env();
+  const created = await Promise.all([createSession(e, user), createSession(e, user)]);
+  e.SESSIONS.ignoreSessionDeletes = true;
+  assert.equal(await revokeSessionsForUser(e, user.id), 2);
+  for (const session of created) {
+    assert.ok(e.SESSIONS.values.has(SESSION_PREFIX + session.sessionId));
+    assert.equal(await getSession(e, new Request("https://myfenrir.com/auth/me", {
+      headers: { Cookie: session.cookie },
+    })), null);
+  }
+});
+
 test("missing SESSIONS binding fails closed on write", async () => {
   await assert.rejects(
     () => createSession({ SESSION_SECRET: "x" }, user),
+    (err) => err instanceof SessionStoreUnavailable,
+  );
+});
+
+test("missing SESSION_AUTHORITY binding fails closed on write", async () => {
+  await assert.rejects(
+    () => createSession({ SESSION_SECRET: "x", SESSIONS: kv() }, user),
     (err) => err instanceof SessionStoreUnavailable,
   );
 });

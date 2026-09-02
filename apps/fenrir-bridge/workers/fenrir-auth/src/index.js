@@ -23,6 +23,8 @@ import { createSession, getSession, destroySession } from "./identity.js";
 import { checkDatabase } from "./neon.js";
 import { saveOAuthState, consumeOAuthState } from "./session.js";
 
+export { SessionAuthority } from "./session.js";
+
 const LOGIN_ERRORS = {
   provider_error: "The identity provider rejected the sign-in.",
   missing_code_or_state: "The sign-in response was incomplete. Try again.",
@@ -345,7 +347,7 @@ async function handleReady(env) {
   );
   const database = await checkDatabase(env);
   const sessionSecret = Boolean(identity.secret);
-  const kv = Boolean(env.SESSIONS);
+  const kv = Boolean(env.SESSIONS && env.SESSION_AUTHORITY);
   const loginReady = sessionSecret && Object.values(providers).every(Boolean) && (database.ok || kv);
   return json({
     ready: loginReady,

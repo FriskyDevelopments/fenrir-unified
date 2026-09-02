@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import worker from "../src/index.js";
 import { bindRequest, cfg, cookieDomainForHost, isAllowedAuthHost } from "../src/config.js";
 import { createSession } from "../src/identity.js";
+import { memorySessionAuthority } from "./session-authority.mock.mjs";
 
 function kv(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -29,6 +30,7 @@ function configuredEnv(extra = {}) {
     APPLE_KEY_ID: "key",
     APPLE_PRIVATE_KEY: "private",
     SESSIONS: kv(),
+    SESSION_AUTHORITY: memorySessionAuthority(),
     ...extra,
   };
 }
