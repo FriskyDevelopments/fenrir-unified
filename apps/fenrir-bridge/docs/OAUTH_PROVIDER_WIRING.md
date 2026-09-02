@@ -18,6 +18,22 @@ retired.
 - Apple start: `https://myfenrir.com/auth/apple`
 - Callbacks: `https://myfenrir.com/auth/{google|microsoft|apple}/callback`
 
+## Do not register these (they cause `unknown_provider`)
+
+```text
+https://www.myfenrir.com/auth/callback
+https://myfenrir.com/auth/callback
+https://www.myfenrir.com/auth/callback/google
+https://auth.myfenrir.com/api/auth/callback/google
+https://www.myfenrir.com/api/auth/callback/google
+https://www.myfenrir.com/api/frisky-auth/callback/google
+```
+
+`/auth/callback` is parsed as provider name `callback`. Live proof:
+`GET /auth/callback` → `{"error":"unknown_provider","provider":"callback"}`.
+
+Step-by-step consoles: [OAUTH_CONSOLE_REDIRECTS.md](./OAUTH_CONSOLE_REDIRECTS.md).
+
 ## Google
 
 In Google Auth Platform, edit the existing web OAuth client (do not invent a new
@@ -69,6 +85,8 @@ APPLE_PRIVATE_KEY=
 
 Apply `workers/fenrir-auth/neon/schema.sql` on the Fenrir Neon database. Create
 the KV namespace and paste its id into `wrangler.fenrir-auth.jsonc`.
+
+`/auth/ready` is degraded while `database: false`. KV can still mint sessions.
 
 ## Out of scope
 
