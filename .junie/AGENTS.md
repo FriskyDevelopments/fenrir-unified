@@ -52,6 +52,7 @@ The Worker always emits the **apex** callback, even when the user started on www
 Console walkthrough: `apps/fenrir-bridge/docs/OAUTH_CONSOLE_REDIRECTS.md`.
 
 ## Deployment Config
+
 - Public Cloudflare Pages vars live in `apps/fenrir-bridge/wrangler.jsonc`.
 - Secret values must stay in Cloudflare Pages/Workers environment variables and must not be committed.
 - `PUBLIC_SITE_URL` should point at the canonical app origin.

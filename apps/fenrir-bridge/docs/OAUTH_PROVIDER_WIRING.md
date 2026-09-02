@@ -18,7 +18,7 @@ retired.
 - Apple start: `https://myfenrir.com/auth/apple`
 - Callbacks: `https://myfenrir.com/auth/{google|microsoft|apple}/callback`
 
-## Do not register these (they cause `unknown_provider`)
+## Do not register these invalid or retired URLs
 
 ```text
 https://www.myfenrir.com/auth/callback
@@ -29,8 +29,11 @@ https://www.myfenrir.com/api/auth/callback/google
 https://www.myfenrir.com/api/frisky-auth/callback/google
 ```
 
-`/auth/callback` is parsed as provider name `callback`. Live proof:
-`GET /auth/callback` → `{"error":"unknown_provider","provider":"callback"}`.
+`/auth/callback` is parsed as provider name `callback`, so it returns
+`{"error":"unknown_provider","provider":"callback"}`. In contrast,
+`/auth/callback/google` reaches the Google callback handler and, without OAuth
+parameters, returns `{"error":"missing_code_or_state"}`. The remaining URLs
+are retired broker or parked routes and must not be registered.
 
 Step-by-step consoles: [OAUTH_CONSOLE_REDIRECTS.md](./OAUTH_CONSOLE_REDIRECTS.md).
 

@@ -40,7 +40,7 @@ Live client IDs observed on 2026-09-02:
    - `https://myfenrir.com`
    - `https://www.myfenrir.com`
 6. Save. Wait 1–5 minutes.
-7. Verify: `curl -sSI https://myfenrir.com/auth/google` Location header must contain
+7. Verify: `curl -sS -D - -o /dev/null https://myfenrir.com/auth/google` Location header must contain
    `redirect_uri=https%3A%2F%2Fmyfenrir.com%2Fauth%2Fgoogle%2Fcallback`.
 
 ## 2. Microsoft Entra ID
@@ -53,7 +53,7 @@ Live client IDs observed on 2026-09-02:
 5. Remove the stale SPA / broker URIs listed in the Google section, swapping `google` for `microsoft`.
 6. Keep `openid`, `email`, `profile`. Implicit grant is not required (code + PKCE).
 7. Save.
-8. Verify: `curl -sSI https://myfenrir.com/auth/microsoft` Location must contain
+8. Verify: `curl -sS -D - -o /dev/null https://myfenrir.com/auth/microsoft` Location must contain
    `redirect_uri=https%3A%2F%2Fmyfenrir.com%2Fauth%2Fmicrosoft%2Fcallback`.
 
 ## 3. Apple Developer — Sign in with Apple
@@ -63,10 +63,14 @@ Live client IDs observed on 2026-09-02:
 3. Enable Sign in with Apple → Configure.
 4. Domains and Subdomains: `myfenrir.com`
 5. Return URLs: `https://myfenrir.com/auth/apple/callback`
-6. Remove `https://www.myfenrir.com/auth/callback` and any `/api/auth/callback/apple` return URLs.
+6. Remove, if present:
+   - `https://www.myfenrir.com/auth/callback`
+   - `https://myfenrir.com/auth/callback`
+   - `https://auth.myfenrir.com/api/auth/callback/apple`
+   - `https://www.myfenrir.com/api/auth/callback/apple`
 7. Save. Apple can take several minutes to propagate.
 8. The Worker accepts Apple's `form_post` POST on that return URL.
-9. Verify: `curl -sSI https://myfenrir.com/auth/apple` Location must contain
+9. Verify: `curl -sS -D - -o /dev/null https://myfenrir.com/auth/apple` Location must contain
    `redirect_uri=https%3A%2F%2Fmyfenrir.com%2Fauth%2Fapple%2Fcallback` and `response_mode=form_post`.
 
 ## After consoles match
