@@ -38,6 +38,8 @@ Cookie `fenrir_session` = `<sessionId>.<HMAC-SHA256(sessionId, SESSION_SECRET)>`
 
 - **KV** (`SESSIONS`) holds short-lived OAuth state (PKCE verifier + returnTo)
   and is the **session fallback** when Neon is unset or unreachable.
+- **Durable Objects** (`SESSION_AUTHORITY`) serialize each user's complete KV
+  session index and provide strongly consistent active/revoked session state.
 - **Neon** holds `users` and `sessions` when `DATABASE_URL` is healthy. Apply
   `neon/schema.sql`. Login stays up on KV until then (`degraded: true`).
 

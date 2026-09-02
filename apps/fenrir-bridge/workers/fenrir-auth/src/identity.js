@@ -23,8 +23,8 @@ export async function createSession(env, user, meta = {}) {
       /* fall through to KV so a Neon outage does not block login */
     }
   }
-  if (!hasKv(env)) throw new Error("session_store_unavailable");
-  return kv.createSession(env, user);
+  if (!hasKv(env)) throw new kv.SessionStoreUnavailable();
+  return kv.createSession(env, user, meta);
 }
 
 export async function getSession(env, request) {
@@ -61,5 +61,5 @@ export async function destroySession(env, request) {
     cookie = await kv.destroySession(env, request);
   }
   if (cookie) return cookie;
-  return kv.destroySession(env, request);
+  return kv.emptySessionCookie(env);
 }

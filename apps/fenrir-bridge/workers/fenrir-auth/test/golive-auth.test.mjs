@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import worker from "../src/index.js";
 import { createSession, getSession } from "../src/identity.js";
+import { memorySessionAuthority } from "./session-authority.mock.mjs";
 
 function kv(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -28,6 +29,7 @@ function configuredEnv(extra = {}) {
     APPLE_KEY_ID: "key",
     APPLE_PRIVATE_KEY: "private",
     SESSIONS: kv(),
+    SESSION_AUTHORITY: memorySessionAuthority(),
     ...extra,
   };
 }
@@ -94,6 +96,14 @@ test("KV sessions resolve a Bearer token without DATABASE_URL", async () => {
   const body = await me.json();
   assert.equal(body.authenticated, true);
   assert.equal(body.user.email, "ada@myfenrir.com");
+});
+
+test("malformed session cookie without a bearer token is unauthenticated", async () => {
+  const response = await worker.fetch(new Request("https://myfenrir.com/auth/me", {
+    headers: { Cookie: "fenrir_session=%E0%A4%A" },
+  }), configuredEnv());
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { authenticated: false });
 });
 
 test("www origin can read /auth/me with CORS credentials", async () => {

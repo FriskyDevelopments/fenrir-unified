@@ -30,5 +30,13 @@
   // Replace id after: wrangler kv namespace create FENRIR_AUTH_SESSIONS
   "kv_namespaces": [
     { "binding": "SESSIONS", "id": "9e3b6917e8354d66aa3f4375f345e440" }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "SESSION_AUTHORITY", "class_name": "SessionAuthority" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["SessionAuthority"] }
   ]
 }
