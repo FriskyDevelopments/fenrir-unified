@@ -12,10 +12,17 @@ describe("retired Pages login paths", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
-        new Response(JSON.stringify({ ok: true, service: "fenrir-auth-worker" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
+        new Response(
+          JSON.stringify({
+            ready: true,
+            service: "fenrir-auth-worker",
+            providers: { google: true, microsoft: true, apple: true },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
       ),
     );
 

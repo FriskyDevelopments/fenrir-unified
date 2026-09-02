@@ -8,10 +8,10 @@ import {
   transactionSetCookie,
   type OAuthEnv,
 } from "../../../_lib/oauth";
-import { authOrigin, siteOrigin } from "../../../_lib/billing-env";
+import { authOrigin } from "../../../_lib/billing-env";
 import { friskyAuthEnabled } from "../../../_lib/frisky-auth";
 import { FRISKY_AUTH_BASE_PATH } from "@frisky/auth";
-import { publicFenrirAuthWorkerIsLive } from "../../../_lib/fenrir-login";
+import { FENRIR_LOGIN_ORIGIN, publicFenrirAuthWorkerIsLive } from "../../../_lib/fenrir-login";
 
 export const onRequestGet: PagesFunction<OAuthEnv> = async (context) => {
   const provider = context.params.provider;
@@ -30,14 +30,14 @@ export const onRequestGet: PagesFunction<OAuthEnv> = async (context) => {
     );
   }
 
-  const origin = siteOrigin(context.request, context.env);
   const requestUrl = new URL(context.request.url);
   const returnTo = safeReturnPath(
     requestUrl.searchParams.get("return_to") || requestUrl.searchParams.get("redirect") || "/main",
   );
 
-  if (await publicFenrirAuthWorkerIsLive(origin)) {
-    const target = new URL(`/auth/${provider}`, origin);
+  // Gate on public /auth/ready at the apex, never /auth/health liveness.
+  if (await publicFenrirAuthWorkerIsLive(FENRIR_LOGIN_ORIGIN)) {
+    const target = new URL(`/auth/${provider}`, FENRIR_LOGIN_ORIGIN);
     target.searchParams.set("redirect", returnTo);
     return Response.redirect(target.toString(), 302);
   }
