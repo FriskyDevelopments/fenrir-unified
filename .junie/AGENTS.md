@@ -24,27 +24,38 @@ cd apps/fenrir-bridge
 Run `npm run build` before deploy-oriented changes.
 
 ## Auth Redirect Notes
-- The SPA callback route is `/auth/callback`.
-- The direct provider callback routes are `/api/auth/callback/google`, `/api/auth/callback/microsoft`, and `/api/auth/callback/apple`.
-- Every OAuth dashboard (Supabase provider config, Google/Microsoft/Apple consoles) must register redirect URIs exactly; if a provider reports an invalid redirect URI, add the exact URI it printed to that provider's allowed list.
+Live identity is `fenrir-auth-worker` on `https://myfenrir.com/auth/*`.
 
-Current callback candidates used by this app:
+- Login start URLs: `/auth/google`, `/auth/microsoft`, `/auth/apple`.
+- Provider callbacks (register these in OAuth consoles): `/auth/{provider}/callback`.
+- Do not register the SPA path `/auth/callback`. The Worker treats the last `/auth/{segment}` as a provider name, so `/auth/callback` returns `{"error":"unknown_provider","provider":"callback"}`.
+- `auth.myfenrir.com` and `/api/auth/callback/:provider` are retired broker paths. Keep them out of Google / Microsoft / Apple consoles for Fenrir app login.
+- `/api/frisky-auth/callback/*` is parked (PR #3). Do not point consoles there.
+
+Current callback URIs used by the live Worker:
 
 ```text
-https://myfenrir.com/auth/callback
-https://www.myfenrir.com/auth/callback
-https://auth.myfenrir.com/api/auth/callback/google
-https://auth.myfenrir.com/api/auth/callback/microsoft
-https://auth.myfenrir.com/api/auth/callback/apple
+https://myfenrir.com/auth/google/callback
+https://myfenrir.com/auth/microsoft/callback
+https://myfenrir.com/auth/apple/callback
 ```
 
-Do not confuse the SPA callback route (`/auth/callback`) with direct provider callbacks (`/api/auth/callback/:provider`).
+Start URLs:
+
+```text
+https://myfenrir.com/auth/google
+https://myfenrir.com/auth/microsoft
+https://myfenrir.com/auth/apple
+```
+
+The Worker always emits the **apex** callback, even when the user started on www.
+Console walkthrough: `apps/fenrir-bridge/docs/OAUTH_CONSOLE_REDIRECTS.md`.
 
 ## Deployment Config
 - Public Cloudflare Pages vars live in `apps/fenrir-bridge/wrangler.jsonc`.
 - Secret values must stay in Cloudflare Pages/Workers environment variables and must not be committed.
 - `PUBLIC_SITE_URL` should point at the canonical app origin.
-- `PUBLIC_AUTH_URL` should point at `https://auth.myfenrir.com`.
+- Fenrir app login does not use `PUBLIC_AUTH_URL=https://auth.myfenrir.com` anymore.
 - `ALLOWED_REDIRECT_URIS` should include every post-auth app origin that can receive users.
 
 ## Safety

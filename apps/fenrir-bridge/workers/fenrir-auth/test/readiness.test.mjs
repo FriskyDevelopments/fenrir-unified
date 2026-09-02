@@ -64,6 +64,21 @@ test("unknown extra providers are rejected", async () => {
   assert.equal(body.error, "unknown_provider");
 });
 
+test("stale SPA /auth/callback is not a provider", async () => {
+  const response = await worker.fetch(new Request("https://myfenrir.com/auth/callback"), env);
+  assert.equal(response.status, 404);
+  const body = await response.json();
+  assert.equal(body.error, "unknown_provider");
+  assert.equal(body.provider, "callback");
+});
+
+test("provider callback without code is missing_code_or_state, not unknown_provider", async () => {
+  const response = await worker.fetch(new Request("https://myfenrir.com/auth/google/callback"), env);
+  assert.equal(response.status, 400);
+  const body = await response.json();
+  assert.equal(body.error, "missing_code_or_state");
+});
+
 test("/auth/api is out of Fenrir identity", async () => {
   const response = await worker.fetch(new Request("https://myfenrir.com/auth/api/clients"), env);
   assert.equal(response.status, 404);
