@@ -45,7 +45,7 @@ test("issues a grant bound to the Quality origin and per-attempt context", async
   assert.equal((await consume("b".repeat(32))).status, 400);
 });
 
-test("accepts the canonical FriskyDEV Authentik gateway as an audience", async () => {
+test("accepts leftover Authentik hostname as audience for already-issued tokens only", async () => {
   const query = new URLSearchParams({ audience: authentikAudience, context });
   const response = await worker.fetch(new Request(`${origin}/api/slider?${query}`), env);
   assert.equal(response.status, 200);

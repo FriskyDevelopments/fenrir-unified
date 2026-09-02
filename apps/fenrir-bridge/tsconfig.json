@@ -17,7 +17,10 @@
     "moduleResolution": "Node",
     "baseUrl": ".",
     "paths": {
-      "@frisky/gate-brand": ["../../packages/gate-brand/src/presets.ts"]
+      "@frisky/gate-brand": ["../../packages/gate-brand/src/presets.ts"],
+      "@frisky/auth": ["../../packages/auth/src/index.ts"],
+      "@frisky/auth/server": ["../../packages/auth/src/server.ts"],
+      "@frisky/auth/client": ["../../packages/auth/src/client.ts"]
     },
     "ignoreDeprecations": "6.0",
     "resolveJsonModule": true,

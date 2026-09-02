@@ -8,7 +8,10 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@frisky/gate-brand": gateBrand
+      "@frisky/gate-brand": gateBrand,
+      "@frisky/auth/client": path.resolve(import.meta.dirname, "../../packages/auth/src/client.ts"),
+      "@frisky/auth/server": path.resolve(import.meta.dirname, "../../packages/auth/src/server.ts"),
+      "@frisky/auth": path.resolve(import.meta.dirname, "../../packages/auth/src/index.ts")
     }
   },
   server: {

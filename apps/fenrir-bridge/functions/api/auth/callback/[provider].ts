@@ -13,6 +13,11 @@ import { authOrigin, siteOrigin } from "../../../_lib/billing-env";
 import { ensureDefaultWorkspace } from "../../../_lib/workspaces";
 import { upsertProfileForSession } from "../../../_lib/supabase-profiles";
 
+/**
+ * Handles OAuth callback requests for supported providers.
+ *
+ * @returns A response that completes authentication, redirects to the login page on failure, or reports an unavailable or unsupported provider.
+ */
 async function handleCallback(context: EventContext<OAuthEnv, "provider", unknown>) {
   const provider = context.params.provider;
 
@@ -21,7 +26,7 @@ async function handleCallback(context: EventContext<OAuthEnv, "provider", unknow
       {
         ok: false,
         error: "direct_oauth_retired",
-        detail: "Apple sign-in is the Better Auth Worker at /auth/apple when that Worker is live.",
+        detail: "Apple direct OAuth is disabled. Use the Fenrir Better Auth Worker at /auth/apple when it is live, or Better Auth at /api/frisky-auth when FRISKY_AUTH_ENABLED=1 (marketing may still list Apple; it is not live until Apple env + callbacks are set)."
       },
       { status: 410 },
     );

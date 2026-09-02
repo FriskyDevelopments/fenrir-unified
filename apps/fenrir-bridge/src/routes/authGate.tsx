@@ -121,6 +121,11 @@ function providerLabel(provider: AuthProvider, c: Copy) {
   return c.continueMicrosoft;
 }
 
+/**
+ * Creates a user-facing message for the authentication error in the URL.
+ *
+ * @returns The appropriate authentication error message, or `null` when no message should be shown.
+ */
 function authErrorMessage() {
   return loginPageErrorMessage(window.location.search);
 }

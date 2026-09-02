@@ -26,13 +26,19 @@ function readableCommunityError(detail: unknown, fallback?: string) {
   return fallback || "Community Gate is not ready yet.";
 }
 
+/**
+ * Converts a Community Gate administration request error into a user-facing message.
+ *
+ * @param error - The error produced by the Community Gate administration request
+ * @returns A descriptive message for the error condition
+ */
 function communityBrandAdminErrorMessage(error: unknown) {
   if (!(error instanceof CommunityBrandRequestError)) {
     return "Network/API failure. The brand workspace could not be loaded.";
   }
   if (error.status === 401 || error.error === "authentication_required") return "Not signed in. Sign in to the Fenrir admin before customizing this Community Gate.";
   if (error.status === 403 || error.error === "forbidden") return "Forbidden. Your account is not an owner or allowlisted admin for this Community Gate.";
-  if (error.status === 503 || error.error === "community_auth_not_configured") return readableCommunityError(error.detail, "Missing Community Gate config. Firebase Auth handles sign-in; Neon is only the gate data plane.");
+  if (error.status === 503 || error.error === "community_auth_not_configured") return readableCommunityError(error.detail, "Missing Community Gate config. Membership uses fenrir_community_session and Neon fenrir_* tables; Firebase bearer verification is leftover, not Fenrir app identity.");
   if (error.error === "community_gate_schema_missing") return "Missing Neon schema. Apply the Community Gate schema before customizing this gate.";
   return `Community Gate load failed: ${error.error || `HTTP ${error.status}`}.`;
 }

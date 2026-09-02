@@ -10,6 +10,7 @@ import {
 import { copy } from "../i18n";
 import { resolveAuthOrigin } from "./authOrigin";
 import { addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
+import { signInWithFriskyAuth, signOutFriskyAuthClient } from "./friskyAuth";
 import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TrialPublic, TrialStatusPayload } from "./types";
 import { fenrirAuthWorkerCanStartLogin, preservedLoginNext } from "../../functions/_lib/fenrir-login";
 
@@ -156,7 +157,7 @@ export type AuthSession = {
     id: string;
     email: string;
     name: string;
-    authProvider: "google" | "microsoft" | "apple" | "telegram" | "passkey";
+    authProvider: "google" | "microsoft" | "apple" | "telegram" | "passkey" | "frisky";
   };
   org?: {
     id: string;
@@ -425,12 +426,25 @@ export const authService = {
     }
   },
   async login(provider: "google" | "microsoft" | "apple") {
+    const caps = await this.authCapabilities();
+    if (caps.engine === "better-auth") {
+      await signInWithFriskyAuth(provider);
+      return;
+    }
     const returnTo = safeCurrentAuthReturnPath();
     if (await workerAuthIsLive()) {
       window.location.assign(`${workerAuthUrl(`/auth/${provider}`)}?redirect=${encodeURIComponent(returnTo)}`);
       return;
     }
     window.location.assign(`/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
+  },
+  async authCapabilities() {
+    return apiRequest<{
+      ok: true;
+      engine: "better-auth" | "legacy-direct-oauth";
+      providers: Array<"google" | "microsoft" | "apple">;
+      appleLive: boolean;
+    }>("/api/auth/providers");
   },
   async enabledProviders() {
     try {
@@ -440,10 +454,7 @@ export const authService = {
     } catch {
       // Fall back to Pages capability metadata when the Worker is not local.
     }
-    const result = await apiRequest<{
-      ok: true;
-      providers: Array<"google" | "microsoft" | "apple">;
-    }>("/api/auth/providers");
+    const result = await this.authCapabilities();
     return result.providers;
   },
   async telegramLogin(payload: TelegramLoginPayload) {
@@ -458,6 +469,7 @@ export const authService = {
     } catch {
       // Optional cleanup only.
     }
+    await signOutFriskyAuthClient();
     await fetch(workerAuthUrl("/auth/logout"), { credentials: "include" }).catch(() => null);
     await apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }).catch(() => null);
   }

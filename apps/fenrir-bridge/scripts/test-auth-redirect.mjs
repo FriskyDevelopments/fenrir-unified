@@ -1,6 +1,7 @@
-// Guard: MyFenrir sign-in prefers the Fenrir Better Auth Worker on /auth/{provider}.
-// Until that Worker is publicly routed, Pages /api/auth/login stays as the live
-// Google/Microsoft fallback. Authentic/Supabase proxy stays retired. WorkOS stays banned.
+// Guard: new MyFenrir sign-ins prefer the Fenrir Better Auth Worker on /auth/{provider}
+// when it is live, then Better Auth (@frisky/auth) when /api/auth/providers reports
+// engine=better-auth, and finally fall back to direct OAuth as the cutover fallback.
+// Authentik/Supabase proxy stays retired. WorkOS is banned from this repo (same as Vercel).
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -25,6 +26,14 @@ function workosMatches() {
 const offenders = workosMatches();
 const checks = [
   {
+    name: "new social login prefers Better Auth when providers.engine is better-auth",
+    pass: apiSource.includes("signInWithFriskyAuth") &&
+      apiSource.includes('engine === "better-auth"') &&
+      apiSource.includes('>("/api/auth/providers")') &&
+      !apiSource.includes("signInWithSupabase(provider)") &&
+      providersSource.includes("better-auth")
+  },
+  {
     name: "new social login prefers Fenrir Better Auth Worker /auth/{provider}, Pages OAuth until that Worker is live",
     pass: apiSource.includes("/auth/${provider}") &&
       apiSource.includes('workerAuthUrl("/auth/providers")') &&
@@ -33,7 +42,7 @@ const checks = [
       apiSource.includes('workerAuthUrl("/auth/ready")') &&
       !apiSource.includes('workerAuthUrl("/auth/health")') &&
       !apiSource.includes("signInWithSupabase(provider)") &&
-      providersSource.includes("isDirectOAuthAvailable(provider, context.env)")
+      providersSource.includes("better-auth")
   },
   {
     name: "the production App auth surface renders only advertised providers",

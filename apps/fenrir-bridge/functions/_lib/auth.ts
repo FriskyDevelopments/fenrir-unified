@@ -1,10 +1,13 @@
 type OAuthProvider = "google" | "microsoft" | "apple" | "telegram";
 
-/** OAuth or passkey — session cookie may reference either after sign-in. */
-export type SessionProvider = OAuthProvider | "passkey";
+/** OAuth, passkey, or Better Auth (`frisky`) — session cookie may reference any after sign-in. */
+export type SessionProvider = OAuthProvider | "passkey" | "frisky";
 
 export type AuthEnv = {
   SESSION_SECRET?: string;
+  BETTER_AUTH_SECRET?: string;
+  FRISKY_AUTH_SECRET?: string;
+  FRISKY_AUTH_ENABLED?: string;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
   SUPABASE_ADMIN_EMAILS?: string;
@@ -49,6 +52,13 @@ export function sessionCookieName() {
   return sessionCookie;
 }
 
+/**
+ * Signs a session payload for use as an authenticated session token.
+ *
+ * @param payload - The session data to encode and sign
+ * @param env - The environment containing the session signing secret
+ * @returns The encoded session payload followed by its HMAC signature
+ */
 export async function signSession(payload: SessionPayload, env: AuthEnv) {
   const secret = requireSecret(env.SESSION_SECRET, "SESSION_SECRET");
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(payload)));
@@ -56,6 +66,31 @@ export async function signSession(payload: SessionPayload, env: AuthEnv) {
   return `${encoded}.${signature}`;
 }
 
+/**
+ * Reads and validates the Fenrir session cookie from a request.
+ *
+ * @param env - Environment containing the session signing secret
+ * @returns The decoded session payload, or `null` if the cookie is missing, invalid, or expired
+ */
+export async function readFenrirCookieSession(request: Request, env: AuthEnv) {
+  const token = readCookie(request, sessionCookie);
+  if (!token) return null;
+  const [encoded, signature] = token.split(".");
+  if (!encoded || !signature) return null;
+  const expected = await hmac(requireSecret(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
+  if (!timingSafeEqual(signature, expected)) return null;
+  const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as SessionPayload;
+  if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
+  return payload;
+}
+
+/**
+ * Reads the authenticated session from the Fenrir cookie or, when enabled, Frisky Auth.
+ *
+ * @param request - The incoming request containing session credentials
+ * @param env - The environment configuration used to validate and load the session
+ * @returns The authenticated session, or `null` when no valid session is available
+ */
 export async function readSession(request: Request, env: AuthEnv) {
   if (env.AUTH?.fetch) {
     try {
@@ -82,17 +117,20 @@ export async function readSession(request: Request, env: AuthEnv) {
     }
   }
 
-  const token = readCookie(request, sessionCookie);
-  if (!token) return null;
-  const [encoded, signature] = token.split(".");
-  if (!encoded || !signature) return null;
-  const expected = await hmac(requireSecret(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
-  if (!timingSafeEqual(signature, expected)) return null;
-  const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as SessionPayload;
-  if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
-  return payload;
+  const cookieSession = await readFenrirCookieSession(request, env);
+  if (cookieSession) return cookieSession;
+  const { friskyAuthEnabled, readFriskyAuthSession } = await import("./frisky-auth");
+  if (!friskyAuthEnabled(env)) return null;
+  return readFriskyAuthSession(request, env);
 }
 
+/**
+ * Creates a session cookie containing the specified token with a one-week lifetime.
+ *
+ * @param token - The session token to store in the cookie
+ * @param domain - The optional cookie domain
+ * @returns A `Set-Cookie` header value
+ */
 export function sessionSetCookie(token: string, domain?: string) {
   return cookieHeader(sessionCookie, token, week, domain);
 }

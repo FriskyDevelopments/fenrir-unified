@@ -60,8 +60,8 @@ export function legacyAuthErrorMessage(error: string | null | undefined): string
   if (error.startsWith("missing_env:")) {
     return "This provider is not live yet. Use an enabled sign-in option, or refresh to return to the clean Fenrir gate.";
   }
-  if (error === "direct_oauth_disabled") {
-    return "That old sign-in route was retired. Use the provider buttons on this Fenrir gate.";
+  if (error === "direct_oauth_disabled" || error === "use_frisky_auth") {
+    return "App login uses Better Auth. Use the provider buttons on this Fenrir gate.";
   }
   if (errorCode === "oauth_access_denied") {
     return "The provider denied access. Try again and confirm consent to continue with this account.";

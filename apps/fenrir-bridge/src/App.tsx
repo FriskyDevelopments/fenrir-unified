@@ -2175,6 +2175,12 @@ function planLabel(plan: Plan) {
   return labels[plan];
 }
 
+/**
+ * Resolves a provider identifier to its display label.
+ *
+ * @param provider - The provider identifier to label
+ * @returns A recognized provider label, the original identifier, or `OAuth` when no identifier is provided
+ */
 function authProviderLabel(provider: string) {
   const value = provider.toLowerCase();
   if (value.includes("apple")) return "Apple";
@@ -2182,6 +2188,7 @@ function authProviderLabel(provider: string) {
   if (value.includes("microsoft") || value.includes("azure")) return "Microsoft";
   if (value.includes("telegram")) return "Telegram";
   if (value.includes("passkey")) return "Passkey";
+  if (value.includes("frisky") || value.includes("better-auth")) return "Frisky";
   return provider || "OAuth";
 }
 
@@ -2461,21 +2468,33 @@ const accessStateHelp: Record<DefaultAccessState, string> = {
   disabled: "The gate stays closed while you finish setup."
 };
 
+/**
+ * Converts a community authentication provider identifier into a display label.
+ *
+ * @param provider - The authentication provider identifier
+ * @returns The provider's display label
+ */
 function communityAuthProviderLabel(provider: string) {
   if (provider === "magic_link") return "Magic link";
   if (provider === "microsoft") return "Microsoft";
-  if (provider === "authentik") return "FriskyDev Auth";
+  if (provider === "authentik") return "Retired Authentik (not Fenrir identity)";
   return provider[0]?.toUpperCase() + provider.slice(1);
 }
 
 /**
  * Providers the Community Gate OAuth bridge can complete end-to-end.
- * `authentik` is the broker: when it is enabled it fronts Google / Microsoft / Apple
- * instead of sitting beside them, so a community normally enables EITHER authentik
- * OR the direct three — not both. See docs/AUTHENTIK_OIDC_INTEGRATION.md.
+ * Authentik is leftover (VM destroyed 2026-08-28) and is not shown.
+ * Community membership still uses fenrir_* + fenrir_community_session.
  */
-const communityOAuthProviders = ["google", "microsoft", "apple", "authentik"] as const;
+const communityOAuthProviders = ["google", "microsoft", "apple"] as const;
 
+/**
+ * Builds the OAuth authentication URL for a community.
+ *
+ * @param provider - The OAuth provider to authenticate with
+ * @param slug - The community slug
+ * @returns The provider-specific community OAuth URL
+ */
 function communityOAuthStartUrl(provider: string, slug: string) {
   const params = new URLSearchParams({ slug, return_to: `/community/${slug}` });
   return `/api/community-auth/oauth/${provider}?${params.toString()}`;
@@ -3244,13 +3263,19 @@ function readableCommunityError(detail: unknown, fallback?: string) {
   return fallback || "Community Gate is not ready yet.";
 }
 
+/**
+ * Maps a Community Gate branding request error to a user-facing message.
+ *
+ * @param error - The error raised while loading Community Gate branding.
+ * @returns A descriptive message for the authentication, authorization, configuration, schema, or network failure.
+ */
 function communityBrandAdminErrorMessage(error: unknown) {
   if (!(error instanceof CommunityBrandRequestError)) {
     return "Network/API failure. The brand workspace could not be loaded.";
   }
   if (error.status === 401 || error.error === "authentication_required") return "Not signed in. Sign in to the Fenrir admin before customizing this Community Gate.";
   if (error.status === 403 || error.error === "forbidden") return "Forbidden. Your account is not an owner or allowlisted admin for this Community Gate.";
-  if (error.status === 503 || error.error === "community_auth_not_configured") return readableCommunityError(error.detail, "Missing Community Gate config. Firebase Auth handles sign-in; Neon is only the gate data plane.");
+  if (error.status === 503 || error.error === "community_auth_not_configured") return readableCommunityError(error.detail, "Missing Community Gate config. Membership uses fenrir_community_session and Neon fenrir_* tables; Firebase bearer verification is leftover, not Fenrir app identity.");
   if (error.error === "community_gate_schema_missing") return "Missing Neon schema. Apply the Community Gate schema before customizing this gate.";
   return `Community Gate load failed: ${error.error || `HTTP ${error.status}`}.`;
 }

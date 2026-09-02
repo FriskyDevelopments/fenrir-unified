@@ -1,25 +1,25 @@
 /**
  * Better Auth mount point for the shared @frisky/auth package.
  *
- * Disabled by default so production keeps the current Supabase / direct OAuth
- * path until Neon app_auth_* tables + provider console callbacks are ready.
+ * App login (who is this user?) lives here. Community Gate membership
+ * (is this user a member of this community?) stays on /api/community-gate/*
+ * and /api/community-auth/* — those routes are not this handler.
  *
- * Enable with FRISKY_AUTH_ENABLED=1 and install @frisky/auth (see
- * docs/FRISKY_AUTH_MIGRATION.md). Copied from frisky-ui-kits/packages/auth/examples/pages-function.ts.
+ * Enable with FRISKY_AUTH_ENABLED=1 after Neon app_auth_* tables and
+ * provider console callbacks are ready. See docs/FRISKY_AUTH_MIGRATION.md.
+ *
+ * Authentik is not Fenrir identity. Do not point this mount at Authentik.
  */
 import { noStoreJson } from "../../_lib/responses";
+import { friskyAuthEnabled } from "../../_lib/frisky-auth";
 
 type Env = Record<string, string | undefined> & {
   FRISKY_AUTH_ENABLED?: string;
   NEON_DATABASE_URL?: string;
 };
 
-function enabled(value: string | undefined): boolean {
-  return ["1", "true", "yes", "on"].includes((value ?? "").trim().toLowerCase());
-}
-
 export const onRequest: PagesFunction<Env> = async (context) => {
-  if (!enabled(context.env.FRISKY_AUTH_ENABLED)) {
+  if (!friskyAuthEnabled(context.env)) {
     return noStoreJson(
       {
         ok: false,
@@ -27,7 +27,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         product: "fenrir-bridge",
         detail: {
           message:
-            "Shared @frisky/auth is scaffolded but not enabled. Keep Supabase/direct OAuth until Neon app_auth_* + provider callbacks are cut over. See docs/FRISKY_AUTH_MIGRATION.md.",
+            "Better Auth (@frisky/auth) is the Fenrir app identity plane but is not enabled in this environment. Set FRISKY_AUTH_ENABLED=1, BETTER_AUTH_SECRET, provider client IDs, and NEON_DATABASE_URL after applying packages/auth/sql/app_auth.sql. Authentik is retired leftover — do not wire it back.",
         },
       },
       { status: 503 },
@@ -39,7 +39,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       {
         ok: false,
         error: "frisky_auth_missing_neon",
-        detail: { message: "NEON_DATABASE_URL is required for @frisky/auth." },
+        detail: { message: "NEON_DATABASE_URL is required for @frisky/auth app_auth_* tables." },
       },
       { status: 503 },
     );
@@ -47,7 +47,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   try {
     const { Pool } = await import("@neondatabase/serverless");
-    // Dynamic import keeps deploy green when @frisky/auth is not yet a dependency.
     const authMod = await import("@frisky/auth/server");
     const pool = new Pool({
       connectionString: authMod.neonConnectionString(context.env),
@@ -72,7 +71,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         error: "frisky_auth_boot_failed",
         detail: {
           message,
-          hint: "Install @frisky/auth and apply Neon app_auth_* tables before enabling FRISKY_AUTH_ENABLED.",
+          hint: "Install @frisky/auth, apply packages/auth/sql/app_auth.sql, and set Better Auth secrets before enabling FRISKY_AUTH_ENABLED.",
         },
       },
       { status: 503 },
