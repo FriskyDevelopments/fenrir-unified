@@ -22,6 +22,7 @@ import { createPkce, randomToken } from "./crypto.js";
 import { createSession, getSession, destroySession } from "./identity.js";
 import { checkDatabase } from "./neon.js";
 import { saveOAuthState, consumeOAuthState } from "./session.js";
+import { handleTelegramLink } from "./telegram.js";
 
 export { SessionAuthority } from "./session.js";
 
@@ -412,8 +413,12 @@ async function handleRequest(request, env) {
     return json({ error: "not_found", hint: "This Worker only serves /auth/*" }, 404);
   }
 
+  if (parts[0] === "api" && parts[1] === "telegram" && parts[2] === "link") {
+    return handleTelegramLink(request, env, parts);
+  }
+
   if (parts[0] !== "auth") {
-    return json({ error: "not_found", hint: "This Worker only serves /auth/*" }, 404);
+    return json({ error: "not_found", hint: "This Worker only serves /auth/* and /api/telegram/link*" }, 404);
   }
 
   if (parts[1] === "api") {

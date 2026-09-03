@@ -84,38 +84,56 @@ export async function readFenrirCookieSession(request: Request, env: AuthEnv) {
   return payload;
 }
 
-/**
- * Reads the authenticated session from the Fenrir cookie or, when enabled, Frisky Auth.
- *
- * @param request - The incoming request containing session credentials
- * @param env - The environment configuration used to validate and load the session
- * @returns The authenticated session, or `null` when no valid session is available
- */
-export async function readSession(request: Request, env: AuthEnv) {
+async function sessionFromAuthMe(body: {
+  authenticated?: boolean;
+  user?: { id: string; email?: string | null; name?: string | null; provider?: SessionProvider };
+} | null) {
+  if (!body?.authenticated || !body.user) return null;
+  return createSessionPayload({
+    email: body.user.email || "",
+    name: body.user.name || body.user.email || "",
+    provider: sessionProviderFromIdentity(body.user.provider),
+    identityId: body.user.id
+  });
+}
+
+async function readWorkerFenrirSession(request: Request, env: AuthEnv) {
+  const headers = {
+    Cookie: request.headers.get("Cookie") ?? "",
+    Authorization: request.headers.get("Authorization") ?? "",
+    Accept: "application/json",
+  };
+  const cookie = headers.Cookie;
+  const bearer = headers.Authorization;
+  if (!cookie.includes("fenrir_session=") && !bearer.toLowerCase().startsWith("bearer ")) {
+    return null;
+  }
   if (env.AUTH?.fetch) {
     try {
-      const forwarded = await env.AUTH.fetch(new Request("https://myfenrir.com/auth/me", {
-        headers: {
-          Cookie: request.headers.get("Cookie") ?? "",
-          Authorization: request.headers.get("Authorization") ?? ""
-        }
-      }));
-      const body = await forwarded.json().catch(() => null) as {
-        authenticated?: boolean;
-        user?: { id: string; email?: string | null; name?: string | null; provider?: SessionProvider };
-      } | null;
-      if (body?.authenticated && body.user) {
-        return createSessionPayload({
-          email: body.user.email || "",
-          name: body.user.name || body.user.email || "",
-          provider: sessionProviderFromIdentity(body.user.provider),
-          identityId: body.user.id
-        });
-      }
+      const forwarded = await env.AUTH.fetch(new Request("https://myfenrir.com/auth/me", { headers }));
+      const fromBinding = await sessionFromAuthMe(await forwarded.json().catch(() => null));
+      if (fromBinding) return fromBinding;
     } catch {
-      // Fall through to the legacy payload cookie.
+      // Fall through to the public Worker /auth/me (same fenrir_session cookie).
     }
   }
+
+  try {
+    const forwarded = await fetch("https://myfenrir.com/auth/me", { headers });
+    return sessionFromAuthMe(await forwarded.json().catch(() => null));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reads the authenticated session from the Fenrir Worker cookie (fenrir_session)
+ * via the AUTH service binding or public /auth/me, then the legacy payload cookie,
+ * then Frisky Auth when enabled.
+ */
+export async function readSession(request: Request, env: AuthEnv) {
+  const workerSession = await readWorkerFenrirSession(request, env);
+  if (workerSession) return workerSession;
 
   const cookieSession = await readFenrirCookieSession(request, env);
   if (cookieSession) return cookieSession;

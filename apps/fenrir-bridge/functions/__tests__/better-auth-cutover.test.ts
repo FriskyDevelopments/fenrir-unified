@@ -12,10 +12,17 @@ describe("retired Pages login paths", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
-        new Response(JSON.stringify({ ok: true, service: "fenrir-auth-worker" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
+        new Response(
+          JSON.stringify({
+            ready: true,
+            service: "fenrir-auth-worker",
+            providers: { google: true, microsoft: true, apple: true },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
       ),
     );
 
@@ -57,5 +64,14 @@ describe("retired Pages login paths", () => {
     expect(session?.email).toBe("ada@myfenrir.com");
     expect(session?.provider).toBe("google");
     expect(session?.frisky_user_id).toMatch(/^frisky_usr_/);
+  });
+
+  it("readSession skips the AUTH service binding without session credentials", async () => {
+    const authFetch = vi.fn(async () => new Response(null, { status: 401 }));
+
+    await expect(readSession(new Request("https://myfenrir.com/api/auth/me"), {
+      AUTH: { fetch: authFetch },
+    })).resolves.toBeNull();
+    expect(authFetch).not.toHaveBeenCalled();
   });
 });

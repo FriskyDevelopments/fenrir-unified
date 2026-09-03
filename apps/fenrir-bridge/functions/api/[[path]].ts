@@ -3,6 +3,27 @@ import { createFallbackChallenge, createVerificationGrant, riskLevel, verifyFall
 
 export async function onRequest(context: any) {
   const url = new URL(context.request.url);
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+  const method = context.request.method.toUpperCase();
+
+  // Restore Telegram identity link if this catch-all won the /api/* match.
+  // App identity stays fenrir_session / AUTH Worker. Do not touch VC bot webhooks.
+  if (path === "/api/telegram/link/start" && method === "GET") {
+    const { onRequestGet } = await import("./telegram/link/start");
+    return onRequestGet(context);
+  }
+  if (path === "/api/telegram/link/start" && method === "HEAD") {
+    return new Response(null, { status: 405, headers: { Allow: "GET", "Cache-Control": "no-store" } });
+  }
+  if (path === "/api/telegram/link") {
+    if (method === "HEAD") {
+      return new Response(null, { status: 405, headers: { Allow: "GET, POST", "Cache-Control": "no-store" } });
+    }
+    const link = await import("./telegram/link");
+    if (method === "GET") return link.onRequestGet(context);
+    if (method === "POST") return link.onRequestPost(context);
+  }
+
   // Cloudflare Pages lets this optional catch-all own /api/* on this project.
   if (url.pathname === "/api/verification/challenge" && context.request.method === "GET") {
     const mode = url.searchParams.get("mode");

@@ -112,7 +112,30 @@ the KV namespace and paste its id into `wrangler.fenrir-auth.jsonc`.
 
 `/auth/ready` is degraded while `database: false`. KV can still mint sessions.
 
+## Telegram identity (two-bot split)
+
+After OAuth, `fenrir_session` can start a Telegram identity link:
+
+- Start: `GET https://myfenrir.com/api/telegram/link/start`
+- Complete mint: `POST https://myfenrir.com/api/telegram/link`
+- Bot: **@Myfenrir_bot** (`t.me/Myfenrir_bot?start=link_<code>`)
+- Do not use **@MyFenrirTeleConnectBot** (VC / `vc.friskydev.com`)
+- Do not move the Community Gate webhook off `gate.myfenrir.com/tg`
+
+## Operator leftovers
+
+Not code in this repo:
+
+- Bind Neon `DATABASE_URL` so `/auth/ready` reports `database: true` / not degraded
+- `login.myfenrir.com` DNS
+- Cloudflare MCP reconnect
+
+Do not create new OAuth clients. Live IDs:
+
+- Google `411033642222-3cbc7g2sjq9navh6lqfuclhbj0hj4cp4`
+- Microsoft `bd7f4392-853c-4c41-89e7-443691424188`
+- Apple Services ID `com.myfenrir.FenrirProtocol`
+
 ## Out of scope
 
-`/auth/api/*`, KYC/KYB, CFDI, timbrado, passkeys, extra providers, Telegram dens.
-Telegram linking stays the post-login gate in the Fenrir dashboard.
+`/auth/api/*`, KYC/KYB, CFDI, timbrado, passkeys, extra providers, Telegram identity links.

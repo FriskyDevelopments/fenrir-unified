@@ -4,7 +4,8 @@ Fenrir **Better Auth** identity on a Cloudflare Worker. Public HTTP copies the
 `folios-auth-worker` contract (endpoints, HMAC cookie, PKCE S256, Apple
 `form_post` + ES256 client-secret JWT). This is **not** a Folios product merge:
 cookie domain is `myfenrir.com`, Worker origin is `myfenrir.com/auth/*` and
-`www.myfenrir.com/auth/*`. Fenrir login is never served on `folios.works`.
+`www.myfenrir.com/auth/*`, plus Telegram identity link on `/api/telegram/link*`.
+Fenrir login is never served on `folios.works`.
 
 Authentic / the `fenrir-auth-proxy` Supabase broker on `auth.myfenrir.com` is
 retired (410).
@@ -20,11 +21,20 @@ retired (410).
 | GET | `https://myfenrir.com/auth/me` | `{ "authenticated": false }` or `{ "authenticated": true, "user": {…} }` |
 | GET | `https://myfenrir.com/auth/logout` | Clears session + cookie, 302 to `/login` |
 | GET | `https://myfenrir.com/auth/providers` | Which providers can start |
-| GET | `https://myfenrir.com/auth/health` | Liveness |
+| GET | `https://myfenrir.com/auth/health` | Liveness only — do **not** gate login on this |
 | GET | `https://myfenrir.com/auth/ready` | Session secret + all three providers + (Neon **or** KV); 503 only when login cannot mint a session |
+| GET | `https://myfenrir.com/api/telegram/link/start` | Unauthenticated 302 `/login?next=/api/telegram/link/start`; signed-in 302 `t.me/Myfenrir_bot?start=link_<code>` |
+| POST | `https://myfenrir.com/api/telegram/link` | Mint the same one-time code against `fenrir_session`. Unauthenticated `{ error: authentication_required }` |
 
 `?redirect=` is allow-listed to `myfenrir.com` / `www.myfenrir.com` (open-redirect
 protection). `/auth/api/*`, KYC, passkeys, and extra providers are out.
+Do not register `/auth/callback` (returns `unknown_provider`).
+
+## Telegram identity vs VC (two-bot split)
+
+- Community / identity: **@Myfenrir_bot** via `/api/telegram/link*` after `fenrir_session`.
+- VC / TeleConnect: **@MyFenrirTeleConnectBot** on `vc.friskydev.com`. Do not touch it.
+- Community Gate webhook stays `gate.myfenrir.com/tg`. This Worker does not steal it.
 
 `www.myfenrir.com` 301s to the apex (Pages `_redirects` + `fenrir-redirects`).
 Worker routes remain on both hosts. Browser OAuth failures 302 to
@@ -82,8 +92,12 @@ curl -sI "https://myfenrir.com/auth/google?redirect=/main"
 Google/Microsoft should 302 to the IdP with `redirect_uri=https://myfenrir.com/auth/{provider}/callback`
 and PKCE `S256`. Apple 302s with `response_mode=form_post`. Then click through
 https://myfenrir.com/login (private-access gate) and confirm `GET /auth/me` with
-credentials returns `authenticated: true`. Telegram linking is the post-login
-gate in the dashboard — this Worker does not create dens or chat IDs.
+credentials returns `authenticated: true`. Then `GET /api/telegram/link/start`
+should 302 to `t.me/Myfenrir_bot?start=link_…`. This Worker does not create Telegram identity links.
+
+Operator leftovers (not this Worker deploy): bind Neon so `/auth/ready` is not
+`degraded`, `login.myfenrir.com` DNS, Cloudflare MCP reconnect. Do not invent
+secrets or new OAuth clients.
 
 ## KV namespace (human)
 

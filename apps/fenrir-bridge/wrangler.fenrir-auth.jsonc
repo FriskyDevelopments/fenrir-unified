@@ -9,11 +9,14 @@
     "enabled": true,
     "logs": { "head_sampling_rate": 1 }
   },
-  // Worker as origin for /auth/* on Fenrir, and as the login gate on
-  // forge/paperclip (already live). Do not attach this Worker to folios.works.
+  // Worker as origin for /auth/* on Fenrir, Telegram identity link start/complete,
+  // and the login gate on forge/paperclip (already live). Do not attach this
+  // Worker to folios.works. Do not steal gate.myfenrir.com/tg.
   "routes": [
     { "pattern": "myfenrir.com/auth/*", "zone_name": "myfenrir.com" },
     { "pattern": "www.myfenrir.com/auth/*", "zone_name": "myfenrir.com" },
+    { "pattern": "myfenrir.com/api/telegram/link*", "zone_name": "myfenrir.com" },
+    { "pattern": "www.myfenrir.com/api/telegram/link*", "zone_name": "myfenrir.com" },
     { "pattern": "forge.friskydev.com/*", "zone_name": "friskydev.com" },
     { "pattern": "paperclip.friskydev.com/*", "zone_name": "friskydev.com" }
   ],
@@ -30,6 +33,14 @@
   // Replace id after: wrangler kv namespace create FENRIR_AUTH_SESSIONS
   "kv_namespaces": [
     { "binding": "SESSIONS", "id": "9e3b6917e8354d66aa3f4375f345e440" }
+  ],
+  // Existing fenrir-bridge D1 (telegram_account_link_codes). Do not invent a new DB.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "fenrir-bridge",
+      "database_id": "1238059e-2638-4317-982e-e74dda046ccb"
+    }
   ],
   "durable_objects": {
     "bindings": [
