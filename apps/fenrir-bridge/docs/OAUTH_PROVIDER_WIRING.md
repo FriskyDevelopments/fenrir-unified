@@ -138,4 +138,4 @@ Do not create new OAuth clients. Live IDs:
 
 ## Out of scope
 
-`/auth/api/*`, KYC/KYB, CFDI, timbrado, passkeys, extra providers, Telegram dens.
+`/auth/api/*`, KYC/KYB, CFDI, timbrado, passkeys, extra providers, Telegram identity links.

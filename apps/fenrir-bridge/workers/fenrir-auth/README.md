@@ -93,7 +93,7 @@ Google/Microsoft should 302 to the IdP with `redirect_uri=https://myfenrir.com/a
 and PKCE `S256`. Apple 302s with `response_mode=form_post`. Then click through
 https://myfenrir.com/login (private-access gate) and confirm `GET /auth/me` with
 credentials returns `authenticated: true`. Then `GET /api/telegram/link/start`
-should 302 to `t.me/Myfenrir_bot?start=link_…`. This Worker does not create dens.
+should 302 to `t.me/Myfenrir_bot?start=link_…`. This Worker does not create Telegram identity links.
 
 Operator leftovers (not this Worker deploy): bind Neon so `/auth/ready` is not
 `degraded`, `login.myfenrir.com` DNS, Cloudflare MCP reconnect. Do not invent

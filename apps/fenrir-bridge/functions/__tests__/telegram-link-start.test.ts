@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { onRequestGet } from "../api/telegram/link/start";
 import { onRequestPost } from "../api/telegram/link";
+import { onRequest as dispatchApi } from "../api/[[path]]";
+
+const sessionCookie = "fenrir_session=test-session";
 
 describe("FriskyDev Telegram link-start", () => {
   it("sends unauthenticated browsers to Better Auth /login, not /main", async () => {
@@ -22,8 +25,9 @@ describe("FriskyDev Telegram link-start", () => {
     const env = {
       FENRIR_TELEGRAM_BOT_USERNAME: "Myfenrir_bot",
       AUTH: {
-        fetch: async () =>
-          new Response(
+        fetch: async (request: Request) => {
+          expect(request.headers.get("Cookie")).toBe(sessionCookie);
+          return new Response(
             JSON.stringify({
               authenticated: true,
               user: {
@@ -34,7 +38,8 @@ describe("FriskyDev Telegram link-start", () => {
               },
             }),
             { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
+          );
+        },
       },
       DB: {
         prepare() {
@@ -51,7 +56,9 @@ describe("FriskyDev Telegram link-start", () => {
     };
 
     const response = await onRequestGet({
-      request: new Request("https://www.myfenrir.com/api/telegram/link/start"),
+      request: new Request("https://www.myfenrir.com/api/telegram/link/start", {
+        headers: { Cookie: sessionCookie },
+      }),
       env,
     });
 
@@ -77,8 +84,9 @@ describe("FriskyDev Telegram link-start", () => {
     const env = {
       FENRIR_TELEGRAM_BOT_USERNAME: "Myfenrir_bot",
       AUTH: {
-        fetch: async () =>
-          new Response(
+        fetch: async (request: Request) => {
+          expect(request.headers.get("Cookie")).toBe(sessionCookie);
+          return new Response(
             JSON.stringify({
               authenticated: true,
               user: {
@@ -89,7 +97,8 @@ describe("FriskyDev Telegram link-start", () => {
               },
             }),
             { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
+          );
+        },
       },
       DB: {
         prepare() {
@@ -105,7 +114,10 @@ describe("FriskyDev Telegram link-start", () => {
     };
 
     const response = await onRequestPost({
-      request: new Request("https://www.myfenrir.com/api/telegram/link", { method: "POST" }),
+      request: new Request("https://www.myfenrir.com/api/telegram/link", {
+        method: "POST",
+        headers: { Cookie: sessionCookie },
+      }),
       env,
     });
 
@@ -113,5 +125,28 @@ describe("FriskyDev Telegram link-start", () => {
     const body = await response.json();
     expect(body.ok).toBe(true);
     expect(body.url).toMatch(/^https:\/\/t\.me\/Myfenrir_bot\?start=link_/i);
+  });
+
+  it("rejects HEAD link routes without invoking their stateful handlers", async () => {
+    for (const path of ["/api/telegram/link/start", "/api/telegram/link"]) {
+      const response = await dispatchApi({
+        request: new Request(`https://www.myfenrir.com${path}`, { method: "HEAD" }),
+        env: {
+          AUTH: {
+            fetch: async () => {
+              throw new Error("AUTH.fetch must not be called");
+            },
+          },
+          DB: {
+            prepare: () => {
+              throw new Error("DB.prepare must not be called");
+            },
+          },
+        },
+      });
+
+      expect(response.status).toBe(405);
+      expect(response.headers.get("Allow")).toContain("GET");
+    }
   });
 });

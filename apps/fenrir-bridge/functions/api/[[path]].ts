@@ -8,13 +8,19 @@ export async function onRequest(context: any) {
 
   // Restore Telegram identity link if this catch-all won the /api/* match.
   // App identity stays fenrir_session / AUTH Worker. Do not touch VC bot webhooks.
-  if (path === "/api/telegram/link/start" && (method === "GET" || method === "HEAD")) {
+  if (path === "/api/telegram/link/start" && method === "GET") {
     const { onRequestGet } = await import("./telegram/link/start");
     return onRequestGet(context);
   }
+  if (path === "/api/telegram/link/start" && method === "HEAD") {
+    return new Response(null, { status: 405, headers: { Allow: "GET", "Cache-Control": "no-store" } });
+  }
   if (path === "/api/telegram/link") {
+    if (method === "HEAD") {
+      return new Response(null, { status: 405, headers: { Allow: "GET, POST", "Cache-Control": "no-store" } });
+    }
     const link = await import("./telegram/link");
-    if (method === "GET" || method === "HEAD") return link.onRequestGet(context);
+    if (method === "GET") return link.onRequestGet(context);
     if (method === "POST") return link.onRequestPost(context);
   }
 

@@ -103,6 +103,11 @@ async function readWorkerFenrirSession(request: Request, env: AuthEnv) {
     Authorization: request.headers.get("Authorization") ?? "",
     Accept: "application/json",
   };
+  const cookie = headers.Cookie;
+  const bearer = headers.Authorization;
+  if (!cookie.includes("fenrir_session=") && !bearer.toLowerCase().startsWith("bearer ")) {
+    return null;
+  }
   if (env.AUTH?.fetch) {
     try {
       const forwarded = await env.AUTH.fetch(new Request("https://myfenrir.com/auth/me", { headers }));
@@ -113,11 +118,6 @@ async function readWorkerFenrirSession(request: Request, env: AuthEnv) {
     }
   }
 
-  const cookie = headers.Cookie;
-  const bearer = headers.Authorization;
-  if (!cookie.includes("fenrir_session=") && !bearer.toLowerCase().startsWith("bearer ")) {
-    return null;
-  }
   try {
     const forwarded = await fetch("https://myfenrir.com/auth/me", { headers });
     return sessionFromAuthMe(await forwarded.json().catch(() => null));
