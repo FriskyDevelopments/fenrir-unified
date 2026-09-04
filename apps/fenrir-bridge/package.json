@@ -30,15 +30,15 @@
     "pretypecheck": "bash scripts/run-with-node-lts.sh node scripts/clean-icloud-dupes.mjs"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.0.1",
     "@frisky/auth": "file:../../packages/auth",
-    "better-auth": "^1.4.21",
+    "@neondatabase/serverless": "^1.0.1",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.0",
     "@supabase/supabase-js": "^2.105.3",
     "@vitejs/plugin-react": "^5.2.0",
+    "better-auth": "^1.4.21",
     "motion": "^12.43.0",
-    "posthog-js": "^1.414.0",
+    "posthog-js": "^1.426.4",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "stripe": "^17.7.0",
