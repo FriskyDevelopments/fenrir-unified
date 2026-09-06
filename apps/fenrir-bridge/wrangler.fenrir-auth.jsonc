@@ -7,7 +7,18 @@
   "workers_dev": false,
   "observability": {
     "enabled": true,
-    "logs": { "head_sampling_rate": 1 }
+    "traces": {
+      "enabled": true,
+      "destinations": ["bluebox-traces"],
+      "head_sampling_rate": 1,
+      "persist": true
+    },
+    "logs": {
+      "enabled": true,
+      "destinations": ["bluebox-logs"],
+      "head_sampling_rate": 1,
+      "persist": true
+    }
   },
   // Worker as origin for /auth/* on Fenrir, Telegram identity link start/complete,
   // and the login gate on forge/paperclip (already live). Do not attach this
