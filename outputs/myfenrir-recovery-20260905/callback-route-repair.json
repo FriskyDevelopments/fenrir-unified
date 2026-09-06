@@ -1,0 +1,41 @@
+{
+  "reason": "Restore Pages-owned OAuth callbacks and signed Telegram confirmation masked by broader fenrir-auth-worker routes",
+  "created": [
+    {
+      "id": "973175fc63cb42b0b6a159ec3898de8d",
+      "pattern": "myfenrir.com/auth/callback*",
+      "script": null,
+      "request_limit_fail_open": false
+    },
+    {
+      "id": "7a70bf9ff5214981a6fa8e2afef7ec31",
+      "pattern": "www.myfenrir.com/auth/callback*",
+      "script": null,
+      "request_limit_fail_open": false
+    },
+    {
+      "id": "fef1c33a062544d1a2014e7204dae25b",
+      "pattern": "myfenrir.com/auth/v1/callback*",
+      "script": null,
+      "request_limit_fail_open": false
+    },
+    {
+      "id": "8060cca5235f4d44b8373b639a199c7d",
+      "pattern": "www.myfenrir.com/auth/v1/callback*",
+      "script": null,
+      "request_limit_fail_open": false
+    },
+    {
+      "id": "a056066aaa7b48f3aae0493d31f0d47e",
+      "pattern": "myfenrir.com/api/telegram/link/confirm*",
+      "script": null,
+      "request_limit_fail_open": false
+    },
+    {
+      "id": "0c3aee0a869c491ebcfc4941f7171d4b",
+      "pattern": "www.myfenrir.com/api/telegram/link/confirm*",
+      "script": null,
+      "request_limit_fail_open": false
+    }
+  ]
+}

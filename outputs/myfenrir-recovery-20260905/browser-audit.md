@@ -1,7 +1,7 @@
 # MyFenrir public and recovery audit — 2026-09-06 UTC
 
 Public live checks:
-- myfenrir.com and www.myfenrir.com return 200 with matching deployment assets index-C3jZlSfd.js and index-CUviGQ7V.css.
+- myfenrir.com and www.myfenrir.com return 200 with matching final deployment assets index-B8dV-RnJ.js and index-CUviGQ7V.css.
 - Public landing, login, and Community Bridge login load without page exceptions or failed assets in a fresh headless Chrome context.
 - Google, Apple, and Azure Supabase authorize endpoints return 302 to their real provider authorization pages.
 - Human verification slider completed through normal keyboard input: verification service POST 200, MyFenrir grant POST 200, verification cookie set for .myfenrir.com, all provider buttons enabled.
@@ -20,3 +20,20 @@ Actual patched logout handler was imported and its Set-Cookie headers applied in
 
 Runner: Playwright package /Users/friskypup/.npm/_npx/9833c18b2d85bc59/node_modules/playwright with /Applications/Google Chrome.app/Contents/MacOS/Google Chrome, fresh headless contexts. No screenshots, existing browser profiles, real sessions, email, or payments used.
 Scripts: audit.cjs, verify.cjs, recovery.cjs, cookie-regression.mjs in this directory.
+
+## Final production validation
+
+Deployment reported by root: https://f8b485a1.fenrir-bridge.pages.dev.
+Both production domains independently confirmed to serve final index-B8dV-RnJ.js.
+Fresh browser verified www.myfenrir.com/login → completed human slider → /api/verification/grant 200 → enabled social buttons → Google identifier sign-in page after deployment. No account credentials entered.
+Actual production unauthenticated POST /api/auth/logout returned 200 with two fenrir_session expiration headers: host-only and Domain=myfenrir.com. This confirms the logout cookie-scope repair is live.
+Final isolated production-bundle workspace retry regression also confirmed that the stale error notice is removed after successful recovery.
+
+## Worker route return-path correction
+
+Independent comparison identified the live legacy auth Worker intercepting /auth/callback and /auth/v1/callback with 404 unknown_provider while the exact Pages deployment returned HTML 200. Root corrected the Cloudflare route ownership.
+After the correction, fresh browser tests on both apex and www loaded /auth/callback?error=access_denied with 200, removed original callback parameters, reached /main with only auth_error, and displayed recoverable sign-in with a provider-denied explanation. No page errors, failed requests, or HTTP resource errors occurred.
+
+Additional route blocker reported to root: empty unsigned POST /api/telegram/link/confirm returns Worker404 on both custom domains while the exact Pages deployment correctly returns401 invalid_signature. No codes, identity data, signatures, or account sessions were supplied. This is the canonical bot confirmation writer in source and requires route ownership correction before claiming Telegram link confirmation operational.
+
+GET /api/telegram/link/start returns unauthenticated302 on both production domains; GET /api/telegram/link returns expected401. /api/telegram/link/status is not implemented or referenced in canonical client source and returns404 on both production and Pages.
