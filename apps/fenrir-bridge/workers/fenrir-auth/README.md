@@ -108,3 +108,16 @@ npx wrangler kv namespace create FENRIR_AUTH_SESSIONS --config wrangler.fenrir-a
 
 Paste the id into `wrangler.fenrir-auth.jsonc` (`kv_namespaces[0].id`) before
 the first production deploy.
+
+## Bluebox / OpenTelemetry
+
+Export traces + logs via Cloudflare Workers native Observability destinations (not a Node OTel SDK).
+
+1. In Cloudflare → Workers Observability → Destinations, create:
+   - `bluebox-traces` (Traces) → Bluebox OTLP base + `/v1/traces`
+   - `bluebox-logs` (Logs) → Bluebox OTLP base + `/v1/logs`
+2. Bluebox OTLP base: `bluebox otlp-endpoint` (currently Dynatrace live ingest under the workspace).
+3. Custom header: exact **Reveal token** value from Bluebox Setup (never commit it).
+4. This Worker’s wrangler names those destinations under `observability.traces` / `observability.logs`.
+5. Metrics export is **not** supported on Cloudflare Workers yet.
+6. After deploy, hit `https://myfenrir.com/auth/health` to generate traffic for Bluebox.
