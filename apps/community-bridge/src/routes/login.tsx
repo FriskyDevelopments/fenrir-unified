@@ -155,15 +155,23 @@ function LoginPage() {
 
   useEffect(() => {
     let active = true;
-    void loadCommunityProviders({
-      supabaseUrl: import.meta.env["VITE_SUPABASE_URL"] || CANONICAL_SUPABASE_URL,
-      publishableKey:
-        import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || CANONICAL_SUPABASE_PUBLISHABLE_KEY,
-    })
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
+    void loadCommunityProviders(
+      {
+        supabaseUrl: import.meta.env["VITE_SUPABASE_URL"] || CANONICAL_SUPABASE_URL,
+        publishableKey:
+          import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || CANONICAL_SUPABASE_PUBLISHABLE_KEY,
+      },
+      controller.signal,
+    )
       .then((providers) => active && setEnabledCommunityProviders(providers))
-      .catch(() => active && setEnabledCommunityProviders([]));
+      .catch(() => active && setEnabledCommunityProviders([]))
+      .finally(() => window.clearTimeout(timeout));
     return () => {
       active = false;
+      window.clearTimeout(timeout);
+      controller.abort();
     };
   }, []);
 
@@ -387,7 +395,7 @@ function LoginPage() {
         {enabledCommunityProviders === null ? (
           <p className="text-center text-xs text-muted-foreground">Checking available sign-in…</p>
         ) : null}
-        {enabledCommunityProviders?.length === 0 ? (
+        {enabledCommunityProviders !== null && availableIds.length === 0 ? (
           <div
             role="alert"
             className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
