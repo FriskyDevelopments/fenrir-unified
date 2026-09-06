@@ -50,7 +50,15 @@ export async function mintSupabaseSharedSessionCookies(
     const anonKey = env.SUPABASE_ANON_KEY?.trim();
     const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
     const normalizedEmail = email.trim().toLowerCase();
-    if (!supabaseUrl || !anonKey || !serviceKey || !normalizedEmail) return [];
+    if (!supabaseUrl || !anonKey || !serviceKey || !normalizedEmail) {
+      console.error("supabase_shared_session_skipped", {
+        hasUrl: Boolean(supabaseUrl),
+        hasAnon: Boolean(anonKey),
+        hasService: Boolean(serviceKey),
+        hasEmail: Boolean(normalizedEmail),
+      });
+      return [];
+    }
 
     const linkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
       method: "POST",
@@ -71,7 +79,10 @@ export async function mintSupabaseSharedSessionCookies(
       }),
     });
     const link = (await linkResponse.json().catch(() => null)) as { hashed_token?: string } | null;
-    if (!linkResponse.ok || !link?.hashed_token) return [];
+    if (!linkResponse.ok || !link?.hashed_token) {
+      console.error("supabase_generate_link_failed", linkResponse.status);
+      return [];
+    }
 
     const verifyResponse = await fetch(`${supabaseUrl}/auth/v1/verify`, {
       method: "POST",
@@ -81,7 +92,10 @@ export async function mintSupabaseSharedSessionCookies(
     const auth = (await verifyResponse.json().catch(() => null)) as
       | { access_token?: string; refresh_token?: string; expires_in?: number; token_type?: string; user?: unknown }
       | null;
-    if (!verifyResponse.ok || !auth?.access_token || !auth.refresh_token || !auth.user) return [];
+    if (!verifyResponse.ok || !auth?.access_token || !auth.refresh_token || !auth.user) {
+      console.error("supabase_verify_failed", verifyResponse.status);
+      return [];
+    }
 
     const ref = new URL(supabaseUrl).hostname.split(".")[0] || "auth";
     const value = JSON.stringify({
@@ -93,7 +107,8 @@ export async function mintSupabaseSharedSessionCookies(
       user: auth.user,
     });
     return sessionCookies(`sb-${ref}-auth-token`, value);
-  } catch {
+  } catch (error) {
+    console.error("supabase_shared_session_failed", error instanceof Error ? error.message : "unknown");
     return [];
   }
 }

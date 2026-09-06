@@ -73,7 +73,7 @@ function getSession(chatId: number): Session {
 
 // ── HTML-safe escape ──────────────────────────────────────
 function esc(s: string): string {
-    return s.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">");
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 // ── Inline keyboard builders ──────────────────────────────
