@@ -18,9 +18,18 @@ function safeNext(raw: string | null) {
 }
 
 export async function onRequestGet(context: { request: Request }) {
-  const next = safeNext(new URL(context.request.url).searchParams.get("next"));
+  const requestUrl = new URL(context.request.url);
+  const next = new URL(safeNext(requestUrl.searchParams.get("next")));
+  const login = new URL("/login", COMMUNITY_ORIGIN);
+  // Existing Community sessions resume next in /login; signed-out visitors
+  // start Community's own provider flow. This handoff never copies app identity.
+  login.searchParams.set("next", next.pathname === "/login" ? "/dashboard" : `${next.pathname}${next.search}${next.hash}`);
+  for (const key of ["brand", "gate"]) {
+    const value = requestUrl.searchParams.get(key);
+    if (value) login.searchParams.set(key, value);
+  }
   return new Response(null, {
     status: 302,
-    headers: { Location: next, "Cache-Control": "no-store" },
+    headers: { Location: login.toString(), "Cache-Control": "no-store" },
   });
 }

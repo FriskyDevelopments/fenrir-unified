@@ -9,6 +9,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "check:gate-contract": "node scripts/check-gate-contract.mjs",
+    "test:auth": "node --experimental-strip-types --test scripts/test-community-auth.mjs",
     "preflight:production": "node scripts/check-production-secrets.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."

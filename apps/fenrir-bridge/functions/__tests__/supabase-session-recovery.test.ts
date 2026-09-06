@@ -126,6 +126,8 @@ describe("Supabase callback recovery", () => {
     "/login?next=/main",
     "/api/auth/login",
     "/auth/callback",
+    "/auth/logout",
+    "/api/frisky-auth/sign-out",
     "/main/../login",
     "/main/../auth/callback",
   ])("rejects an unsafe return path: %s", async (destination) => {
@@ -157,6 +159,46 @@ describe("Supabase callback recovery", () => {
     expect(sdk.getSession).toHaveBeenCalledOnce();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([
+    new TypeError("network_unavailable"),
+    new DOMException("Aborted", "AbortError"),
+  ])("scrubs a consumed callback after a session POST transport failure: %s", async (error) => {
+    const auth = await import("../../src/services/supabaseAuth");
+    browser.localStorage.setItem(destinationKey, "/main/communities?view=members#pending");
+    navigate("/auth/callback?code=consumed-code&state=oauth-state#access_token=stale-token");
+    sdk.getSession.mockResolvedValue({ data: { session: { access_token: "provider-session" } }, error: null });
+    fetchMock.mockRejectedValue(error);
+
+    await expect(auth.completeSupabaseSession()).resolves.toBe(false);
+
+    expect(browser.location.pathname).toBe("/main/communities");
+    expect(browser.location.searchParams.get("view")).toBe("members");
+    expect(browser.location.hash).toBe("#pending");
+    expect(browser.location.searchParams.get("auth_error")).toBe(`supabase_session_failed:${encodeURIComponent(error.message)}`);
+    for (const key of callbackKeys) expect(browser.location.searchParams.has(key)).toBe(false);
+  });
+
+  it("turns a stalled session POST into a scrubbed callback error and permits retry", async () => {
+    const auth = await import("../../src/services/supabaseAuth");
+    vi.useFakeTimers();
+    navigate("/auth/callback?code=consumed-code&state=oauth-state#access_token=stale-token");
+    sdk.getSession.mockResolvedValue({ data: { session: { access_token: "provider-session" } }, error: null });
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+    const completion = expect(auth.completeSupabaseSession()).resolves.toBe(false);
+    await vi.dynamicImportSettled();
+    await vi.advanceTimersByTimeAsync(12_001);
+    await completion;
+
+    expect(browser.location.searchParams.get("auth_error")).toBe("supabase_session_failed:request_timeout");
+    for (const key of callbackKeys) expect(browser.location.searchParams.has(key)).toBe(false);
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+
+    fetchMock.mockResolvedValue(Response.json({ ok: true }));
+    await expect(auth.completeSupabaseSession()).resolves.toBe(true);
+    expect(sdk.exchangeCodeForSession).toHaveBeenCalledTimes(1);
   });
 
   it("scrubs a consumed callback code when the provider returns no session", async () => {
@@ -201,7 +243,7 @@ describe("Supabase local logout", () => {
       requestSignal = init.signal ?? null;
       requestSignal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
     }));
-    const completion = expect(auth.completeSupabaseSession()).rejects.toMatchObject({ name: "AbortError" });
+    const completion = expect(auth.completeSupabaseSession()).resolves.toBe(false);
     await vi.dynamicImportSettled();
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(requestSignal).toBeInstanceOf(AbortSignal);
@@ -211,6 +253,8 @@ describe("Supabase local logout", () => {
     await completion;
 
     expect(requestSignal!.aborted).toBe(true);
+    expect(browser.history.replaceState).not.toHaveBeenCalled();
+    expect(browser.location.searchParams.has("auth_error")).toBe(false);
     expect(sdk.signOut).toHaveBeenCalledWith({ scope: "local" });
     expect(browser.localStorage.getItem(signedOutKey)).toBe("1");
     expect(fetchMock).toHaveBeenCalledOnce();

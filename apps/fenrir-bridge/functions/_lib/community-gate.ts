@@ -34,16 +34,24 @@ export function communityGateDataConfigured(env: CommunityGateEnv) {
   return Boolean(env.NEON_DATABASE_URL?.trim());
 }
 
+/**
+ * Creates a 503 response describing missing Community Gate configuration.
+ *
+ * @param env - Environment values used to check authentication and database configuration
+ * @returns A no-store JSON response listing the missing configuration values
+ */
 export function communityGateNotConfigured(env: CommunityGateEnv = {}) {
   const missing = [] as string[];
-  if (!env.FIREBASE_PROJECT_ID?.trim() && !env.FENRIR_COMMUNITY_AUTH_SECRET?.trim()) missing.push("FIREBASE_PROJECT_ID");
+  if (!env.FIREBASE_PROJECT_ID?.trim() && !env.FENRIR_COMMUNITY_AUTH_SECRET?.trim()) {
+    missing.push("FENRIR_COMMUNITY_AUTH_SECRET");
+  }
   if (!env.NEON_DATABASE_URL?.trim()) missing.push("NEON_DATABASE_URL");
 
   return noStoreJson({
     ok: false,
     error: "community_gate_not_configured",
     detail: {
-      message: "Community Gate member auth uses Firebase Auth. Set FIREBASE_PROJECT_ID for token verification and NEON_DATABASE_URL for the gate data plane, then apply docs/neon-community-gate-schema.sql in Neon.",
+      message: "Community Gate membership uses fenrir_community_session plus Neon fenrir_* tables. Optional leftover FIREBASE_PROJECT_ID still verifies bearer tokens; it is not Fenrir app identity. Set FENRIR_COMMUNITY_AUTH_SECRET or FIREBASE_PROJECT_ID, plus NEON_DATABASE_URL, then apply docs/neon-community-gate-schema.sql.",
       missing
     }
   }, { status: 503 });

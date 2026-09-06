@@ -1,6 +1,7 @@
+import { communityLoginPath } from "@/lib/canonical-auth";
 import { getSiteUrl } from "@/config/site-url";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { GatePreview } from "@/components/gate/gate-preview";
 import { GateShare } from "@/components/gate/gate-share";
@@ -10,7 +11,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { createGateTelegramHandoff, getPublicGate } from "@/lib/gate.functions";
 import { GATE_UNAVAILABLE_MESSAGE, isGateUnavailableError } from "@/lib/gate-availability";
 // Copy del Gate: una sola fuente en src/i18n, ya no una isla local.
-import { detectLocale, rememberLocale, LOCALE_NAMES, LOCALES, type Locale } from "@/i18n/locale";
+import {
+  DEFAULT_LOCALE,
+  detectLocale,
+  rememberLocale,
+  LOCALE_NAMES,
+  LOCALES,
+  type Locale,
+} from "@/i18n/locale";
 import { gateCopy, type GateCopy } from "@/i18n/gate";
 import {
   requestGateAccess,
@@ -35,14 +43,7 @@ function gateReturnPath(slug: string) {
 }
 
 function communitySsoUrl(slug: string, brandId: string) {
-  const url = new URL("https://www.myfenrir.com/api/auth/community-sso");
-  url.searchParams.set("next", `https://communities.myfenrir.com${gateReturnPath(slug)}`);
-  url.searchParams.set("brand", brandId);
-  // The Gate is the public source of the community's visual identity. Carry
-  // its slug separately so the login surface can resolve that identity again
-  // instead of falling back to a generic platform card.
-  url.searchParams.set("gate", slug);
-  return url.toString();
+  return communityLoginPath({ nextPath: gateReturnPath(slug), brandId, gateSlug: slug });
 }
 
 export const Route = createFileRoute("/g/$slug")({
@@ -176,7 +177,10 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
   const createTelegramHandoff = useServerFn(createGateTelegramHandoff);
   const requestAccess = useServerFn(requestGateAccess);
   const runSecurityPreflight = useServerFn(runGateSecurityPreflight);
-  const [locale, setLocale] = useState<Locale>(detectLocale);
+  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
+  useEffect(() => {
+    setLocale(detectLocale());
+  }, []);
   const [handoffPending, setHandoffPending] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [accessRequested, setAccessRequested] = useState(false);
@@ -225,6 +229,7 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
       const { token } = await createTelegramHandoff({ data: { slug: params.slug } });
       window.location.assign(telegramDeepLink(token));
     } catch (error) {
+      setGateOutcome(null);
       setHandoffError(
         error instanceof Error ? error.message : "Could not start the secure Telegram handoff.",
       );
@@ -318,7 +323,7 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
               ? explainSetupPending
               : undefined
         }
-        actionPending={handoffPending}
+        actionPending={checkingAccess || handoffPending}
       />
       {/* Elegir idioma aquí SÍ es una preferencia explícita: se recuerda, y es
           lo que hace que el fallback a inglés no sea una jaula. */}
@@ -428,9 +433,7 @@ function GateSecurityPanel({
             className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs"
           >
             <span>{STAGE_LABEL[stage.key]}</span>
-            <span
-              className={`font-mono uppercase tracking-[0.16em] ${STATUS_TONE[stage.status]}`}
-            >
+            <span className={`font-mono uppercase tracking-[0.16em] ${STATUS_TONE[stage.status]}`}>
               {STATUS_LABEL[stage.status]}
             </span>
           </div>

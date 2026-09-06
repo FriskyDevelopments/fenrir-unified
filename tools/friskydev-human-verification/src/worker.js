@@ -12,6 +12,8 @@ const allowedAudiences = new Set([
   // allowed https://quality.communities.myfenrir.com instead.
   "https://quality.communities.myfenrir.com",
   "https://www.myfenrir.com",
+  // Stale leftover hostname (Authentik VM destroyed 2026-08-28). Kept only so
+  // already-issued challenge tokens can still verify. Not Fenrir app identity.
   "https://authentik.friskydev.com",
   "https://authentik.tailab8146.ts.net:9443",
 ]);
@@ -173,7 +175,10 @@ export default {
     }
 
     if (request.method === "POST" && url.pathname === "/api/verify") {
-      const input = await body(request);
+      const input = await body(request).catch(() => null);
+      if (!input || typeof input !== "object" || Array.isArray(input)) {
+        return json({ verified: false, error: "invalid_verification_input" }, 400);
+      }
       const existingGrant = await readToken(input.fallbackGrant, secret, "verification-grant");
       if (existingGrant) return json({ verified: true, method: existingGrant.method, grant: input.fallbackGrant });
       const binding = await verifyAltcha(input.altcha, secret);

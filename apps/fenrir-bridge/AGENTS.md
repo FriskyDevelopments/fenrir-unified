@@ -7,8 +7,16 @@
 
 ## Quick Context
 This is the **production monorepo** for Fenrir Bridge. The app is deployed to Cloudflare Pages
-(`fenrir-bridge` project) at `myfenrir.com`. All secrets are already set in Cloudflare Pages
-production environment (SUPABASE_URL, SUPABASE_ANON_KEY, SESSION_SECRET, TELEGRAM_BOT_TOKEN, etc.).
+(`fenrir-bridge` project) at `myfenrir.com`.
+
+App login (who is this user?) is the Fenrir Better Auth Worker `fenrir-auth-worker`
+on `myfenrir.com/auth/*` (cookie domain `myfenrir.com`), with Better Auth
+(`@frisky/auth`) on Neon `app_auth_*` available at `/api/frisky-auth/*` once
+`FRISKY_AUTH_ENABLED=1` plus `BETTER_AUTH_SECRET` / provider secrets are bound.
+Until that flag is set, leftover direct OAuth under `/api/auth/*` still serves
+Google/Microsoft as the final fallback. Community membership stays on `fenrir_*`
++ `fenrir_community_session`. Authentik and the Supabase proxy on
+`auth.myfenrir.com` are both retired/leftover.
 
 ## Setup
 ```bash
@@ -26,16 +34,17 @@ npm run build && wrangler pages deploy dist/ --project-name fenrir-bridge
 ```
 
 ## Code Map
-- `src/App.tsx` — root component, Supabase auth session management
+- `src/App.tsx` — root component, Fenrir Better Auth session via `/auth/me` (Worker), with Better Auth (`@frisky/auth`) as an additional identity source
 - `src/components/` — UI components (sections, shared)
 - `src/services/` — API client layer
 - `functions/` — Cloudflare Pages Functions (edge API)
 - `functions/_lib/` — shared utilities: auth.ts, billing-env.ts, readiness.ts, responses.ts
-- `functions/api/` — API routes: auth/, billing/, bridges/, domains/, telegram/, stripe/, webauthn/
+- `functions/api/` — API routes: frisky-auth/ (Better Auth mount), auth/ (login redirects to the Worker when live, else leftover direct OAuth; `/api/auth/me` reads the Worker session), billing/, bridges/, domains/, telegram/, stripe/, webauthn/
 - `public/` — static assets (SVG icons, webmanifest, brand assets)
-- `workers/` — standalone Cloudflare Workers (fenrir-gate-router, fenrir-stars-payments)
+- `workers/` — standalone Cloudflare Workers (`fenrir-auth` on `myfenrir.com/auth/*`, fenrir-gate-router, fenrir-stars-payments)
 - `database/` — D1 schema SQL files
-- `wrangler.jsonc` — Pages + D1 binding config
+- `wrangler.jsonc` — Pages + D1 + AUTH service binding to `fenrir-auth-worker`
+- `wrangler.fenrir-auth.jsonc` — Better Auth Worker on `myfenrir.com/auth/*`
 - `wrangler.fenrir-gate-router.toml` — Worker route config for `myfenrir.com/gate/*` and `www.myfenrir.com/gate/*`
 
 ## D1 Database
@@ -61,7 +70,7 @@ npm run build && wrangler pages deploy dist/ --project-name fenrir-bridge
 
 ## Immediate / Post-Deploy Tasks
 - Verify authenticated `/api/readiness` (with valid session) reports `readyForPaidUsers: true`
-- Confirm Google OAuth redirect URIs registered for production
+- Confirm Google / Microsoft / Apple redirect URIs are `https://myfenrir.com/auth/{provider}/callback`
 - Wire `CommunitySecurityReport` component into admin UI (API + service + types ready)
 - Monitor Telegram Stars entitlements and community gate review flows in prod
 - Keep secrets only in Cloudflare Pages env (never in git)

@@ -79,7 +79,7 @@ export async function verifyDns(
     const want = await expectedToken(domain, chatId, secret);
     const url = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(challengeRecord(domain))}&type=TXT`;
 
-    let payload: { Answer?: Array<{ data?: string }> };
+    let payload: unknown;
     try {
         const res = await fetch(url, {
             headers: { accept: "application/dns-json" },
@@ -91,10 +91,39 @@ export async function verifyDns(
         return { ok: false, reason: "lookup_failed" };
     }
 
-    const answers = payload.Answer ?? [];
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        return { ok: false, reason: "lookup_failed" };
+    }
+    // An absent Answer is a normal negative DNS response. A present malformed
+    // Answer is a lookup failure, so callers can reset the verification flow.
+    const answers = "Answer" in payload ? payload.Answer : [];
+    if (!Array.isArray(answers) || answers.some((answer) =>
+        !answer || typeof answer !== "object" || typeof answer.data !== "string"
+    )) {
+        return { ok: false, reason: "lookup_failed" };
+    }
     if (answers.length === 0) return { ok: false, reason: "record_missing" };
 
-    // El TXT viene entrecomillado y puede venir troceado en varias cadenas.
-    const values = answers.map((a) => String(a.data ?? "").replace(/"/g, "").trim());
-    return values.some((v) => v === want) ? { ok: true } : { ok: false, reason: "token_mismatch" };
+    const values = answers.map((answer) => parseTxtData(answer.data));
+    return values.some((value) => value === want) ? { ok: true } : { ok: false, reason: "token_mismatch" };
+}
+
+/** Join the character strings of one TXT record, preserving spaces inside them. */
+function parseTxtData(data: string): string | null {
+    const input = data.trim();
+    if (!input.startsWith('"')) return input;
+
+    const characterString = /"((?:\\.|[^"\\])*)"\s*/gy;
+    let value = "";
+    let offset = 0;
+    while (offset < input.length) {
+        characterString.lastIndex = offset;
+        const match = characterString.exec(input);
+        if (!match) return null;
+        value += match[1].replace(/\\([0-9]{3}|[\s\S])/g, (_, escaped: string) =>
+            /^[0-9]{3}$/.test(escaped) ? String.fromCharCode(Number(escaped)) : escaped
+        );
+        offset = characterString.lastIndex;
+    }
+    return value;
 }

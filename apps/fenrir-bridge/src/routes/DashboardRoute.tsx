@@ -354,12 +354,26 @@ export function DashboardRoute() {
   async function addNewDomain() {
     if (!domainInput.trim()) return;
     const tags = parseDomainTags(domainTagsInput);
-    const result = await domainService.create(domainInput.trim());
-    if (result.ok) {
+    try {
+      const result = await domainService.create(domainInput.trim());
+      if (!result?.ok || !result.data) {
+        const fail = result as { error?: string; message?: string } | null;
+        setNotice(fail?.message || fail?.error || "Connect failed.");
+        return;
+      }
       setDomainTagsById((current) => ({ ...current, [result.data.id]: tags }));
-      setNotice(`Telegram Lock domain ${result.data.domain} added with tags: ${tags.join(", ")}.`);
+      const ssl = result.data.certificateStatus === "active" ? "Live." : "SSL is provisioning.";
+      setNotice(`${result.data.domain} connected. ${ssl}`);
       setDomainInput("");
       await refresh();
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      if (code === "zone_not_in_account") setNotice("That domain is not in this Cloudflare account. Add the zone, then click Connect.");
+      else if (code === "connect_not_configured") setNotice("Connect is not configured on this Worker yet.");
+      else if (code === "authentication_required") setNotice(c.signedOut);
+      else if (code === "invalid_domain") setNotice("Enter a domain like pupfrisky.com.");
+      else if (code === "pages_domain_attach_failed") setNotice("Cloudflare could not attach that hostname.");
+      else setNotice(code || "Connect failed.");
     }
   }
 
@@ -380,9 +394,14 @@ export function DashboardRoute() {
   async function checkDns(domain: FriskyDomain) {
     setNotice("Checking live DNS propagation...");
     const result = await domainService.checkDns(domain.id);
-    setNotice(result.ok ? `${domain.domain} verified.` : result.error?.message ?? "DNS check failed.");
-    if (result.ok) {
-      triggerCelebration("DNS verified", `${domain.domain} is ready for Telegram Lock traffic.`, "dns");
+    if (!result.ok) {
+      setNotice(result.error?.message ?? "Connect check failed.");
+      return;
+    }
+    const live = result.data.certificateStatus === "active";
+    setNotice(live ? `${domain.domain} is live.` : `${domain.domain} attached. SSL ${result.data.certificateStatus}.`);
+    if (live) {
+      triggerCelebration("Domain live", `${domain.domain} is serving on this Cloudflare account.`, "dns");
     }
     await refresh();
   }
@@ -419,28 +438,52 @@ export function DashboardRoute() {
 
   async function createLiveRoom() {
     const domainId = selectedDomainRecord?.id;
-    if (!domainId || !roomTargetInput.trim()) return;
+    if (!domainId) {
+      setNotice(c.chooseDomain);
+      return;
+    }
+    if (!roomTargetInput.trim()) {
+      setNotice(ui.liveRoomUrlHint + ".");
+      return;
+    }
     const targetUrl = safeHttpUrl(roomTargetInput);
     if (!targetUrl) {
       setNotice(ui.liveRoomUrlHint + ".");
       return;
     }
-    const coverImageUrl = safeHttpUrl(roomCoverInput);
-    if (roomCoverInput.trim() && !coverImageUrl) {
+    const slug = roomSlugInput.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "call";
+    const requestedCover = roomCoverInput.trim();
+    const coverImageUrl = requestedCover.startsWith("/") ? requestedCover : safeHttpUrl(requestedCover);
+    if (requestedCover && !coverImageUrl) {
       setNotice(ui.roomCoverImageInvalid);
       return;
     }
-    const result = await liveRoomService.create({
-      domainId,
-      slug: roomSlugInput.trim() || "call",
-      title: roomTitleInput.trim(),
-      provider: roomProviderInput,
-      targetUrl,
-      coverImageUrl: coverImageUrl || providerLogoPresets[roomProviderInput]
-    });
-    setNotice(`Live Room ${result.data.publicUrl} ${ui.routePrivateViaFenrir}`);
-    triggerCelebration("Live Room ready", `${result.data.title} is now behind your domain.`, "dns");
-    await refresh();
+    try {
+      const result = await liveRoomService.create({
+        domainId,
+        slug,
+        title: roomTitleInput.trim(),
+        provider: roomProviderInput,
+        targetUrl,
+        coverImageUrl
+      });
+      if (!result?.ok || !result.data) {
+        setNotice((result as { error?: string } | null)?.error ?? copy[locale].checkoutErrorGeneric);
+        return;
+      }
+      setRoomSlugInput(slug);
+      setNotice(`Live Room ${result.data.publicUrl} ${ui.routePrivateViaFenrir}`);
+      triggerCelebration("Live Room ready", `${result.data.title} is now behind your domain.`, "dns");
+      await refresh();
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      if (code === "invalid_target_url") setNotice(ui.liveRoomUrlHint + ".");
+      else if (code === "domain_not_found") setNotice(c.chooseDomain);
+      else if (code === "slug_taken") setNotice("That room slug is already in use. Pick another one.");
+      else if (code === "invalid_cover_image_url") setNotice(ui.roomCoverImageInvalid);
+      else if (code === "authentication_required") setNotice(c.signedOut);
+      else setNotice(code || copy[locale].checkoutErrorGeneric);
+    }
   }
 
   async function pauseRoom(room: FriskyLiveRoom) {

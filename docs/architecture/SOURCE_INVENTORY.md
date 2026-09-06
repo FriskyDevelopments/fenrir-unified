@@ -23,6 +23,7 @@ tailwind.config.ts
 tsconfig.json
 vite.config.ts
 wrangler.jsonc
+wrangler.fenrir-auth.jsonc
 wrangler.fenrir-auth-proxy.toml
 wrangler.fenrir-direct-oauth-guard.toml
 wrangler.fenrir-gate-router.toml
@@ -58,6 +59,8 @@ functions/_lib/community-gate.ts
 workers/fenrir-gate-router.js
 workers/fenrir-stars-payments.js
 workers/fenrir-mcp-beta.js
+workers/fenrir-auth/src/index.js
+workers/fenrir-auth-proxy-retired.js
 scripts/check-cloudflare-tooling.sh
 scripts/guard-wrangler-deploy.sh
 scripts/run-with-node-lts.sh

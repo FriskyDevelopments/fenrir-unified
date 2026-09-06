@@ -1,0 +1,25 @@
+# Copy to .dev.vars (gitignored) for `wrangler dev`. Do NOT commit real values.
+# Existing Fenrir / Folios secret names — do not invent credentials.
+SESSION_SECRET="dev-only-change-me"
+BETTER_AUTH_SECRET=""
+
+# Neon (either name is accepted)
+DATABASE_URL=""
+NEON_DATABASE_URL=""
+
+# Google (existing names)
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+
+# Microsoft — Fenrir Pages uses MICROSOFT_*; folios-auth-worker uses MS_*.
+# Both names are accepted. Set the pair you already have.
+MICROSOFT_CLIENT_ID=""
+MICROSOFT_CLIENT_SECRET=""
+MS_CLIENT_ID=""
+MS_CLIENT_SECRET=""
+
+# Apple (Sign in with Apple) — existing names
+APPLE_CLIENT_ID=""
+APPLE_TEAM_ID=""
+APPLE_KEY_ID=""
+APPLE_PRIVATE_KEY=""

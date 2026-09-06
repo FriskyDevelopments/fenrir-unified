@@ -13,32 +13,12 @@ import {
   type DomainSearchResult,
 } from "../../shared/domain-search";
 import { copy } from "../i18n";
-import { withDeadline } from "./request";
-import {
-  addDomain,
-  addLiveRoom,
-  appendAudit,
-  pauseLiveRoom,
-  store,
-  trackCommissionClick,
-} from "./mockStore";
-import {
-  completeSupabaseSession,
-  hasSupabaseCallbackInLocation,
-  signInWithSupabase,
-  signOutSupabase,
-} from "./supabaseAuth";
-import type {
-  AppState,
-  CommunitySecurityReport,
-  FriskyBridge,
-  FriskyLiveRoom,
-  FriskyTelegramInvite,
-  LiveRoomProvider,
-  Plan,
-  TrialPublic,
-  TrialStatusPayload,
-} from "./types";
+import { fetchWithTimeout, withDeadline } from "./request";
+import { resolveAuthOrigin } from "./authOrigin";
+import { addDomain, addLiveRoom, appendAudit, pauseLiveRoom, store, trackCommissionClick } from "./mockStore";
+import { signInWithFriskyAuth, signOutFriskyAuthClient } from "./friskyAuth";
+import type { AppState, CommunitySecurityReport, FriskyBridge, FriskyLiveRoom, FriskyTelegramInvite, LiveRoomProvider, Plan, TrialPublic, TrialStatusPayload } from "./types";
+import { fenrirAuthWorkerCanStartLogin, preservedLoginNext } from "../../functions/_lib/fenrir-login";
 
 /** English-primary message for Stripe checkout failures; UI should prefer `copy[locale].checkoutErrorGeneric` when rendering. */
 export const defaultBillingCheckoutErrorMessage = copy.en.checkoutErrorGeneric;
@@ -51,6 +31,45 @@ const telegramBotUsername = () =>
   )
     .replace(/^@/, "")
     .trim();
+
+const workerAuthOrigin = (import.meta.env.VITE_FENRIR_AUTH_ORIGIN ?? "").trim().replace(/\/$/, "");
+
+export { PRODUCTION_AUTH_ORIGIN, isWwwHostname, resolveAuthOrigin } from "./authOrigin";
+
+function browserAuthOrigin(): string {
+  return resolveAuthOrigin(
+    workerAuthOrigin,
+    typeof window === "undefined" ? "" : window.location.hostname,
+  );
+}
+
+function workerAuthUrl(path: string) {
+  const origin = browserAuthOrigin();
+  return origin ? `${origin}${path}` : path;
+}
+
+async function workerAuthIsLive(): Promise<boolean> {
+  try {
+    const response = await fetchWithTimeout(workerAuthUrl("/auth/ready"), { credentials: "include" });
+    const body = await withDeadline(response.json()).catch(() => null);
+    return fenrirAuthWorkerCanStartLogin(
+      response.status,
+      response.headers.get("content-type"),
+      body,
+    );
+  } catch {
+    return false;
+  }
+}
+
+type WorkerAuthProvider = "google" | "microsoft" | "apple";
+
+function workerProviderList(body: {
+  providers?: Record<string, { can_start?: boolean }>;
+} | null): WorkerAuthProvider[] | null {
+  if (!body?.providers) return null;
+  return (["apple", "google", "microsoft"] as const).filter((provider) => body.providers?.[provider]?.can_start);
+}
 
 export type PaidPlan = Exclude<Plan, "free">;
 
@@ -144,7 +163,7 @@ export type AuthSession = {
     id: string;
     email: string;
     name: string;
-    authProvider: "google" | "microsoft" | "apple" | "authentik" | "telegram" | "passkey";
+    authProvider: "google" | "microsoft" | "apple" | "telegram" | "passkey" | "frisky";
   };
   org?: {
     id: string;
@@ -174,7 +193,7 @@ async function apiRequest<T>(path: string, init?: RequestInit) {
         ...init,
         signal: controller.signal,
       });
-      const body = (await response.json().catch(() => null)) as T | null;
+      const body = (await withDeadline(response.json()).catch(() => null)) as T | null;
       if (!body) {
         throw new Error(`api_empty_${response.status}`);
       }
@@ -218,11 +237,24 @@ function devAuthSession(): AuthSession & { ok: true } {
   };
 }
 
-function devApiFallback<T>(
-  path: string,
-  init: RequestInit | undefined,
-  reason: string
-): T {
+function safeLoginNextPath() {
+  if (typeof window === "undefined") return null;
+  return preservedLoginNext(new URLSearchParams(window.location.search).get("next"));
+}
+
+function safeCurrentAuthReturnPath() {
+  const loginNext = safeLoginNextPath();
+  if (loginNext) return loginNext;
+  const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (!path.startsWith("/") || path.startsWith("//")) return "/main";
+  const pathname = window.location.pathname || "/";
+  if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) {
+    return "/main";
+  }
+  return path;
+}
+
+function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: string): T {
   if (!import.meta.env.DEV) {
     throw new Error(reason);
   }
@@ -368,7 +400,7 @@ async function webauthnPost<T>(path: string, body?: unknown): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: body !== undefined ? JSON.stringify(body) : "{}",
   });
-  const data = (await response.json().catch(() => null)) as
+  const data = (await withDeadline(response.json()).catch(() => null)) as
     | T
     | { error?: string }
     | null;
@@ -411,19 +443,36 @@ export const authService = {
     return withDeadline(readAuthSession(), 20_000, "session_timeout");
   },
   async login(provider: "google" | "microsoft" | "apple" | "authentik") {
-    // Production routes the legacy direct OAuth endpoints through a guard, so
-    // sending a browser there creates a callback dead-end. The supported
-    // providers return through the canonical SPA callback instead.
-    if (provider === "authentik") {
-      throw new Error("authentik_provider_unavailable");
+    if (provider === "authentik") throw new Error("authentik_provider_unavailable");
+    const caps = await this.authCapabilities();
+    if (caps.engine === "better-auth") {
+      await signInWithFriskyAuth(provider);
+      return;
     }
-    await signInWithSupabase(provider);
+    const returnTo = safeCurrentAuthReturnPath();
+    if (await workerAuthIsLive()) {
+      window.location.assign(`${workerAuthUrl(`/auth/${provider}`)}?redirect=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+    window.location.assign(`/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
+  },
+  async authCapabilities() {
+    return apiRequest<{
+      ok: true;
+      engine: "better-auth" | "legacy-direct-oauth";
+      providers: Array<"google" | "microsoft" | "apple">;
+      appleLive: boolean;
+    }>("/api/auth/providers");
   },
   async enabledProviders() {
-    const result = await apiRequest<{
-      ok: true;
-      providers: Array<"google" | "microsoft" | "apple" | "authentik">;
-    }>("/api/auth/providers");
+    try {
+      const response = await fetchWithTimeout(workerAuthUrl("/auth/providers"), { credentials: "include" });
+      const advertised = workerProviderList(await withDeadline(response.json()).catch(() => null));
+      if (advertised && advertised.length > 0) return advertised;
+    } catch {
+      // Fall back to Pages capability metadata when the Worker is not local.
+    }
+    const result = await this.authCapabilities();
     return result.providers;
   },
   async telegramLogin(payload: TelegramLoginPayload) {
@@ -443,42 +492,60 @@ export const authService = {
     } catch {
       // Optional cleanup only.
     }
-    // Always reach the server cookie endpoint, even if the identity provider
-    // is unavailable. A failed cookie clear must remain visible and retryable.
-    const [, server] = await Promise.allSettled([
-      // This helper bounds the provider call and removes local credentials in
-      // its finally block, including when remote revocation fails.
-      signOutSupabase(),
+    // Start all cookie clears together so a stalled provider never blocks them.
+    const [, worker, server] = await Promise.allSettled([
+      withDeadline(signOutFriskyAuthClient()),
+      fetchWithTimeout(workerAuthUrl("/auth/logout"), { credentials: "include" }).then((response) => {
+        // Local Pages development can run without the auth Worker.
+        if (!response.ok && response.status !== 404) throw new Error(`worker_logout_failed_${response.status}`);
+      }),
       apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
     ]);
+    // A failed cookie clear must remain visible and retryable in the UI.
     if (server.status === "rejected") throw server.reason;
-  },
+    if (worker.status === "rejected") throw worker.reason;
+  }
 };
 
 async function readAuthSession() {
-  // Supabase Auth is the login broker: after the provider redirects back to
-  // /auth/callback, exchange the Supabase session for the Fenrir cookie.
-  if (hasSupabaseCallbackInLocation()) {
-    const completed = await completeSupabaseSession();
-    if (completed) {
+  try {
+    const worker = await fetchWithTimeout(workerAuthUrl("/auth/me"), { credentials: "include" });
+    const identity = await withDeadline(worker.json()).catch(() => null) as {
+      authenticated?: boolean;
+      user?: { id: string; email?: string | null; name?: string | null; provider?: WorkerAuthProvider };
+    } | null;
+    if (worker.ok && identity?.authenticated && identity.user) {
+      try {
+        const app = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
+        if (app.authenticated) return { ok: true as const, data: app };
+      } catch {
+        // Worker cookie is enough to enter; org/plan hydrates when Pages can read it.
+      }
       return {
         ok: true as const,
-        data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me"),
+        data: {
+          authenticated: true,
+          user: {
+            id: identity.user.id,
+            email: identity.user.email || "",
+            name: identity.user.name || identity.user.email || "",
+            authProvider: identity.user.provider === "microsoft" || identity.user.provider === "apple" || identity.user.provider === "google"
+              ? identity.user.provider
+              : "google"
+          },
+          org: {
+            id: `org:${identity.user.id}`,
+            plan: "free" as Plan
+          }
+        } satisfies AuthSession
       };
     }
+  } catch {
+    // Local Vite without the Worker falls through to Pages /api/auth/me.
   }
 
   const result = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
-  if (typeof result.authenticated !== "boolean") throw new Error("invalid_auth_response");
-  if (!result.authenticated) {
-    const completed = await completeSupabaseSession();
-    if (completed) {
-      return {
-        ok: true as const,
-        data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me"),
-      };
-    }
-  }
+  if (typeof result?.authenticated !== "boolean") throw new Error("invalid_auth_response");
   return { ok: true as const, data: result };
 }
 
@@ -858,7 +925,7 @@ export const mediaService = {
       credentials: "include",
       body: form,
     });
-    const body = (await response.json().catch(() => null)) as
+    const body = (await withDeadline(response.json()).catch(() => null)) as
       | (MediaUploadResult & { error?: string })
       | null;
     if (!response.ok || !body?.ok) {

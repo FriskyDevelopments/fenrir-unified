@@ -9,6 +9,28 @@ const audience = "https://quality.communities.myfenrir.com";
 const authentikAudience = "https://authentik.friskydev.com";
 const context = "a".repeat(32);
 
+for (const payload of ["{", "null", "[]", '"invalid"', "42"]) {
+  test(`rejects malformed verification input ${payload} with a client error`, async () => {
+    const response = await worker.fetch(new Request(`${origin}/api/verify`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: payload,
+    }), env);
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), { verified: false, error: "invalid_verification_input" });
+  });
+}
+
+test("rejects malformed multipart verification input with a client error", async () => {
+  const response = await worker.fetch(new Request(`${origin}/api/verify`, {
+    method: "POST",
+    headers: { "content-type": "multipart/form-data; boundary=missing" },
+    body: "malformed multipart",
+  }), env);
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { verified: false, error: "invalid_verification_input" });
+});
+
 function decodeBody(token) {
   const [body] = token.split(".");
   return JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
@@ -46,7 +68,7 @@ test("issues a grant bound to the Quality origin and per-attempt context", async
   assert.equal((await consume("b".repeat(32))).status, 400);
 });
 
-test("accepts the canonical FriskyDEV Authentik gateway as an audience", async () => {
+test("accepts leftover Authentik hostname as audience for already-issued tokens only", async () => {
   const query = new URLSearchParams({ audience: authentikAudience, context });
   const response = await worker.fetch(new Request(`${origin}/api/slider?${query}`), env);
   assert.equal(response.status, 200);

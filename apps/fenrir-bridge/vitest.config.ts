@@ -10,6 +10,11 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["functions/**/__tests__/**/*.test.ts"],
+    alias: {
+      "@frisky/auth": new URL("../../packages/auth/src/index.ts", import.meta.url).pathname,
+      "@frisky/auth/server": new URL("../../packages/auth/src/server.ts", import.meta.url).pathname,
+      "@frisky/auth/client": new URL("../../packages/auth/src/client.ts", import.meta.url).pathname
+    },
     // Fail fast if a test accidentally reaches the network: there is no fetch
     // polyfill beyond Node's built-in, and every suite stubs it explicitly.
     clearMocks: true,

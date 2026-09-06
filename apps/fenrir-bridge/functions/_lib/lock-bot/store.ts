@@ -172,20 +172,25 @@ export async function rotateLock(
             // Atomic batch: UPDATE (revoke old) + INSERT (create fresh)
             // If either fails, both roll back — no half-state.
             try {
-                await db.batch([
+                const [transition] = await db.batch([
                     db
                         // chat_id en el WHERE, no sólo en la comprobación de
                         // arriba: defensa en profundidad. Si alguien añade otro
                         // camino a esta función, la propia sentencia no puede
                         // tocar un candado ajeno.
-                        .prepare("UPDATE invite_locks SET revoked = 1 WHERE id = ? AND chat_id = ?")
+                        .prepare("UPDATE invite_locks SET revoked = 1 WHERE id = ? AND chat_id = ? AND revoked = 0")
                         .bind(lockId, chatId),
                     db
                         .prepare(
-                            "INSERT INTO invite_locks (id, domain, chat_id, created_at, revoked, rotated_from) VALUES (?, ?, ?, ?, 0, ?)",
+                            // changes() belongs to the immediately preceding UPDATE in
+                            // this transaction. A competing rotation that finds the
+                            // old lock revoked must not insert another successor.
+                            "INSERT INTO invite_locks (id, domain, chat_id, created_at, revoked, rotated_from) SELECT ?, ?, ?, ?, 0, ? WHERE changes() = 1",
                         )
                         .bind(freshId, existing.domain, chatId, now, lockId),
                 ]);
+
+                if (transition.meta.changes !== 1) return null;
 
                 const fresh: InviteLock = {
                     id: freshId,

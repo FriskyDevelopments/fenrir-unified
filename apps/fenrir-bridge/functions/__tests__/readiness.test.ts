@@ -13,7 +13,6 @@ describe("production readiness", () => {
         APPLE_TEAM_ID: "apple-team",
         APPLE_KEY_ID: "apple-key",
         APPLE_PRIVATE_KEY: "apple-private-key",
-        APPLE_CLIENT_SECRET: "apple-client-secret",
         DB: {},
         NEON_DATABASE_URL: "postgres://private"
       },
@@ -42,7 +41,7 @@ describe("production readiness", () => {
     expect(snapshot.app.readyForPaidUsers).toBe(true);
   });
 
-  it("does not treat Apple as configured without APPLE_CLIENT_SECRET", () => {
+  it("recognizes Apple credentials that generate the client secret at exchange time", () => {
     const snapshot = computeReadiness({
       APPLE_CLIENT_ID: "apple-id",
       APPLE_TEAM_ID: "apple-team",
@@ -50,6 +49,22 @@ describe("production readiness", () => {
       APPLE_PRIVATE_KEY: "apple-private-key",
     });
 
-    expect(snapshot.auth.appleConfigured).toBe(false);
+    expect(snapshot.auth.appleConfigured).toBe(true);
   });
+
+  it.each(["APPLE_CLIENT_ID", "APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY"] as const)(
+    "requires %s for the community Apple exchange",
+    (missing) => {
+      const snapshot = computeReadiness({
+        APPLE_CLIENT_ID: "apple-id",
+        APPLE_TEAM_ID: "apple-team",
+        APPLE_KEY_ID: "apple-key",
+        APPLE_PRIVATE_KEY: "apple-private-key",
+        APPLE_CLIENT_SECRET: "better-auth-only-secret",
+        [missing]: " ",
+      });
+
+      expect(snapshot.auth.appleConfigured).toBe(false);
+    },
+  );
 });

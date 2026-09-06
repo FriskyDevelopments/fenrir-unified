@@ -69,9 +69,9 @@ export function normalizeLocale(value: string | null | undefined): Locale {
 
 /**
  * Locale inicial del visitante, sin estado de servidor. Prioridad: `?lang=`
- * explícito, luego el idioma del navegador, luego inglés. Devuelve
- * DEFAULT_LOCALE en SSR para que el HTML servido y la primera pintura del
- * cliente coincidan; sin esto React reporta hydration mismatch.
+ * explícito, luego la preferencia guardada, luego inglés. Leer tras montar:
+ * SSR y la primera pintura del cliente deben usar DEFAULT_LOCALE para evitar
+ * diferencias durante la hidratación.
  */
 export const LOCALE_STORAGE_KEY = "fenrir.locale";
 

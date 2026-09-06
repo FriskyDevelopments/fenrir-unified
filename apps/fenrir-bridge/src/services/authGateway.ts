@@ -13,7 +13,7 @@ export type AuthEngine = {
 
 export const friskyClientAuthEngine: AuthEngine = {
   mode: "frisky-client",
-  label: "Frisky Dev client auth",
+  label: "Frisky Better Auth (app login)",
   supportsOAuth: true,
   enabledProviders() {
     return authService.enabledProviders();

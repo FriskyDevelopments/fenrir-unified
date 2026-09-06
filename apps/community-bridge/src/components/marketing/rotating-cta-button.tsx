@@ -78,10 +78,7 @@ export function RotatingCtaButton(props: RotatingCtaButtonProps) {
       {/* Decorative: the ring repeats what `label` already announces. */}
       <span className="rcta__text" aria-hidden="true">
         {characters.map((character, index) => (
-          <span
-            key={`${character}-${index}`}
-            style={{ "--index": index } as React.CSSProperties}
-          >
+          <span key={`${character}-${index}`} style={{ "--index": index } as React.CSSProperties}>
             {character}
           </span>
         ))}
@@ -104,8 +101,31 @@ export function RotatingCtaButton(props: RotatingCtaButtonProps) {
 
   if (typeof href === "string") {
     const anchorProps = rest as React.AnchorHTMLAttributes<HTMLAnchorElement>;
+    const disabled =
+      anchorProps["aria-disabled"] === true || anchorProps["aria-disabled"] === "true";
     return (
-      <a {...shared} {...anchorProps} href={href}>
+      <a
+        {...shared}
+        {...anchorProps}
+        href={disabled ? undefined : href}
+        tabIndex={disabled ? -1 : anchorProps.tabIndex}
+        onClick={(event) => {
+          if (disabled) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          anchorProps.onClick?.(event);
+        }}
+        onKeyDown={(event) => {
+          if (disabled && (event.key === "Enter" || event.key === " ")) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          anchorProps.onKeyDown?.(event);
+        }}
+      >
         {inner}
       </a>
     );

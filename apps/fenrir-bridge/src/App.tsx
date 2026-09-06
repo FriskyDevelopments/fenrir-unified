@@ -80,6 +80,7 @@ import { knowledgeBaseLabel, knowledgeBaseUrl } from "./services/knowledgeBase";
 import { CinematicLanding } from "./components/CinematicLanding";
 import { GlowCard } from "./components/GlowCard";
 import { TelegramLoginWidget } from "./components/TelegramLoginWidget";
+import { loginPageErrorMessage } from "./services/authErrors";
 import { brandThemes, themeClassName, themeCssVars } from "./theme/brandThemes";
 
 const defaultServiceOrg = (
@@ -176,7 +177,7 @@ function postLoginDestination() {
 // where the Gate's "Proceed to SSO" used to die. Keep the allowlist to the one
 // endpoint that needs it: a same-origin GET redirect is not an open redirect,
 // but an unbounded list invites /main?next=/api/auth/logout links.
-const postAuthHandoffPaths = ["/api/auth/community-sso"];
+const postAuthHandoffPaths = ["/api/auth/community-sso", "/api/telegram/link/start"];
 function postAuthHandoffTarget() {
   const requested = new URLSearchParams(window.location.search).get("next");
   if (!requested?.startsWith("/") || requested.startsWith("//")) return null;
@@ -3108,6 +3109,12 @@ function planLabel(plan: Plan) {
   return labels[plan];
 }
 
+/**
+ * Resolves a provider identifier to its display label.
+ *
+ * @param provider - The provider identifier to label
+ * @returns A recognized provider label, the original identifier, or `OAuth` when no identifier is provided
+ */
 function authProviderLabel(provider: string) {
   const value = provider.toLowerCase();
   if (value.includes("apple")) return "Apple";
@@ -3116,6 +3123,7 @@ function authProviderLabel(provider: string) {
     return "Microsoft";
   if (value.includes("telegram")) return "Telegram";
   if (value.includes("passkey")) return "Passkey";
+  if (value.includes("frisky") || value.includes("better-auth")) return "Frisky";
   return provider || "OAuth";
 }
 
@@ -3495,26 +3503,33 @@ const accessStateHelp: Record<DefaultAccessState, string> = {
   disabled: "The gate stays closed while you finish setup.",
 };
 
+/**
+ * Converts a community authentication provider identifier into a display label.
+ *
+ * @param provider - The authentication provider identifier
+ * @returns The provider's display label
+ */
 function communityAuthProviderLabel(provider: string) {
   if (provider === "magic_link") return "Magic link";
   if (provider === "microsoft") return "Microsoft";
-  if (provider === "authentik") return "FriskyDev Auth";
+  if (provider === "authentik") return "Retired Authentik (not Fenrir identity)";
   return provider[0]?.toUpperCase() + provider.slice(1);
 }
 
 /**
  * Providers the Community Gate OAuth bridge can complete end-to-end.
- * `authentik` is the broker: when it is enabled it fronts Google / Microsoft / Apple
- * instead of sitting beside them, so a community normally enables EITHER authentik
- * OR the direct three — not both. See docs/AUTHENTIK_OIDC_INTEGRATION.md.
+ * Authentik is leftover (VM destroyed 2026-08-28) and is not shown.
+ * Community membership still uses fenrir_* + fenrir_community_session.
  */
-const communityOAuthProviders = [
-  "google",
-  "microsoft",
-  "apple",
-  "authentik",
-] as const;
+const communityOAuthProviders = ["google", "microsoft", "apple"] as const;
 
+/**
+ * Builds the OAuth authentication URL for a community.
+ *
+ * @param provider - The OAuth provider to authenticate with
+ * @param slug - The community slug
+ * @returns The provider-specific community OAuth URL
+ */
 function communityOAuthStartUrl(provider: string, slug: string) {
   const params = new URLSearchParams({ slug, return_to: `/community/${slug}` });
   return `/api/community-auth/oauth/${provider}?${params.toString()}`;
@@ -4693,24 +4708,21 @@ function readableCommunityError(detail: unknown, fallback?: string) {
   return fallback || "Community Gate is not ready yet.";
 }
 
+/**
+ * Maps a Community Gate branding request error to a user-facing message.
+ *
+ * @param error - The error raised while loading Community Gate branding.
+ * @returns A descriptive message for the authentication, authorization, configuration, schema, or network failure.
+ */
 function communityBrandAdminErrorMessage(error: unknown) {
   if (!(error instanceof CommunityBrandRequestError)) {
     return "Network/API failure. The brand workspace could not be loaded.";
   }
-  if (error.status === 401 || error.error === "authentication_required")
-    return "Not signed in. Sign in to the Fenrir admin before customizing this Community Gate.";
-  if (error.status === 403 || error.error === "forbidden")
-    return "Forbidden. Your account is not an owner or allowlisted admin for this Community Gate.";
-  if (error.status === 503 || error.error === "community_auth_not_configured")
-    return readableCommunityError(
-      error.detail,
-      "Missing Community Gate config. Firebase Auth handles sign-in; Neon is only the gate data plane."
-    );
-  if (error.error === "community_gate_schema_missing")
-    return "Missing Neon schema. Apply the Community Gate schema before customizing this gate.";
-  return `Community Gate load failed: ${
-    error.error || `HTTP ${error.status}`
-  }.`;
+  if (error.status === 401 || error.error === "authentication_required") return "Not signed in. Sign in to the Fenrir admin before customizing this Community Gate.";
+  if (error.status === 403 || error.error === "forbidden") return "Forbidden. Your account is not an owner or allowlisted admin for this Community Gate.";
+  if (error.status === 503 || error.error === "community_auth_not_configured") return readableCommunityError(error.detail, "Missing Community Gate config. Membership uses fenrir_community_session and Neon fenrir_* tables; Firebase bearer verification is leftover, not Fenrir app identity.");
+  if (error.error === "community_gate_schema_missing") return "Missing Neon schema. Apply the Community Gate schema before customizing this gate.";
+  return `Community Gate load failed: ${error.error || `HTTP ${error.status}`}.`;
 }
 
 function AuthGate({
@@ -4827,9 +4839,7 @@ function AuthGate({
               <b>Encrypted sign-in</b>
               <span />
             </div>
-            <p className="lovable-auth-new-user">
-              New here? Your account is created automatically on first sign-in.
-            </p>
+            <p className="lovable-auth-new-user">New here? Your account is created automatically on first sign-in. Telegram linking happens after login — Fenrir never invents a group for you.</p>
           </div>
         </section>
 
@@ -4904,45 +4914,7 @@ function LovableAuthTerminal({
 }
 
 function authErrorMessage() {
-  const error = new URLSearchParams(window.location.search).get("auth_error");
-  if (!error) return null;
-  const [errorCode, errorDetail] = error.split(":", 2);
-  const detail = errorDetail ? decodeURIComponent(errorDetail) : "";
-
-  if (error.startsWith("missing_env:")) {
-    return "This provider is not live yet. Use an enabled sign-in option, or refresh to return to the clean Fenrir gate.";
-  }
-  if (error === "direct_oauth_disabled") {
-    return "That old sign-in route was retired. Use the provider buttons on this Fenrir gate.";
-  }
-  if (errorCode === "oauth_access_denied") {
-    return "The provider denied access. Try again and confirm consent to continue with this account.";
-  }
-  if (errorCode === "oauth_callback_error") {
-    return `Provider error while returning from sign-in.${
-      detail ? ` ${detail}` : ""
-    }`;
-  }
-  if (errorCode === "code_exchange_failed") {
-    return `Could not exchange the OAuth callback code. ${
-      detail ? `(${detail})` : "Please try again."
-    }`;
-  }
-  if (errorCode === "session_lookup_failed") {
-    return `Could not read the Frisky login session after login. ${
-      detail ? `(${detail})` : "Please retry from the sign-in screen."
-    }`;
-  }
-  if (errorCode === "supabase_session_failed") {
-    if (detail === "human_verification_required") return null;
-    return `Could not open a Fenrir admin session.${
-      detail ? ` (${detail})` : ""
-    }`;
-  }
-  if (errorCode === "missing_code") {
-    return "The provider did not return a sign-in code. Please try again.";
-  }
-  return "Sign-in could not finish. Try another provider or refresh the page.";
+  return loginPageErrorMessage(window.location.search);
 }
 
 function CommunityAuthProposalPanel({

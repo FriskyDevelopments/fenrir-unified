@@ -1,13 +1,17 @@
 type OAuthProvider = "google" | "microsoft" | "apple" | "telegram";
 
-/** OAuth or passkey — session cookie may reference either after sign-in. */
-export type SessionProvider = OAuthProvider | "passkey";
+/** OAuth, passkey, or Better Auth (`frisky`) — session cookie may reference any after sign-in. */
+export type SessionProvider = OAuthProvider | "passkey" | "frisky";
 
 export type AuthEnv = {
   SESSION_SECRET?: string;
+  BETTER_AUTH_SECRET?: string;
+  FRISKY_AUTH_SECRET?: string;
+  FRISKY_AUTH_ENABLED?: string;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
   SUPABASE_ADMIN_EMAILS?: string;
+  AUTH?: { fetch: (request: Request) => Promise<Response> };
 };
 
 export type SessionPayload = {
@@ -48,6 +52,13 @@ export function sessionCookieName() {
   return sessionCookie;
 }
 
+/**
+ * Signs a session payload for use as an authenticated session token.
+ *
+ * @param payload - The session data to encode and sign
+ * @param env - The environment containing the session signing secret
+ * @returns The encoded session payload followed by its HMAC signature
+ */
 export async function signSession(payload: SessionPayload, env: AuthEnv) {
   const secret = requireSecret(env.SESSION_SECRET, "SESSION_SECRET");
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(payload)));
@@ -55,7 +66,13 @@ export async function signSession(payload: SessionPayload, env: AuthEnv) {
   return `${encoded}.${signature}`;
 }
 
-export async function readSession(request: Request, env: AuthEnv) {
+/**
+ * Reads and validates the Fenrir session cookie from a request.
+ *
+ * @param env - Environment containing the session signing secret
+ * @returns The decoded session payload, or `null` if the cookie is missing, invalid, or expired
+ */
+export async function readFenrirCookieSession(request: Request, env: AuthEnv) {
   const token = readCookie(request, sessionCookie);
   if (!token) return null;
   const [encoded, signature] = token.split(".");
@@ -67,6 +84,71 @@ export async function readSession(request: Request, env: AuthEnv) {
   return payload;
 }
 
+async function sessionFromAuthMe(body: {
+  authenticated?: boolean;
+  user?: { id: string; email?: string | null; name?: string | null; provider?: SessionProvider };
+} | null) {
+  if (!body?.authenticated || !body.user) return null;
+  return createSessionPayload({
+    email: body.user.email || "",
+    name: body.user.name || body.user.email || "",
+    provider: sessionProviderFromIdentity(body.user.provider),
+    identityId: body.user.id
+  });
+}
+
+async function readWorkerFenrirSession(request: Request, env: AuthEnv) {
+  const headers = {
+    Cookie: request.headers.get("Cookie") ?? "",
+    Authorization: request.headers.get("Authorization") ?? "",
+    Accept: "application/json",
+  };
+  const cookie = headers.Cookie;
+  const bearer = headers.Authorization;
+  if (!cookie.includes("fenrir_session=") && !bearer.toLowerCase().startsWith("bearer ")) {
+    return null;
+  }
+  if (env.AUTH?.fetch) {
+    try {
+      const forwarded = await env.AUTH.fetch(new Request("https://myfenrir.com/auth/me", { headers }));
+      const fromBinding = await sessionFromAuthMe(await forwarded.json().catch(() => null));
+      if (fromBinding) return fromBinding;
+    } catch {
+      // Fall through to the public Worker /auth/me (same fenrir_session cookie).
+    }
+  }
+
+  try {
+    const forwarded = await fetch("https://myfenrir.com/auth/me", { headers });
+    return sessionFromAuthMe(await forwarded.json().catch(() => null));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reads the authenticated session from the Fenrir Worker cookie (fenrir_session)
+ * via the AUTH service binding or public /auth/me, then the legacy payload cookie,
+ * then Frisky Auth when enabled.
+ */
+export async function readSession(request: Request, env: AuthEnv) {
+  const workerSession = await readWorkerFenrirSession(request, env);
+  if (workerSession) return workerSession;
+
+  const cookieSession = await readFenrirCookieSession(request, env);
+  if (cookieSession) return cookieSession;
+  const { friskyAuthEnabled, readFriskyAuthSession } = await import("./frisky-auth");
+  if (!friskyAuthEnabled(env)) return null;
+  return readFriskyAuthSession(request, env);
+}
+
+/**
+ * Creates a session cookie containing the specified token with a one-week lifetime.
+ *
+ * @param token - The session token to store in the cookie
+ * @param domain - The optional cookie domain
+ * @returns A `Set-Cookie` header value
+ */
 export function sessionSetCookie(token: string, domain?: string) {
   return cookieHeader(sessionCookie, token, week, domain);
 }
@@ -90,6 +172,19 @@ export function createSessionPayload(input: {
     iat: now,
     exp: now + week
   };
+}
+
+function sessionProviderFromIdentity(provider: string | undefined): SessionProvider {
+  switch (provider) {
+    case "google":
+    case "microsoft":
+    case "apple":
+    case "telegram":
+    case "passkey":
+      return provider;
+    default:
+      return "google";
+  }
 }
 
 function requireSecret(value: string | undefined, name: string) {

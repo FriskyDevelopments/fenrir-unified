@@ -34,7 +34,7 @@ const en = {
   // Sólo se promete el correo cuando el envío devolvió `true`. Ver
   // access.functions.ts:sendGateConfirmationEmail, que devuelve false en
   // silencio si la identidad de Telegram no trae correo.
-  emailNotSent: "No email on this identity — your confirmation arrives in Telegram.",
+  emailNotSent: "We could not send an email confirmation. Your Gate status is shown here.",
   securityComplete: "Gate security complete",
   // Etiquetas GENÉRICAS de progreso. El miembro ve que hay etapas y cómo van;
   // nunca qué señal se examinó ni cuál falló. La pantalla de seguridad
@@ -70,7 +70,8 @@ export const gateCopy = defineCopy(en, {
     reviewBody:
       "Seguridad marcó este acceso para revisión del owner. Puede aprobar, negar o pedir más info.",
     emailPrefix: "Correo de confirmación",
-    emailNotSent: "Esta identidad no trae correo — tu confirmación llega por Telegram.",
+    emailNotSent:
+      "No pudimos enviar la confirmación por correo. El estado de tu acceso aparece aquí.",
     securityComplete: "Seguridad del Gate completa",
     stageIdentity: "Revisión de identidad",
     stageSafety: "Revisión de seguridad",
@@ -102,7 +103,8 @@ export const gateCopy = defineCopy(en, {
     reviewBody:
       "La sécurité a envoyé cette entrée en revue owner. Ils peuvent approuver, refuser ou demander plus d’infos.",
     emailPrefix: "Email de confirmation",
-    emailNotSent: "Aucun email sur cette identité — votre confirmation arrive sur Telegram.",
+    emailNotSent:
+      "La confirmation par email n’a pas pu être envoyée. Le statut de votre accès est affiché ici.",
     securityComplete: "Sécurité Gate terminée",
     stageIdentity: "Contrôle d’identité",
     stageSafety: "Contrôle de sécurité",
@@ -134,7 +136,8 @@ export const gateCopy = defineCopy(en, {
     reviewBody:
       "Die Sicherheit hat diesen Eintritt zur Owner-Prüfung markiert. Sie können genehmigen, ablehnen oder mehr Infos anfordern.",
     emailPrefix: "Bestätigungs-E-Mail",
-    emailNotSent: "Keine E-Mail zu dieser Identität — die Bestätigung kommt über Telegram.",
+    emailNotSent:
+      "Die Bestätigung konnte nicht per E-Mail gesendet werden. Dein Zugangsstatus wird hier angezeigt.",
     securityComplete: "Gate-Sicherheit abgeschlossen",
     stageIdentity: "Identitätsprüfung",
     stageSafety: "Sicherheitsprüfung",

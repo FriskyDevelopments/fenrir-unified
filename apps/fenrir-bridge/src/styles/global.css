@@ -1983,7 +1983,7 @@ code {
 .authentik-icon svg {
   width: 19px;
   height: 19px;
-  fill: currentColor;
+  fill: currentcolor;
 }
 
 .auth-actions .apple-auth-button {

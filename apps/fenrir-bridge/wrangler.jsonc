@@ -6,7 +6,8 @@
   // Pages cannot own send_email directly. EMAIL is a private service binding
   // to the dedicated Worker declared in wrangler.fenrir-email.toml.
   "services": [
-    { "binding": "EMAIL", "service": "fenrir-transactional-email" }
+    { "binding": "EMAIL", "service": "fenrir-transactional-email" },
+    { "binding": "AUTH", "service": "fenrir-auth-worker" }
   ],
   "vars": {
     "PUBLIC_SITE_URL": "https://www.myfenrir.com",

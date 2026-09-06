@@ -8,6 +8,12 @@ import {
 } from "../../../_lib/community-gate";
 import { noStoreJson } from "../../../_lib/responses";
 
+/**
+ * Handles GET requests for Community Gate authentication and profile access.
+ *
+ * @param context - Request context containing the incoming request and environment configuration
+ * @returns A response describing authentication status, configuration requirements, or the authenticated user's profile
+ */
 export async function onRequestGet(context: any) {
   if (!communityGateAuthConfigured(context.env)) return communityGateNotConfigured(context.env);
 
@@ -20,7 +26,7 @@ export async function onRequestGet(context: any) {
         product: "fenrir-community-gate",
         error: "community_gate_data_not_configured",
         detail: {
-          message: "Firebase Auth accepted the user, but the Community Gate data plane still needs NEON_DATABASE_URL and docs/neon-community-gate-schema.sql.",
+          message: "Community Gate accepted the member, but the Neon data plane still needs NEON_DATABASE_URL and docs/neon-community-gate-schema.sql.",
           missing: ["NEON_DATABASE_URL"]
         },
         user: {

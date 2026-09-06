@@ -46,7 +46,7 @@ const telegramPreviewSteps = [
     label: "Link ID",
     title: "Link your FriskyDev ID",
     message: "Connect this Telegram account to your FriskyDev identity.",
-    detail: "The secure link is single-use and confirms which Telegram account belongs to you.",
+    detail: "Opens www.myfenrir.com/api/telegram/link/start. Sign in with Better Auth if needed. There is no 6-character paste code.",
   },
   {
     label: "Account",
@@ -58,13 +58,14 @@ const telegramPreviewSteps = [
     label: "Group",
     title: "Protected group",
     message: "Add @Myfenrir_bot to the group and grant Invite Users.",
-    detail: "Fenrir keeps the real destination private behind the Gate.",
+    detail: "Continue on communities.myfenrir.com. Add @Myfenrir_bot to the group and grant Invite Users.",
   },
   {
     label: "Mapping",
     title: "Map the destination",
     message: "Run /connect@Myfenrir_bot in the protected group.",
-    detail: "The public Gate remains pending until this mapping is verified.",
+    detail:
+      "The public Gate remains pending until this mapping is verified on Community Bridge — not www.myfenrir.com/main.",
   },
   {
     label: "Access",
@@ -76,6 +77,8 @@ const telegramPreviewSteps = [
 ] as const;
 
 const telegramStepLinks = [
+  // Step 1 is FriskyDev identity on www.myfenrir.com. Steps 2–5 stay on
+  // Community Bridge + @Myfenrir_bot. Never send this walkthrough to /main.
   "https://www.myfenrir.com/api/telegram/link/start",
   "https://t.me/Myfenrir_bot?start=account",
   "https://t.me/Myfenrir_bot?startgroup=discover",

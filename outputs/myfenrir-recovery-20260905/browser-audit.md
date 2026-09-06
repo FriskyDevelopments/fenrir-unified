@@ -18,7 +18,7 @@ Local production bundle with synthetic browser request fixtures: 6/6 pass.
 
 Actual patched logout handler was imported and its Set-Cookie headers applied in an isolated browser origin. Both the host-only www.myfenrir.com cookie and parent-domain .myfenrir.com cookie were removed (2 before, 0 after).
 
-Runner: Playwright package /Users/friskypup/.npm/_npx/9833c18b2d85bc59/node_modules/playwright with /Applications/Google Chrome.app/Contents/MacOS/Google Chrome, fresh headless contexts. No screenshots, existing browser profiles, real sessions, email, or payments used.
+Runner: Playwright with Google Chrome, fresh headless contexts. No screenshots, existing browser profiles, real sessions, email, or payments used.
 Scripts: audit.cjs, verify.cjs, recovery.cjs, cookie-regression.mjs in this directory.
 
 ## Final production validation
@@ -34,6 +34,6 @@ Final isolated production-bundle workspace retry regression also confirmed that 
 Independent comparison identified the live legacy auth Worker intercepting /auth/callback and /auth/v1/callback with 404 unknown_provider while the exact Pages deployment returned HTML 200. Root corrected the Cloudflare route ownership.
 After the correction, fresh browser tests on both apex and www loaded /auth/callback?error=access_denied with 200, removed original callback parameters, reached /main with only auth_error, and displayed recoverable sign-in with a provider-denied explanation. No page errors, failed requests, or HTTP resource errors occurred.
 
-Additional route blocker reported to root: empty unsigned POST /api/telegram/link/confirm returns Worker404 on both custom domains while the exact Pages deployment correctly returns401 invalid_signature. No codes, identity data, signatures, or account sessions were supplied. This is the canonical bot confirmation writer in source and requires route ownership correction before claiming Telegram link confirmation operational.
+Additional route blocker reported to root: empty unsigned POST /api/telegram/link/confirm returns Worker 404 on both custom domains while the exact Pages deployment correctly returns 401 invalid_signature. No codes, identity data, signatures, or account sessions were supplied. This is the canonical bot confirmation writer in source and requires route ownership correction before claiming Telegram link confirmation operational.
 
-GET /api/telegram/link/start returns unauthenticated302 on both production domains; GET /api/telegram/link returns expected401. /api/telegram/link/status is not implemented or referenced in canonical client source and returns404 on both production and Pages.
+GET /api/telegram/link/start returns unauthenticated 302 on both production domains; GET /api/telegram/link returns expected 401. /api/telegram/link/status is not implemented or referenced in canonical client source and returns 404 on both production and Pages.

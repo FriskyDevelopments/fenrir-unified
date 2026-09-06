@@ -18,13 +18,12 @@ import {
   createLinkCode,
   resolveSupabaseUserId,
 } from "../../../_lib/account-links";
+import { canonicalFenrirLoginUrl, TELEGRAM_LINK_START_PATH } from "../../../_lib/fenrir-login";
 
 export const onRequestGet: PagesFunction<BillingEnv> = async (context) => {
   const session = await readSession(context.request, context.env);
   if (!session) {
-    const login = new URL("/main", context.request.url);
-    login.searchParams.set("next", "/api/telegram/link/start");
-    return Response.redirect(login.toString(), 302);
+    return Response.redirect(canonicalFenrirLoginUrl(TELEGRAM_LINK_START_PATH), 302);
   }
 
   if (!context.env.DB) return dbNotConfiguredResponse();

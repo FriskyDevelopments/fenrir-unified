@@ -3,12 +3,18 @@ export default {
     const incoming = new URL(request.url);
     const target = new URL(request.url);
 
-    // Keep the Telegram Mini App on the canonical MyFenrir URL while serving
-    // the Pages build as an implementation detail.
-    if (incoming.pathname === "/gate/app" || incoming.pathname === "/gate/miniapp" || incoming.pathname === "/api/verification/canonical-grant") {
+    // Telegram Mini App and /gate/app used to proxy the old Pages Gatekeeper
+    // (fenrir-bridge.pages.dev). New Gate lives on communities.myfenrir.com.
+    if (incoming.pathname === "/gate/app" || incoming.pathname === "/gate/miniapp") {
+      const dest = new URL("https://communities.myfenrir.com/gate");
+      dest.search = incoming.search;
+      return Response.redirect(dest.toString(), 302);
+    }
+
+    // Keep the verification grant on the Pages implementation for now.
+    if (incoming.pathname === "/api/verification/canonical-grant") {
       target.protocol = "https:";
       target.hostname = "fenrir-bridge.pages.dev";
-      target.pathname = incoming.pathname === "/api/verification/canonical-grant" ? incoming.pathname : "/gate/app";
       const routed = new Request(target.toString(), request);
       routed.headers.set("x-fenrir-gate-route", "myfenrir.com/gate/miniapp");
       return fetch(routed);

@@ -18,20 +18,20 @@ const root = new URL("..", import.meta.url).pathname;
 const requiredSource = [
   [["src/routes/g.$slug.tsx", "src/i18n/gate.ts"], "Proceed to SSO"],
   [["src/routes/g.$slug.tsx", "src/i18n/gate.ts"], "Continue Gate"],
-  ["src/routes/g.$slug.tsx", "community-sso"],
-  ["src/routes/g.$slug.tsx", 'url.searchParams.set("gate", slug)'],
+  ["src/routes/g.$slug.tsx", "communityLoginPath"],
+  ["src/routes/g.$slug.tsx", "gateSlug: slug"],
   ["src/lib/access.functions.ts", "Gate security:"],
   ["src/lib/access.functions.ts", "decision_note"],
   ["src/lib/access.functions.ts", "telegram_user_id"],
   ["src/routes/access.tsx", "Security context"],
   ["src/routes/access.tsx", "Ask info"],
-  ["src/routes/login.tsx", "canonicalCommunityOAuthUrl"],
+  ["src/routes/login.tsx", "startCommunityOAuth"],
   ["src/routes/login.tsx", "availableBrandProviders"],
   ["src/routes/login.tsx", "sourceGate"],
   ["src/components/auth/auth-layout.tsx", "Community sign-in"],
   ["src/lib/canonical-auth.ts", "brandId"],
   ["src/lib/canonical-auth.ts", "gateSlug"],
-  ["src/lib/canonical-auth.ts", "/api/auth/community-sso"],
+  ["src/lib/canonical-auth.ts", "signInWithOAuth"],
 ];
 
 const forbiddenSource = [
@@ -40,7 +40,9 @@ const forbiddenSource = [
   ["src/lib/gate.functions.ts", "Link Telegram securely"],
   ["src/routes/g.$slug.tsx", 'href="/activate"'],
   ["src/routes/g.$slug.tsx", "communities.myfenrir.com/activate"],
-  ["src/routes/login.tsx", "supabase.auth.signInWithOAuth"],
+  ["src/lib/canonical-auth.ts", "/api/auth/login/"],
+  ["src/lib/canonical-auth.ts", "/api/auth/community-sso"],
+  ["src/routes/g.$slug.tsx", "/api/auth/community-sso"],
 ];
 
 function read(rel) {
@@ -75,7 +77,7 @@ const routeSource = read("src/routes/g.$slug.tsx");
 // Lo que el guardia SÍ debe seguir impidiendo es que entren condiciones de
 // identidad de Telegram en `needsSso`: eso pertenece a la seguridad post-SSO.
 const needsSsoLine = routeSource.match(/const needsSso = .*;/)?.[0] ?? "";
-if (!/const needsSso = (!checkingAccess && !session|checkingAccess \|\| !session);/.test(needsSsoLine)) {
+if (needsSsoLine !== "const needsSso = !checkingAccess && !session;") {
   fail(
     "public Gate must derive needsSso only from checkingAccess/session; found: " + needsSsoLine,
   );

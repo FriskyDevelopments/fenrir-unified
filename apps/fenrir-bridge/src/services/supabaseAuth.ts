@@ -80,7 +80,11 @@ export function isSafeRedirectPath(path: string | null) {
   const destination = new URL(path, window.location.origin);
   if (destination.origin !== window.location.origin) return false;
   const pathname = destination.pathname.replace(/\/+$/, "") || "/";
-  const authRoute = pathname.startsWith("/api/auth/") && pathname !== "/api/auth/community-sso";
+  const authRoute = (
+    pathname === "/auth" || pathname.startsWith("/auth/") ||
+    pathname === "/api/frisky-auth" || pathname.startsWith("/api/frisky-auth/") ||
+    pathname === "/api/auth" || pathname.startsWith("/api/auth/")
+  ) && pathname !== "/api/auth/community-sso";
   return pathname !== "/login" && !authRoute && !isAuthCallbackPath(pathname);
 }
 
@@ -184,6 +188,11 @@ export async function completeSupabaseSession() {
       body: JSON.stringify({ accessToken }),
       signal: controller.signal,
     });
+  } catch (error) {
+    // Logout intentionally aborts requests from the previous session generation.
+    if (generation !== sessionGeneration) return false;
+    setAuthCallbackError(`supabase_session_failed:${encodeURIComponent(error instanceof Error ? error.message : "request_failed")}`);
+    return false;
   } finally {
     pendingSessionRequests.delete(controller);
   }

@@ -1,4 +1,4 @@
-import type { OAuthEnv } from "./oauth";
+import { isDirectOAuthAvailable, type OAuthEnv } from "./oauth";
 
 function nonEmpty(value: string | undefined): boolean {
   return typeof value === "string" && value.trim().length > 0;
@@ -41,20 +41,15 @@ export function computeReadiness(
   env: OAuthEnv,
   managedRail: ManagedTelegramRail = { starsConfigured: false, webhookConfigured: false }
 ): ReadinessSnapshot {
-  const supabaseConfigured = nonEmpty(env.SUPABASE_URL) && nonEmpty(env.SUPABASE_ANON_KEY);
   const directGoogle = nonEmpty(env.GOOGLE_CLIENT_ID) && nonEmpty(env.GOOGLE_CLIENT_SECRET);
   const directMicrosoft = nonEmpty(env.MICROSOFT_CLIENT_ID) && nonEmpty(env.MICROSOFT_CLIENT_SECRET);
-  const directApple =
-    nonEmpty(env.APPLE_CLIENT_ID) &&
-    nonEmpty(env.APPLE_TEAM_ID) &&
-    nonEmpty(env.APPLE_KEY_ID) &&
-    nonEmpty(env.APPLE_PRIVATE_KEY) &&
-    nonEmpty(env.APPLE_CLIENT_SECRET);
+  // Community OAuth signs the Apple client secret from the p8 at exchange time.
+  const directApple = isDirectOAuthAvailable("apple", env);
 
   const auth = {
-    googleConfigured: directGoogle || (supabaseConfigured && enabled(env.FENRIR_GOOGLE_OAUTH_CONFIGURED)),
-    microsoftConfigured: directMicrosoft || (supabaseConfigured && enabled(env.FENRIR_MICROSOFT_OAUTH_CONFIGURED)),
-    appleConfigured: directApple || (supabaseConfigured && enabled(env.FENRIR_APPLE_OAUTH_CONFIGURED)),
+    googleConfigured: directGoogle,
+    microsoftConfigured: directMicrosoft,
+    appleConfigured: directApple,
     friskyAuthEnabled: enabled(env.FRISKY_AUTH_ENABLED)
   };
 

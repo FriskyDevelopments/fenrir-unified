@@ -1,0 +1,53 @@
+{
+  "name": "fenrir-auth-worker",
+  "main": "workers/fenrir-auth/src/index.js",
+  "compatibility_date": "2026-08-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "e2a7eccb24c4836847fd14d08c499bd0",
+  "workers_dev": false,
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 }
+  },
+  // Worker as origin for /auth/* on Fenrir, Telegram identity link start/complete,
+  // and the login gate on forge/paperclip (already live). Do not attach this
+  // Worker to folios.works. Do not steal gate.myfenrir.com/tg.
+  "routes": [
+    { "pattern": "myfenrir.com/auth/*", "zone_name": "myfenrir.com" },
+    { "pattern": "www.myfenrir.com/auth/*", "zone_name": "myfenrir.com" },
+    { "pattern": "myfenrir.com/api/telegram/link*", "zone_name": "myfenrir.com" },
+    { "pattern": "www.myfenrir.com/api/telegram/link*", "zone_name": "myfenrir.com" },
+    { "pattern": "forge.friskydev.com/*", "zone_name": "friskydev.com" },
+    { "pattern": "paperclip.friskydev.com/*", "zone_name": "friskydev.com" }
+  ],
+  "vars": {
+    "BASE_URL": "https://myfenrir.com",
+    "COOKIE_DOMAIN": "myfenrir.com",
+    "POST_LOGIN_REDIRECT": "https://myfenrir.com/main",
+    "LOGOUT_REDIRECT": "https://myfenrir.com/login",
+    "SESSION_TTL_SECONDS": "604800",
+    "SESSION_COOKIE_NAME": "fenrir_session",
+    "ALLOWED_REDIRECT_HOSTS": "myfenrir.com,www.myfenrir.com,forge.friskydev.com,paperclip.friskydev.com,mcp.friskydev.com",
+    "TRUSTED_ORIGINS": "https://myfenrir.com,https://www.myfenrir.com,https://forge.friskydev.com,https://paperclip.friskydev.com,https://mcp.friskydev.com"
+  },
+  // Replace id after: wrangler kv namespace create FENRIR_AUTH_SESSIONS
+  "kv_namespaces": [
+    { "binding": "SESSIONS", "id": "9e3b6917e8354d66aa3f4375f345e440" }
+  ],
+  // Existing fenrir-bridge D1 (telegram_account_link_codes). Do not invent a new DB.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "fenrir-bridge",
+      "database_id": "1238059e-2638-4317-982e-e74dda046ccb"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "SESSION_AUTHORITY", "class_name": "SessionAuthority" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["SessionAuthority"] }
+  ]
+}

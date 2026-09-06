@@ -1,0 +1,21 @@
+:root {
+  /* Community Gate tokens */
+  --brand-primary: 260 84% 58%;
+  --brand-secondary: 240 60% 50%;
+  --brand-accent: 200 100% 50%;
+  --brand-glow: 200 100% 50%;
+
+  --brand-gradient-start: 260 84% 58%;
+  --brand-gradient-middle: 200 100% 50%;
+  --brand-gradient-end: 280 70% 55%;
+
+  /* Theme tokens */
+  --theme-bg: 220 30% 3%;
+  --theme-text: 220 13% 91%;
+  --theme-text-muted: 220 13% 62%;
+  --theme-border: 220 13% 20%;
+  --theme-surface: 220 13% 12%;
+  --theme-glow: 200 100% 50%;
+}
+
+/* Keep existing app/surface/theme-* vars if present; these are additive. */

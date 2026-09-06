@@ -13,9 +13,15 @@ import { logDemoEvent } from "@/config/demo-log";
 import { getSiteUrl } from "@/config/site-url";
 import {
   availableBrandProviders,
-  canonicalCommunityOAuthUrl,
-  loadCanonicalProviders,
+  startCommunityOAuth,
+  loadCommunityProviders,
+  safeCommunityNext,
 } from "@/lib/canonical-auth";
+import {
+  supabase,
+  CANONICAL_SUPABASE_URL,
+  CANONICAL_SUPABASE_PUBLISHABLE_KEY,
+} from "@/integrations/supabase/client";
 import { getPublicGate, type PublicGateConfig } from "@/lib/gate.functions";
 
 /** Build-time brand: head() is static, so it uses the deployment's brand. */
@@ -119,22 +125,17 @@ const PROVIDERS: ProviderConfig[] = [
   },
 ];
 
-function safeNext(next: unknown): string | null {
-  if (typeof next !== "string" || !next.startsWith("/") || next.startsWith("//")) return null;
-  return next;
-}
-
 function LoginPage() {
   const { session, loading } = useAuth();
   const navigate = useNavigate();
   const loadPublicGate = useServerFn(getPublicGate);
   const brand = useBrand();
   const search = Route.useSearch() as { next?: string; gate?: string; sso?: string };
-  const next = safeNext(search.next);
+  const next = safeCommunityNext(search.next);
   const [pending, setPending] = useState<ProviderId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [configIssues, setConfigIssues] = useState<RedirectIssue[]>([]);
-  const [enabledCanonicalProviders, setEnabledCanonicalProviders] = useState<ProviderId[] | null>(
+  const [enabledCommunityProviders, setEnabledCommunityProviders] = useState<ProviderId[] | null>(
     null,
   );
   const [sourceGate, setSourceGate] = useState<PublicGateConfig | null>(null);
@@ -142,10 +143,8 @@ function LoginPage() {
   // resolving it late would let the signed-in redirect fire before we know.
   const [demo] = useState(() => isDemoMode());
 
-  // Community Bridge owns a single, same-origin login. Do not bounce an
-  // unauthenticated visitor through Quality or another identity provider:
-  // that was the source of the visible second-login loop. Existing shared
-  // MyFenrir sessions are still adopted by useAuth before this screen renders.
+  // Community owns this Supabase session. The client persists the provider
+  // callback before useAuth resumes the Gate; no MyFenrir app token is copied.
 
   // Runtime check: the brand's OAuth return and post-login paths must be
   // same-origin and on the allowed sign-in URL list, or SSO silently bounces.
@@ -156,9 +155,13 @@ function LoginPage() {
 
   useEffect(() => {
     let active = true;
-    void loadCanonicalProviders()
-      .then((providers) => active && setEnabledCanonicalProviders(providers))
-      .catch(() => active && setEnabledCanonicalProviders([]));
+    void loadCommunityProviders({
+      supabaseUrl: import.meta.env["VITE_SUPABASE_URL"] || CANONICAL_SUPABASE_URL,
+      publishableKey:
+        import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || CANONICAL_SUPABASE_PUBLISHABLE_KEY,
+    })
+      .then((providers) => active && setEnabledCommunityProviders(providers))
+      .catch(() => active && setEnabledCommunityProviders([]));
     return () => {
       active = false;
     };
@@ -181,11 +184,11 @@ function LoginPage() {
   }, [brand.id, loadPublicGate, search.gate]);
 
   // Preserve the community's chosen order, but never advertise a provider
-  // whose credentials are absent from the canonical MyFenrir runtime.
+  // whose credentials are absent from this Community identity project.
   const availableIds =
-    enabledCanonicalProviders === null
+    enabledCommunityProviders === null
       ? []
-      : availableBrandProviders(brand.providers, enabledCanonicalProviders);
+      : availableBrandProviders(brand.providers, enabledCommunityProviders);
   const providers = availableIds
     .map((id) => PROVIDERS.find((p) => p.id === id))
     .filter((p): p is ProviderConfig => Boolean(p));
@@ -219,15 +222,19 @@ function LoginPage() {
       return;
     }
 
-    window.location.assign(
-      canonicalCommunityOAuthUrl({
+    try {
+      const url = await startCommunityOAuth(supabase.auth, {
         provider,
         communityOrigin: window.location.origin,
         nextPath: next ?? brand.redirect.afterLogin,
         brandId: brand.id,
         gateSlug: search.gate,
-      }),
-    );
+      });
+      window.location.assign(url);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not start Community sign-in.");
+      setPending(null);
+    }
   }
 
   const copy = brandLoginCopy(brand);
@@ -248,7 +255,7 @@ function LoginPage() {
     <AuthLayout
       title={copy.headline}
       subtitle={communityName ? `Sign in to continue to ${communityName}` : copy.subheadline}
-      providers={enabledCanonicalProviders === null ? null : availableIds}
+      providers={enabledCommunityProviders === null ? null : availableIds}
       gate={sourceGate}
       footer={
         <span className="block space-y-2">
@@ -377,16 +384,15 @@ function LoginPage() {
           );
         })}
 
-        {enabledCanonicalProviders === null ? (
+        {enabledCommunityProviders === null ? (
           <p className="text-center text-xs text-muted-foreground">Checking available sign-in…</p>
         ) : null}
-        {enabledCanonicalProviders?.length === 0 ? (
+        {enabledCommunityProviders?.length === 0 ? (
           <div
             role="alert"
             className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
           >
-            Sign-in is temporarily unavailable. No provider is enabled in the canonical MyFenrir
-            runtime.
+            Sign-in is temporarily unavailable for this community. Please try again later.
           </div>
         ) : null}
 

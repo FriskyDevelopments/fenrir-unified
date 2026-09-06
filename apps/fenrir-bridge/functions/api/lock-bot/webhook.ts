@@ -8,11 +8,8 @@
  *   LOCK_BOT_TOKEN             — Bot token from @BotFather
  *   LOCK_BOT_WEBHOOK_SECRET    — Shared secret for X-Telegram-Bot-Api-Secret-Token
  *
- * Set webhook:
- *   curl -X POST https://api.telegram.org/bot<LOCK_BOT_TOKEN>/setWebhook \
- *     -d "url=https://<your-domain>/api/lock-bot/webhook" \
- *     -d "secret_token=<LOCK_BOT_WEBHOOK_SECRET>" \
- *     -d 'allowed_updates=["message","callback_query"]'
+ * Provision both Pages environments and register Telegram's secret_token
+ * before deployment. See docs/LOCK_BOT_ROLLOUT.md for the release sequence.
  *
  * Route: POST /api/lock-bot/webhook
  */
@@ -44,8 +41,8 @@ export const onRequestPost: PagesFunction<LockBotEnv> = async (context) => {
     //
     // Antes esto era `if (configuredSecret) { …401 }`: si la variable no estaba
     // puesta, no se validaba NADA y cualquiera podía postear updates falsos.
-    // Y no estaba puesta: LOCK_BOT_WEBHOOK_SECRET no existe ni en production ni
-    // en preview de fenrir-bridge (comprobado contra la API de Cloudflare).
+    // La configuración de production y preview debe comprobarse antes del
+    // despliegue siguiendo docs/LOCK_BOT_ROLLOUT.md.
     //
     // Un secreto ausente es una configuración incompleta, no un permiso. El
     // webhook de @Myfenrir_bot ya lo hace bien devolviendo 500 cuando falta

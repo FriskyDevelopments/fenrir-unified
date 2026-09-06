@@ -87,8 +87,7 @@ test("availableCommunityAuthProviders reflects bound credentials", () => {
     APPLE_CLIENT_ID: "x",
     APPLE_TEAM_ID: "x",
     APPLE_KEY_ID: "x",
-    APPLE_PRIVATE_KEY: "x",
-    APPLE_CLIENT_SECRET: "test-client-secret"
+    APPLE_PRIVATE_KEY: "x"
   }));
   assert.deepEqual(allThree, ["magic_link", "google", "microsoft", "apple"]);
   assert.deepEqual(availableCommunityAuthProviders(testEnv({
@@ -97,7 +96,7 @@ test("availableCommunityAuthProviders reflects bound credentials", () => {
     APPLE_KEY_ID: "x",
     APPLE_PRIVATE_KEY: "x",
     APPLE_CLIENT_SECRET: undefined,
-  })), ["magic_link", "google"]);
+  })), ["magic_link", "google", "apple"]);
 });
 
 test("transaction cookie round-trips the community slug", async () => {
@@ -390,11 +389,11 @@ test("authentikEndpoints derives the global triple and the per-app jwks", () => 
   assert.deepEqual(authentikEndpoints(AUTHENTIK_ISSUER.replace(/\/$/, "")), endpoints);
 });
 
-test("authentik stays invisible until AUTHENTIK_ENABLED is exactly true", () => {
+test("authentik stays invisible even when AUTHENTIK_ENABLED is true", () => {
   assert.equal(isDirectOAuthAvailable("authentik", authentikEnv()), false);
   assert.equal(isDirectOAuthAvailable("authentik", authentikEnv({ AUTHENTIK_ENABLED: "false" } as never)), false);
   assert.equal(isDirectOAuthAvailable("authentik", authentikEnv({ AUTHENTIK_ENABLED: "1" } as never)), false);
-  assert.equal(isDirectOAuthAvailable("authentik", authentikEnv({ AUTHENTIK_ENABLED: "true" } as never)), true);
+  assert.equal(isDirectOAuthAvailable("authentik", authentikEnv({ AUTHENTIK_ENABLED: "true" } as never)), false);
 });
 
 test("authentik needs credentials AND a parseable issuer even with the flag on", () => {
@@ -424,24 +423,17 @@ test("flag off leaves the advertised provider list byte-identical", () => {
   assert.equal(availableCommunityAuthProviders(withAuthentikCreds).includes("authentik"), false);
 });
 
-test("authentik authorize URL carries PKCE, nonce and the bridge callback", async () => {
+test("authentik authorize is refused as retired leftover identity", async () => {
   const env = authentikEnv({ AUTHENTIK_ENABLED: "true" } as never);
   const tx = await createCommunityOAuthTransaction("authentik", env as OAuthEnv, {
     community: "fenrir",
     returnTo: "/community/fenrir"
   });
   const callbackUri = `${ORIGIN}${communityOAuthCallbackPath("authentik")}`;
-  const url = new URL(await getAuthorizationUrl("authentik", env as OAuthEnv, callbackUri, tx));
-
-  assert.equal(url.origin + url.pathname, "https://authentik.friskydev.com/application/o/authorize/");
-  assert.equal(url.searchParams.get("redirect_uri"), callbackUri);
-  assert.equal(url.searchParams.get("response_type"), "code");
-  assert.equal(url.searchParams.get("scope"), "openid email profile");
-  assert.equal(url.searchParams.get("code_challenge_method"), "S256");
-  assert.equal(url.searchParams.get("state"), tx.state);
-  assert.equal(url.searchParams.get("nonce"), tx.nonce);
-  // The verifier must never leave the signed cookie.
-  assert.equal(url.toString().includes(tx.verifier), false);
+  await assert.rejects(
+    () => getAuthorizationUrl("authentik", env as OAuthEnv, callbackUri, tx),
+    /authentik_retired/
+  );
 });
 
 test("authentik uses SameSite=Lax — only Apple needs None", async () => {
@@ -459,17 +451,18 @@ test("authentik uses SameSite=Lax — only Apple needs None", async () => {
   assert.equal(roundTripped?.provider, "authentik");
 });
 
-test("authentik start bounces to provider_not_configured while the flag is off", async () => {
+test("authentik start bounces to provider_not_configured even if the old flag is on", async () => {
   const response = await handleCommunityOAuthStart({
     request: new Request(`${ORIGIN}/api/community-auth/oauth/authentik?slug=fenrir`),
-    env: authentikEnv(),
+    env: authentikEnv({ AUTHENTIK_ENABLED: "true" } as never),
     provider: "authentik"
   });
   assert.equal(response.status, 302);
   assert.match(response.headers.get("Location") ?? "", /auth_error=provider_not_configured$/);
 });
 
-test("authentik is a recognized community provider", () => {
+test("authentik remains a recognized leftover community provider name, never advertised", () => {
   assert.equal(isCommunityOAuthProvider("authentik"), true);
   assert.equal(communityOAuthCallbackPath("authentik"), "/api/community-auth/oauth/callback/authentik");
+  assert.equal(availableCommunityAuthProviders(authentikEnv({ AUTHENTIK_ENABLED: "true" } as never)).includes("authentik"), false);
 });
