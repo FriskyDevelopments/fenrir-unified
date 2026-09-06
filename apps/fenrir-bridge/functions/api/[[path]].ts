@@ -41,14 +41,37 @@ export async function onRequest(context: any) {
         body: JSON.stringify({ grant: body.grant, context: body.context, audience: url.origin }),
         signal: controller.signal
       });
-    } catch {
+    } catch (error) {
+      console.error("verification_grant_unreachable", error);
       response = null;
     } finally {
       clearTimeout(timer);
     }
-    if (!response?.ok) return noStoreJson({ verified: false, error: "verification_grant_rejected" }, { status: 400 });
+    /*
+     * "No pude verificar" y "no pasó la verificación" son sucesos DISTINTOS.
+     *
+     * Antes todo lo que no fuera un 200 caía en un mismo
+     * `400 verification_grant_rejected`: verificador caído, timeout, red rota y
+     * 503 `verification_unavailable` del propio verificador se presentaban al
+     * visitante como si hubiera fallado ÉL. Eso es culpar a alguien de una
+     * caída nuestra, y es justo lo que no se hace aquí.
+     *
+     * Ahora: sin respuesta, 5xx o cuerpo ilegible → 503 (fallo nuestro,
+     * reintentable). Sólo cuando el verificador contesta y dice que no, hay
+     * rechazo real → 400.
+     */
+    if (!response || response.status >= 500) {
+      if (response) console.error("verification_grant_upstream_error", response.status);
+      return noStoreJson({ verified: false, error: "verification_unavailable" }, { status: 503 });
+    }
     const result = await response.json().catch(() => null) as { verified?: boolean; method?: string } | null;
-    if (!result?.verified) return noStoreJson({ verified: false, error: "verification_grant_rejected" }, { status: 400 });
+    if (!result) {
+      console.error("verification_grant_unreadable_response", response.status);
+      return noStoreJson({ verified: false, error: "verification_unavailable" }, { status: 503 });
+    }
+    if (!response.ok || !result.verified) {
+      return noStoreJson({ verified: false, error: "verification_grant_rejected" }, { status: 400 });
+    }
     return noStoreJson({ verified: true, method: result.method });
   }
   return noStoreJson(

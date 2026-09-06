@@ -13,6 +13,7 @@ import {
   type DomainSearchResult,
 } from "../../shared/domain-search";
 import { copy } from "../i18n";
+import { withDeadline } from "./request";
 import {
   addDomain,
   addLiveRoom,
@@ -24,6 +25,7 @@ import {
 import {
   completeSupabaseSession,
   hasSupabaseCallbackInLocation,
+  signInWithSupabase,
   signOutSupabase,
 } from "./supabaseAuth";
 import type {
@@ -49,10 +51,6 @@ const telegramBotUsername = () =>
   )
     .replace(/^@/, "")
     .trim();
-
-const directAuthOrigin = (import.meta.env.VITE_DIRECT_AUTH_ORIGIN ?? "")
-  .trim()
-  .replace(/\/$/, "");
 
 export type PaidPlan = Exclude<Plan, "free">;
 
@@ -146,7 +144,7 @@ export type AuthSession = {
     id: string;
     email: string;
     name: string;
-    authProvider: "google" | "microsoft" | "apple" | "telegram" | "passkey";
+    authProvider: "google" | "microsoft" | "apple" | "authentik" | "telegram" | "passkey";
   };
   org?: {
     id: string;
@@ -165,31 +163,37 @@ export type TelegramLoginPayload = {
 };
 
 async function apiRequest<T>(path: string, init?: RequestInit) {
+  const controller = new AbortController();
   try {
-    const response = await fetch(path, {
-      credentials: "include",
-      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-      ...init,
-    });
-    const body = (await response.json().catch(() => null)) as T | null;
-    if (!body) {
-      return devApiFallback<T>(path, init, `api_empty_${response.status}`);
-    }
-    if (!response.ok) {
-      return devApiFallback<T>(
-        path,
-        init,
-        (body as { error?: string } | null)?.error ??
-          `api_error_${response.status}`
-      );
-    }
-    return body as T;
+    // Include response-body reads in the deadline: a stalled JSON response
+    // otherwise strands the initial session or workspace load on the boot view.
+    return await withDeadline((async () => {
+      const response = await fetch(path, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+        ...init,
+        signal: controller.signal,
+      });
+      const body = (await response.json().catch(() => null)) as T | null;
+      if (!body) {
+        throw new Error(`api_empty_${response.status}`);
+      }
+      if (!response.ok) {
+        throw new Error(
+          (body as { error?: string } | null)?.error ??
+            `api_error_${response.status}`
+        );
+      }
+      return body;
+    })());
   } catch (error) {
     return devApiFallback<T>(
       path,
       init,
       error instanceof Error ? error.message : "api_unavailable"
     );
+  } finally {
+    controller.abort();
   }
 }
 
@@ -212,21 +216,6 @@ function devAuthSession(): AuthSession & { ok: true } {
       plan: store.org.plan,
     },
   };
-}
-
-function safeCurrentAuthReturnPath() {
-  const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-  if (!path.startsWith("/") || path.startsWith("//")) return "/main";
-  const pathname = window.location.pathname || "/";
-  if (
-    pathname === "/" ||
-    pathname === "/login" ||
-    pathname.startsWith("/auth/") ||
-    pathname.startsWith("/api/auth/")
-  ) {
-    return "/main";
-  }
-  return path;
 }
 
 function devApiFallback<T>(
@@ -419,57 +408,21 @@ export const webauthnService = {
 
 export const authService = {
   async me() {
-    // Supabase Auth is the login broker: after the provider redirects back to
-    // /auth/callback, exchange the Supabase session for the Fenrir cookie.
-    if (hasSupabaseCallbackInLocation()) {
-      const completed = await completeSupabaseSession();
-      if (completed) {
-        return {
-          ok: true as const,
-          data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me"),
-        };
-      }
-    }
-
-    try {
-      const result = await apiRequest<AuthSession & { ok: boolean }>(
-        "/api/auth/me"
-      );
-      if (!result.authenticated) {
-        const completed = await completeSupabaseSession();
-        if (completed) {
-          return {
-            ok: true as const,
-            data: await apiRequest<AuthSession & { ok: boolean }>(
-              "/api/auth/me"
-            ),
-          };
-        }
-      }
-      return { ok: true as const, data: result };
-    } catch {
-      return {
-        ok: true as const,
-        data: { authenticated: false } as AuthSession,
-      };
-    }
+    return withDeadline(readAuthSession(), 20_000, "session_timeout");
   },
-  async login(provider: "google" | "microsoft" | "apple") {
-    // New sign-ins use only the direct provider stack whose runtime credentials
-    // are advertised by /api/auth/providers. The Supabase project still accepts
-    // existing sessions and callbacks, but its social providers are not assumed
-    // to be enabled merely because its public URL/key exist.
-    const returnTo = safeCurrentAuthReturnPath();
-    window.location.assign(
-      `${directAuthOrigin}/api/auth/login/${provider}?return_to=${encodeURIComponent(
-        returnTo
-      )}`
-    );
+  async login(provider: "google" | "microsoft" | "apple" | "authentik") {
+    // Production routes the legacy direct OAuth endpoints through a guard, so
+    // sending a browser there creates a callback dead-end. The supported
+    // providers return through the canonical SPA callback instead.
+    if (provider === "authentik") {
+      throw new Error("authentik_provider_unavailable");
+    }
+    await signInWithSupabase(provider);
   },
   async enabledProviders() {
     const result = await apiRequest<{
       ok: true;
-      providers: Array<"google" | "microsoft" | "apple">;
+      providers: Array<"google" | "microsoft" | "apple" | "authentik">;
     }>("/api/auth/providers");
     return result.providers;
   },
@@ -490,12 +443,44 @@ export const authService = {
     } catch {
       // Optional cleanup only.
     }
-    await signOutSupabase();
-    await apiRequest<{ ok: boolean }>("/api/auth/logout", {
-      method: "POST",
-    }).catch(() => null);
+    // Always reach the server cookie endpoint, even if the identity provider
+    // is unavailable. A failed cookie clear must remain visible and retryable.
+    const [, server] = await Promise.allSettled([
+      // This helper bounds the provider call and removes local credentials in
+      // its finally block, including when remote revocation fails.
+      signOutSupabase(),
+      apiRequest<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
+    ]);
+    if (server.status === "rejected") throw server.reason;
   },
 };
+
+async function readAuthSession() {
+  // Supabase Auth is the login broker: after the provider redirects back to
+  // /auth/callback, exchange the Supabase session for the Fenrir cookie.
+  if (hasSupabaseCallbackInLocation()) {
+    const completed = await completeSupabaseSession();
+    if (completed) {
+      return {
+        ok: true as const,
+        data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me"),
+      };
+    }
+  }
+
+  const result = await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me");
+  if (typeof result.authenticated !== "boolean") throw new Error("invalid_auth_response");
+  if (!result.authenticated) {
+    const completed = await completeSupabaseSession();
+    if (completed) {
+      return {
+        ok: true as const,
+        data: await apiRequest<AuthSession & { ok: boolean }>("/api/auth/me"),
+      };
+    }
+  }
+  return { ok: true as const, data: result };
+}
 
 export const liveRoomService = {
   async create(input: {
@@ -526,7 +511,11 @@ export const liveRoomService = {
 
 export const appService = {
   async load(): Promise<{ ok: true; data: AppState }> {
-    return apiRequest<{ ok: true; data: AppState }>("/api/app-state");
+    const result = await apiRequest<{ ok: true; data: AppState }>("/api/app-state");
+    if (!result.data?.user || !result.data.org || !Array.isArray(result.data.domains)) {
+      throw new Error("invalid_app_state");
+    }
+    return result;
   },
 };
 

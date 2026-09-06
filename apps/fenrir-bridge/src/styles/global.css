@@ -1980,6 +1980,12 @@ code {
   fill: currentColor;
 }
 
+.authentik-icon svg {
+  width: 19px;
+  height: 19px;
+  fill: currentColor;
+}
+
 .auth-actions .apple-auth-button {
   color: #ffffff;
   border-color: rgba(255,255,255,.42);

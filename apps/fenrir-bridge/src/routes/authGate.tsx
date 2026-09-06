@@ -181,6 +181,7 @@ export function AuthGate({
 function providerLabel(provider: AuthProvider, c: Copy) {
   if (provider === "apple") return c.continueApple;
   if (provider === "google") return c.continueGoogle;
+  if (provider === "authentik") return c.continueAuthentik;
   return c.continueMicrosoft;
 }
 

@@ -1,6 +1,6 @@
 import { authService } from "./api";
 
-export type AuthProvider = "apple" | "google" | "microsoft";
+export type AuthProvider = "apple" | "google" | "microsoft" | "authentik";
 export type AuthMode = "frisky-client" | "fenrir-community";
 
 export type AuthEngine = {

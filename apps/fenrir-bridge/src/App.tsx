@@ -38,6 +38,7 @@ import {
   friskyClientAuthEngine,
   type AuthProvider,
 } from "./services/authGateway";
+import { isSafeRedirectPath } from "./services/supabaseAuth";
 import {
   getCommunityAuthBrandForAdmin,
   getCommunityAuthProposal,
@@ -88,10 +89,84 @@ const defaultServiceSubdomain = (
   import.meta.env.VITE_DEFAULT_SERVICE_SUBDOMAIN ?? "vip.myfenrir.com"
 ).trim();
 const managedDashboardPath = "/main";
+const recoveryCopy = {
+  en: {
+    session: "We couldn't check your session.",
+    workspace: "We couldn't load your workspace.",
+    detail: "Please check your connection and try again.",
+    retry: "Try again",
+    signOut: "Sign out",
+    signingOut: "Signing out…",
+    signOutError: "Sign-out could not finish. Please try again.",
+    providers: "Sign-in options could not be loaded. Please try again.",
+  },
+  es: {
+    session: "No pudimos comprobar tu sesión.",
+    workspace: "No pudimos cargar tu espacio de trabajo.",
+    detail: "Revisa tu conexión e inténtalo de nuevo.",
+    retry: "Intentar de nuevo",
+    signOut: "Cerrar sesión",
+    signingOut: "Cerrando sesión…",
+    signOutError: "No se pudo cerrar la sesión. Inténtalo de nuevo.",
+    providers: "No pudimos cargar las opciones de acceso. Inténtalo de nuevo.",
+  },
+  fr: {
+    session: "Impossible de vérifier votre session.",
+    workspace: "Impossible de charger votre espace de travail.",
+    detail: "Vérifiez votre connexion et réessayez.",
+    retry: "Réessayer",
+    signOut: "Se déconnecter",
+    signingOut: "Déconnexion…",
+    signOutError: "La déconnexion a échoué. Réessayez.",
+    providers: "Impossible de charger les options de connexion. Réessayez.",
+  },
+  de: {
+    session: "Deine Sitzung konnte nicht überprüft werden.",
+    workspace: "Dein Arbeitsbereich konnte nicht geladen werden.",
+    detail: "Prüfe deine Verbindung und versuche es erneut.",
+    retry: "Erneut versuchen",
+    signOut: "Abmelden",
+    signingOut: "Abmeldung läuft…",
+    signOutError: "Die Abmeldung ist fehlgeschlagen. Versuche es erneut.",
+    providers: "Anmeldeoptionen konnten nicht geladen werden. Versuche es erneut.",
+  },
+} satisfies Record<Locale, Record<string, string>>;
+
+function RecoveryScreen({ kind, locale, onRetry, onSignOut, signingOut, signOutError }: {
+  kind: "session" | "workspace";
+  locale: Locale;
+  onRetry: () => void;
+  onSignOut: () => void;
+  signingOut: boolean;
+  signOutError: boolean;
+}) {
+  const text = recoveryCopy[locale];
+  return (
+    <main className="lovable-auth-page" data-recovery={kind}>
+      <div className="lovable-auth-column">
+        <section className="lovable-auth-card" aria-labelledby="recovery-title">
+          <div className="lovable-auth-brand">
+            <strong className="lovable-auth-name">MYFENRIR</strong>
+            <h1 id="recovery-title">{text[kind]}</h1>
+            <p role="alert">{text.detail}</p>
+          </div>
+          <div className="lovable-auth-actions">
+            <button type="button" onClick={onRetry} disabled={signingOut}>{text.retry}</button>
+            <button type="button" className="secondary" onClick={onSignOut} disabled={signingOut}>
+              {signingOut ? text.signingOut : text.signOut}
+            </button>
+          </div>
+          {signOutError ? <p role="alert">{text.signOutError}</p> : null}
+        </section>
+      </div>
+    </main>
+  );
+}
+
 function postLoginDestination() {
   const requested = new URLSearchParams(window.location.search).get("next");
-  return requested?.startsWith("/") && !requested.startsWith("//")
-    ? requested
+  return isSafeRedirectPath(requested)
+    ? requested as string
     : managedDashboardPath;
 }
 // The Community Gate parks a signed-out visitor here to authenticate and needs
@@ -1379,6 +1454,12 @@ export function App() {
   const legalMatch = legalRoutes.has(path);
   const [state, setState] = useState<AppState | null>(null);
   const [auth, setAuth] = useState<AuthSession | null>(null);
+  const [authLoadError, setAuthLoadError] = useState(false);
+  const [workspaceLoadError, setWorkspaceLoadError] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState(false);
+  const authRequest = useRef(0);
+  const workspaceRequest = useRef(0);
   const [active, setActive] = useState<PageKey>(() =>
     activePageFromLocation(path, window.location.hash)
   );
@@ -1471,9 +1552,15 @@ export function App() {
   }
 
   async function refresh() {
+    const request = ++workspaceRequest.current;
+    setWorkspaceLoadError(false);
     try {
       const result = await appService.load();
+      if (request !== workspaceRequest.current) return;
       setState(result.data);
+      setNotice((current) =>
+        current === recoveryCopy[locale].workspace ? c.initialNotice : current
+      );
       setSelectedDomain(
         (current) => current || result.data.domains[0]?.id || ""
       );
@@ -1481,21 +1568,30 @@ export function App() {
         await refreshBilling();
         await refreshTelegramIdentity();
       }
-    } catch {
-      setState(null);
+    } catch (error) {
+      if (request !== workspaceRequest.current) return;
+      if (error instanceof Error && error.message === "authentication_required") {
+        setState(null);
+        setAuth({ authenticated: false });
+        return;
+      }
+      setWorkspaceLoadError(true);
+      setNotice(recoveryCopy[locale].workspace);
     }
   }
 
   async function refreshAuth() {
+    const request = ++authRequest.current;
+    setAuthLoadError(false);
     let result: Awaited<ReturnType<typeof authService.me>>;
     try {
       result = await authService.me();
     } catch {
-      // An edge/network failure must not strand visitors on the boot screen.
-      // Render the sign-in gate; provider discovery can recover independently.
-      setAuth({ authenticated: false });
+      if (request !== authRequest.current) return;
+      setAuthLoadError(true);
       return;
     }
+    if (request !== authRequest.current) return;
     setAuth(result.data);
     if (
       result.data.authenticated &&
@@ -1716,6 +1812,12 @@ export function App() {
     return <CinematicLanding />;
   }
 
+  if (authLoadError) {
+    return <RecoveryScreen kind="session" locale={locale}
+      onRetry={() => void refreshAuth()} onSignOut={() => void signOut()}
+      signingOut={signingOut} signOutError={signOutError} />;
+  }
+
   if (!auth) {
     return <div className="boot">{c.boot}</div>;
   }
@@ -1734,6 +1836,11 @@ export function App() {
   }
 
   if (!state) {
+    if (workspaceLoadError) {
+      return <RecoveryScreen kind="workspace" locale={locale}
+        onRetry={() => void refresh()} onSignOut={() => void signOut()}
+        signingOut={signingOut} signOutError={signOutError} />;
+    }
     return <div className="boot">{c.boot}</div>;
   }
 
@@ -2053,11 +2160,27 @@ export function App() {
   }
 
   async function signOut() {
-    await authService.logout();
-    setAuth({ authenticated: false });
-    setFenrirRole(null);
-    window.history.replaceState({}, "", "/");
-    setNotice(c.signedOut);
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError(false);
+    try {
+      await authService.logout();
+      // Discard loads started by the old account before returning to sign-in.
+      authRequest.current += 1;
+      workspaceRequest.current += 1;
+      setState(null);
+      setAuth({ authenticated: false });
+      setAuthLoadError(false);
+      setWorkspaceLoadError(false);
+      setFenrirRole(null);
+      window.history.replaceState({}, "", "/login");
+      setNotice(c.signedOut);
+    } catch {
+      setSignOutError(true);
+      setNotice(recoveryCopy[locale].signOutError);
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   function addPersonalLink() {
@@ -4609,9 +4732,11 @@ function AuthGate({
   const [enabledProviders, setEnabledProviders] = useState<
     AuthProvider[] | null
   >(null);
+  const [providerAttempt, setProviderAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setEnabledProviders(null);
     void friskyClientAuthEngine
       .enabledProviders()
       .then((providers) => active && setEnabledProviders(providers))
@@ -4619,7 +4744,7 @@ function AuthGate({
     return () => {
       active = false;
     };
-  }, []);
+  }, [providerAttempt]);
   const onHumanVerified = useCallback((verified: boolean) => {
     setHumanVerified(verified);
     if (!verified) return;
@@ -4627,8 +4752,8 @@ function AuthGate({
     void authService.me().then((result) => {
       if (result.data.authenticated)
         window.location.assign(postLoginDestination());
-    });
-  }, []);
+    }).catch(() => setAuthNote(recoveryCopy[locale].session));
+  }, [locale]);
 
   async function signInWithProvider(provider: AuthProvider) {
     setAuthNote(null);
@@ -4682,9 +4807,12 @@ function AuthGate({
                 <small className="muted">Checking available sign-in…</small>
               ) : null}
               {enabledProviders?.length === 0 ? (
-                <small className="muted">
-                  No OAuth provider is available right now.
-                </small>
+                <>
+                  <small className="muted">{recoveryCopy[locale].providers}</small>
+                  <button type="button" className="secondary" onClick={() => setProviderAttempt((attempt) => attempt + 1)}>
+                    {recoveryCopy[locale].retry}
+                  </button>
+                </>
               ) : null}
             </div>
 

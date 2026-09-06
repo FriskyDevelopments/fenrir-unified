@@ -44,7 +44,12 @@ export function computeReadiness(
   const supabaseConfigured = nonEmpty(env.SUPABASE_URL) && nonEmpty(env.SUPABASE_ANON_KEY);
   const directGoogle = nonEmpty(env.GOOGLE_CLIENT_ID) && nonEmpty(env.GOOGLE_CLIENT_SECRET);
   const directMicrosoft = nonEmpty(env.MICROSOFT_CLIENT_ID) && nonEmpty(env.MICROSOFT_CLIENT_SECRET);
-  const directApple = nonEmpty(env.APPLE_CLIENT_ID) && nonEmpty(env.APPLE_TEAM_ID) && nonEmpty(env.APPLE_KEY_ID) && nonEmpty(env.APPLE_PRIVATE_KEY);
+  const directApple =
+    nonEmpty(env.APPLE_CLIENT_ID) &&
+    nonEmpty(env.APPLE_TEAM_ID) &&
+    nonEmpty(env.APPLE_KEY_ID) &&
+    nonEmpty(env.APPLE_PRIVATE_KEY) &&
+    nonEmpty(env.APPLE_CLIENT_SECRET);
 
   const auth = {
     googleConfigured: directGoogle || (supabaseConfigured && enabled(env.FENRIR_GOOGLE_OAUTH_CONFIGURED)),
