@@ -62,11 +62,9 @@ function createSupabaseClient() {
       fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
     },
     auth: {
-      // Sesión compartida con el resto de *.myfenrir.com: quien ya entró en
-      // myfenrir.com llega aquí autenticado. Una sola sesión en cookie de
-      // dominio (ver shared-session.ts) — nunca dos copias del refresh token,
-      // porque Supabase lo rota y las copias se invalidan entre sí.
-      // Nunca sessionStorage: cerrar la pestaña no debe desloguear al operador.
+      // Community owns a namespaced session in this origin's localStorage.
+      // The adapter never imports or publishes parent-domain auth cookies.
+      // Keep persistence across tabs/visits without adopting MyFenrir identity.
       storage: typeof window !== "undefined" ? sharedSessionStorage : undefined,
       storageKey: sharedStorageKey(SUPABASE_URL),
       persistSession: true,

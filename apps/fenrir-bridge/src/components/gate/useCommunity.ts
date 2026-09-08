@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useBrandTheme, type BrandKey } from "./useBrandTheme";
+import { useBrandTheme } from "./useBrandTheme";
+import type { BrandKey } from "../../theme/brandThemes";
 
 export type CommunityConfig = {
   slug: string;

@@ -90,6 +90,13 @@ test("availableCommunityAuthProviders reflects bound credentials", () => {
     APPLE_PRIVATE_KEY: "x"
   }));
   assert.deepEqual(allThree, ["magic_link", "google", "microsoft", "apple"]);
+  assert.deepEqual(availableCommunityAuthProviders(testEnv({
+    APPLE_CLIENT_ID: "x",
+    APPLE_TEAM_ID: "x",
+    APPLE_KEY_ID: "x",
+    APPLE_PRIVATE_KEY: "x",
+    APPLE_CLIENT_SECRET: undefined,
+  })), ["magic_link", "google", "apple"]);
 });
 
 test("transaction cookie round-trips the community slug", async () => {

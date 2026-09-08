@@ -1,6 +1,7 @@
+import { communityLoginPath } from "@/lib/canonical-auth";
 import { getSiteUrl } from "@/config/site-url";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { GatePreview } from "@/components/gate/gate-preview";
 import { GateShare } from "@/components/gate/gate-share";
@@ -10,7 +11,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { createGateTelegramHandoff, getPublicGate } from "@/lib/gate.functions";
 import { GATE_UNAVAILABLE_MESSAGE, isGateUnavailableError } from "@/lib/gate-availability";
 // Copy del Gate: una sola fuente en src/i18n, ya no una isla local.
-import { detectLocale, LOCALE_NAMES, LOCALES, type Locale } from "@/i18n/locale";
+import {
+  DEFAULT_LOCALE,
+  detectLocale,
+  rememberLocale,
+  LOCALE_NAMES,
+  LOCALES,
+  type Locale,
+} from "@/i18n/locale";
 import { gateCopy, type GateCopy } from "@/i18n/gate";
 import {
   requestGateAccess,
@@ -35,14 +43,7 @@ function gateReturnPath(slug: string) {
 }
 
 function communitySsoUrl(slug: string, brandId: string) {
-  const url = new URL("https://www.myfenrir.com/api/auth/community-sso");
-  url.searchParams.set("next", `https://communities.myfenrir.com${gateReturnPath(slug)}`);
-  url.searchParams.set("brand", brandId);
-  // The Gate is the public source of the community's visual identity. Carry
-  // its slug separately so the login surface can resolve that identity again
-  // instead of falling back to a generic platform card.
-  url.searchParams.set("gate", slug);
-  return url.toString();
+  return communityLoginPath({ nextPath: gateReturnPath(slug), brandId, gateSlug: slug });
 }
 
 export const Route = createFileRoute("/g/$slug")({
@@ -176,10 +177,18 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
   const createTelegramHandoff = useServerFn(createGateTelegramHandoff);
   const requestAccess = useServerFn(requestGateAccess);
   const runSecurityPreflight = useServerFn(runGateSecurityPreflight);
-  const [locale, setLocale] = useState<Locale>(detectLocale);
+  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
+  useEffect(() => {
+    setLocale(detectLocale());
+  }, []);
   const [handoffPending, setHandoffPending] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [accessRequested, setAccessRequested] = useState(false);
+  // La UI prometía "Confirmation sent" siempre. sendGateConfirmationEmail
+  // devuelve false en silencio si la identidad de Telegram no trae correo o si
+  // MYFENRIR_EMAILS_URL no está configurada (access.functions.ts:109-111), así
+  // que sólo prometemos el correo cuando el envío lo confirmó.
+  const [emailSent, setEmailSent] = useState(false);
   const [securityPreflight, setSecurityPreflight] = useState<GateSecurityPreflight | null>(null);
   const [gateOutcome, setGateOutcome] = useState<
     "granted" | "review" | "pending" | "blocked" | null
@@ -192,7 +201,18 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
   const ssoHref = communitySsoUrl(params.slug, config.brand_id);
   // A visitor starts with MyFenrir SSO. Once SSO has returned a session, the
   // Gate runs its security preflight instead of bouncing back to SSO.
-  const needsSso = checkingAccess || !session;
+  // "Todavía no sé" NO es "hace falta iniciar sesión".
+  //
+  // Antes esto era `checkingAccess || !session`, así que durante la ventana de
+  // carga el botón se pintaba como "Continue to SSO" CON su enlace vivo. Quien
+  // lo pulsaba en ese momento —y es el instante en que más se pulsa, porque es
+  // lo primero que aparece— iba al SSO, que veía una sesión ya válida y lo
+  // devolvía a /gates. Un botón que te deja donde estabas es un botón roto a
+  // ojos de cualquiera, aunque cada salto por separado sea correcto.
+  //
+  // Ahora sólo es `needsSso` cuando de verdad NO hay sesión. Mientras se
+  // comprueba, `checkingAccess` deja el botón en un estado neutro y sin enlace.
+  const needsSso = !checkingAccess && !session;
   // `isStaff` can hydrate from a cached role result before an SSO session is
   // available. Public visitors must never see the internal Gates shortcut in
   // that transient state; it strands them at a second login wall instead of
@@ -209,6 +229,7 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
       const { token } = await createTelegramHandoff({ data: { slug: params.slug } });
       window.location.assign(telegramDeepLink(token));
     } catch (error) {
+      setGateOutcome(null);
       setHandoffError(
         error instanceof Error ? error.message : "Could not start the secure Telegram handoff.",
       );
@@ -235,10 +256,12 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
       if (preflight.status === "review") {
         const result = await requestAccess({ data: { slug: params.slug } });
         setAccessRequested(true);
+        setEmailSent(result.emailSent === true);
         setGateOutcome(result.status === "granted" ? "granted" : "review");
         return;
       }
       const result = await requestAccess({ data: { slug: params.slug } });
+      setEmailSent(result.emailSent === true);
       setGateOutcome(
         result.status === "granted"
           ? "granted"
@@ -300,14 +323,23 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
               ? explainSetupPending
               : undefined
         }
-        actionPending={handoffPending}
+        actionPending={checkingAccess || handoffPending}
       />
-      <GateLanguageSwitcher locale={locale} onChange={setLocale} />
+      {/* Elegir idioma aquí SÍ es una preferencia explícita: se recuerda, y es
+          lo que hace que el fallback a inglés no sea una jaula. */}
+      <GateLanguageSwitcher
+        locale={locale}
+        onChange={(next) => {
+          rememberLocale(next);
+          setLocale(next);
+        }}
+      />
       {securityPreflight ? <GateSecurityPanel preflight={securityPreflight} copy={copy} /> : null}
       {gateOutcome ? (
         <GateOutcomeCelebration
           outcome={gateOutcome}
           email={session?.user.email ?? null}
+          emailSent={emailSent}
           copy={copy}
         />
       ) : null}
@@ -321,10 +353,12 @@ function PublicGatePage({ config }: { config: ReturnType<typeof Route.useLoaderD
 function GateOutcomeCelebration({
   outcome,
   email,
+  emailSent,
   copy,
 }: {
   outcome: "granted" | "review" | "pending" | "blocked";
   email: string | null;
+  emailSent: boolean;
   copy: GateCopy;
 }) {
   const outcomeCopy =
@@ -347,10 +381,13 @@ function GateOutcomeCelebration({
         </p>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight">{outcomeCopy.title}</h2>
         <p className="mt-2 text-sm leading-relaxed text-white/68">{outcomeCopy.body}</p>
-        {email ? (
+        {/* Sólo se nombra el correo cuando el servidor confirmó el envío. */}
+        {emailSent && email ? (
           <p className="mt-3 text-xs text-white/42">
             {copy.emailPrefix}: {email}
           </p>
+        ) : outcome !== "blocked" ? (
+          <p className="mt-3 text-xs text-white/42">{copy.emailNotSent}</p>
         ) : null}
       </div>
     </aside>
@@ -364,20 +401,40 @@ function GateSecurityPanel({
   preflight: GateSecurityPreflight;
   copy: GateCopy;
 }) {
+  // Se ve el PROGRESO, no el criterio. Etapas genéricas con etiqueta puesta
+  // aquí desde i18n —el servidor sólo manda la `key`—, así que nunca sale el
+  // nombre real de un control ni qué señal concreta falló. La pantalla de
+  // seguridad infantil va absorbida en "safety" y no se nombra ni se insinúa.
+  // El desglose real vive en decision_note y sólo lo ve el owner en /access.
+  const STAGE_LABEL: Record<(typeof preflight.stages)[number]["key"], string> = {
+    identity: copy.stageIdentity,
+    safety: copy.stageSafety,
+  };
+  const STATUS_LABEL = {
+    pass: copy.stagePass,
+    review: copy.stageReview,
+    blocked: copy.stageBlocked,
+  } as const;
+  const STATUS_TONE = {
+    pass: "text-emerald-300",
+    review: "text-amber-300",
+    blocked: "text-rose-300",
+  } as const;
+
   return (
     <aside className="absolute inset-x-0 bottom-24 z-10 mx-auto w-[min(92vw,430px)] rounded-3xl border border-white/12 bg-black/70 p-4 text-white shadow-2xl backdrop-blur-xl">
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/45">
         {copy.securityComplete}
       </p>
       <div className="mt-3 grid gap-2">
-        {preflight.checks.map((check) => (
+        {preflight.stages.map((stage) => (
           <div
-            key={check.key}
+            key={stage.key}
             className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs"
           >
-            <span>{check.label}</span>
-            <span className="font-mono uppercase tracking-[0.16em] text-white/60">
-              {check.status}
+            <span>{STAGE_LABEL[stage.key]}</span>
+            <span className={`font-mono uppercase tracking-[0.16em] ${STATUS_TONE[stage.status]}`}>
+              {STATUS_LABEL[stage.status]}
             </span>
           </div>
         ))}

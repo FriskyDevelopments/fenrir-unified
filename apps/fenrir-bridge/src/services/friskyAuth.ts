@@ -1,4 +1,5 @@
 import { createFriskyAuthClient, type FriskySocialProvider } from "@frisky/auth/client";
+import { isSafeRedirectPath } from "./supabaseAuth";
 
 export type AppAuthProvider = FriskySocialProvider;
 
@@ -9,7 +10,7 @@ export type AppAuthProvider = FriskySocialProvider;
  */
 function safeReturnPath() {
   const requested = new URLSearchParams(window.location.search).get("next");
-  if (requested?.startsWith("/") && !requested.startsWith("//")) return requested;
+  if (isSafeRedirectPath(requested)) return requested as string;
   return "/main";
 }
 

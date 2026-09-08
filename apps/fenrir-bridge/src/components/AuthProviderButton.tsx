@@ -7,10 +7,17 @@ type AuthProviderButtonProps = {
   disabled?: boolean;
 };
 
-export function AuthProviderButton({ provider, label, onClick, disabled = false }: AuthProviderButtonProps) {
+export function AuthProviderButton({
+  provider,
+  label,
+  onClick,
+  disabled = false,
+}: AuthProviderButtonProps) {
   return (
     <button
-      className={`auth-provider-button ${provider}-auth-button ${provider === "microsoft" ? "secondary" : ""}`.trim()}
+      className={`auth-provider-button ${provider}-auth-button ${
+        provider === "microsoft" ? "secondary" : ""
+      }`.trim()}
       type="button"
       onClick={onClick}
       disabled={disabled}
@@ -37,6 +44,16 @@ export function AuthProviderIcon({ provider }: { provider: AuthProvider }) {
         <span />
         <span />
         <span />
+      </span>
+    );
+  }
+
+  if (provider === "authentik") {
+    return (
+      <span className="provider-icon authentik-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" role="img">
+          <path d="M12 2 3 6.5v11L12 22l9-4.5v-11L12 2Zm0 2.2 6.6 3.3v8L12 18.8 5.4 15.5v-8L12 4.2Zm0 3.3-4 6.9h2.4l.7-1.3h2.8l.7 1.3H17L12 7.5Zm0 2.2.9 1.6h-1.8L12 9.7Z" />
+        </svg>
       </span>
     );
   }

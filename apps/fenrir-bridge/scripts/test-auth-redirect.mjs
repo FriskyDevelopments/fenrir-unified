@@ -11,6 +11,8 @@ const apiSource = readFileSync(join(root, "src/services/api.ts"), "utf8");
 const providersSource = readFileSync(join(root, "functions/api/auth/providers.ts"), "utf8");
 const appSource = readFileSync(join(root, "src/App.tsx"), "utf8");
 const routingSource = readFileSync(join(root, "src/app/routing.ts"), "utf8");
+const communityOAuthSource = readFileSync(join(root, "functions/_lib/community-oauth.ts"), "utf8");
+const communityMagicLinkSource = readFileSync(join(root, "functions/api/community-auth/magic-link/consume.ts"), "utf8");
 const workerIndex = readFileSync(join(root, "workers/fenrir-auth/src/index.js"), "utf8");
 const appCallbackPathMatcher = appSource.match(/function isAuthCallbackPath[\s\S]*?\n}/)?.[0] ?? "";
 const routingCallbackPathMatcher = routingSource.match(/export function isAuthCallbackPath[\s\S]*?\n}/)?.[0] ?? "";
@@ -83,7 +85,14 @@ const checks = [
       !routingCallbackPathMatcher.includes('normalizedPath === "/login"')
   },
   {
-    name: "SPA no longer completes Authentic/Supabase sessions",
+    name: "Community OAuth and magic links never mint a MyFenrir Supabase session",
+    pass: !communityOAuthSource.includes("supabase-shared-session") &&
+      !communityMagicLinkSource.includes("supabase-shared-session") &&
+      !communityOAuthSource.includes("sb-") &&
+      !communityMagicLinkSource.includes("sb-")
+  },
+  {
+    name: "SPA no longer completes Authentik/Supabase sessions",
     pass: !apiSource.includes("completeSupabaseSession") && !apiSource.includes("signOutSupabase")
   },
   {

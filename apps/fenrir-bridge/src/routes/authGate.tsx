@@ -10,10 +10,11 @@ import { managedDashboardPath, twoFactorHelpLinks } from "../app/shared";
 import { BrandSignature } from "./routeCommon";
 import { HumanVerificationGate } from "../components/HumanVerificationGate";
 import { loginPageErrorMessage } from "../services/authErrors";
+import { isSafeRedirectPath } from "../services/supabaseAuth";
 
-function postLoginDestination() {
+export function postLoginDestination() {
   const requested = new URLSearchParams(window.location.search).get("next");
-  return requested?.startsWith("/") && !requested.startsWith("//") ? requested : managedDashboardPath;
+  return isSafeRedirectPath(requested) ? requested as string : managedDashboardPath;
 }
 
 export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onLocale: (locale: Locale) => void }) {
@@ -38,8 +39,8 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
     setAuthNote(null);
     void authService.me().then((result) => {
       if (result.data.authenticated) window.location.assign(postLoginDestination());
-    });
-  }, []);
+    }).catch(() => setAuthNote(c.authProviderError));
+  }, [c.authProviderError]);
 
   async function signInWithProvider(provider: AuthProvider) {
     setAuthNote(null);

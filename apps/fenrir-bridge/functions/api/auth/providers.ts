@@ -3,7 +3,12 @@ import { friskyAuthEnabled } from "../../_lib/frisky-auth";
 import { noStoreJson } from "../../_lib/responses";
 import { appleConfigured, enabledSocialProviders } from "@frisky/auth";
 
-const CLIENT_AUTH_PROVIDERS = ["apple", "google", "microsoft"] as const satisfies readonly OAuthProvider[];
+// Legacy app login supports Google and Microsoft. Apple uses Better Auth;
+// the community OAuth flow has its own provider list. Authentik is retired.
+const CLIENT_AUTH_PROVIDERS = [
+  "google",
+  "microsoft",
+] as const satisfies readonly OAuthProvider[];
 
 /**
  * Reports the authentication capabilities available for the current environment.
@@ -22,7 +27,7 @@ export async function onRequestGet(context: { env: OAuthEnv & { FRISKY_AUTH_ENAB
       engine: betterAuthOn ? "better-auth" : "legacy-direct-oauth",
       identity: betterAuthOn ? "better-auth+neon-app_auth" : "legacy-direct-oauth",
       authentik: "retired",
-      appleLive: appleConfigured(context.env),
+      appleLive: betterAuthOn && appleConfigured(context.env),
       providers,
     },
     {
@@ -31,6 +36,6 @@ export async function onRequestGet(context: { env: OAuthEnv & { FRISKY_AUTH_ENAB
         // the same truthful provider list without receiving any credential.
         "Access-Control-Allow-Origin": "*",
       },
-    },
+    }
   );
 }

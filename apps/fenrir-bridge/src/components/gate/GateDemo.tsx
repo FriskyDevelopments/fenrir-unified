@@ -44,7 +44,7 @@ function DemoInner() {
           </div>
           <div className="gate-auth-pane">
             <div className="gate-auth-inner gate-card" style={{ padding: 24 }}>
-              <WolfMascot style={{ width: 120, marginBottom: 16 }} />
+              <WolfMascot className="w-[120px] mb-4" />
               <StatusBadge status="verified" label="demo live" />
             </div>
           </div>

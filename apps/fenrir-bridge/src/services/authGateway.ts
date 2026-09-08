@@ -1,6 +1,6 @@
 import { authService } from "./api";
 
-export type AuthProvider = "apple" | "google" | "microsoft";
+export type AuthProvider = "apple" | "google" | "microsoft" | "authentik";
 export type AuthMode = "frisky-client" | "fenrir-community";
 
 export type AuthEngine = {
@@ -20,7 +20,7 @@ export const friskyClientAuthEngine: AuthEngine = {
   },
   signInWithProvider(provider) {
     return authService.login(provider);
-  }
+  },
 };
 
 export const neonCommunityAuthEngine: AuthEngine = {
@@ -32,5 +32,5 @@ export const neonCommunityAuthEngine: AuthEngine = {
   },
   async signInWithProvider() {
     throw new Error("neon_magic_link_auth_only");
-  }
+  },
 };

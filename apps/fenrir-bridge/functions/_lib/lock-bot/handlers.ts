@@ -10,6 +10,7 @@
 
 import type { Locale } from "./locales.js";
 import { t } from "./locales.js";
+import { verifyDns, expectedToken, challengeRecord } from "./dns.js";
 import {
     createLock,
     getLock,
@@ -72,7 +73,7 @@ function getSession(chatId: number): Session {
 
 // ── HTML-safe escape ──────────────────────────────────────
 function esc(s: string): string {
-    return s.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">");
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 // ── Inline keyboard builders ──────────────────────────────
@@ -395,7 +396,6 @@ async function handleUpdateInner(
             s.flow = "verifying";
             s.pendingDomain = domain;
 
-            // Verifying...
             await tg(env, "sendMessage", {
                 chat_id: chatId,
                 parse_mode: "HTML",
@@ -403,9 +403,37 @@ async function handleUpdateInner(
                 reply_markup: disabledKb(t(s.locale, "verifying")),
             });
 
-            await sleep(1500);
+            // VERIFICACIÓN REAL. Antes aquí había `await sleep(1500)` y acto
+            // seguido un mensaje "✅ verificado": no sólo no se comprobaba nada,
+            // se le AFIRMABA al usuario que el dominio estaba verificado. Con
+            // eso cualquiera acuñaba un candado para un dominio ajeno.
+            const verdict = await verifyDns(domain, chatId, env.LOCK_BOT_DNS_SECRET);
+            if (!verdict.ok) {
+                s.flow = "create-input";
+                const record = challengeRecord(domain);
+                const detail =
+                    verdict.reason === "not_configured"
+                        ? "Domain verification is not configured on the server (LOCK_BOT_DNS_SECRET). No lock was created."
+                        : verdict.reason === "lookup_failed"
+                          ? "Could not reach DNS to check the record. This is not a rejection — please try again."
+                          : `No matching TXT record found at <code>${esc(record)}</code>.`;
+                const token =
+                    verdict.reason === "not_configured"
+                        ? null
+                        : await expectedToken(domain, chatId, env.LOCK_BOT_DNS_SECRET ?? "");
+                await tg(env, "sendMessage", {
+                    chat_id: chatId,
+                    parse_mode: "HTML",
+                    text:
+                        `⚠️ <b>${esc(domain)}</b> — not verified.\n\n${detail}` +
+                        (token
+                            ? `\n\nAdd this TXT record, then send the domain again:\n<code>${esc(record)}</code>\n<code>${esc(token)}</code>`
+                            : ""),
+                    reply_markup: backKb(s.locale),
+                });
+                return Response.json({ ok: true });
+            }
 
-            // Verified
             await tg(env, "sendMessage", {
                 chat_id: chatId,
                 parse_mode: "HTML",
@@ -414,7 +442,6 @@ async function handleUpdateInner(
             });
 
             s.flow = "creating";
-            await sleep(1000);
 
             // Create lock (persists to D1 or in-memory)
             const lock = await createLock(domain, chatId, env);
@@ -489,7 +516,11 @@ async function handleUpdateInner(
                 const lock = parsed.payload
                     ? await getLock(parsed.payload, env)
                     : undefined;
-                if (lock && !lock.revoked) {
+                // Acotado por dueno: getLock busca solo por id, asi que sin
+                // esta comprobacion cualquiera con un id ajeno se llevaba el
+                // codigo del candado de otro. Se responde igual que si no
+                // existiera: no se confirma que el id sea valido.
+                if (lock && !lock.revoked && lock.chatId === chatId) {
                     // Send the code as a new message (Telegram has no clipboard API)
                     await tg(env, "sendMessage", {
                         chat_id: chatId,
@@ -549,7 +580,7 @@ async function handleUpdateInner(
             case "confirm-revoke": {
                 const lockId = s.pendingDomain;
                 if (lockId) {
-                    const revoked = await revokeLock(lockId, env);
+                    const revoked = await revokeLock(lockId, chatId, env);
                     if (revoked) {
                         s.flow = "revoked";
                         await edit(revokedMsg(s.locale, revoked.domain), backKb(s.locale));

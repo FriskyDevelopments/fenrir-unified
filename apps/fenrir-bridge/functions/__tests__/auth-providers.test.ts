@@ -36,6 +36,58 @@ describe("public auth provider capabilities", () => {
     });
   });
 
+  it("keeps retired Authentik hidden despite leftover credentials and the old flag", async () => {
+    const response = await onRequestGet({
+      env: {
+        AUTHENTIK_ENABLED: "true",
+        AUTHENTIK_ISSUER: "https://authentik.example/application/o/fenrir/",
+        AUTHENTIK_CLIENT_ID: "old-client",
+        AUTHENTIK_CLIENT_SECRET: "old-secret",
+        GOOGLE_CLIENT_ID: "google-id",
+        GOOGLE_CLIENT_SECRET: "google-secret",
+      },
+    });
+
+    await expect(response.json()).resolves.toMatchObject({
+      authentik: "retired",
+      providers: ["google"],
+    });
+  });
+
+  it("does not advertise the retired direct-app Apple callback", async () => {
+    const response = await onRequestGet({
+      env: {
+        APPLE_CLIENT_ID: "apple-id",
+        APPLE_TEAM_ID: "apple-team",
+        APPLE_KEY_ID: "apple-key",
+        APPLE_PRIVATE_KEY: "community-p8",
+        APPLE_CLIENT_SECRET: "better-auth-secret",
+      },
+    });
+
+    await expect(response.json()).resolves.toMatchObject({
+      engine: "legacy-direct-oauth",
+      appleLive: false,
+      providers: [],
+    });
+  });
+
+  it("advertises Apple for Better Auth using its pre-signed client secret", async () => {
+    const response = await onRequestGet({
+      env: {
+        FRISKY_AUTH_ENABLED: "1",
+        APPLE_CLIENT_ID: "apple-id",
+        APPLE_CLIENT_SECRET: "better-auth-secret",
+      },
+    });
+
+    await expect(response.json()).resolves.toMatchObject({
+      engine: "better-auth",
+      appleLive: true,
+      providers: ["apple"],
+    });
+  });
+
   it("does not advertise Apple from community-gate p8 when Better Auth is on", async () => {
     const response = await onRequestGet({
       env: {

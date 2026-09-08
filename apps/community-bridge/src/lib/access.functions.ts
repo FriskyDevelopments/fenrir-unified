@@ -4,7 +4,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { neonSql } from "@/lib/neon.server";
 import { normalizeHandle, type HandleDecision } from "@/lib/username-guard.functions";
 
-const slug = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/);
+const slug = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/);
 const decision = z.enum(["pending", "granted", "denied", "revoked"]);
 
 export type GateAccessRequest = {
@@ -25,18 +29,34 @@ export type GateAccessOutcome = {
   emailSent?: boolean;
 };
 
+/**
+ * Lo ÚNICO que sale hacia el cliente es el veredicto agregado.
+ *
+ * Antes viajaban `checks[]` (con `label` y `status` por control) e `identity`.
+ * Eso le enseñaba a quien intenta colarse exactamente qué señales miramos y
+ * cuál falló —"Telegram photo signal: review"—, que es justo el mapa que
+ * necesita para evadirlas al siguiente intento; y en el caso de la pantalla de
+ * seguridad infantil, confirmaba su existencia y su comportamiento.
+ *
+ * El desglose NO desaparece: `gateSecuritySummary().note` se sigue guardando en
+ * `cb_gate_access_requests.decision_note` y el owner lo lee en /access. Detalle
+ * del lado del servidor, veredicto del lado del cliente.
+ */
+export type GateStageKey = "identity" | "safety";
+export type GateStageStatus = "pass" | "review" | "blocked";
+
 export type GateSecurityPreflight = {
   status: "ok" | "sso_required" | "review" | "blocked";
-  identity: {
-    telegramId: string | null;
-    telegramUsername: string | null;
-    telegramFirstName: string | null;
-  };
-  checks: Array<{
-    key: "username" | "photo" | "blacklist" | "cp";
-    label: string;
-    status: "pass" | "missing" | "review" | "blocked";
-  }>;
+  /**
+   * Progreso por ETAPA, no por control. El miembro ve que el Gate hace un
+   * trabajo serio y en qué punto va; nunca qué señal se examinó ni cuál falló.
+   *
+   * Sólo viaja la `key` —"identity" / "safety"—; la etiqueta legible la pone el
+   * cliente desde i18n/gate.ts, así que ningún nombre real de control sale de
+   * este proceso. `blacklist` y la pantalla de seguridad infantil quedan
+   * absorbidas dentro de "safety", que no las nombra ni las insinúa.
+   */
+  stages: Array<{ key: GateStageKey; status: GateStageStatus }>;
 };
 
 /**
@@ -93,7 +113,11 @@ async function gateSecuritySummary(identity: {
     handleDecision === "block" ? "blocked" : handleDecision === "review" ? "review" : "pass";
   const photoStatus = "review" as const;
   const overall: "blocked" | "review" | "ok" =
-    usernameStatus === "blocked" ? "blocked" : usernameStatus === "review" || photoStatus === "review" ? "review" : "ok";
+    usernameStatus === "blocked"
+      ? "blocked"
+      : usernameStatus === "review" || photoStatus === "review"
+        ? "review"
+        : "ok";
   const usernameLabel = telegramUsername ? `@${telegramUsername}` : "missing username";
   return {
     overall,
@@ -164,33 +188,34 @@ export const runGateSecurityPreflight = createServerFn({ method: "POST" })
       .eq("status", "linked")
       .maybeSingle();
 
-    if (error || !identity?.telegram_id) {
-      return {
-        status: "sso_required",
-        identity: { telegramId: null, telegramUsername: null, telegramFirstName: null },
-        checks: [
-          { key: "username", label: "Telegram username", status: "missing" },
-          { key: "photo", label: "Telegram photo signal", status: "missing" },
-          { key: "blacklist", label: "Blacklist screen", status: "missing" },
-          { key: "cp", label: "CP safety screen", status: "missing" },
-        ],
-      };
-    }
+    if (error) throw new Error("Could not check Gate access. Please try again.");
+    if (!identity?.telegram_id) return { status: "sso_required", stages: [] };
 
     const summary = await gateSecuritySummary(identity);
 
+    // Dos etapas genéricas. `identity` agrega las señales de la cuenta;
+    // `safety` agrega el resto —incluida la pantalla que no se nombra—. Un
+    // bloqueo manda a ambas a "blocked" para no señalar cuál disparó.
+    const identityStage: GateStageStatus =
+      summary.usernameStatus === "blocked"
+        ? "blocked"
+        : summary.usernameStatus === "review" || summary.photoStatus === "review"
+          ? "review"
+          : "pass";
+    const safetyStage: GateStageStatus =
+      summary.usernameStatus === "blocked"
+        ? "blocked"
+        : summary.usernameStatus === "review"
+          ? "review"
+          : "pass";
+
+    // `summary.note` (el desglose real por control) NO se devuelve: se persiste
+    // en decision_note desde requestGateAccess y sólo lo ve el owner en /access.
     return {
       status: summary.overall,
-      identity: {
-        telegramId: String(identity.telegram_id),
-        telegramUsername: identity.telegram_username ?? null,
-        telegramFirstName: identity.telegram_first_name ?? null,
-      },
-      checks: [
-        { key: "username", label: "Telegram username", status: summary.usernameStatus },
-        { key: "photo", label: "Telegram photo signal", status: summary.photoStatus },
-        { key: "blacklist", label: "Blacklist screen", status: summary.usernameStatus },
-        { key: "cp", label: "CP safety screen", status: summary.usernameStatus },
+      stages: [
+        { key: "identity", status: identityStage },
+        { key: "safety", status: safetyStage },
       ],
     };
   });
@@ -229,17 +254,20 @@ export const requestGateAccess = createServerFn({ method: "POST" })
       .eq("status", "linked")
       .maybeSingle();
     if (error || !identity?.telegram_id) {
-      throw new Error("Telegram identity missing from this SSO session. Return from Telegram and continue through the Gate.");
+      throw new Error(
+        "Telegram identity missing from this SSO session. Return from Telegram and continue through the Gate.",
+      );
     }
     const sql = neonSql();
-    const gates = await sql`
+    const gates = (await sql`
       select id, user_id, community_id from cb_gate_configs
       where slug = ${data.slug} and community_id is not null limit 1
-    ` as Array<{ id: string; user_id: string; community_id: string }>;
+    `) as Array<{ id: string; user_id: string; community_id: string }>;
     const gate = gates[0];
     if (!gate) throw new Error("This Gate is not ready for access requests.");
     const summary = await gateSecuritySummary(identity);
-    if (summary.overall === "blocked") throw new Error("Access blocked by the Gate security screen.");
+    if (summary.overall === "blocked")
+      throw new Error("Access blocked by the Gate security screen.");
     if (gate.user_id === context.userId) {
       const emailSent = await sendGateConfirmationEmail({
         to: applicantEmail(context.claims),
@@ -249,7 +277,7 @@ export const requestGateAccess = createServerFn({ method: "POST" })
       });
       return { status: "granted" as const, owner: true, emailSent };
     }
-    const rows = await sql`
+    const rows = (await sql`
       insert into cb_gate_access_requests (
         gate_id, owner_id, community_id, applicant_id, telegram_user_id, applicant_email, applicant_name, decision_note
       ) values (
@@ -265,7 +293,7 @@ export const requestGateAccess = createServerFn({ method: "POST" })
         end,
         updated_at = now()
       returning status
-    ` as Array<{ status: GateAccessRequest["status"] }>;
+    `) as Array<{ status: GateAccessRequest["status"] }>;
     const status = rows[0]!.status;
     const emailSent = await sendGateConfirmationEmail({
       to: applicantEmail(context.claims),
@@ -281,7 +309,7 @@ export const listMyGateAccessRequests = createServerFn({ method: "GET" })
   .validator(() => undefined)
   .handler(async ({ context }): Promise<GateAccessRequest[]> => {
     const sql = neonSql();
-    const rows = await sql`
+    const rows = (await sql`
       select r.id, g.slug as gate_slug, coalesce(d.display_name, r.community_id) as community_label,
         r.applicant_email, r.applicant_name, r.telegram_user_id, r.decision_note, r.status, r.requested_at
       from cb_gate_access_requests r
@@ -290,23 +318,36 @@ export const listMyGateAccessRequests = createServerFn({ method: "GET" })
         on d.user_id = g.user_id and d.community_id = r.community_id and d.provider = 'telegram' and d.status = 'verified'
       order by case r.status when 'pending' then 0 else 1 end, r.requested_at asc
       limit 100
-    ` as GateAccessRequest[];
+    `) as GateAccessRequest[];
     return rows.map((row) => ({ ...row, requested_at: new Date(row.requested_at).toISOString() }));
   });
 
 /** Owner-scoped and auditable; granting permits the applicant's next signed handoff. */
 export const decideGateAccessRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data) => z.object({ id: z.string().uuid(), status: decision, note: z.string().trim().max(500).optional() }).parse(data))
+  .validator((data) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        status: decision,
+        note: z.string().trim().max(500).optional(),
+      })
+      .parse(data),
+  )
   .handler(async ({ context, data }) => {
     const sql = neonSql();
-    const rows = await sql`
+    const rows = (await sql`
       update cb_gate_access_requests r set status = ${data.status}, decided_by = ${context.userId}::uuid,
         decided_at = now(), decision_note = ${data.note ?? null}, updated_at = now()
       from cb_gate_configs g
       where r.id = ${data.id}::uuid and r.gate_id = g.id and g.user_id = ${context.userId}::uuid
       returning r.id, r.status, r.applicant_email, g.slug as gate_slug
-    ` as Array<{ id: string; status: GateAccessRequest["status"]; applicant_email: string | null; gate_slug: string }>;
+    `) as Array<{
+      id: string;
+      status: GateAccessRequest["status"];
+      applicant_email: string | null;
+      gate_slug: string;
+    }>;
     if (!rows[0]) throw new Error("Access request not found for this Gate.");
     await sendGateConfirmationEmail({
       to: rows[0].applicant_email,

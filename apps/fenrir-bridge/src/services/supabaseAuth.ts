@@ -4,7 +4,7 @@
 // únicamente se invoca en flujos de auth (login / callback / logout). Así la
 // landing no paga el peso de supabase-js hasta que el usuario interactúa.
 import type { Provider, SupabaseClient } from "@supabase/supabase-js";
-import { sharedSessionStorage, sharedStorageKey } from "./sharedSession";
+import { fetchWithTimeout, withDeadline } from "./request";
 
 type AuthProvider = "google" | "microsoft" | "apple";
 
@@ -18,6 +18,10 @@ const authRedirectOrigin = (import.meta.env.VITE_AUTH_REDIRECT_ORIGIN ?? "https:
 const authRedirectPath = (import.meta.env.VITE_AUTH_REDIRECT_PATH ?? "/auth/callback").trim();
 const fenrirManagedUrl = (import.meta.env.VITE_FENRIR_MANAGED_URL ?? "/main").trim();
 const postAuthDestinationKey = "fenrir_post_auth_destination";
+const signedOutKey = "fenrir_auth_signed_out";
+function sessionStorageKey() {
+  return `sb-${new URL(supabaseUrl).hostname.split(".")[0]}-auth-token`;
+}
 const humanVerificationRequired = "human_verification_required";
 
 function sanitizeRedirectPath(path: string) {
@@ -36,6 +40,8 @@ function configuredRedirectTarget() {
 }
 
 let client: SupabaseClient | null = null;
+let sessionGeneration = 0;
+const pendingSessionRequests = new Set<AbortController>();
 
 export function isSupabaseAuthConfigured() {
   return Boolean(
@@ -69,17 +75,24 @@ function fallbackPostAuthDestination() {
   }
 }
 
-function isSafeRedirectPath(path: string | null) {
-  if (!path || !path.startsWith("/") || path.startsWith("//")) return false;
-  const pathname = path.split(/[?#]/, 1)[0] || "/";
-  return !isAuthCallbackPath(pathname);
+export function isSafeRedirectPath(path: string | null) {
+  if (!path || !path.startsWith("/") || path.startsWith("//") || /[\\\r\n]/.test(path)) return false;
+  const destination = new URL(path, window.location.origin);
+  if (destination.origin !== window.location.origin) return false;
+  const pathname = destination.pathname.replace(/\/+$/, "") || "/";
+  const authRoute = (
+    pathname === "/auth" || pathname.startsWith("/auth/") ||
+    pathname === "/api/frisky-auth" || pathname.startsWith("/api/frisky-auth/") ||
+    pathname === "/api/auth" || pathname.startsWith("/api/auth/")
+  ) && pathname !== "/api/auth/community-sso";
+  return pathname !== "/login" && !authRoute && !isAuthCallbackPath(pathname);
 }
 
 function currentPostAuthDestination() {
   const requested = new URLSearchParams(window.location.search).get("next");
   if (isSafeRedirectPath(requested)) return requested as string;
-  const destination = window.location.pathname;
-  return destination === "/" || !isSafeRedirectPath(destination) ? fallbackPostAuthDestination() : destination;
+  const destination = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  return window.location.pathname === "/" || !isSafeRedirectPath(destination) ? fallbackPostAuthDestination() : destination;
 }
 
 function rememberPostAuthDestination() {
@@ -107,36 +120,41 @@ function callbackDestinationPath(pathname: string, hasCallbackParams = false) {
 }
 
 export async function signInWithSupabase(providerName: AuthProvider) {
-  const supabase = await supabaseClient();
+  try { window.localStorage.removeItem(signedOutKey); } catch { /* Storage can be unavailable. */ }
+  const supabase = await withDeadline(supabaseClient());
   rememberPostAuthDestination();
-  const { error } = await supabase.auth.signInWithOAuth({
+  const { error } = await withDeadline(supabase.auth.signInWithOAuth({
     provider: supabaseProvider(providerName),
     options: {
       redirectTo: configuredRedirectTarget(),
       scopes: providerName === "microsoft" ? "email profile" : undefined
     }
-  });
+  }));
   if (error) throw error;
 }
 
 export async function completeSupabaseSession() {
   if (!isSupabaseAuthConfigured()) return false;
+  const generation = sessionGeneration;
   const params = parseSupabaseCallbackParams();
+  // A failed remote sign-out must never silently restore a session on return.
+  try {
+    if (!params.hasCallbackParams && window.localStorage.getItem(signedOutKey)) return false;
+  } catch { /* Continue with the provider's own storage handling. */ }
 
   if (params.error) {
     const detail = params.errorDescription?.trim();
     const errorKey = params.error === "access_denied" ? "oauth_access_denied" : "oauth_callback_error";
     setAuthCallbackError(`${errorKey}${detail ? `:${encodeURIComponent(detail)}` : ""}`);
-    clearCallbackParameters(params.hasCallbackParams);
     return false;
   }
 
-  const supabase = await supabaseClient();
+  const supabase = await withDeadline(supabaseClient());
   const code = params.code;
 
   if (code) {
     try {
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      const { error } = await withDeadline(supabase.auth.exchangeCodeForSession(code));
       if (error) throw error;
     } catch (error) {
       setAuthCallbackError(`code_exchange_failed:${encodeURIComponent(error instanceof Error ? error.message : "exchange_failed")}`);
@@ -144,20 +162,41 @@ export async function completeSupabaseSession() {
     }
   }
 
-  const { data, error } = await supabase.auth.getSession();
+  const { data, error } = await withDeadline(supabase.auth.getSession());
   if (error) {
     setAuthCallbackError(`session_lookup_failed:${encodeURIComponent(error.message)}`);
     return false;
   }
   const accessToken = data.session?.access_token;
-  if (!accessToken) return false;
+  if (!accessToken) {
+    if (params.hasCallbackParams || isAuthCallbackPath(window.location.pathname)) {
+      setAuthCallbackError("session_lookup_failed:missing_session");
+    }
+    return false;
+  }
+  // A lookup started before sign-out must not mint a fresh server cookie later.
+  if (generation !== sessionGeneration) return false;
 
-  const response = await fetch("/api/auth/supabase-session", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ accessToken })
-  });
+  const controller = new AbortController();
+  pendingSessionRequests.add(controller);
+  let response: Response;
+  try {
+    response = await fetchWithTimeout("/api/auth/supabase-session", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    // Logout intentionally aborts requests from the previous session generation.
+    if (generation !== sessionGeneration) return false;
+    setAuthCallbackError(`supabase_session_failed:${encodeURIComponent(error instanceof Error ? error.message : "request_failed")}`);
+    return false;
+  } finally {
+    pendingSessionRequests.delete(controller);
+  }
+  if (generation !== sessionGeneration) return false;
   if (!response.ok) {
     const responseError = await readResponseError(response);
     if (response.status === 403 && responseError === humanVerificationRequired) {
@@ -176,17 +215,37 @@ export async function completeSupabaseSession() {
   if (params.hasCallbackParams || isAuthCallbackPath(window.location.pathname)) {
     clearCallbackParameters(params.hasCallbackParams);
   }
+  try { window.localStorage.removeItem(signedOutKey); } catch { /* Storage can be unavailable. */ }
   return true;
 }
 
 export async function signOutSupabase() {
   if (!isSupabaseAuthConfigured()) return;
+  sessionGeneration += 1;
+  for (const request of pendingSessionRequests) request.abort();
+  pendingSessionRequests.clear();
   try {
     window.localStorage.removeItem(postAuthDestinationKey);
+    window.localStorage.setItem(signedOutKey, "1");
   } catch {
     // Ignore storage cleanup failures.
   }
-  await (await supabaseClient()).auth.signOut();
+  try {
+    const supabase = await withDeadline(supabaseClient());
+    const { error } = await withDeadline(supabase.auth.signOut({ scope: "local" }));
+    if (error) throw error;
+  } finally {
+    // Supabase can retain its persisted session when remote revocation fails.
+    // Always remove this origin's credentials; Community owns separate storage.
+    if (client) void client.auth.stopAutoRefresh().catch(() => undefined);
+    client = null;
+    try {
+      const authStorageKey = sessionStorageKey();
+      for (const key of [authStorageKey, `${authStorageKey}-code-verifier`, `${authStorageKey}-user`]) {
+        window.localStorage.removeItem(key);
+      }
+    } catch { /* The signed-out marker still prevents automatic restoration. */ }
+  }
 }
 
 async function supabaseClient() {
@@ -197,14 +256,13 @@ async function supabaseClient() {
   // Carga diferida de supabase-js: sale del chunk inicial y sólo se descarga
   // cuando de verdad se necesita un cliente (login/callback/logout).
   const { createClient } = await import("@supabase/supabase-js");
-  // La sesión se guarda en una cookie de `.myfenrir.com` para que valga en
-  // todas las superficies (communities.myfenrir.com incluida) — ver
-  // services/sharedSession.ts. La clave es la que Supabase usa por defecto,
-  // así que las sesiones ya abiertas en localStorage se adoptan sin re-login.
+  // Main MyFenrir owns this browser session. Community Bridge intentionally
+  // keeps a distinct identity boundary and therefore must not receive this
+  // token through a parent-domain cookie.
   client ??= createClient(supabaseUrl, supabaseAnonKey, {
+    global: { fetch: fetchWithTimeout },
     auth: {
-      storage: sharedSessionStorage,
-      storageKey: sharedStorageKey(supabaseUrl),
+      storageKey: sessionStorageKey(),
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true
@@ -238,26 +296,27 @@ function hasSupabaseCallbackParams(params: URLSearchParams) {
 
 function clearCallbackParameters(hasCallbackParams = false) {
   const destinationPath = callbackDestinationPath(window.location.pathname, hasCallbackParams);
-  const nextParams = new URLSearchParams(window.location.search);
+  const destination = new URL(destinationPath, window.location.origin);
+  const nextParams = new URLSearchParams(destination.search);
+  for (const [key, value] of new URLSearchParams(window.location.search)) nextParams.set(key, value);
   for (const key of callbackParameterKeys) {
     nextParams.delete(key);
   }
   const nextSearch = nextParams.toString();
-  const target = `${destinationPath}${nextSearch ? `?${nextSearch}` : ""}`;
+  const target = `${destination.pathname}${nextSearch ? `?${nextSearch}` : ""}${destination.hash}`;
   window.history.replaceState({}, "", target);
 }
 
 function setAuthCallbackError(code: string) {
   const params = parseSupabaseCallbackParams();
   const destinationPath = callbackDestinationPath(window.location.pathname, params.hasCallbackParams);
-  const nextParams = new URLSearchParams(window.location.search);
+  const destination = new URL(destinationPath, window.location.origin);
+  const nextParams = new URLSearchParams(destination.search);
+  for (const [key, value] of new URLSearchParams(window.location.search)) nextParams.set(key, value);
+  for (const key of callbackParameterKeys) nextParams.delete(key);
   nextParams.set("auth_error", code);
   const nextSearch = nextParams.toString();
-  if (destinationPath === "/") {
-    window.history.replaceState({}, "", `/?${nextSearch}`);
-    return;
-  }
-  window.history.replaceState({}, "", `${destinationPath}${nextSearch ? `?${nextSearch}` : ""}`);
+  window.history.replaceState({}, "", `${destination.pathname}${nextSearch ? `?${nextSearch}` : ""}${destination.hash}`);
 }
 
 function clearDeferredVerificationError() {
@@ -272,6 +331,6 @@ function clearDeferredVerificationError() {
 const callbackParameterKeys = ["code", "error", "error_description", "state", "scope", "access_token", "id_token", "refresh_token", "token_type", "expires_in"];
 
 async function readResponseError(response: Response) {
-  const body = await response.json().catch(() => null) as { error?: string } | null;
+  const body = await withDeadline(response.json()).catch(() => null) as { error?: string } | null;
   return body?.error ?? `session_error_${response.status}`;
 }

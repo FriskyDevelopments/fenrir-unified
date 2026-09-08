@@ -1,4 +1,4 @@
-import type { OAuthEnv } from "./oauth";
+import { isDirectOAuthAvailable, type OAuthEnv } from "./oauth";
 
 function nonEmpty(value: string | undefined): boolean {
   return typeof value === "string" && value.trim().length > 0;
@@ -43,7 +43,8 @@ export function computeReadiness(
 ): ReadinessSnapshot {
   const directGoogle = nonEmpty(env.GOOGLE_CLIENT_ID) && nonEmpty(env.GOOGLE_CLIENT_SECRET);
   const directMicrosoft = nonEmpty(env.MICROSOFT_CLIENT_ID) && nonEmpty(env.MICROSOFT_CLIENT_SECRET);
-  const directApple = nonEmpty(env.APPLE_CLIENT_ID) && nonEmpty(env.APPLE_TEAM_ID) && nonEmpty(env.APPLE_KEY_ID) && nonEmpty(env.APPLE_PRIVATE_KEY);
+  // Community OAuth signs the Apple client secret from the p8 at exchange time.
+  const directApple = isDirectOAuthAvailable("apple", env);
 
   const auth = {
     googleConfigured: directGoogle,

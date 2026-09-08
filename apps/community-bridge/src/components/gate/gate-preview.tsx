@@ -1,3 +1,4 @@
+import { communityLoginPath } from "@/lib/canonical-auth";
 import { Crown, Flame, Ghost, PawPrint, ShieldCheck, Sparkles, Waves } from "lucide-react";
 import { GateAccessMotion } from "@/components/gate/gate-access-motion";
 import { cn } from "@/lib/utils";
@@ -10,18 +11,11 @@ import {
 } from "@/lib/gate-presets";
 
 function gateLoginHref(slug?: string, brandId?: string) {
-  const next = slug ? `/g/${encodeURIComponent(slug)}` : "/";
-  const ssoNext = `https://communities.myfenrir.com${next}`;
-  const sso = new URL("https://www.myfenrir.com/api/auth/community-sso");
-  sso.searchParams.set("next", ssoNext);
-  if (brandId) sso.searchParams.set("brand", brandId);
-
-  if (typeof window === "undefined") {
-    return sso.toString();
-  }
-
-  sso.searchParams.set("next", `${window.location.origin}${next}`);
-  return sso.toString();
+  return communityLoginPath({
+    nextPath: slug ? `/g/${encodeURIComponent(slug)}` : "/dashboard",
+    brandId,
+    gateSlug: slug,
+  });
 }
 
 const MASCOT_ICONS = {
@@ -187,8 +181,19 @@ export function GatePreview({
 
         {!compact ? (
           <a
-            href={actionHref ?? (onAction ? "#telegram-handoff" : gateLoginHref(config.slug, preset.brandId))}
+            href={
+              actionPending
+                ? undefined
+                : (actionHref ??
+                  (onAction ? "#telegram-handoff" : gateLoginHref(config.slug, preset.brandId)))
+            }
+            tabIndex={actionPending ? -1 : undefined}
             onClick={(event) => {
+              if (actionPending) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+              }
               if (!onAction) return;
               event.preventDefault();
               if (!actionPending) onAction();
