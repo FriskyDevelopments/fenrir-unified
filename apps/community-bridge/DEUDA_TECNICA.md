@@ -12,8 +12,8 @@ la midió y decidió posponerla conscientemente.
 
 **Severidad: alta. Preexistente. Pospuesta a propósito.**
 
-El canon del proyecto dice: *comunidad = Neon; admin = Supabase; Supabase en el
-camino del miembro es el bug.* Hoy no se cumple del todo.
+El canon del proyecto dice: _comunidad = Neon; admin = Supabase; Supabase en el
+camino del miembro es el bug._ Hoy no se cumple del todo.
 
 `communities.myfenrir.com` se despliega como un solo Worker, y ese Worker carga
 `SUPABASE_SERVICE_ROLE_KEY`. La service-role key **evita RLS por completo**: es
@@ -201,13 +201,13 @@ escriben los dos nombres desde un único valor. Lo que queda son las filas
 
 **Impacto medido en su momento** (para no volver a contarlo):
 
-| Medida | Valor |
-|---|---|
-| Filas en `cb_gate_configs` | 6 |
-| Filas en `fenrir_gate_communities` | 16 |
+| Medida                             | Valor              |
+| ---------------------------------- | ------------------ |
+| Filas en `cb_gate_configs`         | 6                  |
+| Filas en `fenrir_gate_communities` | 16                 |
 | Slugs que ya coinciden entre ambas | **1** (`goonbros`) |
-| Vistas totales, histórico completo | **17** |
-| Hosts referrer distintos | **1** |
+| Vistas totales, histórico completo | **17**             |
+| Hosts referrer distintos           | **1**              |
 
 Ojo con esa cifra: `visitor_key` es `${visitorId}:${utcDayKey()}`, así que son
 **17 visitante-días**, no 17 personas. El número real de humanos es ≤17 y
@@ -247,7 +247,7 @@ compra riesgo sin comprar valor.
   es el camino de Telegram, donde la identidad puede no traer correo: se
   resuelve a `null` explícito para que la ausencia quede como NULL en una
   columna nullable y como `emailSent: false` visible, no como `undefined`.
-- **Mensajes del handoff de Telegram.** Un único texto —*"Your access request
-  must be accepted…"*— cubría tres estados distintos y culpaba a una solicitud
+- **Mensajes del handoff de Telegram.** Un único texto —_"Your access request
+  must be accepted…"_— cubría tres estados distintos y culpaba a una solicitud
   pendiente aunque la causa real fuera que el Gate no tiene destino
   configurado. Separados en tres, ES y EN, en `src/lib/gate-availability.ts`.

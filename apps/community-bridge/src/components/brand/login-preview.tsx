@@ -168,8 +168,8 @@ export function LoginPreview({ brand }: { brand: BrandConfig }) {
                   <ol className="mt-1.5 space-y-1 text-[10px] leading-relaxed text-muted-foreground">
                     <li>1. Link your FriskyDev ID on www.myfenrir.com.</li>
                     <li>
-                      2. Press Start in the bot — Telegram confirms automatically. There is no
-                      code to copy.
+                      2. Press Start in the bot — Telegram confirms automatically. There is no code
+                      to copy.
                     </li>
                     <li>3. Continue this Community Gate walkthrough.</li>
                   </ol>

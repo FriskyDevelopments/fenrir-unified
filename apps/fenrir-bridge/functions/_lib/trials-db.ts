@@ -281,6 +281,7 @@ export async function upsertTrial(
          started_at             = COALESCE(excluded.started_at, trials.started_at),
          ends_at                = COALESCE(excluded.ends_at, trials.ends_at),
          updated_at             = excluded.updated_at
+       WHERE trials.status NOT IN ('active', 'converted')
        RETURNING *`
     )
     .bind(
@@ -319,7 +320,11 @@ export async function attachStripeToTrial(
     .run();
 }
 
-/** Move a trial to active, stamping start/end from a code's duration. */
+/**
+ * Move a pending card trial to active, stamping start/end from a code's
+ * duration. The status predicate is the concurrency lock: a webhook and the
+ * browser may race, but only one can activate the trial.
+ */
 export async function activateTrial(
   db: D1Database,
   id: string,
@@ -336,7 +341,7 @@ export async function activateTrial(
          started_at   = ?,
          ends_at      = ?,
          updated_at   = ?
-       WHERE id = ?
+       WHERE id = ? AND status = 'pending_card'
        RETURNING *`
     )
     .bind(input.cardOnFile ? 1 : 0, started, ends, nowIso(), id)

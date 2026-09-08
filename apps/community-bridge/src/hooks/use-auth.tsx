@@ -20,6 +20,29 @@ import { logDemoEvent } from "@/config/demo-log";
 
 const supabaseConfigured = true;
 const OWNER_TELEGRAM_IDS = new Set([8581086019]);
+const HANDOFF_TOKEN_PARAM = "fenrir_handoff";
+const HANDOFF_TYPE_PARAM = "fenrir_handoff_type";
+
+async function redeemFenrirHandoff(): Promise<void> {
+  if (typeof window === "undefined" || !window.location.hash) return;
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  const tokenHash = hash.get(HANDOFF_TOKEN_PARAM);
+  if (!tokenHash || hash.get(HANDOFF_TYPE_PARAM) !== "magiclink") return;
+
+  // Remove the one-time credential before any other browser work can copy it
+  // into navigation history, screenshots, or outbound links.
+  hash.delete(HANDOFF_TOKEN_PARAM);
+  hash.delete(HANDOFF_TYPE_PARAM);
+  const cleanHash = hash.toString();
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${window.location.pathname}${window.location.search}${cleanHash ? `#${cleanHash}` : ""}`,
+  );
+
+  const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });
+  if (error) throw new Error(`community_handoff_failed:${error.message}`);
+}
 
 export type AppRole = "owner" | "admin" | "user";
 
@@ -123,15 +146,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    supabase.auth.getSession().then(({ data }) => {
+    let active = true;
+    void (async () => {
+      try {
+        await redeemFenrirHandoff();
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : "community_handoff_failed");
+      }
+      const { data } = await supabase.auth.getSession();
+      if (!active) return;
       setSession(data.session);
       const uid = data.session?.user.id ?? null;
       currentUserId.current = uid;
       void loadRole(uid);
       setLoading(false);
-    });
+    })();
 
     return () => {
+      active = false;
       sub.subscription.unsubscribe();
     };
   }, [loadRole]);

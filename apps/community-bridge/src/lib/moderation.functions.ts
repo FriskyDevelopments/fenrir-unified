@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { neonSql } from "@/lib/neon.server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Cola de revisión humana (Neon `cb_moderation_reviews`).
@@ -17,7 +18,7 @@ import { neonSql } from "@/lib/neon.server";
 const NOT_STAFF = "Only staff can review moderation items.";
 
 type AuthedContext = {
-  supabase: { from: (table: string) => any };
+  supabase: SupabaseClient;
   userId: string;
   claims: Record<string, unknown>;
 };

@@ -187,7 +187,10 @@ export function GatePreview({
 
         {!compact ? (
           <a
-            href={actionHref ?? (onAction ? "#telegram-handoff" : gateLoginHref(config.slug, preset.brandId))}
+            href={
+              actionHref ??
+              (onAction ? "#telegram-handoff" : gateLoginHref(config.slug, preset.brandId))
+            }
             onClick={(event) => {
               if (!onAction) return;
               event.preventDefault();

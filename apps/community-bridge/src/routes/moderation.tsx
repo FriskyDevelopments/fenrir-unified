@@ -177,12 +177,17 @@ function ModerationQueue() {
                 {rows.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell>
-                      <Badge variant={row.reason === "no_age_reading" ? "destructive" : "secondary"}>
+                      <Badge
+                        variant={row.reason === "no_age_reading" ? "destructive" : "secondary"}
+                      >
                         {REASON_LABEL[row.reason] ?? row.reason}
                       </Badge>
                     </TableCell>
                     <TableCell className="max-w-[22rem]">
-                      <p className="truncate font-mono text-xs text-foreground" title={row.subject_ref}>
+                      <p
+                        className="truncate font-mono text-xs text-foreground"
+                        title={row.subject_ref}
+                      >
                         {row.subject_ref}
                       </p>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -191,7 +196,9 @@ function ModerationQueue() {
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       <div>Apparent age: {row.apparent_age ?? "—"}</div>
-                      <div>Explicit: {row.explicit === null ? "—" : row.explicit ? "yes" : "no"}</div>
+                      <div>
+                        Explicit: {row.explicit === null ? "—" : row.explicit ? "yes" : "no"}
+                      </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(row.created_at).toLocaleString()}
@@ -214,7 +221,10 @@ function ModerationQueue() {
                               disabled={busyId === row.id}
                               onClick={() => resolve(row, "approved")}
                             >
-                              <span className="mr-1" aria-hidden="true">🛡️</span> Approve
+                              <span className="mr-1" aria-hidden="true">
+                                🛡️
+                              </span>{" "}
+                              Approve
                             </Button>
                             <Button
                               size="sm"
@@ -222,7 +232,10 @@ function ModerationQueue() {
                               disabled={busyId === row.id}
                               onClick={() => resolve(row, "rejected")}
                             >
-                              <span className="mr-1" aria-hidden="true">🔑</span> Reject
+                              <span className="mr-1" aria-hidden="true">
+                                🔑
+                              </span>{" "}
+                              Reject
                             </Button>
                           </div>
                         </div>

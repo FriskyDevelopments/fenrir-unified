@@ -18,6 +18,7 @@ import {
   isCodeExpired,
   normalizeInviteCode,
   publicTrial,
+  releaseInviteUse,
   setTrialCardOnFile
 } from "../../_lib/trials-db";
 
@@ -101,7 +102,17 @@ export async function onRequestPost(context: { request: Request; env: BillingEnv
       durationDays: invite.duration_days,
       cardOnFile: true
     });
-    if (!activated) return noStoreJson({ ok: false, error: "trial_start_failed" }, { status: 500 });
+    if (!activated) {
+      // Another verifier/webhook won the pending_card -> active transition.
+      // Return this request's invite claim so concurrent calls consume one use
+      // in total, then report the winning state idempotently.
+      await releaseInviteUse(db, trial.code);
+      const current = await getTrialForOrg(db, session.frisky_org_id);
+      if (current?.status === "active" || current?.status === "converted") {
+        return noStoreJson({ ok: true, alreadyActive: true, trial: publicTrial(current) });
+      }
+      return noStoreJson({ ok: false, error: "trial_start_failed" }, { status: 500 });
+    }
 
     return noStoreJson({ ok: true, trial: publicTrial(activated) });
   } catch (error) {

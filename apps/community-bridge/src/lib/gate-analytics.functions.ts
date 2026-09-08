@@ -139,7 +139,10 @@ export const getMyGateViewStats = createServerFn({ method: "GET" })
         where gate_id = any(${ids}::uuid[])
         limit 50000
       `,
-    ])) as unknown as [Array<{ gate_id: string; viewed_at: string | Date }>, Array<{ gate_id: string }>];
+    ])) as unknown as [
+      Array<{ gate_id: string; viewed_at: string | Date }>,
+      Array<{ gate_id: string }>,
+    ];
 
     const stats = new Map<string, GateViewStats>(
       ids.map((id) => [id, { gate_id: id, total: 0, last7: 0, daily: emptyDays() }]),

@@ -16,8 +16,7 @@ import type {} from "@tanstack/react-start";
  * the box on Quality. The Bot Token and Client Secret are NEVER used here.
  */
 
-const FALLBACK_PUBLIC_KEY =
-  "e52709d77ef99c87d2b439d3bb9fe8c0a5d21071f88dd8f62d51e9e7df2b740f";
+const FALLBACK_PUBLIC_KEY = "e52709d77ef99c87d2b439d3bb9fe8c0a5d21071f88dd8f62d51e9e7df2b740f";
 
 function publicKeyHex(): string {
   const fromEnv =
@@ -53,7 +52,12 @@ async function verifySignature(
       ["verify"],
     );
     const message = new TextEncoder().encode(timestamp + rawBody);
-    return await crypto.subtle.verify({ name: "Ed25519" }, key, sigBytes as unknown as ArrayBuffer, message);
+    return await crypto.subtle.verify(
+      { name: "Ed25519" },
+      key,
+      sigBytes as unknown as ArrayBuffer,
+      message,
+    );
   } catch {
     return false;
   }
@@ -94,7 +98,9 @@ async function handleInteraction(request: Request): Promise<Response> {
   if (payload?.type === 2) {
     return json({
       type: 4,
-      data: { content: "Fenrir Community Bridge is connected. Verify through your Gate to get access." },
+      data: {
+        content: "Fenrir Community Bridge is connected. Verify through your Gate to get access.",
+      },
     });
   }
 

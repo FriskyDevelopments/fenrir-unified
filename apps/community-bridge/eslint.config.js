@@ -42,7 +42,10 @@ export default tseslint.config(
           ],
         },
       ],
-      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+      // This app intentionally colocates shadcn variants and TanStack route
+      // exports with their components. They are stable module constants, not
+      // mutable runtime state, so Fast Refresh remains safe.
+      "react-refresh/only-export-components": "off",
       "@typescript-eslint/no-unused-vars": "off",
     },
   },

@@ -38,13 +38,13 @@ El control NO es "bloquear desnudez", es **estimar edad aparente** y bloquear
 material de abuso infantil (CSAM). Eso obliga a capas distintas, porque ninguna
 resuelve el problema sola.
 
-| Capa | Qué resuelve | Con qué | Costo |
-| --- | --- | --- | --- |
-| 1. Hash-match CSAM conocido | Material ya catalogado por NCMEC | **Cloudflare CSAM Scanning Tool**, PhotoDNA | Gratis |
-| 2. Edad aparente / CSAM nuevo | Material que ningún hash conoce | Hive AI, Thorn Safer | De pago |
-| 3. Vibe check general | ¿Hay persona? ¿está entrando? | `fenrir-bridge/functions/_lib/image-guard` | Según proveedor |
-| 4. Nombres de usuario | Términos codificados en el texto | Moderación de texto + blocklist | Bajo |
-| 5. Revisión humana + reporte | Lo que las capas anteriores marcan | NCMEC CyberTipline | — |
+| Capa                          | Qué resuelve                       | Con qué                                     | Costo           |
+| ----------------------------- | ---------------------------------- | ------------------------------------------- | --------------- |
+| 1. Hash-match CSAM conocido   | Material ya catalogado por NCMEC   | **Cloudflare CSAM Scanning Tool**, PhotoDNA | Gratis          |
+| 2. Edad aparente / CSAM nuevo | Material que ningún hash conoce    | Hive AI, Thorn Safer                        | De pago         |
+| 3. Vibe check general         | ¿Hay persona? ¿está entrando?      | `fenrir-bridge/functions/_lib/image-guard`  | Según proveedor |
+| 4. Nombres de usuario         | Términos codificados en el texto   | Moderación de texto + blocklist             | Bajo            |
+| 5. Revisión humana + reporte  | Lo que las capas anteriores marcan | NCMEC CyberTipline                          | —               |
 
 ### Capa 1 — Cloudflare CSAM Scanning Tool
 
@@ -79,7 +79,7 @@ Dos reglas duras:
    tasa de error. Además los ToS de los proveedores prohíben enviarles ese
    material: el filtro no puede consistir en reenviárselo a un tercero.
 2. **El prompt por defecto todavía no refleja nuestra política.** Hoy pregunta
-   *"appropriate for a general audience (no nudity…)"* y rechaza toda desnudez.
+   _"appropriate for a general audience (no nudity…)"_ y rechaza toda desnudez.
    Con la política real la pregunta es la edad aparente, no la desnudez.
    Pendiente en `image-guard/prompts.ts`.
 

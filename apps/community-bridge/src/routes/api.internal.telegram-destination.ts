@@ -11,11 +11,12 @@ const destinationInput = z
       .trim()
       .toLowerCase()
       .regex(/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/),
-    telegramChatId: z.string().trim().regex(/^-100\d{6,20}$/),
+    telegramChatId: z
+      .string()
+      .trim()
+      .regex(/^-100\d{6,20}$/),
     displayName: z.string().trim().min(1).max(120),
-    capabilities: z
-      .object({ botAdmin: z.literal(true), canInviteUsers: z.literal(true) })
-      .strict(),
+    capabilities: z.object({ botAdmin: z.literal(true), canInviteUsers: z.literal(true) }).strict(),
     /**
      * Gobierno del grupo, tal y como lo devuelve `getChatAdministrators`.
      * Sirve para dos cosas: saber de quién es el grupo de verdad, y detectar
@@ -86,7 +87,9 @@ function sameSecret(left: string, right: string): boolean {
  */
 async function syncTelegramDestination(request: Request): Promise<Response> {
   const expectedSecret = process.env["COMMUNITY_BRIDGE_DESTINATION_SYNC_SECRET"]?.trim();
-  const suppliedSecret = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  const suppliedSecret = (request.headers.get("authorization") ?? "")
+    .replace(/^Bearer\s+/i, "")
+    .trim();
   if (!expectedSecret || !sameSecret(expectedSecret, suppliedSecret)) {
     return json({ ok: false, error: "unauthorized" }, 401);
   }

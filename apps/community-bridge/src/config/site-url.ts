@@ -15,7 +15,9 @@ function readOrigin(): string {
     return window.location.origin;
   }
   // SSR fallback — env var must be set in build-time for static generation.
-  const env = (import.meta as unknown as Record<string, unknown>).env as Record<string, string | undefined> | undefined;
+  const env = (import.meta as unknown as Record<string, unknown>).env as
+    | Record<string, string | undefined>
+    | undefined;
   return env?.["VITE_SITE_URL"] ?? "http://localhost:5173";
 }
 

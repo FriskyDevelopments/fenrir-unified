@@ -76,14 +76,14 @@ It is bound to the current MyFenrir user and has a five-minute TTL. The token st
 
 ## Files changed by this fix
 
-| Area | Main files |
-| --- | --- |
-| Gate mapping | `src/lib/gate.functions.ts`, `src/routes/gate.tsx`, `src/routes/gates.index.tsx`, `src/components/gate/gate-form.tsx` |
-| Bot verification sync | `src/routes/api.internal.telegram-destination.ts`, `apps/fenrir-bridge/workers/fenrir-stars-payments.js` |
-| Public access and approvals | `src/routes/g.$slug.tsx`, `src/lib/access.functions.ts`, `src/routes/access.tsx` |
-| Persistence | `neon/schema.sql` |
-| Telegram identity continuity | `apps/fenrir-bridge/functions/api/telegram/link/confirm.ts` |
-| Automated coverage | `apps/fenrir-bridge/functions/__tests__/gate-telegram-handoff.test.ts` |
+| Area                         | Main files                                                                                                            |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Gate mapping                 | `src/lib/gate.functions.ts`, `src/routes/gate.tsx`, `src/routes/gates.index.tsx`, `src/components/gate/gate-form.tsx` |
+| Bot verification sync        | `src/routes/api.internal.telegram-destination.ts`, `apps/fenrir-bridge/workers/fenrir-stars-payments.js`              |
+| Public access and approvals  | `src/routes/g.$slug.tsx`, `src/lib/access.functions.ts`, `src/routes/access.tsx`                                      |
+| Persistence                  | `neon/schema.sql`                                                                                                     |
+| Telegram identity continuity | `apps/fenrir-bridge/functions/api/telegram/link/confirm.ts`                                                           |
+| Automated coverage           | `apps/fenrir-bridge/functions/__tests__/gate-telegram-handoff.test.ts`                                                |
 
 ## Required deployment work
 

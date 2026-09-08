@@ -17,7 +17,16 @@ function adminError(message: string, cause?: unknown): Error {
  */
 async function adminRpc<T>(name: string, args: Record<string, unknown>) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return (supabaseAdmin as any).rpc(name, args) as Promise<{
+  const rpcClient = supabaseAdmin as unknown as {
+    rpc: (
+      rpcName: string,
+      rpcArgs: Record<string, unknown>,
+    ) => Promise<{
+      data: T | null;
+      error: { message: string } | null;
+    }>;
+  };
+  return rpcClient.rpc(name, args) as Promise<{
     data: T | null;
     error: { message: string } | null;
   }>;

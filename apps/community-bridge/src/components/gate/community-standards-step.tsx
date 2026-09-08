@@ -15,7 +15,10 @@ import { getCommunityStandards, type StandardsRule } from "@/config/community-st
 const ACK_KEY = "myfenrir-community-standards-accepted";
 
 const TONE: Record<StandardsRule["tone"], { icon: typeof ShieldCheck; className: string }> = {
-  allow: { icon: ShieldCheck, className: "text-emerald-400 border-emerald-400/30 bg-emerald-400/5" },
+  allow: {
+    icon: ShieldCheck,
+    className: "text-emerald-400 border-emerald-400/30 bg-emerald-400/5",
+  },
   ban: { icon: ShieldAlert, className: "text-red-400 border-red-400/30 bg-red-400/5" },
   duty: { icon: Scale, className: "text-amber-400 border-amber-400/30 bg-amber-400/5" },
 };

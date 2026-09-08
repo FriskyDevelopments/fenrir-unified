@@ -9,7 +9,10 @@ export function BrandMark({ className }: { className?: string }) {
       <img
         src={brand.logo.markUrl}
         alt={brand.logo.alt}
-        className={["block h-full w-full min-h-8 min-w-8 rounded-[22%] object-contain", className ?? ""].join(" ")}
+        className={[
+          "block h-full w-full min-h-8 min-w-8 rounded-[22%] object-contain",
+          className ?? "",
+        ].join(" ")}
         loading="eager"
         decoding="async"
       />
@@ -37,7 +40,10 @@ export function BrandWordmark({ className }: { className?: string }) {
       <img
         src={brand.logo.wordmarkUrl}
         alt={`${brand.name} wordmark logo`}
-        className={["block h-auto min-h-8 w-full max-w-[14rem] object-contain", className ?? ""].join(" ")}
+        className={[
+          "block h-auto min-h-8 w-full max-w-[14rem] object-contain",
+          className ?? "",
+        ].join(" ")}
         decoding="async"
       />
     );

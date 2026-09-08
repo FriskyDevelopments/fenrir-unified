@@ -27,8 +27,10 @@ export default defineTool({
         .maybeSingle(), // RLS restricts to the caller's own row
     ]);
 
-    if (roleRes.error) return { content: [{ type: "text", text: roleRes.error.message }], isError: true };
-    if (linkRes.error) return { content: [{ type: "text", text: linkRes.error.message }], isError: true };
+    if (roleRes.error)
+      return { content: [{ type: "text", text: roleRes.error.message }], isError: true };
+    if (linkRes.error)
+      return { content: [{ type: "text", text: linkRes.error.message }], isError: true };
 
     const link = linkRes.data;
     const account = {

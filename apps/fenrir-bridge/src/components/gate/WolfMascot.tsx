@@ -1,10 +1,22 @@
+import type { SVGProps } from "react";
+
 /**
  * Stylised wolf silhouette mascot — pure SVG, theme-aware via --gate-* vars.
  * Ported from community-gate/frontend/src/components/WolfMascot.jsx.
  */
-export function WolfMascot({ className = "", label = "FENRIR · PROTOCOL" }: { className?: string; label?: string }) {
+export function WolfMascot({
+  className = "",
+  label = "FENRIR · PROTOCOL",
+  ...svgProps
+}: SVGProps<SVGSVGElement> & { label?: string }) {
   return (
-    <svg viewBox="0 0 400 460" className={className} data-testid="wolf-mascot" aria-hidden>
+    <svg
+      viewBox="0 0 400 460"
+      className={className}
+      data-testid="wolf-mascot"
+      aria-hidden
+      {...svgProps}
+    >
       <defs>
         <linearGradient id="gate-wolf-body" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="hsl(var(--gate-text) / 0.04)" />

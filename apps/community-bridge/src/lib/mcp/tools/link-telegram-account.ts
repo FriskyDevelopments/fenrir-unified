@@ -37,7 +37,10 @@ export default defineTool({
 
     return {
       content: [{ type: "text", text }],
-      structuredContent: { linked, telegram_id: data?.telegram_id ? String(data.telegram_id) : null },
+      structuredContent: {
+        linked,
+        telegram_id: data?.telegram_id ? String(data.telegram_id) : null,
+      },
     };
   },
 });
