@@ -22,7 +22,7 @@ import { createPkce, randomToken } from "./crypto.js";
 import { createSession, getSession, destroySession } from "./identity.js";
 import { checkDatabase } from "./neon.js";
 import { saveOAuthState, consumeOAuthState } from "./session.js";
-import { handleTelegramLink } from "./telegram.js";
+import { handleTelegramLink, notifyLoginEvent } from "./telegram.js";
 
 export { SessionAuthority } from "./session.js";
 
@@ -298,6 +298,9 @@ async function handleCallback(request, env, providerName) {
   } catch (e) {
     return authFailure(request, env, "session_create_failed", 503, { detail: String(e.message || e) });
   }
+  // Ops notify to dens log channel — never block the login redirect.
+  const loginHost = new URL(request.url).host;
+  void notifyLoginEvent(env, user, { host: loginHost });
   return redirect(saved.returnTo || cfg(env).postLoginRedirect, { "Set-Cookie": cookie });
 }
 

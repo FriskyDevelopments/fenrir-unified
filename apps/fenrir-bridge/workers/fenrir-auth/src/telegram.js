@@ -179,3 +179,65 @@ function redirect(location, extraHeaders = {}) {
     headers: { Location: location, "Cache-Control": "no-store", ...extraHeaders },
   });
 }
+
+/** Ops log sink for successful MyFenrir logins (Krystal bot logs). Never include secrets. */
+export function authLogChatId(env) {
+  const raw = String(env?.FENRIR_AUTH_LOG_CHAT_ID || env?.MYFENRIR_AUTH_LOG_CHAT_ID || "").trim();
+  return raw || "";
+}
+
+export function telegramBotToken(env) {
+  return String(
+    env?.TELEGRAM_PROD_BOT_TOKEN ||
+      env?.TELEGRAM_BOT_TOKEN ||
+      env?.MYFENRIR_BOT_TOKEN ||
+      "",
+  ).trim();
+}
+
+function redactUserLabel(user) {
+  const provider = String(user?.provider || "unknown").slice(0, 32);
+  const sub = String(user?.sub || user?.id || "");
+  const tail = sub.length <= 4 ? "****" : sub.slice(-4);
+  return `${provider} · …${tail}`;
+}
+
+/**
+ * Fire-and-forget Telegram notify after a successful session mint.
+ * Skips quietly when chat id or bot token is unset. Never throws into the login path.
+ */
+export async function notifyLoginEvent(env, user, meta = {}) {
+  const chatId = authLogChatId(env);
+  const token = telegramBotToken(env);
+  if (!chatId || !token) return { ok: false, skipped: true };
+
+  const host = String(meta.host || "myfenrir.com").slice(0, 64);
+  const text = [
+    "MyFenrir login",
+    `host: ${host}`,
+    `who: ${redactUserLabel(user)}`,
+  ].join("\n");
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        disable_web_page_preview: true,
+      }),
+    });
+    if (!res.ok) {
+      console.error(JSON.stringify({ message: "auth_login_log_failed", status: res.status }));
+      return { ok: false, status: res.status };
+    }
+    return { ok: true };
+  } catch (error) {
+    console.error(JSON.stringify({
+      message: "auth_login_log_failed",
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    return { ok: false };
+  }
+}

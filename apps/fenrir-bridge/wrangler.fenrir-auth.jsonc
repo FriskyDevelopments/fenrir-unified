@@ -39,7 +39,8 @@
     "SESSION_TTL_SECONDS": "604800",
     "SESSION_COOKIE_NAME": "fenrir_session",
     "ALLOWED_REDIRECT_HOSTS": "myfenrir.com,www.myfenrir.com,forge.friskydev.com,paperclip.friskydev.com,mcp.friskydev.com",
-    "TRUSTED_ORIGINS": "https://myfenrir.com,https://www.myfenrir.com,https://forge.friskydev.com,https://paperclip.friskydev.com,https://mcp.friskydev.com"
+    "TRUSTED_ORIGINS": "https://myfenrir.com,https://www.myfenrir.com,https://forge.friskydev.com,https://paperclip.friskydev.com,https://mcp.friskydev.com",
+    "FENRIR_AUTH_LOG_CHAT_ID": "-1004450930780"
   },
   // Replace id after: wrangler kv namespace create FENRIR_AUTH_SESSIONS
   "kv_namespaces": [

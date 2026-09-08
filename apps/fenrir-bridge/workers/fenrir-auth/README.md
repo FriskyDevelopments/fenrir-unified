@@ -41,6 +41,12 @@ Worker routes remain on both hosts. Browser OAuth failures 302 to
 `/login?error=…` (HTML Accept); API clients still get JSON. CORS credentials
 are allowed for `https://www.myfenrir.com` so the www SPA can call apex `/auth/me`.
 
+## Login ops notify
+
+After a successful OAuth session mint, the Worker may `sendMessage` to `FENRIR_AUTH_LOG_CHAT_ID`
+(default dens log chat when set in wrangler vars). Message text includes provider + redacted subject
+tail only — no tokens, cookies, or emails. Missing token/chat id skips quietly; notify never blocks login.
+
 ## Session
 
 Cookie `fenrir_session` = `<sessionId>.<HMAC-SHA256(sessionId, SESSION_SECRET)>`,
@@ -65,6 +71,8 @@ Set with `wrangler secret put <NAME> --config wrangler.fenrir-auth.jsonc`.
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | `MS_CLIENT_ID` / `MS_CLIENT_SECRET` | Entra ID web app |
 | `APPLE_CLIENT_ID` | | Services ID |
 | `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` | | Sign in with Apple `.p8` |
+| `TELEGRAM_PROD_BOT_TOKEN` or `TELEGRAM_BOT_TOKEN` | `MYFENRIR_BOT_TOKEN` | Optional — @Myfenrir_bot token for login ops notify |
+| `FENRIR_AUTH_LOG_CHAT_ID` | (wrangler var) | Optional — Telegram chat id for login ops logs (Krystal bot logs) |
 
 ## Human-only callback mapping
 
