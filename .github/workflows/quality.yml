@@ -34,7 +34,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: apps/fenrir-bridge/package-lock.json
+          cache-dependency-path: |
+            apps/fenrir-bridge/package-lock.json
+            packages/auth/package-lock.json
+      - name: Install shared auth dependencies
+        working-directory: packages/auth
+        run: npm ci
       - name: Install locked dependencies
         run: npm ci
       - name: Test
@@ -44,6 +49,9 @@ jobs:
       - name: Build
         run: npm run build
       - name: Audit dependencies
+        run: npm audit --audit-level=high
+      - name: Audit shared auth dependencies
+        working-directory: packages/auth
         run: npm audit --audit-level=high
 
   community-bridge:
