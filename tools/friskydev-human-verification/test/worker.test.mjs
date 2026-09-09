@@ -54,11 +54,46 @@ test("accepts leftover Authentik hostname as audience for already-issued tokens 
   assert.equal(decodeBody(challenge.token).audience, authentikAudience);
 });
 
-test("offers only native Frisky challenges, never an ALTCHA route", async () => {
+test("offers Altcha alongside native Frisky challenges", async () => {
   const query = new URLSearchParams({ audience, context });
   const slider = await worker.fetch(new Request(`${origin}/api/slider?${query}`), env);
   assert.equal(slider.status, 200);
 
-  const removed = await worker.fetch(new Request(`${origin}/api/altcha/challenge?${query}`), env);
-  assert.equal(removed.status, 404);
+  const challengeResponse = await worker.fetch(new Request(`${origin}/api/altcha/challenge?${query}`), env);
+  assert.equal(challengeResponse.status, 200);
+  const challenge = await challengeResponse.json();
+  assert.equal(challenge.algorithm, "SHA-256");
+  assert.equal(challenge.maxnumber, 120000);
+
+  // Brute the PoW for the test secret scope.
+  const encoder = new TextEncoder();
+  const digestHex = async (value) => {
+    const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value));
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  };
+  let number = -1;
+  for (let n = 0; n <= challenge.maxnumber; n += 1) {
+    if (await digestHex(`${challenge.salt}${n}`) === challenge.challenge) { number = n; break; }
+  }
+  assert.notEqual(number, -1);
+
+  const payload = Buffer.from(JSON.stringify({
+    algorithm: challenge.algorithm,
+    challenge: challenge.challenge,
+    number,
+    salt: challenge.salt,
+    signature: challenge.signature,
+    maxnumber: challenge.maxnumber,
+  })).toString("base64url");
+
+  const verify = await worker.fetch(new Request(`${origin}/api/verify`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ altcha: payload }),
+  }), env);
+  assert.equal(verify.status, 200);
+  const proof = await verify.json();
+  assert.equal(proof.verified, true);
+  assert.equal(proof.method, "altcha");
+  assert.ok(proof.grant);
 });

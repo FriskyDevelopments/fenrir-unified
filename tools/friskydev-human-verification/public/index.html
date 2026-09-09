@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Human verification</title>
-    <link rel="stylesheet" href="/styles.css?v=20260821-native-1" />
-    <script defer type="module" src="/app.js?v=20260821-native-1"></script>
+    <link rel="stylesheet" href="/styles.css?v=20260909-altcha-1" />
+    <script defer type="module" src="/app.js?v=20260909-altcha-1"></script>
   </head>
   <body>
     <main class="card" aria-labelledby="title">
@@ -24,7 +24,7 @@
       <div class="mark" role="img" aria-label="FriskyDev wolf logo"></div>
       <p class="eyebrow">FRISKYDEV · SECURE CHECK</p>
       <h1 id="title">Let’s make sure you’re human</h1>
-      <p id="intro" class="intro">Choose a private Frisky challenge. No tracking, third-party CAPTCHA, or image recognition.</p>
+      <p id="intro" class="intro">Choose Altcha or a private Frisky challenge. No tracking pixels or image recognition.</p>
 
       <form id="puzzle-form" class="puzzle" hidden>
         <div class="signal-head">
@@ -67,6 +67,16 @@
         <button class="slider-submit" type="submit">Verify position <b aria-hidden="true">↗</b></button>
       </form>
       <button id="show-slider" class="link alt-method" type="button" hidden>Use Signal Slider instead</button>
+
+      <section id="altcha-panel" class="altcha-panel" hidden>
+        <div class="slider-copy">
+          <p class="puzzle-label">ALTCHA · PROOF OF WORK</p>
+          <h2 id="altcha-title">Quiet math check</h2>
+          <p id="altcha-instruction">Runs a short proof-of-work in your browser. No images, no tracking.</p>
+        </div>
+        <button id="altcha-run" class="unlock" type="button"><span id="altcha-label">Run Altcha</span><b aria-hidden="true">↗</b></button>
+      </section>
+      <button id="show-altcha" class="link alt-method" type="button">Use Altcha instead</button>
 
       <p id="status" class="status" role="status" aria-live="polite"></p>
       <p id="privacy" class="privacy">No cookies · No fingerprinting · No image recognition</p>

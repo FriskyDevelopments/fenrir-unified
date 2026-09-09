@@ -16,6 +16,12 @@ const riskTag = document.querySelector('#risk-tag');
 const themeButtons = document.querySelectorAll('[data-theme]');
 const card = document.querySelector('.card');
 const showSlider = document.querySelector('#show-slider');
+const showAltcha = document.querySelector('#show-altcha');
+const altchaPanel = document.querySelector('#altcha-panel');
+const altchaRun = document.querySelector('#altcha-run');
+const altchaTitle = document.querySelector('#altcha-title');
+const altchaInstruction = document.querySelector('#altcha-instruction');
+const altchaLabel = document.querySelector('#altcha-label');
 const sliderForm = document.querySelector('#slider-form');
 const sliderTitle = document.querySelector('#slider-title');
 const sliderInstruction = document.querySelector('#slider-instruction');
@@ -46,17 +52,17 @@ if (window.parent !== window) {
 }
 
 const copy = {
-  en: { title: 'Let’s make sure you’re human', intro: 'Choose a private Frisky challenge. No tracking, third-party CAPTCHA, or image recognition.', continue: 'Continue', fallback: 'Use Frisky Runes', puzzleTitle: 'Frisky Runes', puzzleInstruction: 'Tap the identical signal below. Order matters.', legend: 'Select the matching signal', unlock: 'Unlock signal', privacy: 'No cookies · No fingerprinting · No image recognition', checking: 'Checking…', checkingAnswer: 'Checking your answer…', verified: 'Verified. You may continue.', failed: 'Verification failed. Try Frisky Runes below.', failedPuzzle: 'Verification failed. Choose a new Frisky challenge.', unavailable: 'The challenge could not load. Please try again later.', mismatch: 'That signal didn’t match. Here’s a new challenge.', then: 'then', risk: { low: 'LOW', medium: 'MEDIUM', high: 'HIGH' }, glyph: { moon: 'moon', paw: 'paw', spark: 'spark', eye: 'eye', bolt: 'bolt', diamond: 'diamond', flame: 'flame', orbit: 'orbit', wolf: 'wolf', star: 'star' } },
-  es: { title: 'Confirmemos que eres humano', intro: 'Elige un reto privado de Frisky. Sin seguimiento, CAPTCHA externo ni reconocimiento de imágenes.', continue: 'Continuar', fallback: 'Usar Frisky Runes', puzzleTitle: 'Frisky Runes', puzzleInstruction: 'Toca la señal idéntica. El orden importa.', legend: 'Selecciona la señal correcta', unlock: 'Desbloquear señal', privacy: 'Sin cookies · Sin huella digital · Sin reconocimiento de imágenes', checking: 'Verificando…', checkingAnswer: 'Comprobando tu respuesta…', verified: 'Verificado. Puedes continuar.', failed: 'La verificación falló. Usa Frisky Runes.', failedPuzzle: 'La verificación falló. Elige un nuevo reto Frisky.', unavailable: 'El reto no pudo cargarse. Inténtalo más tarde.', mismatch: 'La señal no coincide. Aquí tienes un nuevo reto.', then: 'seguido de', risk: { low: 'BAJO', medium: 'MEDIO', high: 'ALTO' }, glyph: { moon: 'luna', paw: 'huella', spark: 'destello', eye: 'ojo', bolt: 'rayo', diamond: 'diamante', flame: 'llama', orbit: 'órbita', wolf: 'lobo', star: 'estrella' } },
-  fr: { title: 'Vérifions que vous êtes humain', intro: 'Choisissez un défi Frisky privé. Sans suivi, CAPTCHA tiers ni reconnaissance d’image.', continue: 'Continuer', fallback: 'Utiliser Frisky Runes', puzzleTitle: 'Frisky Runes', puzzleInstruction: 'Touchez le signal identique. L’ordre compte.', legend: 'Sélectionnez le bon signal', unlock: 'Déverrouiller le signal', privacy: 'Sans cookies · Sans empreinte numérique · Sans reconnaissance d’image', checking: 'Vérification…', checkingAnswer: 'Vérification de votre réponse…', verified: 'Vérifié. Vous pouvez continuer.', failed: 'La vérification a échoué. Utilisez Frisky Runes.', failedPuzzle: 'La vérification a échoué. Choisissez un nouveau défi Frisky.', unavailable: 'Le défi n’a pas pu être chargé. Réessayez plus tard.', mismatch: 'Ce signal ne correspond pas. Voici un nouveau défi.', then: 'puis', risk: { low: 'FAIBLE', medium: 'MOYEN', high: 'ÉLEVÉ' }, glyph: { moon: 'lune', paw: 'patte', spark: 'éclat', eye: 'œil', bolt: 'éclair', diamond: 'diamant', flame: 'flamme', orbit: 'orbite', wolf: 'loup', star: 'étoile' } },
-  pt: { title: 'Vamos confirmar que você é humano', intro: 'Escolha um desafio privado Frisky. Sem rastreamento, CAPTCHA de terceiros ou reconhecimento de imagens.', continue: 'Continuar', fallback: 'Usar Frisky Runes', puzzleTitle: 'Frisky Runes', puzzleInstruction: 'Toque no sinal idêntico. A ordem importa.', legend: 'Selecione o sinal correto', unlock: 'Desbloquear sinal', privacy: 'Sem cookies · Sem impressão digital · Sem reconhecimento de imagens', checking: 'Verificando…', checkingAnswer: 'Verificando sua resposta…', verified: 'Verificado. Você pode continuar.', failed: 'A verificação falhou. Use Frisky Runes.', failedPuzzle: 'A verificação falhou. Escolha um novo desafio Frisky.', unavailable: 'Não foi possível carregar o desafio. Tente novamente mais tarde.', mismatch: 'O sinal não corresponde. Aqui está um novo desafio.', then: 'depois', risk: { low: 'BAIXO', medium: 'MÉDIO', high: 'ALTO' }, glyph: { moon: 'lua', paw: 'pata', spark: 'faísca', eye: 'olho', bolt: 'raio', diamond: 'diamante', flame: 'chama', orbit: 'órbita', wolf: 'lobo', star: 'estrela' } },
+  en: { title: 'Let’s make sure you’re human', intro: 'Choose Altcha or a private Frisky challenge. No tracking pixels or image recognition.', continue: 'Continue', fallback: 'Use Frisky Runes', puzzleTitle: 'Frisky Runes', puzzleInstruction: 'Tap the identical signal below. Order matters.', legend: 'Select the matching signal', unlock: 'Unlock signal', privacy: 'No cookies · No fingerprinting · No image recognition', checking: 'Checking…', checkingAnswer: 'Checking your answer…', verified: 'Verified. You may continue.', failed: 'Verification failed. Try Frisky Runes below.', failedPuzzle: 'Verification failed. Choose a new Frisky challenge.', unavailable: 'The challenge could not load. Please try again later.', mismatch: 'That signal didn’t match. Here’s a new challenge.', then: 'then', risk: { low: 'LOW', medium: 'MEDIUM', high: 'HIGH' }, glyph: { moon: 'moon', paw: 'paw', spark: 'spark', eye: 'eye', bolt: 'bolt', diamond: 'diamond', flame: 'flame', orbit: 'orbit', wolf: 'wolf', star: 'star' } },
+  es: { title: 'Confirmemos que eres humano', intro: 'Elige Altcha o un reto privado de Frisky. Sin píxeles de seguimiento ni reconocimiento de imágenes.', continue: 'Continuar', fallback: 'Usar Frisky Runes', puzzleTitle: 'Frisky Runes', puzzleInstruction: 'Toca la señal idéntica. El orden importa.', legend: 'Selecciona la señal correcta', unlock: 'Desbloquear señal', privacy: 'Sin cookies · Sin huella digital · Sin reconocimiento de imágenes', checking: 'Verificando…', checkingAnswer: 'Comprobando tu respuesta…', verified: 'Verificado. Puedes continuar.', failed: 'La verificación falló. Usa Frisky Runes.', failedPuzzle: 'La verificación falló. Elige un nuevo reto Frisky.', unavailable: 'El reto no pudo cargarse. Inténtalo más tarde.', mismatch: 'La señal no coincide. Aquí tienes un nuevo reto.', then: 'seguido de', risk: { low: 'BAJO', medium: 'MEDIO', high: 'ALTO' }, glyph: { moon: 'luna', paw: 'huella', spark: 'destello', eye: 'ojo', bolt: 'rayo', diamond: 'diamante', flame: 'llama', orbit: 'órbita', wolf: 'lobo', star: 'estrella' } },
+  fr: { title: 'Vérifions que vous êtes humain', intro: 'Choisissez Altcha ou un défi Frisky privé. Sans pixels de suivi ni reconnaissance d’image.', continue: 'Continuer', fallback: 'Utiliser Frisky Runes', puzzleTitle: 'Frisky Runes', puzzleInstruction: 'Touchez le signal identique. L’ordre compte.', legend: 'Sélectionnez le bon signal', unlock: 'Déverrouiller le signal', privacy: 'Sans cookies · Sans empreinte numérique · Sans reconnaissance d’image', checking: 'Vérification…', checkingAnswer: 'Vérification de votre réponse…', verified: 'Vérifié. Vous pouvez continuer.', failed: 'La vérification a échoué. Utilisez Frisky Runes.', failedPuzzle: 'La vérification a échoué. Choisissez un nouveau défi Frisky.', unavailable: 'Le défi n’a pas pu être chargé. Réessayez plus tard.', mismatch: 'Ce signal ne correspond pas. Voici un nouveau défi.', then: 'puis', risk: { low: 'FAIBLE', medium: 'MOYEN', high: 'ÉLEVÉ' }, glyph: { moon: 'lune', paw: 'patte', spark: 'éclat', eye: 'œil', bolt: 'éclair', diamond: 'diamant', flame: 'flamme', orbit: 'orbite', wolf: 'loup', star: 'étoile' } },
+  pt: { title: 'Vamos confirmar que você é humano', intro: 'Escolha Altcha ou um desafio privado Frisky. Sem pixels de rastreamento nem reconhecimento de imagens.', continue: 'Continuar', fallback: 'Usar Frisky Runes', puzzleTitle: 'Frisky Runes', puzzleInstruction: 'Toque no sinal idêntico. A ordem importa.', legend: 'Selecione o sinal correto', unlock: 'Desbloquear sinal', privacy: 'Sem cookies · Sem impressão digital · Sem reconhecimento de imagens', checking: 'Verificando…', checkingAnswer: 'Verificando sua resposta…', verified: 'Verificado. Você pode continuar.', failed: 'A verificação falhou. Use Frisky Runes.', failedPuzzle: 'A verificação falhou. Escolha um novo desafio Frisky.', unavailable: 'Não foi possível carregar o desafio. Tente novamente mais tarde.', mismatch: 'O sinal não corresponde. Aqui está um novo desafio.', then: 'depois', risk: { low: 'BAIXO', medium: 'MÉDIO', high: 'ALTO' }, glyph: { moon: 'lua', paw: 'pata', spark: 'faísca', eye: 'olho', bolt: 'raio', diamond: 'diamante', flame: 'chama', orbit: 'órbita', wolf: 'lobo', star: 'estrela' } },
 };
 
 const sliderCopy = {
-  en: { method: 'Use Signal Slider', puzzle: 'Use Frisky Runes instead', title: 'Lock onto the signal', instruction: 'Drag the wolf into the glowing target.', verify: 'Verify position', aria: 'Signal position' },
-  es: { method: 'Usar Signal Slider', puzzle: 'Usar Frisky Runes', title: 'Sintoniza la señal', instruction: 'Arrastra el lobo hasta el objetivo brillante.', verify: 'Verificar posición', aria: 'Posición de la señal' },
-  fr: { method: 'Utiliser Signal Slider', puzzle: 'Utiliser Frisky Runes', title: 'Verrouillez le signal', instruction: 'Faites glisser le loup dans la cible lumineuse.', verify: 'Vérifier la position', aria: 'Position du signal' },
-  pt: { method: 'Usar Signal Slider', puzzle: 'Usar Frisky Runes', title: 'Sintonize o sinal', instruction: 'Arraste o lobo até o alvo brilhante.', verify: 'Verificar posição', aria: 'Posição do sinal' },
+  en: { method: 'Use Signal Slider', puzzle: 'Use Frisky Runes instead', altcha: 'Use Altcha instead', altchaTitle: 'Quiet math check', altchaInstruction: 'Runs a short proof-of-work in your browser. No images, no tracking.', altchaRun: 'Run Altcha', altchaWorking: 'Solving…', title: 'Lock onto the signal', instruction: 'Drag the wolf into the glowing target.', verify: 'Verify position', aria: 'Signal position' },
+  es: { method: 'Usar Signal Slider', puzzle: 'Usar Frisky Runes', altcha: 'Usar Altcha', altchaTitle: 'Chequeo silencioso', altchaInstruction: 'Prueba de trabajo corta en tu navegador. Sin imágenes ni seguimiento.', altchaRun: 'Ejecutar Altcha', altchaWorking: 'Resolviendo…', title: 'Sintoniza la señal', instruction: 'Arrastra el lobo hasta el objetivo brillante.', verify: 'Verificar posición', aria: 'Posición de la señal' },
+  fr: { method: 'Utiliser Signal Slider', puzzle: 'Utiliser Frisky Runes', altcha: 'Utiliser Altcha', altchaTitle: 'Vérification discrète', altchaInstruction: 'Courte preuve de travail dans votre navigateur. Sans images ni suivi.', altchaRun: 'Lancer Altcha', altchaWorking: 'Calcul…', title: 'Verrouillez le signal', instruction: 'Faites glisser le loup dans la cible lumineuse.', verify: 'Vérifier la position', aria: 'Position du signal' },
+  pt: { method: 'Usar Signal Slider', puzzle: 'Usar Frisky Runes', altcha: 'Usar Altcha', altchaTitle: 'Checagem silenciosa', altchaInstruction: 'Prova de trabalho curta no seu navegador. Sem imagens nem rastreamento.', altchaRun: 'Executar Altcha', altchaWorking: 'Resolvendo…', title: 'Sintonize o sinal', instruction: 'Arraste o lobo até o alvo brilhante.', verify: 'Verificar posição', aria: 'Posição do sinal' },
 };
 
 const glyphs = { moon: '◒', paw: '◆', spark: '✦', eye: '◉', bolt: 'ϟ', diamond: '◇', flame: '♨', orbit: '⊛', star: '★' };
@@ -97,6 +103,10 @@ function applyLanguage(language) {
   unlockLabel.textContent = t('unlock');
   privacy.textContent = t('privacy');
   showSlider.textContent = sliderCopy[language].method;
+  showAltcha.textContent = sliderCopy[language].altcha;
+  altchaTitle.textContent = sliderCopy[language].altchaTitle;
+  altchaInstruction.textContent = sliderCopy[language].altchaInstruction;
+  altchaLabel.textContent = sliderCopy[language].altchaRun;
   sliderTitle.textContent = sliderCopy[language].title;
   sliderInstruction.textContent = sliderCopy[language].instruction;
   sliderForm.querySelector('.slider-submit').childNodes[0].textContent = `${sliderCopy[language].verify} `;
@@ -197,20 +207,84 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
   });
 }
 
+function showMethod(method) {
+  puzzleForm.hidden = method !== 'puzzle';
+  sliderForm.hidden = method !== 'slider';
+  altchaPanel.hidden = method !== 'altcha';
+  showPuzzle.hidden = method === 'puzzle';
+  showSlider.hidden = method === 'slider';
+  showAltcha.hidden = method === 'altcha';
+}
+
 showPuzzle.addEventListener('click', async () => {
-  puzzleForm.hidden = false;
-  sliderForm.hidden = true;
-  showSlider.hidden = false;
-  showPuzzle.hidden = true;
+  showMethod('puzzle');
   try { await loadPuzzle(); } catch { setStatus(t('unavailable')); }
 });
 
 showSlider.addEventListener('click', async () => {
-  puzzleForm.hidden = true;
-  showSlider.hidden = true;
-  sliderForm.hidden = false;
-  showPuzzle.hidden = false;
+  showMethod('slider');
   try { await loadSlider(); } catch { setStatus(t('unavailable')); }
+});
+
+showAltcha.addEventListener('click', () => {
+  showMethod('altcha');
+  setStatus('');
+});
+
+async function digestHex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function encodeAltcha(payload) {
+  const json = JSON.stringify(payload);
+  const bytes = new TextEncoder().encode(json);
+  let binary = '';
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/g, '');
+}
+
+altchaRun.addEventListener('click', async () => {
+  altchaRun.disabled = true;
+  altchaLabel.textContent = sliderCopy[currentLanguage].altchaWorking;
+  setStatus(t('checking'));
+  try {
+    const challengeResponse = await fetch(verificationEndpoint('/api/altcha/challenge'), { cache: 'no-store' });
+    if (!challengeResponse.ok) throw new Error('challenge');
+    const challenge = await challengeResponse.json();
+    let number = -1;
+    for (let n = 0; n <= challenge.maxnumber; n += 1) {
+      if (await digestHex(`${challenge.salt}${n}`) === challenge.challenge) {
+        number = n;
+        break;
+      }
+    }
+    if (number < 0) throw new Error('unsolved');
+    const payload = encodeAltcha({
+      algorithm: challenge.algorithm,
+      challenge: challenge.challenge,
+      number,
+      salt: challenge.salt,
+      signature: challenge.signature,
+      maxnumber: challenge.maxnumber,
+    });
+    const verify = await fetch('/api/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ altcha: payload }),
+    });
+    const result = await verify.json();
+    if (result.verified) {
+      completeChallenge(result);
+    } else {
+      setStatus(t('failedPuzzle'));
+    }
+  } catch {
+    setStatus(t('unavailable'));
+  } finally {
+    altchaRun.disabled = false;
+    altchaLabel.textContent = sliderCopy[currentLanguage].altchaRun;
+  }
 });
 
 signalSlider.addEventListener('input', () => {
