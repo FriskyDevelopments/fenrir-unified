@@ -7755,3 +7755,33 @@ p {
 .community-bridge-handoff-actions .button-link {
   white-space: nowrap;
 }
+
+/* DNS-WIZARD: public resolver evidence inside the existing authenticated DNS tab. */
+.dns-lookup-panel { margin: 1.25rem 0 2rem; padding: clamp(1rem, 2vw, 1.5rem); border: 1px solid var(--line-strong); border-radius: 20px; background: var(--surface-soft); }
+.dns-lookup-header, .dns-lookup-summary, .dns-lookup-query-head, .dns-lookup-quick { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.dns-lookup-header { justify-content: space-between; align-items: flex-start; }
+.dns-lookup-header h3 { margin: 0 0 .5rem; }
+.dns-lookup-header p { max-width: 65ch; }
+.dns-lookup-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(130px, .35fr) auto; gap: .75rem; margin: 1rem 0; align-items: end; }
+.dns-lookup-form label { display: grid; gap: .4rem; font-size: .85rem; }
+.dns-lookup-form input, .dns-lookup-form select { width: 100%; min-width: 0; }
+.dns-lookup-boundary, .dns-lookup-query p, .dns-lookup-quick, .dns-lookup-summary time { font-size: .82rem; line-height: 1.6; }
+.dns-lookup-boundary { max-width: 100ch; opacity: .8; }
+.dns-lookup-summary { justify-content: space-between; margin: 1.25rem 0; overflow-wrap: anywhere; }
+.dns-lookup-warning { padding: .8rem 1rem; background: var(--amber-soft); border-left: 2px solid var(--amber); font-size: .88rem; }
+.dns-lookup-resolvers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.dns-lookup-resolver { border: 1px solid var(--line); border-radius: 14px; padding: 1rem; min-width: 0; }
+.dns-lookup-resolver h4 { margin: 0 0 1rem; }
+.dns-lookup-query { padding: .8rem 0; border-top: 1px solid var(--line); }
+.dns-lookup-query-head .status { font-size: .68rem; }
+.dns-lookup-answer { display: grid; gap: .35rem; padding: .6rem 0; }
+.dns-lookup-answer code, .dns-lookup-expected code, .dns-lookup-quick button { overflow-wrap: anywhere; white-space: pre-wrap; }
+.dns-lookup-answer code { font-size: .78rem; }
+.dns-lookup-answer small, .dns-lookup-query-head small { font-size: .7rem; opacity: .7; }
+.dns-lookup-query details { margin: .5rem 0; font-size: .8rem; }
+.dns-lookup-query summary { cursor: pointer; }
+.dns-lookup-comparison { color: var(--teal); }
+@media (max-width: 760px) {
+  .dns-lookup-form, .dns-lookup-resolvers { grid-template-columns: minmax(0, 1fr); }
+  .dns-lookup-form button { width: 100%; }
+}
