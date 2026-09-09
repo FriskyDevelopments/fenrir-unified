@@ -3,12 +3,14 @@ import { dbNotConfiguredResponse, type BillingEnv } from "../_lib/billing-env";
 import { signedMediaProxyPath } from "../_lib/media-proxy";
 import { addAudit, cleanSlug, createProductId, getDomainForOrg, mapRoom, publicUrl } from "../_lib/product-db";
 import { noStoreJson } from "../_lib/responses";
+import { hasDomainChallenge, sameOriginMutation } from "../_lib/domain-lifecycle";
 
 const providers = new Set(["zoom", "webex", "whereby", "google_meet", "other"]);
 
 export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
   const session = await readSession(context.request, context.env);
   if (!session) return noStoreJson({ ok: false, error: "authentication_required" }, { status: 401 });
+  if (!sameOriginMutation(context.request)) return noStoreJson({ ok: false, error: "origin_not_allowed" }, { status: 403 });
   if (!context.env.DB) return dbNotConfiguredResponse();
 
   const body = await context.request.json<{
@@ -22,6 +24,7 @@ export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
   const domainId = typeof body?.domainId === "string" ? body.domainId : "";
   const domain = await getDomainForOrg(context.env.DB, session.frisky_org_id, domainId);
   if (!domain) return noStoreJson({ ok: false, error: "domain_not_found" }, { status: 404 });
+  if (domain.status !== "verified" || domain.certificateStatus !== "active" || !hasDomainChallenge(domain)) return noStoreJson({ ok: false, error: "domain_not_ready" }, { status: 409 });
 
   const targetUrl = typeof body?.targetUrl === "string" ? body.targetUrl.trim() : "";
   if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
@@ -52,7 +55,7 @@ export const onRequestPost: PagesFunction<BillingEnv> = async (context) => {
           cover_image_url, status, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`
       )
-      .bind(roomId, session.frisky_org_id, domain.id, slug, title, provider, targetUrl, publicUrl(domain.domain, slug), coverImageUrl, ts)
+      .bind(roomId, session.frisky_org_id, domain.id, slug, title, provider, targetUrl, publicUrl(domain.domain, `room/${slug}`), coverImageUrl, ts)
       .run();
   } catch (error) {
     const message = error instanceof Error ? error.message : "";

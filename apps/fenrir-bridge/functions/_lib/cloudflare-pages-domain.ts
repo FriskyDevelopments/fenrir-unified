@@ -1,4 +1,5 @@
 import type { BillingEnv } from "./billing-env";
+import { normalizeDnsName } from "../../shared/dns-lookup";
 
 const DEFAULT_ACCOUNT_ID = "e2a7eccb24c4836847fd14d08c499bd0";
 const DEFAULT_PAGES_PROJECT = "fenrir-bridge";
@@ -42,7 +43,7 @@ export function connectToken(env: BillingEnv) {
 }
 
 export function isPublicHostname(host: string) {
-  if (!host || host.length > 253) return false;
+  if (normalizeDnsName(host) !== host || host.includes("_") || host.split(".").length > 10) return false;
   if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false;
   if (host.endsWith(".workers.dev") || host.endsWith(".pages.dev")) return false;
   if (!host.includes(".")) return false;
@@ -51,23 +52,24 @@ export function isPublicHostname(host: string) {
 }
 
 export function isReservedFenrirHost(host: string) {
-  return RESERVED_HOSTS.has(host);
+  return RESERVED_HOSTS.has(host) || host.endsWith(".myfenrir.com");
 }
 
 async function cf<T>(token: string, path: string, init?: RequestInit): Promise<CfEnvelope<T>> {
-  const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {})
-    }
-  });
-  const body = (await response.json().catch(() => null)) as CfEnvelope<T> | null;
-  if (!body) {
-    return { success: false, errors: [{ message: `cloudflare_http_${response.status}` }] };
+  try {
+    const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
+      ...init, redirect: "manual", signal: AbortSignal.timeout(8000),
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+    });
+    const body = await response.json() as CfEnvelope<T> | null;
+    // Only a confirmed missing Pages hostname permits a subsequent create call.
+    if (response.status === 404) return { success: false, errors: [{ code: 404 }] };
+    if (!response.ok || !body || typeof body !== "object" || typeof body.success !== "boolean") throw new Error("cloudflare_unavailable");
+    return body;
+  } catch {
+    // Provider bodies and credentials are never reflected into browser errors.
+    throw new Error("cloudflare_unavailable");
   }
-  return body;
 }
 
 function cfMessage(body: CfEnvelope<unknown>, fallback: string) {
@@ -79,8 +81,9 @@ export async function findZoneOnAccount(token: string, acct: string, hostname: s
   while (labels.length >= 2) {
     const name = labels.join(".");
     const body = await cf<CfZone[]>(token, `/zones?name=${encodeURIComponent(name)}&account.id=${encodeURIComponent(acct)}&status=active`);
-    const zone = body.result?.[0];
-    if (zone?.id) return zone;
+    if (!body.success || !Array.isArray(body.result)) throw new Error("cloudflare_unavailable");
+    const zone = body.result.find((candidate) => candidate.id && candidate.name === name && candidate.status === "active" && candidate.account?.id === acct);
+    if (zone) return zone;
     labels.shift();
   }
   return null;
@@ -91,8 +94,9 @@ export async function getPagesDomain(token: string, acct: string, project: strin
     token,
     `/accounts/${encodeURIComponent(acct)}/pages/projects/${encodeURIComponent(project)}/domains/${encodeURIComponent(hostname)}`
   );
-  if (body.success && body.result) return body.result;
-  return null;
+  if (body.success && body.result && body.result.name === hostname && body.result.id && typeof body.result.status === "string") return body.result;
+  if (!body.success && body.errors?.some((error) => error.code === 404 || error.code === 8000007)) return null;
+  throw new Error("cloudflare_unavailable");
 }
 
 export async function attachPagesDomain(token: string, acct: string, project: string, hostname: string) {
@@ -105,7 +109,7 @@ export async function attachPagesDomain(token: string, acct: string, project: st
     { method: "POST", body: JSON.stringify({ name: hostname }) }
   );
 
-  if (body.success && body.result) return { ok: true as const, domain: body.result, created: true };
+  if (body.success && body.result?.name === hostname && body.result.id && typeof body.result.status === "string") return { ok: true as const, domain: body.result, created: true };
 
   const message = cfMessage(body, "pages_domain_attach_failed");
   if (/already exists|already been added|81007|8000007/i.test(message)) {
@@ -113,12 +117,12 @@ export async function attachPagesDomain(token: string, acct: string, project: st
     if (again) return { ok: true as const, domain: again, created: false };
   }
 
-  return { ok: false as const, error: message };
+  return { ok: false as const, error: "pages_domain_attach_failed" };
 }
 
 export function mapCertificateStatus(pagesDomain: CfPagesDomain | null) {
-  const status = (pagesDomain?.status || pagesDomain?.validation_data?.status || "").toLowerCase();
+  const status = (pagesDomain?.status || "").toLowerCase();
   if (status === "active") return { status: "verified", certificateStatus: "active" };
-  if (status === "deactivated" || status === "error") return { status: "failed", certificateStatus: status };
-  return { status: "pending", certificateStatus: status || "pending" };
+  if (["deactivated", "blocked", "error"].includes(status)) return { status: "failed", certificateStatus: "failed" };
+  return { status: "pending", certificateStatus: "issuing" };
 }
