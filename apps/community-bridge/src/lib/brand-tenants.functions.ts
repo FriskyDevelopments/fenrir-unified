@@ -9,11 +9,7 @@ import {
   brandTenantSchema,
   type BrandTenantRow,
 } from "@/config/brand-tenant";
-import {
-  diffTenantFields,
-  type AuditFieldChange,
-  type BrandAuditEntry,
-} from "@/lib/brand-audit";
+import { diffTenantFields, type AuditFieldChange, type BrandAuditEntry } from "@/lib/brand-audit";
 
 // Tenants y auditoría en Neon (cb_brand_tenants / cb_brand_tenant_audit).
 // Con Neon no hay RLS: el gate de staff se hace EXPLÍCITO aquí, consultando
@@ -121,9 +117,7 @@ export const listBrandTenants = createServerFn({ method: "GET" })
 /** Create or replace a tenant, keyed by brand id. Staff-only (gate explícito). */
 export const saveBrandTenant = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data) =>
-    brandTenantSchema.extend({ id: z.string().uuid().optional() }).parse(data),
-  )
+  .validator((data) => brandTenantSchema.extend({ id: z.string().uuid().optional() }).parse(data))
   .handler(async ({ context, data }) => {
     await assertStaff(context as unknown as AuthedContext);
     const sql = neonSql();
@@ -291,6 +285,9 @@ export const listBrandTenantAudit = createServerFn({ method: "GET" })
 
     return rows.map((row) => ({
       ...row,
-      created_at: row["created_at"] instanceof Date ? (row["created_at"] as Date).toISOString() : row["created_at"],
+      created_at:
+        row["created_at"] instanceof Date
+          ? (row["created_at"] as Date).toISOString()
+          : row["created_at"],
     })) as unknown as BrandAuditEntry[];
   });

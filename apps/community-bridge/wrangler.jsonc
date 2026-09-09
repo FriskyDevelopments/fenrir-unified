@@ -1,4 +1,4 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "workers_dev": false
+  "workers_dev": false,
 }

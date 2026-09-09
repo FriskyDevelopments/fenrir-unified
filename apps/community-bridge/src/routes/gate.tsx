@@ -128,7 +128,12 @@ function NewGatePage() {
     setSaving(true);
     try {
       const saved = await persist({
-        data: { ...config, headline: config.headline.trim(), brand_id: brand.id, community_id: null },
+        data: {
+          ...config,
+          headline: config.headline.trim(),
+          brand_id: brand.id,
+          community_id: null,
+        },
       });
       toast.success("Gate address reserved — setup required");
       setCreatedGate({ id: saved.id, slug: saved.slug });
@@ -191,7 +196,9 @@ function NewGatePage() {
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Fenrir, not a typed browser field, verifies your eligible Telegram groups. Run
-                  <code className="mx-1 rounded bg-background px-1.5 py-0.5 font-mono text-xs">/connect</code>
+                  <code className="mx-1 rounded bg-background px-1.5 py-0.5 font-mono text-xs">
+                    /connect
+                  </code>
                   inside the group you want to protect.
                 </p>
               </div>
@@ -206,7 +213,13 @@ function NewGatePage() {
               </li>
               <li className="flex gap-3">
                 <span className="font-semibold text-primary">2.</span>
-                <span>Inside that group, an admin sends <code className="rounded bg-background px-1.5 py-0.5 font-mono text-xs">/connect</code>. Fenrir verifies the group and adds it to your dashboard.</span>
+                <span>
+                  Inside that group, an admin sends{" "}
+                  <code className="rounded bg-background px-1.5 py-0.5 font-mono text-xs">
+                    /connect
+                  </code>
+                  . Fenrir verifies the group and adds it to your dashboard.
+                </span>
               </li>
               <li className="flex gap-3">
                 <span className="font-semibold text-primary">3.</span>
@@ -321,17 +334,15 @@ function NewGatePage() {
           <p className="text-sm font-semibold text-foreground">Telegram group comes next</p>
           <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-muted-foreground">
             Publish the Gate first. In the protected Telegram group, an admin sends
-            <code className="mx-1 rounded bg-background px-1.5 py-0.5 font-mono text-xs">/connect</code>.
-            Then select that verified group from My Gates. The Gate stays pending until Fenrir
+            <code className="mx-1 rounded bg-background px-1.5 py-0.5 font-mono text-xs">
+              /connect
+            </code>
+            . Then select that verified group from My Gates. The Gate stays pending until Fenrir
             confirms administrator access and Invite Users permission.
           </p>
         </Card>
 
-        <GateForm
-          config={config}
-          onChange={setConfig}
-          slugStatus={slugStatus}
-        />
+        <GateForm config={config} onChange={setConfig} slugStatus={slugStatus} />
       </main>
     </div>
   );

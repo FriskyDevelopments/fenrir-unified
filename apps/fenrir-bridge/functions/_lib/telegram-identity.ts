@@ -43,10 +43,19 @@ export type TelegramIdentityLinkInput = {
 const nowIso = () => new Date().toISOString();
 
 export function telegramBotUsername(env: BillingEnv) {
-  return (env.FENRIR_TELEGRAM_BOT_USERNAME ?? env.MYFENRIR_TELEGRAM_BOT_USERNAME ?? "").replace(/^@/, "").trim();
+  return (
+    env.FENRIR_TELEGRAM_BOT_USERNAME ??
+    env.MYFENRIR_TELEGRAM_BOT_USERNAME ??
+    ""
+  )
+    .replace(/^@/, "")
+    .trim();
 }
 
-export async function createTelegramAccountLinkCode(db: D1Database, session: SessionPayload) {
+export async function createTelegramAccountLinkCode(
+  db: D1Database,
+  session: SessionPayload
+) {
   const code = crypto.randomUUID().replace(/-/g, "").slice(0, 24);
   const now = Date.now();
   const createdAt = new Date(now).toISOString();
@@ -58,86 +67,129 @@ export async function createTelegramAccountLinkCode(db: D1Database, session: Ses
         code, frisky_user_id, frisky_org_id, email, status, created_at, expires_at
       ) VALUES (?, ?, ?, ?, 'pending', ?, ?)`
     )
-    .bind(code, session.frisky_user_id, session.frisky_org_id, session.email, createdAt, expiresAt)
+    .bind(
+      code,
+      session.frisky_user_id,
+      session.frisky_org_id,
+      session.email,
+      createdAt,
+      expiresAt
+    )
     .run();
 
   return { code, expiresAt };
 }
 
-export async function getTelegramIdentityLink(db: D1Database, friskyUserId: string) {
+export async function getTelegramIdentityLink(
+  db: D1Database,
+  friskyUserId: string
+) {
   return db
     .prepare(`SELECT * FROM telegram_identity_links WHERE frisky_user_id = ?`)
     .bind(friskyUserId)
     .first<TelegramIdentityLinkRow>();
 }
 
-export async function consumeTelegramAccountLinkCode(env: BillingEnv, db: D1Database, code: string, claim: TelegramLinkClaim) {
+export async function consumeTelegramAccountLinkCode(
+  env: BillingEnv,
+  db: D1Database,
+  code: string,
+  claim: TelegramLinkClaim
+) {
+  const ts = nowIso();
   const pending = await db
     .prepare(
-      `SELECT * FROM telegram_account_link_codes
-       WHERE code = ? AND status = 'pending'
-       LIMIT 1`
+      `UPDATE telegram_account_link_codes
+       SET status = 'claimed',
+           telegram_user_id = ?,
+           telegram_chat_id = ?,
+           telegram_username = ?,
+           telegram_first_name = ?,
+           claimed_at = ?
+       WHERE code = ? AND status = 'pending' AND expires_at > ?
+       RETURNING code, frisky_user_id, frisky_org_id, email, status, expires_at`
     )
-    .bind(code)
+    .bind(
+      claim.telegramUserId,
+      claim.telegramChatId,
+      claim.telegramUsername ?? null,
+      claim.telegramFirstName ?? null,
+      ts,
+      code,
+      ts
+    )
     .first<TelegramAccountLinkCodeRow>();
 
-  if (!pending) return { ok: false as const, reason: "not_found" };
-  if (Date.parse(pending.expires_at) <= Date.now()) {
-    await db
-      .prepare(`UPDATE telegram_account_link_codes SET status = 'expired' WHERE code = ?`)
+  if (!pending) {
+    const current = await db
+      .prepare(
+        `SELECT status, expires_at FROM telegram_account_link_codes WHERE code = ? LIMIT 1`
+      )
       .bind(code)
+      .first<Pick<TelegramAccountLinkCodeRow, "status" | "expires_at">>();
+    if (!current) return { ok: false as const, reason: "not_found" };
+    if (current.status !== "pending")
+      return { ok: false as const, reason: "not_found" };
+    await db
+      .prepare(
+        `UPDATE telegram_account_link_codes SET status = 'expired' WHERE code = ? AND status = 'pending' AND expires_at <= ?`
+      )
+      .bind(code, ts)
       .run();
     return { ok: false as const, reason: "expired" };
   }
 
-  const ts = nowIso();
-  await db.batch([
-    db
-      .prepare(`DELETE FROM telegram_identity_links WHERE frisky_user_id = ? OR telegram_user_id = ?`)
-      .bind(pending.frisky_user_id, claim.telegramUserId),
-    upsertTelegramIdentityLinkStatement(db, {
-      telegramUserId: claim.telegramUserId,
-      friskyUserId: pending.frisky_user_id,
-      friskyOrgId: pending.frisky_org_id,
-      email: pending.email,
-      telegramUsername: claim.telegramUsername ?? null,
-      telegramFirstName: claim.telegramFirstName ?? null,
-      linkedAt: ts,
-      updatedAt: ts
-    }),
-    db
+  try {
+    await db.batch([
+      db
+        .prepare(
+          `DELETE FROM telegram_identity_links WHERE frisky_user_id = ? OR telegram_user_id = ?`
+        )
+        .bind(pending.frisky_user_id, claim.telegramUserId),
+      upsertTelegramIdentityLinkStatement(db, {
+        telegramUserId: claim.telegramUserId,
+        friskyUserId: pending.frisky_user_id,
+        friskyOrgId: pending.frisky_org_id,
+        email: pending.email,
+        telegramUsername: claim.telegramUsername ?? null,
+        telegramFirstName: claim.telegramFirstName ?? null,
+        linkedAt: ts,
+        updatedAt: ts,
+      }),
+    ]);
+  } catch (error) {
+    await db
       .prepare(
         `UPDATE telegram_account_link_codes
-         SET status = 'claimed',
-             telegram_user_id = ?,
-             telegram_chat_id = ?,
-             telegram_username = ?,
-             telegram_first_name = ?,
-             claimed_at = ?
-         WHERE code = ?`
+         SET status = 'pending', telegram_user_id = NULL, telegram_chat_id = NULL,
+             telegram_username = NULL, telegram_first_name = NULL, claimed_at = NULL
+         WHERE code = ? AND status = 'claimed' AND telegram_user_id = ? AND claimed_at = ?`
       )
-      .bind(
-        claim.telegramUserId,
-        claim.telegramChatId,
-        claim.telegramUsername ?? null,
-        claim.telegramFirstName ?? null,
-        ts,
-        code
-      )
-  ]);
+      .bind(code, claim.telegramUserId, ts)
+      .run()
+      .catch(() => null);
+    throw error;
+  }
 
-  const starsSync = await syncPendingStarsForFriskyUser(db, env, pending.frisky_user_id);
+  const starsSync = await syncPendingStarsForFriskyUser(
+    db,
+    env,
+    pending.frisky_user_id
+  );
 
   return {
     ok: true as const,
     friskyUserId: pending.frisky_user_id,
     friskyOrgId: pending.frisky_org_id,
     email: pending.email,
-    starsApplied: starsSync.applied
+    starsApplied: starsSync.applied,
   };
 }
 
-export function upsertTelegramIdentityLinkStatement(db: D1Database, input: TelegramIdentityLinkInput) {
+export function upsertTelegramIdentityLinkStatement(
+  db: D1Database,
+  input: TelegramIdentityLinkInput
+) {
   const linkedAt = input.linkedAt ?? nowIso();
   const updatedAt = input.updatedAt ?? linkedAt;
   return db

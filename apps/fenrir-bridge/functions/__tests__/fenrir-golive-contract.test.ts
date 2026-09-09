@@ -44,7 +44,7 @@ describe("Fenrir go-live auth contract (Folios#29 bits on myfenrir.com)", () => 
     expect(parseAuthError("token_exchange_failed")).toBe("token_exchange_failed");
     expect(parseAuthError("totally-new-code")).toBe("unknown");
     expect(loginPageErrorMessage("?error=provider_error")).toMatch(/denied or cancelled/i);
-    expect(loginPageErrorMessage("?auth_error=direct_oauth_disabled")).toMatch(/retired/i);
+    expect(loginPageErrorMessage("?auth_error=direct_oauth_disabled")).toMatch(/Better Auth|provider buttons/i);
     expect(authErrorCopy("unknown")).not.toMatch(/password|contraseña/i);
   });
 });

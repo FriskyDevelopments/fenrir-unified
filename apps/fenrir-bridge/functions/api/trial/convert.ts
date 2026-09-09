@@ -3,10 +3,11 @@
 //
 // Requires a card on file (captured earlier via SetupIntent). Creates a Stripe
 // subscription on the same Customer using the saved default payment method; the
-// existing /api/stripe/webhook persists billing_subscriptions on
-// customer.subscription.created. Non-card trials are routed to normal checkout.
+// route persists billing_subscriptions immediately; the webhook remains an
+// idempotent reconciliation path. Non-card trials use normal checkout.
 
 import { readSession } from "../../_lib/auth";
+import { getPrimarySubscriptionForOrg, upsertSubscription } from "../../_lib/billing-db";
 import { dbNotConfiguredResponse, missingEnvResponse, type BillingEnv } from "../../_lib/billing-env";
 import { normalizePaidPlanKey, priceIdForPaidPlan, type PaidPlanKey } from "../../_lib/plan-catalog";
 import { noStoreJson } from "../../_lib/responses";
@@ -72,22 +73,81 @@ export async function onRequestPost(context: { request: Request; env: BillingEnv
   }
 
   try {
-    const subscription = await stripe.subscriptions.create({
+    const existingBilling = await getPrimarySubscriptionForOrg(db, session.frisky_org_id);
+    if (
+      existingBilling &&
+      existingBilling.status !== "canceled" &&
+      existingBilling.status !== "incomplete_expired"
+    ) {
+      const converted = await markTrialStatus(db, trial.id, "converted");
+      return noStoreJson({
+        ok: true,
+        alreadySubscribed: true,
+        plan: existingBilling.plan,
+        subscriptionStatus: existingBilling.status,
+        stripeSubscriptionId: existingBilling.stripe_subscription_id,
+        trial: converted ? publicTrial(converted) : null
+      });
+    }
+
+    // Stripe keeps idempotency keys for a bounded period. The metadata lookup
+    // also finds a prior conversion after that window if the route crashed
+    // after Stripe created the subscription but before D1 was updated.
+    const prior = await stripe.subscriptions.list({
       customer: trial.stripe_customer_id,
-      items: [{ price: priceId }],
-      metadata: {
-        frisky_user_id: session.frisky_user_id,
-        frisky_org_id: session.frisky_org_id,
-        plan,
-        source: "myfenrir_trial_conversion"
-      }
+      status: "all",
+      limit: 100
+    });
+    const priorConversion = prior.data.find(
+      (candidate) =>
+        candidate.metadata?.source === "myfenrir_trial_conversion" &&
+        candidate.metadata?.trial_id === trial.id &&
+        candidate.status !== "canceled" &&
+        candidate.status !== "incomplete_expired"
+    );
+
+    const subscription =
+      priorConversion ??
+      (await stripe.subscriptions.create(
+        {
+          customer: trial.stripe_customer_id,
+          items: [{ price: priceId }],
+          metadata: {
+            frisky_user_id: session.frisky_user_id,
+            frisky_org_id: session.frisky_org_id,
+            trial_id: trial.id,
+            plan,
+            source: "myfenrir_trial_conversion"
+          }
+        },
+        // Stable per trial, not per requested plan. Concurrent requests with
+        // different plans must conflict at Stripe instead of creating two
+        // subscriptions for the same conversion.
+        { idempotencyKey: `myfenrir_trial_conversion:${trial.id}` }
+      ));
+
+    const persistedPlan = normalizePaidPlanKey(subscription.metadata?.plan) ?? plan;
+
+    await upsertSubscription(db, {
+      stripe_subscription_id: subscription.id,
+      frisky_org_id: session.frisky_org_id,
+      stripe_customer_id:
+        typeof subscription.customer === "string"
+          ? subscription.customer
+          : subscription.customer.id,
+      plan: persistedPlan,
+      status: subscription.status,
+      current_period_end: subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000).toISOString()
+        : null,
+      cancel_at_period_end: subscription.cancel_at_period_end
     });
 
     const converted = await markTrialStatus(db, trial.id, "converted");
 
     return noStoreJson({
       ok: true,
-      plan,
+      plan: persistedPlan,
       subscriptionStatus: subscription.status,
       stripeSubscriptionId: subscription.id,
       trial: converted ? publicTrial(converted) : null

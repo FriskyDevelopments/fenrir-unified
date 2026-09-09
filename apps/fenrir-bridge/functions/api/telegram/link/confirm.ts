@@ -12,9 +12,12 @@
 
 import { noStoreJson } from "../../../_lib/responses";
 import { missingEnvResponse, type BillingEnv } from "../../../_lib/billing-env";
-import { consumeLinkCode, resolveSupabaseUserId, upsertAccountLink } from "../../../_lib/account-links";
+import {
+  accountLinksConfigured,
+  consumeLinkCode,
+} from "../../../_lib/account-links";
 import { sendBillingEmail } from "../../../_lib/transactional-email";
-import { consumeTelegramAccountLinkCode, getTelegramIdentityLink } from "../../../_lib/telegram-identity";
+import { consumeTelegramAccountLinkCode } from "../../../_lib/telegram-identity";
 
 type ConfirmBody = {
   code?: string;
@@ -24,19 +27,36 @@ type ConfirmBody = {
   telegramChatId?: string | number | null;
 };
 
-export const onRequestPost: PagesFunction<BillingEnv & { TELEGRAM_LINK_CONFIRM_SECRET?: string; FENRIR_GATEKEEPER_INTERNAL_SECRET?: string }> = async (context) => {
+export const onRequestPost: PagesFunction<
+  BillingEnv & {
+    TELEGRAM_LINK_CONFIRM_SECRET?: string;
+    FENRIR_GATEKEEPER_INTERNAL_SECRET?: string;
+  }
+> = async (context) => {
   const raw = await context.request.text();
   const hmacSecret = context.env.TELEGRAM_LINK_CONFIRM_SECRET?.trim();
   const internalSecret = context.env.FENRIR_GATEKEEPER_INTERNAL_SECRET?.trim();
-  if (!hmacSecret && !internalSecret) return missingEnvResponse("TELEGRAM_LINK_CONFIRM_SECRET");
+  if (!hmacSecret && !internalSecret)
+    return missingEnvResponse("TELEGRAM_LINK_CONFIRM_SECRET");
 
-  const bearer = context.request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() ?? "";
-  const bearerValid = Boolean(internalSecret && bearer && timingSafeEqualText(bearer, internalSecret));
+  const bearer =
+    context.request.headers
+      .get("authorization")
+      ?.replace(/^Bearer\s+/i, "")
+      .trim() ?? "";
+  const bearerValid = Boolean(
+    internalSecret && bearer && timingSafeEqualText(bearer, internalSecret)
+  );
   const provided = context.request.headers.get("x-fenrir-link-signature") ?? "";
   const expected = hmacSecret ? await hmacHex(hmacSecret, raw) : "";
-  const hmacValid = Boolean(hmacSecret && provided && timingSafeEqualHex(provided, expected));
+  const hmacValid = Boolean(
+    hmacSecret && provided && timingSafeEqualHex(provided, expected)
+  );
   if (!bearerValid && !hmacValid) {
-    return noStoreJson({ ok: false, error: "invalid_signature" }, { status: 401 });
+    return noStoreJson(
+      { ok: false, error: "invalid_signature" },
+      { status: 401 }
+    );
   }
 
   let body: ConfirmBody | null = null;
@@ -45,69 +65,64 @@ export const onRequestPost: PagesFunction<BillingEnv & { TELEGRAM_LINK_CONFIRM_S
   } catch {
     return noStoreJson({ ok: false, error: "invalid_json" }, { status: 400 });
   }
-  if (!body?.code || body.telegramId === undefined || body.telegramId === null) {
-    return noStoreJson({ ok: false, error: "missing_code_or_telegram_id" }, { status: 400 });
+  if (
+    !body?.code ||
+    body.telegramId === undefined ||
+    body.telegramId === null
+  ) {
+    return noStoreJson(
+      { ok: false, error: "missing_code_or_telegram_id" },
+      { status: 400 }
+    );
   }
 
-  const d1Result = context.env.DB ? await consumeTelegramAccountLinkCode(context.env, context.env.DB, String(body.code), {
+  const claim = {
     telegramUserId: String(body.telegramId),
     telegramChatId: String(body.telegramChatId ?? body.telegramId),
     telegramUsername: body.telegramUsername ?? undefined,
-    telegramFirstName: body.telegramFirstName ?? undefined
-  }) : null;
+    telegramFirstName: body.telegramFirstName ?? undefined,
+  };
 
   let result: Awaited<ReturnType<typeof consumeLinkCode>>;
-  if (d1Result?.ok) {
-    const supabaseUserId = await resolveSupabaseUserId(context.env, {
-      email: d1Result.email,
-      friskyUserId: d1Result.friskyUserId,
-      telegramId: body.telegramId
-    });
-    if (supabaseUserId) {
-      await upsertAccountLink(context.env, {
-        supabaseUserId,
-        telegramId: body.telegramId,
-        telegramUsername: body.telegramUsername ?? null,
-        telegramFirstName: body.telegramFirstName ?? null,
-        friskyUserId: d1Result.friskyUserId,
-        friskyOrgId: d1Result.friskyOrgId,
-        email: d1Result.email
-      });
-    }
-    result = {
-      ok: true,
-      supabaseUserId: supabaseUserId ?? "",
-      friskyUserId: d1Result.friskyUserId,
-      friskyOrgId: d1Result.friskyOrgId,
-      email: d1Result.email
-    };
-  } else {
+  if (accountLinksConfigured(context.env)) {
     result = await consumeLinkCode(context.env, {
       code: String(body.code),
       telegramId: body.telegramId,
       telegramUsername: body.telegramUsername ?? null,
-      telegramFirstName: body.telegramFirstName ?? null
+      telegramFirstName: body.telegramFirstName ?? null,
     });
-    if (!result.ok && context.env.DB) {
-      const existing = await getTelegramIdentityLink(context.env.DB, String(body.telegramId));
-      if (existing) {
-        result = {
-          ok: true,
-          supabaseUserId: await resolveSupabaseUserId(context.env, {
-            email: existing.email,
-            friskyUserId: existing.frisky_user_id,
-            telegramId: body.telegramId
-          }) ?? "",
-          friskyUserId: existing.frisky_user_id,
-          friskyOrgId: existing.frisky_org_id,
-          email: existing.email
-        };
-      }
+    if (result.ok && context.env.DB) {
+      await consumeTelegramAccountLinkCode(
+        context.env,
+        context.env.DB,
+        String(body.code),
+        claim
+      ).catch((error) =>
+        console.error("telegram_d1_mirror_failed", String(error))
+      );
     }
+  } else {
+    if (!context.env.DB) return missingEnvResponse("DB");
+    const d1Result = await consumeTelegramAccountLinkCode(
+      context.env,
+      context.env.DB,
+      String(body.code),
+      claim
+    );
+    result = d1Result.ok
+      ? {
+          ok: true,
+          supabaseUserId: "",
+          friskyUserId: d1Result.friskyUserId,
+          friskyOrgId: d1Result.friskyOrgId,
+          email: d1Result.email,
+        }
+      : { ok: false, reason: d1Result.reason };
   }
 
   if (!result.ok) {
-    const status = result.reason === "not_found" || result.reason === "expired" ? 409 : 503;
+    const status =
+      result.reason === "not_found" || result.reason === "expired" ? 409 : 503;
     return noStoreJson({ ok: false, error: result.reason }, { status });
   }
 
@@ -118,8 +133,12 @@ export const onRequestPost: PagesFunction<BillingEnv & { TELEGRAM_LINK_CONFIRM_S
       title: "Telegram linked securely",
       body: "Your Telegram identity is now connected to your Frisky Dev account.",
       status: "IDENTITY LINKED",
-      detail: `Telegram ID ${String(body.telegramId)} · You can now continue your MyFenrir community setup.`
-    }).catch((error) => console.error("telegram link confirmation email failed", error));
+      detail: `Telegram ID ${String(
+        body.telegramId
+      )} · You can now continue your MyFenrir community setup.`,
+    }).catch((error) =>
+      console.error("telegram link confirmation email failed", error)
+    );
   }
 
   return noStoreJson({
@@ -128,7 +147,7 @@ export const onRequestPost: PagesFunction<BillingEnv & { TELEGRAM_LINK_CONFIRM_S
     email: result.email,
     supabaseUserId: result.supabaseUserId,
     friskyUserId: result.friskyUserId,
-    friskyOrgId: result.friskyOrgId
+    friskyOrgId: result.friskyOrgId,
   });
 };
 
@@ -140,8 +159,14 @@ async function hmacHex(secret: string, data: string): Promise<string> {
     false,
     ["sign"]
   );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
-  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(data)
+  );
+  return [...new Uint8Array(sig)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function timingSafeEqualHex(a: string, b: string): boolean {
@@ -149,13 +174,15 @@ function timingSafeEqualHex(a: string, b: string): boolean {
   const bv = b.trim().toLowerCase();
   if (av.length !== bv.length) return false;
   let out = 0;
-  for (let i = 0; i < av.length; i += 1) out |= av.charCodeAt(i) ^ bv.charCodeAt(i);
+  for (let i = 0; i < av.length; i += 1)
+    out |= av.charCodeAt(i) ^ bv.charCodeAt(i);
   return out === 0;
 }
 
 function timingSafeEqualText(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let out = 0;
-  for (let i = 0; i < a.length; i += 1) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  for (let i = 0; i < a.length; i += 1)
+    out |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return out === 0;
 }

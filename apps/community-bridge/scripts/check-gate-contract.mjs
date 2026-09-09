@@ -81,6 +81,27 @@ if (!/photoStatus = "review"/.test(accessSource)) {
   fail("photo signal must not be faked as pass before bot-side photo evidence exists");
 }
 
+// SSO boundary: only a one-time token may cross origins. Long-lived Supabase
+// access/refresh tokens must stay in host-isolated storage on Community.
+const handoffSource = read("src/hooks/use-auth.tsx");
+const storageSource = read("src/integrations/supabase/shared-session.ts");
+const ssoSource = read("../fenrir-bridge/functions/api/auth/community-sso.ts");
+for (const needle of ["fenrir_handoff", "verifyOtp", "history.replaceState"]) {
+  if (!handoffSource.includes(needle)) fail(`Community handoff is missing ${needle}`);
+}
+for (const needle of ["hostSessionStorage", "window.localStorage"]) {
+  if (!storageSource.includes(needle)) fail(`host-isolated session storage is missing ${needle}`);
+}
+for (const needle of ["fenrir_handoff", '"Referrer-Policy": "no-referrer"']) {
+  if (!ssoSource.includes(needle)) fail(`Fenrir SSO handoff is missing ${needle}`);
+}
+for (const needle of ["access_token", "refresh_token", "COOKIE_MAX_AGE"]) {
+  if (ssoSource.includes(needle)) fail(`Fenrir SSO must not serialize ${needle}`);
+}
+if (storageSource.includes("writeChunked") || storageSource.includes("COOKIE_MAX_AGE")) {
+  fail("Community must not write refresh tokens into a parent-domain cookie");
+}
+
 const buildRoot = join(root, ".output");
 if (existsSync(buildRoot)) {
   const builtFiles = [];

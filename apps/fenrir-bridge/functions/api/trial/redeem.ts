@@ -93,6 +93,13 @@ export async function onRequestPost(context: { request: Request; env: BillingEnv
 
   if (!trial) {
     await releaseInviteUse(db, code); // roll back the consumed use if the write failed
+    const current = await getTrialForOrg(db, session.frisky_org_id);
+    if (current && (current.status === "active" || current.status === "converted")) {
+      return noStoreJson(
+        { ok: false, error: "trial_already_active", trial: publicTrial(current) },
+        { status: 409 }
+      );
+    }
     return noStoreJson({ ok: false, error: "trial_start_failed" }, { status: 500 });
   }
 

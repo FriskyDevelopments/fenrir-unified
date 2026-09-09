@@ -1,0 +1,103 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  layout:
+    name: Repository layout
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify canonical layout
+        run: bash ops/verify-layout.sh
+
+  fenrir-bridge:
+    name: Fenrir Bridge
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/fenrir-bridge
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            apps/fenrir-bridge/package-lock.json
+            packages/auth/package-lock.json
+      - name: Install shared auth dependencies
+        working-directory: packages/auth
+        run: npm ci
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Test
+        run: npm test
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+      - name: Audit shared auth dependencies
+        working-directory: packages/auth
+        run: npm audit --audit-level=high
+
+  community-bridge:
+    name: Community Bridge
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/community-bridge
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/community-bridge/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Check formatting
+        run: npm run format:check
+      - name: Check identity boundary
+        run: npm run check:gate-contract
+      - name: Build
+        run: npm run build
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+  fenrir-cinema:
+    name: Fenrir Cinema
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/fenrir-cinema
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/fenrir-cinema/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Lint and typecheck
+        run: npm run lint
+      - name: Build
+        run: npm run build

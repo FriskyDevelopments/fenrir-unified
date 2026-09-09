@@ -34,8 +34,14 @@ async function gatekeeperRequest(path: string, init?: RequestInit) {
   });
   const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
   if (!response.ok || body?.["ok"] !== true) {
-    console.error("courtesy_request_failed", response.status, typeof body?.["error"] === "string" ? body["error"] : "invalid_response");
-    throw new Error(typeof body?.["error"] === "string" ? body["error"] : "Courtesy service unavailable");
+    console.error(
+      "courtesy_request_failed",
+      response.status,
+      typeof body?.["error"] === "string" ? body["error"] : "invalid_response",
+    );
+    throw new Error(
+      typeof body?.["error"] === "string" ? body["error"] : "Courtesy service unavailable",
+    );
   }
   return body;
 }
@@ -51,7 +57,12 @@ export const listCourtesies = createServerFn({ method: "GET" })
 export const grantCourtesy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data) =>
-    z.object({ telegramUserId: z.string().regex(/^\d{5,20}$/), duration: z.enum(["30d", "90d", "6m"]) }).parse(data),
+    z
+      .object({
+        telegramUserId: z.string().regex(/^\d{5,20}$/),
+        duration: z.enum(["30d", "90d", "6m"]),
+      })
+      .parse(data),
   )
   .handler(async ({ context, data }) => {
     await requireOwner(context.userId);
@@ -67,7 +78,10 @@ export const revokeCourtesy = createServerFn({ method: "POST" })
   .validator((data) => z.object({ telegramUserId: z.string().regex(/^\d{5,20}$/) }).parse(data))
   .handler(async ({ context, data }) => {
     await requireOwner(context.userId);
-    await gatekeeperRequest(`/api/owner/courtesies?telegramUserId=${encodeURIComponent(data.telegramUserId)}`, {
-      method: "DELETE",
-    });
+    await gatekeeperRequest(
+      `/api/owner/courtesies?telegramUserId=${encodeURIComponent(data.telegramUserId)}`,
+      {
+        method: "DELETE",
+      },
+    );
   });

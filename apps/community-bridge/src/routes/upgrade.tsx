@@ -173,7 +173,10 @@ function UpgradePage() {
           </motion.aside>
         </section>
 
-        <section className="border-t py-12 sm:py-16" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <section
+          className="border-t py-12 sm:py-16"
+          style={{ borderColor: "rgba(255,255,255,0.08)" }}
+        >
           <div className="mb-9 max-w-2xl">
             <p
               className="text-[11px] font-semibold uppercase tracking-[0.22em]"
@@ -217,10 +220,7 @@ function UpgradePage() {
                   <h3 className="mt-7 text-lg font-semibold" style={{ color: "var(--fd-ice)" }}>
                     {cap.title}
                   </h3>
-                  <p
-                    className="mt-2 text-sm leading-relaxed"
-                    style={{ color: "var(--fd-muted)" }}
-                  >
+                  <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--fd-muted)" }}>
                     {cap.body}
                   </p>
                 </motion.article>

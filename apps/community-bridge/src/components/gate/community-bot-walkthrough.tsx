@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { Bot, CheckCircle2, MapPinned, PlugZap, ShieldCheck, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import {
   COMMUNITY_DESTINATION_ADAPTERS,
@@ -46,7 +46,8 @@ const telegramPreviewSteps = [
     label: "Link ID",
     title: "Link your FriskyDev ID",
     message: "Connect this Telegram account to your FriskyDev identity.",
-    detail: "Opens www.myfenrir.com/api/telegram/link/start. Sign in with Better Auth if needed. There is no 6-character paste code.",
+    detail:
+      "Opens www.myfenrir.com/api/telegram/link/start. Sign in with Better Auth if needed. There is no 6-character paste code.",
   },
   {
     label: "Account",
@@ -58,7 +59,8 @@ const telegramPreviewSteps = [
     label: "Group",
     title: "Protected group",
     message: "Add @Myfenrir_bot to the group and grant Invite Users.",
-    detail: "Continue on communities.myfenrir.com. Add @Myfenrir_bot to the group and grant Invite Users.",
+    detail:
+      "Continue on communities.myfenrir.com. Add @Myfenrir_bot to the group and grant Invite Users.",
   },
   {
     label: "Mapping",
@@ -115,7 +117,8 @@ export function CommunityBotWalkthrough({
     visibleMappings.find((mapping) => mapping.communityId === selectedCommunityId) ??
     visibleMappings[0];
   const activeCommunityId = selectedMapping.communityId;
-  const activeCommunityLabel = selectedMapping.communityLabel ||
+  const activeCommunityLabel =
+    selectedMapping.communityLabel ||
     (activeCommunityId === communityId ? communityLabel : activeCommunityId);
   const linkedTelegramLabel = linkedTelegram?.username
     ? `@${linkedTelegram.username}`
@@ -125,19 +128,22 @@ export function CommunityBotWalkthrough({
         ? `Telegram ID ${linkedTelegram.id}`
         : null;
   const telegramLinked = Boolean(linkedTelegram?.id);
-  const stepComplete = [
-    telegramLinked,
-    telegramLinked,
-    mappingVerified,
-    mappingVerified,
-    telegramLinked && mappingVerified,
-  ];
+  const stepComplete = useMemo(
+    () => [
+      telegramLinked,
+      telegramLinked,
+      mappingVerified,
+      mappingVerified,
+      telegramLinked && mappingVerified,
+    ],
+    [telegramLinked, mappingVerified],
+  );
 
   useEffect(() => {
     if (!telegramPreviewOpen) return;
     const firstPending = stepComplete.findIndex((complete) => !complete);
     setTelegramPreviewStep(firstPending === -1 ? 3 : firstPending);
-  }, [telegramPreviewOpen, telegramLinked, mappingVerified]);
+  }, [telegramPreviewOpen, stepComplete]);
 
   function selectTelegramPreviewStep(index: number) {
     setTelegramPreviewStep(index);
@@ -186,7 +192,8 @@ export function CommunityBotWalkthrough({
                   </p>
                   <p className="mt-1 text-sm font-semibold text-foreground">
                     {mapping.communityLabel ||
-                      (mapping.communityId === communityId || mapping.communityId === "myfenrir-core"
+                      (mapping.communityId === communityId ||
+                      mapping.communityId === "myfenrir-core"
                         ? communityLabel
                         : mapping.communityId)}
                   </p>
@@ -289,7 +296,13 @@ export function CommunityBotWalkthrough({
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold">{adapter.label}</span>
                   <span
-                    className={isLive ? "text-emerald-400" : isReady ? "text-primary" : "text-muted-foreground"}
+                    className={
+                      isLive
+                        ? "text-emerald-400"
+                        : isReady
+                          ? "text-primary"
+                          : "text-muted-foreground"
+                    }
                   >
                     ●
                   </span>
@@ -355,31 +368,43 @@ export function CommunityBotWalkthrough({
             </div>
 
             <div className="w-full rounded-2xl border border-border/70 bg-background/60 p-3 shadow-[0_20px_60px_-32px_rgba(0,0,0,.8)]">
-              <div className="grid grid-cols-5 gap-1" role="tablist" aria-label="Telegram setup steps">
-                  {telegramPreviewSteps.map((item, index) => (
-                    <button
-                      key={item.label}
-                      type="button"
-                      role="tab"
-                      aria-selected={telegramPreviewStep === index}
-                      onClick={() => selectTelegramPreviewStep(index)}
-                      className={`group relative overflow-hidden rounded-lg border px-1 py-2 text-center transition duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${telegramPreviewStep === index ? "border-primary/70 bg-primary/15 text-foreground shadow-[0_0_18px_hsl(var(--primary)/.2)]" : "border-border/60 bg-card/50 text-muted-foreground hover:border-primary/40 hover:text-foreground"}`}
+              <div
+                className="grid grid-cols-5 gap-1"
+                role="tablist"
+                aria-label="Telegram setup steps"
+              >
+                {telegramPreviewSteps.map((item, index) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    role="tab"
+                    aria-selected={telegramPreviewStep === index}
+                    onClick={() => selectTelegramPreviewStep(index)}
+                    className={`group relative overflow-hidden rounded-lg border px-1 py-2 text-center transition duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${telegramPreviewStep === index ? "border-primary/70 bg-primary/15 text-foreground shadow-[0_0_18px_hsl(var(--primary)/.2)]" : "border-border/60 bg-card/50 text-muted-foreground hover:border-primary/40 hover:text-foreground"}`}
+                  >
+                    {telegramPreviewStep === index ? (
+                      <span className="absolute inset-0 animate-pulse bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
+                    ) : null}
+                    <span className="relative block text-[6px] font-black uppercase tracking-[0.12em] text-primary">
+                      Step {index + 1}
+                    </span>
+                    <span className="relative mt-0.5 block text-[7px] font-bold uppercase tracking-[0.08em]">
+                      {item.label}
+                    </span>
+                    <span
+                      className={`relative mt-1 block text-[6px] font-black uppercase tracking-[0.1em] ${stepComplete[index] ? "text-emerald-400" : telegramPreviewStep === index ? "animate-bounce text-foreground" : "text-amber-400"}`}
                     >
-                      {telegramPreviewStep === index ? <span className="absolute inset-0 animate-pulse bg-gradient-to-r from-transparent via-primary/10 to-transparent" /> : null}
-                      <span className="relative block text-[6px] font-black uppercase tracking-[0.12em] text-primary">Step {index + 1}</span>
-                      <span className="relative mt-0.5 block text-[7px] font-bold uppercase tracking-[0.08em]">{item.label}</span>
-                      <span className={`relative mt-1 block text-[6px] font-black uppercase tracking-[0.1em] ${stepComplete[index] ? "text-emerald-400" : telegramPreviewStep === index ? "animate-bounce text-foreground" : "text-amber-400"}`}>
-                        {stepComplete[index]
-                          ? "✓ Complete"
-                          : telegramPreviewStep === index
-                            ? "○ Pending · Selected"
-                            : "○ Pending · Tap"}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                      {stepComplete[index]
+                        ? "✓ Complete"
+                        : telegramPreviewStep === index
+                          ? "○ Pending · Selected"
+                          : "○ Pending · Tap"}
+                    </span>
+                  </button>
+                ))}
+              </div>
               <div className="space-y-3 pt-4">
-                  <AnimatePresence mode="wait">
+                <AnimatePresence mode="wait">
                   <motion.div
                     key={telegramPreviewStep}
                     initial={{ opacity: 0, scale: 0.86, y: 14 }}
@@ -388,10 +413,14 @@ export function CommunityBotWalkthrough({
                     transition={{ type: "spring", stiffness: 340, damping: 24 }}
                     className={`rounded-2xl p-4 text-[11px] leading-relaxed text-foreground shadow-sm ${telegramPreviewStep === 4 ? "border border-emerald-400/25 bg-emerald-400/10" : "border border-border/60 bg-card/70"}`}
                   >
-                    <p className="font-semibold">MyFenrir Bot · Step {telegramPreviewStep + 1} of 5</p>
-                    <p className="mt-1 font-semibold text-primary">{telegramPreviewSteps[telegramPreviewStep].title}</p>
+                    <p className="font-semibold">
+                      MyFenrir Bot · Step {telegramPreviewStep + 1} of 5
+                    </p>
+                    <p className="mt-1 font-semibold text-primary">
+                      {telegramPreviewSteps[telegramPreviewStep].title}
+                    </p>
                     <p className="mt-2">{telegramPreviewSteps[telegramPreviewStep].message}</p>
-                      <p className="mt-2 text-[10px] text-muted-foreground">
+                    <p className="mt-2 text-[10px] text-muted-foreground">
                       {telegramPreviewSteps[telegramPreviewStep].detail}
                     </p>
                     {telegramPreviewStep === 1 ? (
@@ -418,21 +447,20 @@ export function CommunityBotWalkthrough({
                       </div>
                     ) : null}
                   </motion.div>
-                  </AnimatePresence>
-                  <a
-                    href={telegramStepLinks[telegramPreviewStep]}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block w-full rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5 text-center text-[10px] font-semibold text-primary transition hover:border-primary/70 hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                  >
-                    {telegramLaunchLabels[telegramPreviewStep]} ↗
-                  </a>
-                </div>
+                </AnimatePresence>
+                <a
+                  href={telegramStepLinks[telegramPreviewStep]}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block w-full rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5 text-center text-[10px] font-semibold text-primary transition hover:border-primary/70 hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                >
+                  {telegramLaunchLabels[telegramPreviewStep]} ↗
+                </a>
               </div>
+            </div>
           </motion.div>
         ) : null}
       </div>
-
     </Card>
   );
 }

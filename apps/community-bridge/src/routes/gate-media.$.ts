@@ -19,8 +19,7 @@ export const Route = createFileRoute("/gate-media/$")({
           return new Response("Not found", { status: 404 });
         }
 
-        const supabaseUrl =
-          process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"];
+        const supabaseUrl = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"];
         if (!supabaseUrl) return new Response("Media service unavailable", { status: 503 });
 
         const objectUrl = new URL(

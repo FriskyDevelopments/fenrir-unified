@@ -9,16 +9,16 @@ en la misma app y el mismo host que la puerta del miembro** (`/g/$slug`).
 
 No están separados. Comparten:
 
-| Qué comparten | Dónde |
-|---|---|
-| El mismo bundle y el mismo router | `src/routeTree.gen.ts` — `upgrade.tsx`, `admin.tsx` y `g.$slug.tsx` son rutas hermanas de `src/routes/` |
-| El mismo shell y providers | `src/routes/__root.tsx` → `BrandProvider` + `AuthProvider` + `Toaster` envuelven las tres |
-| El mismo host declarado | `src/config/brands.ts:114` — `hosts: ["myfenrir.com", "www.myfenrir.com", "communities.myfenrir.com"]` en el brand `myfenrir` |
-| La misma cookie de sesión | `src/integrations/supabase/shared-session.ts:29` — dominio `.myfenrir.com` para todas las superficies |
-| El mismo favicon y `<head>` | `__root.tsx` — `title: "MyFenrir"`, `icon: /fenrir-mark.svg` |
+| Qué comparten                     | Dónde                                                                                                                         |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| El mismo bundle y el mismo router | `src/routeTree.gen.ts` — `upgrade.tsx`, `admin.tsx` y `g.$slug.tsx` son rutas hermanas de `src/routes/`                       |
+| El mismo shell y providers        | `src/routes/__root.tsx` → `BrandProvider` + `AuthProvider` + `Toaster` envuelven las tres                                     |
+| El mismo host declarado           | `src/config/brands.ts:114` — `hosts: ["myfenrir.com", "www.myfenrir.com", "communities.myfenrir.com"]` en el brand `myfenrir` |
+| La misma cookie de sesión         | `src/integrations/supabase/shared-session.ts:29` — dominio `.myfenrir.com` para todas las superficies                         |
+| El mismo favicon y `<head>`       | `__root.tsx` — `title: "MyFenrir"`, `icon: /fenrir-mark.svg`                                                                  |
 
 `src/config/brands.ts:19` incluso comenta que `communities.*` "es la superficie
-separada del Community Bridge" — pero la separación es de *brand config*, no de
+separada del Community Bridge" — pero la separación es de _brand config_, no de
 dominio ni de despliegue. Es el mismo Worker sirviendo las tres rutas.
 
 ### Lo único que ya está bien

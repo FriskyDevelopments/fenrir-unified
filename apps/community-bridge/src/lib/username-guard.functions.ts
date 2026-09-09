@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { neonSql } from "@/lib/neon.server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Escaneo de nombres de usuario / handles.
@@ -20,7 +21,7 @@ import { neonSql } from "@/lib/neon.server";
 const NOT_STAFF = "Only staff can manage blocked terms.";
 
 type AuthedContext = {
-  supabase: { from: (table: string) => any };
+  supabase: SupabaseClient;
   userId: string;
   claims: Record<string, unknown>;
 };
@@ -46,7 +47,10 @@ export function normalizeHandle(input: string): string {
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
-    .replace(/[04135$@]/g, (c) => ({ "0": "o", "4": "a", "1": "i", "3": "e", "5": "s", "$": "s", "@": "a" })[c] ?? c)
+    .replace(
+      /[04135$@]/g,
+      (c) => ({ "0": "o", "4": "a", "1": "i", "3": "e", "5": "s", $: "s", "@": "a" })[c] ?? c,
+    )
     .replace(/[^a-z0-9]/g, "");
 }
 

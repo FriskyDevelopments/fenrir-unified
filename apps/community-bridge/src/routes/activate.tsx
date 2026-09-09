@@ -152,7 +152,9 @@ function ActivatePage() {
       await refreshRole();
       // `telegramId` is supplied by the shared auth context and updates on the
       // next render. The redirect effect above handles the successful state.
-      setLinkCheckMessage("Still waiting for Telegram. If you just pressed Start, give it a moment and check again.");
+      setLinkCheckMessage(
+        "Still waiting for Telegram. If you just pressed Start, give it a moment and check again.",
+      );
     } finally {
       setCheckingLink(false);
     }
@@ -288,9 +290,9 @@ function ActivatePage() {
             <div className="text-sm">
               <p className="font-medium text-foreground">Secure Telegram linking</p>
               <ol className="mt-2 space-y-1.5 text-muted-foreground">
-              <li>1. Open a private, single-use Telegram link.</li>
-              <li>2. Press Start in the MyFenrir bot.</li>
-              <li>3. Return here and confirm the connection.</li>
+                <li>1. Open a private, single-use Telegram link.</li>
+                <li>2. Press Start in the MyFenrir bot.</li>
+                <li>3. Return here and confirm the connection.</li>
               </ol>
             </div>
           </div>
@@ -311,9 +313,12 @@ function ActivatePage() {
         </Button>
         {linkStarted ? (
           <div className="mt-4 rounded-xl border border-primary/25 bg-primary/[.06] p-4">
-            <p className="text-sm font-medium text-foreground">Finish in Telegram, then come right back.</p>
+            <p className="text-sm font-medium text-foreground">
+              Finish in Telegram, then come right back.
+            </p>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              A link is valid for 15 minutes and works once. Use the newly opened Telegram tab, not an older message in your bot history.
+              A link is valid for 15 minutes and works once. Use the newly opened Telegram tab, not
+              an older message in your bot history.
             </p>
             <Button
               type="button"
@@ -326,7 +331,11 @@ function ActivatePage() {
               {checkingLink ? <Loader2 className="animate-spin" /> : <RefreshCw />}
               {checkingLink ? "Checking Telegram…" : "I linked Telegram — check status"}
             </Button>
-            {linkCheckMessage ? <p className="mt-2 text-xs text-muted-foreground" role="status">{linkCheckMessage}</p> : null}
+            {linkCheckMessage ? (
+              <p className="mt-2 text-xs text-muted-foreground" role="status">
+                {linkCheckMessage}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </AuthLayout>

@@ -258,11 +258,7 @@ function EditGatePage() {
           </p>
         </Card>
 
-        <GateForm
-          config={config}
-          onChange={(next) => setConfig(next)}
-          slugStatus={slugStatus}
-        />
+        <GateForm config={config} onChange={(next) => setConfig(next)} slugStatus={slugStatus} />
       </main>
     </div>
   );

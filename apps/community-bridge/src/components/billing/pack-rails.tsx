@@ -252,7 +252,9 @@ export function PackRails() {
           return;
         }
         if (rail === "crypto") {
-          const { url } = await createFoundersNowPaymentsCheckout({ data: { billingPeriod: cryptoPeriod } });
+          const { url } = await createFoundersNowPaymentsCheckout({
+            data: { billingPeriod: cryptoPeriod },
+          });
           window.location.href = url;
           return;
         }

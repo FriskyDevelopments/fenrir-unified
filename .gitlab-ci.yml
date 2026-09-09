@@ -44,7 +44,9 @@ fenrir-bridge:install-and-build:
   script:
     - cd apps/fenrir-bridge
     - npm ci
+    - npm run typecheck
     - npm run build
+    - npm audit --audit-level=high
 
 # Hermetic auth tests: Supabase, Neon, and every OAuth provider fetch are mocked,
 # so this runs with no network egress and no secrets.
@@ -59,6 +61,25 @@ fenrir-bridge:test:
     - npm ci
     - npm test
 
+# Community is a separate package and must be reproducible on its own. Keep
+# install deterministic: a stale lockfile must fail here, never silently fall
+# back to `npm install` during deployment.
+community-bridge:verify:
+  stage: verify
+  image: node:22
+  rules:
+    - exists:
+        - apps/community-bridge/package.json
+  script:
+    - cd apps/community-bridge
+    - npm ci
+    - npm run typecheck
+    - npm run lint
+    - npm run format:check
+    - npm run check:gate-contract
+    - npm run build
+    - npm audit --audit-level=high
+
 fenrir-cinema:install-and-build:
   stage: verify
   image: node:22
@@ -67,8 +88,10 @@ fenrir-cinema:install-and-build:
         - apps/fenrir-cinema/package.json
   script:
     - cd apps/fenrir-cinema
-    - npm install
+    - npm ci
+    - npm run lint
     - npm run build
+    - npm audit --audit-level=high
 
 # Production deploy for fenrir-bridge to Cloudflare Pages.
 #
@@ -90,6 +113,7 @@ fenrir-bridge:deploy:
   image: node:22
   needs:
     - fenrir-bridge:install-and-build
+    - fenrir-bridge:test
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $CLOUDFLARE_API_TOKEN'
       when: manual
@@ -140,6 +164,7 @@ fenrir-bridge:deploy:quality:
   image: node:22
   needs:
     - fenrir-bridge:install-and-build
+    - fenrir-bridge:test
   rules:
     - if: '$CI_COMMIT_BRANCH == "quality" && $CLOUDFLARE_API_TOKEN'
       when: on_success
@@ -166,6 +191,8 @@ fenrir-bridge:deploy:quality:
 community-bridge:deploy:quality:
   stage: deploy
   image: node:22
+  needs:
+    - community-bridge:verify
   rules:
     - if: '$CI_COMMIT_BRANCH == "quality" && $CLOUDFLARE_API_TOKEN'
       when: on_success
@@ -176,7 +203,7 @@ community-bridge:deploy:quality:
     - cd apps/community-bridge
     # Belt-and-suspenders: never let a project-wide prod bot var leak into Quality.
     - unset VITE_TELEGRAM_BOT_USERNAME || true
-    - npm ci || npm install
+    - npm ci
     - bash scripts/deploy-quality.sh
     - |
       url="https://quality.communities.myfenrir.com/"
@@ -193,6 +220,8 @@ community-bridge:deploy:quality:
 community-bridge:deploy:
   stage: deploy
   image: node:22
+  needs:
+    - community-bridge:verify
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $CLOUDFLARE_API_TOKEN'
       when: manual
@@ -207,7 +236,7 @@ community-bridge:deploy:
         echo "PROD_TELEGRAM_BOT_USERNAME not set — refusing to build prod with a dev-bot fallback."
         exit 1
       fi
-    - npm ci || npm install
+    - npm ci
     - VITE_TELEGRAM_BOT_USERNAME="$PROD_TELEGRAM_BOT_USERNAME" bash scripts/deploy-production.sh
     - |
       url="https://communities.myfenrir.com/"

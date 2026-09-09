@@ -8,7 +8,8 @@
  */
 import { execFileSync } from "node:child_process";
 
-const workerName = process.env.COMMUNITY_BRIDGE_WORKER_NAME ||
+const workerName =
+  process.env.COMMUNITY_BRIDGE_WORKER_NAME ||
   "frisky-developments-llc-fenrir-unified-fenrir-unified-apps-community-bridge";
 
 const required = [

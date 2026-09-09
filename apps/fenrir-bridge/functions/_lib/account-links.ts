@@ -194,8 +194,10 @@ export async function upsertAccountLink(
 
   const rows = (await res?.json().catch(() => null)) as AccountLinkRow[] | null;
 
-  // Best-effort legacy mirrors (transition only; never throws).
-  if (telegramId !== null) {
+  // Best-effort legacy mirrors (transition only; never throws). Never mirror a
+  // write that Supabase rejected (for example, a Telegram ID already linked
+  // to another account).
+  if (res?.ok && telegramId !== null) {
     await mirrorLegacySignals(env, input.supabaseUserId, telegramId, input.telegramUsername ?? null);
   }
 
@@ -237,31 +239,46 @@ export async function consumeLinkCode(
 > {
   if (!accountLinksConfigured(env)) return { ok: false, reason: "not_configured" };
   const base = restBase(env);
-
-  const r = await fetch(
-    `${base}/link_codes?code=eq.${encodeURIComponent(input.code)}&status=eq.pending&select=*&limit=1`,
-    { headers: serviceHeaders(env) }
-  ).catch(() => null);
-  const rows = (await r?.json().catch(() => null)) as LinkCodeRow[] | null;
-  const pending = rows?.[0];
-  if (!pending) return { ok: false, reason: "not_found" };
-
-  if (Date.parse(pending.expires_at) <= Date.now()) {
-    await fetch(`${base}/link_codes?code=eq.${encodeURIComponent(input.code)}`, {
-      method: "PATCH",
-      headers: serviceHeaders(env, { Prefer: "return=minimal" }),
-      body: JSON.stringify({ status: "expired" })
-    }).catch(() => null);
-    return { ok: false, reason: "expired" };
-  }
-
   const telegramId = toTelegramBigInt(input.telegramId);
+  if (telegramId === null) return { ok: false, reason: "write_failed" };
 
-  await fetch(`${base}/link_codes?code=eq.${encodeURIComponent(input.code)}`, {
-    method: "PATCH",
-    headers: serviceHeaders(env, { Prefer: "return=minimal" }),
-    body: JSON.stringify({ status: "consumed", consumed_at: nowIso(), telegram_id: telegramId })
-  }).catch(() => null);
+  // Claim in one conditional write. Two concurrent consumers can both read a
+  // pending code, but only one can change pending -> consumed and receive the
+  // row back. The previous read-then-unconditional-patch sequence allowed both
+  // Telegram identities to continue as winners.
+  const consumedAt = nowIso();
+  const claim = await fetch(
+    `${base}/link_codes?code=eq.${encodeURIComponent(input.code)}` +
+      `&status=eq.pending&expires_at=gt.${encodeURIComponent(consumedAt)}&select=*`,
+    {
+      method: "PATCH",
+      headers: serviceHeaders(env, { Prefer: "return=representation" }),
+      body: JSON.stringify({ status: "consumed", consumed_at: consumedAt, telegram_id: telegramId })
+    }
+  ).catch(() => null);
+  const claimedRows = (await claim?.json().catch(() => null)) as LinkCodeRow[] | null;
+  const pending = claim?.ok ? claimedRows?.[0] : null;
+
+  if (!pending) {
+    const current = await fetch(
+      `${base}/link_codes?code=eq.${encodeURIComponent(input.code)}&select=status,expires_at&limit=1`,
+      { headers: serviceHeaders(env) }
+    ).catch(() => null);
+    const rows = (await current?.json().catch(() => null)) as Pick<LinkCodeRow, "status" | "expires_at">[] | null;
+    const row = rows?.[0];
+    if (row?.status === "pending" && Date.parse(row.expires_at) <= Date.now()) {
+      await fetch(
+        `${base}/link_codes?code=eq.${encodeURIComponent(input.code)}&status=eq.pending`,
+        {
+          method: "PATCH",
+          headers: serviceHeaders(env, { Prefer: "return=minimal" }),
+          body: JSON.stringify({ status: "expired" })
+        }
+      ).catch(() => null);
+      return { ok: false, reason: "expired" };
+    }
+    return { ok: false, reason: "not_found" };
+  }
 
   const upsert = await upsertAccountLink(env, {
     supabaseUserId: pending.supabase_user_id,
@@ -272,7 +289,22 @@ export async function consumeLinkCode(
     friskyOrgId: pending.frisky_org_id,
     email: pending.email
   });
-  if (!upsert.ok) return { ok: false, reason: "write_failed" };
+  if (!upsert.ok) {
+    // Restore only the exact claim made above. If another actor changed the
+    // row after our claim, the filters prevent this compensation from
+    // resurrecting their state.
+    await fetch(
+      `${base}/link_codes?code=eq.${encodeURIComponent(input.code)}` +
+        `&status=eq.consumed&telegram_id=eq.${telegramId}` +
+        `&consumed_at=eq.${encodeURIComponent(consumedAt)}`,
+      {
+        method: "PATCH",
+        headers: serviceHeaders(env, { Prefer: "return=minimal" }),
+        body: JSON.stringify({ status: "pending", consumed_at: null, telegram_id: null })
+      }
+    ).catch(() => null);
+    return { ok: false, reason: "write_failed" };
+  }
 
   return {
     ok: true,

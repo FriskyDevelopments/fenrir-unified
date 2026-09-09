@@ -15,5 +15,39 @@ export default defineConfig({
   },
   vite: {
     plugins: [mcpPlugin()],
+    build: {
+      rolldownOptions: {
+        output: {
+          // Keep the public entry below Vite's 500 kB warning threshold. The
+          // app has large, cacheable framework/auth dependencies; splitting
+          // them avoids making every route redownload one monolithic entry.
+          codeSplitting: {
+            maxSize: 450_000,
+            groups: [
+              {
+                name: "vendor-supabase",
+                test: /node_modules\/(?:@supabase|supabase)/,
+                includeDependenciesRecursively: true,
+              },
+              {
+                name: "vendor-tanstack",
+                test: /node_modules\/@tanstack/,
+                includeDependenciesRecursively: true,
+              },
+              {
+                name: "vendor-motion",
+                test: /node_modules\/(?:motion|framer-motion)/,
+                includeDependenciesRecursively: true,
+              },
+              {
+                name: "vendor-react",
+                test: /node_modules\/(?:react|react-dom|scheduler)\//,
+                includeDependenciesRecursively: true,
+              },
+            ],
+          },
+        },
+      },
+    },
   },
 });

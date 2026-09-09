@@ -55,7 +55,11 @@ async function handleCallback(request: Request): Promise<Response> {
 
   const expected = readCookie(request.headers.get("cookie"), STATE_COOKIE);
   if (!expected || expected !== state) {
-    return html(400, "Verification could not be trusted", "State mismatch — start again from your Gate.");
+    return html(
+      400,
+      "Verification could not be trusted",
+      "State mismatch — start again from your Gate.",
+    );
   }
 
   const clientSecret = env("DISCORD_CLIENT_SECRET");
@@ -82,11 +86,16 @@ async function handleCallback(request: Request): Promise<Response> {
         client_secret: clientSecret,
       }).toString(),
     });
-    const token = (await tokenResponse.json().catch(() => null)) as
-      | { access_token?: string; token_type?: string }
-      | null;
+    const token = (await tokenResponse.json().catch(() => null)) as {
+      access_token?: string;
+      token_type?: string;
+    } | null;
     if (!tokenResponse.ok || !token?.access_token) {
-      return html(502, "Discord verification failed", "The identity provider rejected the exchange.");
+      return html(
+        502,
+        "Discord verification failed",
+        "The identity provider rejected the exchange.",
+      );
     }
 
     // Write the verified-member role-connection metadata for this application.

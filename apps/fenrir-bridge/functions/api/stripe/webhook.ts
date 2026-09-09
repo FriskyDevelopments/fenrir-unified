@@ -17,6 +17,7 @@ import {
   getInviteCode,
   getTrialBySetupIntent,
   isCodeExpired,
+  releaseInviteUse,
   setTrialCardOnFile
 } from "../../_lib/trials-db";
 
@@ -138,7 +139,11 @@ async function handleTrialSetupIntentSucceeded(env: BillingEnv, setupIntent: Str
   const claimed = await claimInviteUse(db, trial.code);
   if (!claimed) return;
 
-  await activateTrial(db, trial.id, { durationDays: invite.duration_days, cardOnFile: true });
+  const activated = await activateTrial(db, trial.id, {
+    durationDays: invite.duration_days,
+    cardOnFile: true
+  });
+  if (!activated) await releaseInviteUse(db, trial.code);
 }
 
 export async function onRequestPost(context: { request: Request; env: BillingEnv }) {
