@@ -137,7 +137,7 @@ WRANGLER_SEND_METRICS=false bash scripts/run-with-node-lts.sh node_modules/.bin/
 ```
 
 - TypeScript passed. Vite production build passed (539 modules).
-- New focused suite passed **29/29**, covering input validation, resolver evidence,
+- New focused suite passed **30/30**, covering input validation, resolver evidence,
   NXDOMAIN/error distinctions, malformed/truncated responses, CNAME ownership and
   cycles, body timeout/cancellation, exact TXT/CNAME matching, signed-session
   authorization, invalid queries, no provider writes, no auth-bypassing browser
@@ -146,7 +146,7 @@ WRANGLER_SEND_METRICS=false bash scripts/run-with-node-lts.sh node_modules/.bin/
   `node:sqlite`, covering pending duplicates, simultaneous reservations, expired
   lease takeover, stale token/lease completion, provider failure, ownership before
   attachment, exact public host/tenant isolation, and old/new room URLs.
-- The current-main full Vitest suite passed **249/249** across 34 files. Separate
+- The current-main full Vitest suite passed **255/255** across 35 files. Separate
   auth Worker/redirect tests passed **74/74**, and the auth redirect script passed
   **9 checks**.
   The old-base Apple fixture failure does not occur on current main; no old auth
@@ -166,3 +166,19 @@ WRANGLER_SEND_METRICS=false bash scripts/run-with-node-lts.sh node_modules/.bin/
 
 Local unit tests do not claim a credentialed production journey or a successful
 customer hostname attachment. The release coordinator owns that evidence.
+
+
+## Cloudflare runtime correction
+
+The installed workerd runtime rejects fetch `redirect: "error"` although Node
+accepts it. Public DNS and Cloudflare provider requests now use `manual` and reject
+non-2xx responses. A DNS redirect test and five provider redirect tests ensure that
+301/302/303/307/308 cannot forward credentials, manufacture verified evidence, or
+trigger a speculative hostname create after a redirected read.
+
+The final 255-test Vitest suite and TypeScript passed. A real Miniflare/workerd
+invocation ran this exact DNS engine against Cloudflare and Google for all seven
+record types on `example.com` with no resolver errors. The same runtime rejected
+a synthetic provider redirect without creation or a redirect-target request.
+An independent review exercised 50 redirect scenarios across both applications.
+These checks do not claim a customer hostname attachment or production user login.

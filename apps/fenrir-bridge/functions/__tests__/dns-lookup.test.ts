@@ -29,13 +29,23 @@ describe("DNS lookup evidence", () => {
     const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
       expect(["cloudflare-dns.com", "dns.google"]).toContain(new URL(url).hostname);
       expect(init?.headers).toEqual({ accept: "application/dns-json" });
-      expect(init?.redirect).toBe("error");
+      expect(init?.redirect).toBe("manual");
       return Response.json(payload(url));
     });
     const result = await lookupDnsRecords("example.com", DNS_RECORD_TYPES, { fetcher: fetcher as typeof fetch });
     expect(fetcher).toHaveBeenCalledTimes(14);
     expect(result.resolvers.map((resolver) => resolver.id)).toEqual(["cloudflare", "google"]);
     expect(result.resolvers.every((resolver) => resolver.queries.length === 7)).toBe(true);
+  });
+
+  it("rejects resolver redirects even with valid-looking DNS evidence", async () => {
+    const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(init?.redirect).toBe("manual");
+      return Response.json(payload(url, { Answer: [answer()] }), { status: 302, headers: { Location: "https://untrusted.example/dns" } });
+    });
+    const result = await lookupDnsRecords("example.com", ["A"], { fetcher: fetcher as typeof fetch });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(result.resolvers.every((resolver) => resolver.queries[0].status === "resolver_error" && resolver.queries[0].records.length === 0)).toBe(true);
   });
 
   it("separates requested-type records from the reachable CNAME chain and ignores unrelated answers", async () => {

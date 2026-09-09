@@ -58,7 +58,7 @@ export function isReservedFenrirHost(host: string) {
 async function cf<T>(token: string, path: string, init?: RequestInit): Promise<CfEnvelope<T>> {
   try {
     const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
-      ...init, redirect: "error", signal: AbortSignal.timeout(8000),
+      ...init, redirect: "manual", signal: AbortSignal.timeout(8000),
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
     });
     const body = await response.json() as CfEnvelope<T> | null;
