@@ -1,3 +1,5 @@
+import { DnsLookupPanel } from "./components/DnsLookupPanel";
+import { connectDomain, fetchDomainCapabilities } from "./services/domainConnect";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { copy, detectLocale, languageNames, locales, type Copy, type Locale } from "./i18n";
 import { aiOpsService, appService, authService, billingService, bridgeService, commerceService, domainService, liveRoomService, readinessService, telegramIdentityService, telegramService, webauthnService, type AuthSession, type BillingStatusPayload, type PaidPlan, type ReadinessPayload, type TelegramIdentityLinkPayload } from "./services/api";
@@ -1065,6 +1067,16 @@ export function App() {
   const [domainSearchInput, setDomainSearchInput] = useState("fenrir");
   const [domainSearchResults, setDomainSearchResults] = useState<DomainSearchResult[]>([]);
   const [domainSearchBusy, setDomainSearchBusy] = useState(false);
+  const [domainConnectReady, setDomainConnectReady] = useState(false);
+  const [domainConnectBusy, setDomainConnectBusy] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    setDomainConnectReady(false);
+    if (auth?.authenticated) void fetchDomainCapabilities(controller.signal).then((ready) => {
+      if (!controller.signal.aborted) setDomainConnectReady(ready);
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [auth?.authenticated]);
   const [domainSearchMode, setDomainSearchMode] = useState<"front-door" | "exact">("front-door");
   const [domainSearchMeta, setDomainSearchMeta] = useState<{ checkedAt: string; viaFallback: boolean } | null>(null);
   const [wizardQueue, setWizardQueue] = useState<string[]>([]);
@@ -1325,16 +1337,24 @@ export function App() {
     return <div className="boot">{c.boot}</div>;
   }
 
-  async function addNewDomain() {
-    if (!domainInput.trim()) return;
+  function domainConnectError(cause: unknown) {
+    const code = cause instanceof Error ? cause.message : "";
+    return code === "authentication_required" ? c.dnsConnectAuth : /zone_not_in_account|dedicated_subdomain_required/.test(code) ? c.dnsConnectZone : /conflict|claim_changed|domain_unavailable/.test(code) ? c.dnsConnectConflict : /pending|proof_required/.test(code) ? c.dnsConnectPending : c.dnsConnectError;
+  }
+
+  async function addNewDomain(input = domainInput) {
+    if (!input.trim() || domainConnectBusy || !domainConnectReady) return;
     const tags = parseDomainTags(domainTagsInput);
-    const result = await domainService.create(domainInput.trim());
-    if (result.ok) {
-      setDomainTagsById((current) => ({ ...current, [result.data.id]: tags }));
-      setNotice(`Telegram Lock domain ${result.data.domain} added with tags: ${tags.join(", ")}.`);
+    setDomainConnectBusy(true);
+    try {
+      const data = await connectDomain({ domain: input.trim() });
+      setDomainTagsById((current) => ({ ...current, [data.id]: tags }));
+      setSelectedDomain(data.id);
+      setNotice(c.dnsConnectCreated);
       setDomainInput("");
       await refresh();
-    }
+    } catch (cause) { setNotice(domainConnectError(cause)); }
+    finally { setDomainConnectBusy(false); }
   }
 
   async function runDomainSearch(seed = domainSearchInput, mode = domainSearchMode) {
@@ -1383,13 +1403,15 @@ export function App() {
   }
 
   async function checkDns(domain: FriskyDomain) {
-    setNotice("Checking live DNS propagation...");
-    const result = await domainService.checkDns(domain.id);
-    setNotice(result.ok ? `${domain.domain} verified.` : result.error?.message ?? "DNS check failed.");
-    if (result.ok) {
-      triggerCelebration("DNS verified", `${domain.domain} is ready for Telegram Lock traffic.`, "dns");
-    }
-    await refresh();
+    if (domainConnectBusy || !domainConnectReady) return;
+    setDomainConnectBusy(true);
+    try {
+      const data = await connectDomain({ domainId: domain.id });
+      const ready = data.status === "verified" && data.certificateStatus === "active";
+      setNotice(ready ? c.dnsConnectReady : c.dnsConnectPending);
+      if (ready) triggerCelebration(c.dnsConnectReady, data.domain, "dns");
+    } catch (cause) { setNotice(domainConnectError(cause)); }
+    finally { setDomainConnectBusy(false); await refresh(); }
   }
 
   async function createBridge() {
@@ -1841,7 +1863,9 @@ export function App() {
           />}
 
           {show("command", "domains", "dns") && <section className="panel wide">
-            <PanelTitle title={c.dnsWizard} subtitle={c.dnsWizardSub} />
+            <PanelTitle title={c.dnsWizard} subtitle={c.dnsConnectIntro} />
+            <DnsLookupPanel selected={selectedDomainRecord} c={c} locale={locale} />
+            {!domainConnectReady && <p className="status amber">{c.dnsConnectUnavailable}</p>}
             <LiveDomainSearchPanel
               value={domainSearchInput}
               results={domainSearchResults}
@@ -1873,8 +1897,8 @@ export function App() {
                 </div>
               </div>
               <div className="domain-builder-actions">
-              <button onClick={addNewDomain}>{c.addDomain}</button>
-              {selectedDomainRecord && <button className="secondary" onClick={() => checkDns(selectedDomainRecord)}>{c.checkDns}</button>}
+              <button disabled={!domainConnectReady || domainConnectBusy} onClick={() => void addNewDomain()}>{c.dnsConnectPrepare}</button>
+              {selectedDomainRecord && <button disabled={!domainConnectReady || domainConnectBusy} className="secondary" onClick={() => selectedDomainRecord.txtRecordValue ? void checkDns(selectedDomainRecord) : void addNewDomain(selectedDomainRecord.domain)}>{selectedDomainRecord.txtRecordValue ? c.dnsConnectCheck : c.dnsConnectPrepare}</button>}
               </div>
             </div>
             {selectedDomainRecord && (
@@ -1889,7 +1913,6 @@ export function App() {
               <span className={selectedDomainRecord ? "active" : ""}><b>3</b> DNS</span>
               <span className={selectedDomainRecord?.certificateStatus === "active" ? "active" : ""}><b>4</b> Live</span>
             </div>
-            <DomainChoice c={c} />
             <DnsWizard domains={state.domains} selected={selectedDomainRecord} onSelect={setSelectedDomain} c={c} />
             <RecommendedTools state={state} c={c} onOpen={(slug) => {
               const link = commerceService.click(slug);
@@ -4801,8 +4824,8 @@ function DnsWizard({ domains, selected, onSelect, c }: { domains: FriskyDomain[]
       </div>
       <div className="dns-records">
         <div className="cloudflare-recommendation">
-          <b>{c.recommendedPath}</b>
-          <p>{c.recommendedPathBody}</p>
+          <b>{c.dnsConnectPrepare}</b>
+          <p>{c.dnsConnectIntro}</p>
           <p className="frisky-tip"><b>{c.friskyTip}</b> {c.friskyTipBody}</p>
           <div className="step-line">
             <span className="status good">{c.steps[0]}</span>
@@ -4811,9 +4834,8 @@ function DnsWizard({ domains, selected, onSelect, c }: { domains: FriskyDomain[]
             <span className={selected.status === "verified" && selected.certificateStatus === "active" ? "status good" : "status amber"}>{c.steps[3]}</span>
           </div>
         </div>
-        <DnsRecord type="NS" name="@" value={selected.cloudflareNameservers?.join(" / ") ?? "Cloudflare assigned nameservers"} purpose={c.nsPurpose} />
-        <DnsRecord type="TXT" name={selected.txtRecordName} value={selected.txtRecordValue} purpose={c.txtPurpose} />
-        <DnsRecord type="CNAME" name={selected.cnameHost} value={selected.cnameTarget} purpose={c.cnamePurpose} />
+        {selected.txtRecordValue && <DnsRecord type="TXT" name={selected.txtRecordName} value={selected.txtRecordValue} purpose={c.txtPurpose} />}
+        {selected.cnameTarget && <DnsRecord type="CNAME" name={selected.cnameHost} value={selected.cnameTarget} purpose={c.dnsConnectIntro} />}
         <div className="provider-tabs">
           {["Cloudflare recommended", "Dynadot registrar", "Namecheap registrar", "Generic registrar"].map((provider) => (
             <div className="provider" key={provider}>

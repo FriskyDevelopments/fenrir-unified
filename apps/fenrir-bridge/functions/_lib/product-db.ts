@@ -210,10 +210,15 @@ export async function resolvePublicBridge(db: D1Database, hostname: string, slug
     .prepare(
       `SELECT b.*
        FROM frisky_bridges b
-       JOIN frisky_domains d ON d.id = b.domain_id
+       JOIN frisky_domains d ON d.id = b.domain_id AND d.org_id = b.org_id
        WHERE b.slug = ?
          AND b.status = 'active'
          AND d.status = 'verified'
+         AND d.certificate_status = 'active'
+         AND length(d.verification_token) = 64
+         AND d.txt_record_name = '_fenrir.' || lower(d.domain)
+         AND d.txt_record_value = 'fenrir-verify=' || d.verification_token
+         AND NOT EXISTS (SELECT 1 FROM frisky_domains other WHERE lower(other.domain) = lower(d.domain) AND other.id != d.id AND (other.status = 'verified' OR (other.status = 'provisioning' AND julianday(other.verified_at) >= julianday('now', '-2 minutes'))))
          AND lower(d.domain) IN (${placeholders})
        ORDER BY b.created_at DESC
        LIMIT 1`
@@ -234,9 +239,15 @@ export async function resolvePublicRoom(db: D1Database, hostname: string, slug: 
     .prepare(
       `SELECT r.*
        FROM frisky_live_rooms r
-       JOIN frisky_domains d ON d.id = r.domain_id
+       JOIN frisky_domains d ON d.id = r.domain_id AND d.org_id = r.org_id
        WHERE r.slug = ?
          AND r.status = 'active'
+         AND d.status = 'verified'
+         AND d.certificate_status = 'active'
+         AND length(d.verification_token) = 64
+         AND d.txt_record_name = '_fenrir.' || lower(d.domain)
+         AND d.txt_record_value = 'fenrir-verify=' || d.verification_token
+         AND NOT EXISTS (SELECT 1 FROM frisky_domains other WHERE lower(other.domain) = lower(d.domain) AND other.id != d.id AND (other.status = 'verified' OR (other.status = 'provisioning' AND julianday(other.verified_at) >= julianday('now', '-2 minutes'))))
          AND lower(d.domain) IN (${placeholders})
        ORDER BY r.created_at DESC
        LIMIT 1`
@@ -249,13 +260,7 @@ export async function resolvePublicRoom(db: D1Database, hostname: string, slug: 
 function publicHostCandidates(hostname: string) {
   const host = hostname.trim().toLowerCase().replace(/\.$/, "");
   if (!host || host === "localhost" || host.endsWith(".localhost")) return host ? [host] : [];
-  const candidates = new Set([host]);
-  if (host.startsWith("www.")) {
-    candidates.add(host.slice(4));
-  } else {
-    candidates.add(`www.${host}`);
-  }
-  return [...candidates];
+  return [host];
 }
 
 export function mapDomain(row: DomainRow) {
@@ -308,6 +313,8 @@ export function mapInvite(row: InviteRow) {
 }
 
 export function mapRoom(row: RoomRow) {
+  let roomUrl = "";
+  try { roomUrl = `${new URL(row.public_url).origin}/room/${encodeURIComponent(row.slug)}`; } catch { /* Invalid legacy URLs must not become navigation targets. */ }
   return {
     id: row.id,
     orgId: row.org_id,
@@ -316,7 +323,7 @@ export function mapRoom(row: RoomRow) {
     title: row.title,
     provider: row.provider,
     targetUrl: row.target_url,
-    publicUrl: row.public_url,
+    publicUrl: roomUrl,
     coverImageUrl: row.cover_image_url,
     status: row.status,
     createdAt: row.created_at,
