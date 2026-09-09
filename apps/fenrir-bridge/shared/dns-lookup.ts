@@ -103,7 +103,7 @@ async function queryResolver(endpoint: string, domain: string, type: DnsRecordTy
     url.searchParams.set("name", domain);
     url.searchParams.set("type", type);
     const response = await (options.fetcher ?? fetch)(url.toString(), {
-      headers: { accept: "application/dns-json" }, signal: controller.signal, redirect: "error",
+      headers: { accept: "application/dns-json" }, signal: controller.signal, redirect: "manual",
     });
     if (!response.ok) return { ...base, status: "resolver_error", error: "http_error" };
     const raw = await response.text();
