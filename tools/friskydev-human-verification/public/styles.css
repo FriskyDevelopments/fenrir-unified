@@ -141,3 +141,18 @@ html[data-embed=miniapp] .puzzle, html[data-embed=miniapp] .slider-challenge { m
 html[data-embed=miniapp] .status { min-height:18px; margin-top:9px; font-size:11px; }
 html[data-embed=miniapp] .privacy { margin-top:9px; font-size:10px; }
 @media (prefers-reduced-motion: no-preference) { .card { animation: arrive .5s ease-out both; } @keyframes arrive { from { opacity: 0; transform: translateY(12px); } } }
+
+
+.altcha-panel {
+  display: grid;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.altcha-panel[hidden] {
+  display: none !important;
+}
+
+.altcha-panel .unlock {
+  justify-self: stretch;
+}
