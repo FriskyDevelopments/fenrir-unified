@@ -29,6 +29,7 @@ import type { UiCopy } from "../app/uiCopy";
 import { knowledgeBaseUrl } from "../services/knowledgeBase";
 import { buildVaultLinks, createVaultShareUrl } from "./vaultRoutes";
 import { BrandSignature, bridgeGroupPhotoUrl, GroupAvatar, PanelTitle, providerLabel, ProviderBadge } from "./routeCommon";
+import { DnsLookupPanel } from "../components/DnsLookupPanel";
 export { BrandSignature, bridgeGroupPhotoUrl, GroupAvatar, PanelTitle, providerLabel, ProviderBadge } from "./routeCommon";
 
 
@@ -1236,35 +1237,73 @@ export function LiveRoomGallery({
   );
 }
 
-export function DnsWizard({ domains, selected, onSelect, c }: { domains: FriskyDomain[]; selected: FriskyDomain | null | undefined; onSelect: (id: string) => void; c: Copy }) {
-  if (!selected) return null;
+function domainLacksOwnershipProof(domain: FriskyDomain | null | undefined): boolean {
+  if (!domain) return false;
+  return !domain.txtRecordValue || !domain.cnameTarget || !domain.verificationToken;
+}
+
+export function DnsWizard({
+  domains,
+  selected,
+  onSelect,
+  c,
+  locale,
+  showLookup = true
+}: {
+  domains: FriskyDomain[];
+  selected: FriskyDomain | null | undefined;
+  onSelect: (id: string) => void;
+  c: Copy;
+  locale?: Locale;
+  showLookup?: boolean;
+}) {
+  const fleetNeedsReverify = domains.some((domain) => domainLacksOwnershipProof(domain));
+  const selectedNeedsReverify = domainLacksOwnershipProof(selected);
+
   return (
-    <div className="dns-layout">
-      <div className="domain-list">
-        {domains.map((domain) => (
-          <button className={domain.id === selected.id ? "active-line" : ""} key={domain.id} onClick={() => onSelect(domain.id)}>
-            <b>{domain.domain}</b>
-            <span className={`status ${domain.status === "verified" ? "good" : domain.status === "failed" ? "danger" : "amber"}`}>{domain.status}</span>
-          </button>
-        ))}
-      </div>
-      <div className="dns-records">
-        <div className="cloudflare-recommendation">
-          <b>{c.recommendedPath}</b>
-          <p>{c.recommendedPathBody}</p>
-          <p className="frisky-tip"><b>{c.friskyTip}</b> {c.friskyTipBody}</p>
-          <div className="step-line">
-            <span className="status good">{c.steps[0]}</span>
-            <span className={selected.status === "verified" ? "status good" : "status amber"}>{c.steps[1]}</span>
-            <span className={selected.certificateStatus === "active" ? "status good" : "status amber"}>{c.steps[2]} {selected.certificateStatus}</span>
-            <span className={selected.status === "verified" && selected.certificateStatus === "active" ? "status good" : "status amber"}>{c.steps[3]}</span>
-          </div>
+    <div className="dns-wizard-shell">
+      {fleetNeedsReverify ? (
+        <div className="dns-ops-banner dns-ops-banner-warn" role="status">
+          <strong>{c.dnsReverifyBannerTitle}</strong>
+          <p>{c.dnsReverifyFleetBanner}</p>
         </div>
-        {selected.txtRecordValue || selected.cnameTarget ? (
-          <>
-            <DnsRecord type="NS" name="@" value={selected.cloudflareNameservers?.join(" / ") ?? "Cloudflare assigned nameservers"} purpose={c.nsPurpose} />
-            <DnsRecord type="TXT" name={selected.txtRecordName} value={selected.txtRecordValue} purpose={c.txtPurpose} />
-            <DnsRecord type="CNAME" name={selected.cnameHost} value={selected.cnameTarget} purpose={c.cnamePurpose} />
+      ) : null}
+      {showLookup && locale ? <DnsLookupPanel selected={selected} c={c} locale={locale} /> : null}
+      {!selected ? (
+        <p className="frisky-tip">{c.dnsConnectIntro}</p>
+      ) : (
+        <div className="dns-layout">
+          <div className="domain-list">
+            {domains.map((domain) => (
+              <button className={domain.id === selected.id ? "active-line" : ""} key={domain.id} onClick={() => onSelect(domain.id)}>
+                <b>{domain.domain}</b>
+                <span className={`status ${domain.status === "verified" ? "good" : domain.status === "failed" ? "danger" : "amber"}`}>{domain.status}</span>
+                {domainLacksOwnershipProof(domain) ? <small className="dns-proof-chip">{c.dnsReverifyBannerTitle}</small> : null}
+              </button>
+            ))}
+          </div>
+          <div className="dns-records">
+            <div className="cloudflare-recommendation">
+              <b>{c.dnsConnectPrepare}</b>
+              <p>{c.dnsConnectIntro}</p>
+              <p className="frisky-tip"><b>{c.friskyTip}</b> {c.friskyTipBody}</p>
+              <div className="step-line">
+                <span className="status good">{c.steps[0]}</span>
+                <span className={selected.status === "verified" ? "status good" : "status amber"}>{c.steps[1]}</span>
+                <span className={selected.certificateStatus === "active" ? "status good" : "status amber"}>{c.steps[2]} {selected.certificateStatus}</span>
+                <span className={selected.status === "verified" && selected.certificateStatus === "active" ? "status good" : "status amber"}>{c.steps[3]}</span>
+              </div>
+              {selectedNeedsReverify ? (
+                <div className="dns-ops-banner dns-ops-banner-warn" role="alert">
+                  <strong>{c.dnsReverifyBannerTitle}</strong>
+                  <p>{c.dnsReverifyBannerBody}</p>
+                </div>
+              ) : (
+                <p className="dns-ops-note" role="status">{c.dnsRecheckWarning}</p>
+              )}
+            </div>
+            {selected.txtRecordValue ? <DnsRecord type="TXT" name={selected.txtRecordName} value={selected.txtRecordValue} purpose={c.txtPurpose} /> : null}
+            {selected.cnameTarget ? <DnsRecord type="CNAME" name={selected.cnameHost} value={selected.cnameTarget} purpose={c.cnamePurpose} /> : null}
             <div className="provider-tabs">
               {["Cloudflare recommended", "Dynadot registrar", "Namecheap registrar", "Generic registrar"].map((provider) => (
                 <div className="provider" key={provider}>
@@ -1273,15 +1312,9 @@ export function DnsWizard({ domains, selected, onSelect, c }: { domains: FriskyD
                 </div>
               ))}
             </div>
-          </>
-        ) : (
-          <p className="frisky-tip">
-            {selected.certificateStatus === "active"
-              ? `${selected.domain} is live on this Cloudflare account.`
-              : `${selected.domain} is attached. SSL ${selected.certificateStatus}.`}
-          </p>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,25 +4,26 @@ import { managedDashboardPath, pageKeys, type PageKey } from "./shared";
 export const dashboardPageAliases: Record<string, PageKey> = {
   main: "command",
   command: "command",
-  links: "links",
-  "all-links": "links",
-  vaults: "links",
+  links: "command",
+  "all-links": "command",
+  vaults: "command",
   domains: "domains",
-  dns: "dns",
-  "dns-wizard": "dns",
+  dns: "domains",
+  "dns-wizard": "domains",
   locks: "locks",
+  gates: "locks",
   "telegram-locks": "locks",
   rooms: "rooms",
   "live-rooms": "rooms",
   telegram: "telegram",
-  revocations: "revocations",
+  revocations: "audit",
   audit: "audit",
-  faq: "faq",
-  faqs: "faq",
+  faq: "command",
+  faqs: "command",
   billing: "billing",
-  brands: "brands",
-  "community-brands": "brands",
-  "neon-nexus": "brands"
+  brands: "locks",
+  "community-brands": "locks",
+  "neon-nexus": "locks"
 };
 
 export function isAuthCallbackPath(pathname: string) {
@@ -37,7 +38,7 @@ export function activePageFromLocation(path: string, hash: string): PageKey {
   const hashKey = hash.replace(/^#\/?/, "").replace(/^\/+|\/+$/g, "");
   const key = routeKey || hashKey;
   if (path.startsWith("/admin")) return "locks";
-  if (path.startsWith("/portal")) return "links";
+  if (path.startsWith("/portal")) return "command";
   if (isAuthCallbackPath(path)) return "command";
   return dashboardPageAliases[key] ?? "command";
 }
