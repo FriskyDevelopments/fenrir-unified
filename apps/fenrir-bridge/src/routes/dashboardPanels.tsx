@@ -1237,6 +1237,11 @@ export function LiveRoomGallery({
   );
 }
 
+function domainLacksOwnershipProof(domain: FriskyDomain | null | undefined): boolean {
+  if (!domain) return false;
+  return !domain.txtRecordValue || !domain.cnameTarget || !domain.verificationToken;
+}
+
 export function DnsWizard({
   domains,
   selected,
@@ -1252,8 +1257,17 @@ export function DnsWizard({
   locale?: Locale;
   showLookup?: boolean;
 }) {
+  const fleetNeedsReverify = domains.some((domain) => domainLacksOwnershipProof(domain));
+  const selectedNeedsReverify = domainLacksOwnershipProof(selected);
+
   return (
     <div className="dns-wizard-shell">
+      {fleetNeedsReverify ? (
+        <div className="dns-ops-banner dns-ops-banner-warn" role="status">
+          <strong>{c.dnsReverifyBannerTitle}</strong>
+          <p>{c.dnsReverifyFleetBanner}</p>
+        </div>
+      ) : null}
       {showLookup && locale ? <DnsLookupPanel selected={selected} c={c} locale={locale} /> : null}
       {!selected ? (
         <p className="frisky-tip">{c.dnsConnectIntro}</p>
@@ -1264,6 +1278,7 @@ export function DnsWizard({
               <button className={domain.id === selected.id ? "active-line" : ""} key={domain.id} onClick={() => onSelect(domain.id)}>
                 <b>{domain.domain}</b>
                 <span className={`status ${domain.status === "verified" ? "good" : domain.status === "failed" ? "danger" : "amber"}`}>{domain.status}</span>
+                {domainLacksOwnershipProof(domain) ? <small className="dns-proof-chip">{c.dnsReverifyBannerTitle}</small> : null}
               </button>
             ))}
           </div>
@@ -1278,11 +1293,14 @@ export function DnsWizard({
                 <span className={selected.certificateStatus === "active" ? "status good" : "status amber"}>{c.steps[2]} {selected.certificateStatus}</span>
                 <span className={selected.status === "verified" && selected.certificateStatus === "active" ? "status good" : "status amber"}>{c.steps[3]}</span>
               </div>
-              {!selected.txtRecordValue ? (
-                <p className="status amber" role="status">
-                  Legacy domains without ownership proof fields must Prepare DNS records again before public routing stays active.
-                </p>
-              ) : null}
+              {selectedNeedsReverify ? (
+                <div className="dns-ops-banner dns-ops-banner-warn" role="alert">
+                  <strong>{c.dnsReverifyBannerTitle}</strong>
+                  <p>{c.dnsReverifyBannerBody}</p>
+                </div>
+              ) : (
+                <p className="dns-ops-note" role="status">{c.dnsRecheckWarning}</p>
+              )}
             </div>
             {selected.txtRecordValue ? <DnsRecord type="TXT" name={selected.txtRecordName} value={selected.txtRecordValue} purpose={c.txtPurpose} /> : null}
             {selected.cnameTarget ? <DnsRecord type="CNAME" name={selected.cnameHost} value={selected.cnameTarget} purpose={c.cnamePurpose} /> : null}

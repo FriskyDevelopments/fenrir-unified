@@ -185,11 +185,11 @@ a synthetic provider redirect without creation or a redirect-target request.
 An independent review exercised 50 redirect scenarios across both applications.
 These checks do not claim a customer hostname attachment or production user login.
 
-## Release risks (Frisky OK required)
+## Release risks (Frisky decision recorded)
 
-These risks were identified on draft PR #29 and remain **accepted-or-fix before
-production** — this branch documents them; it does not silently change lifecycle
-semantics.
+Identified on draft PR #29. **2026-09-11 ship decision:** accept legacy re-verify +
+operator/tenant comms; **do not** switch recheck to keep-last-known-good. Risks
+below remain true at runtime; mitigation is UI banners + ops blurb (see next section).
 
 1. **Existing domain rows without proof fields**  
    Public room/bridge resolution now requires a valid stored ownership challenge
@@ -204,5 +204,32 @@ semantics.
    until a later successful retry. Alternatives (keep-last-known-good until the
    new proof succeeds) need an explicit product decision before release.
 
-No automatic backfill migration ships with this code. Coordinate customer
-comms or a soft-launch allowlist before flipping production.
+No automatic backfill migration ships with this code. Customer/operator comms
+and in-product re-verify banners are required before flipping production;
+optional soft-launch allowlists remain ops-side.
+
+## Operator communications (ship decision 2026-09-11)
+
+**Frisky decision:** Ship DNS ownership proof **with legacy-domain re-verify** and operator/tenant communications. Do **not** change recheck to keep-last-known-good.
+
+### What operators must tell tenants
+
+1. **Legacy rows without proof fields go dark for public routing** until the domain owner runs **Prepare DNS records → publish TXT (`_fenrir.<host>`) + DNS-only CNAME → Verify and connect** again.
+2. **Supported shape only:** dedicated subdomain, unflattened, DNS-only CNAME into the MyFenrir-connected Cloudflare account. **Apex**, **proxied**, and **flattened** CNAMEs remain unsupported — tell tenants to use a real subdomain (e.g. `locks.example.com`), not the zone apex or orange-cloud proxy.
+3. **Recheck behavior (accepted):** Verify/recheck still temporarily clears public routing while DNS + Pages are re-checked. A provider/DNS failure can leave the hostname unavailable until a later successful verify. Operators should schedule rechecks with tenants and not treat a failed recheck as “still live.”
+4. **No automatic backfill** ships with this release. Comms + UI banners are the mitigation; soft-launch allowlists remain optional ops tooling outside this PR.
+
+### UI surfaces (not docs-only)
+
+MyFenrir Domains + DNS Wizard shows:
+
+- A **fleet banner** when any listed domain lacks ownership proof fields.
+- A **selected-domain alert** (and list chip) when the active domain needs Prepare → Verify.
+- Lookup panel copy when the selected domain has no stored TXT/CNAME proof.
+- A standing note that recheck can interrupt public routing.
+
+Copy is localized in EN + ES (FR/DE retained in the same keys).
+
+### Ops release blurb (pasteable)
+
+> MyFenrir DNS ownership proof is live. Existing domain rows without TXT+CNAME proof fields **stop public room/bridge routing** until owners re-verify. Ask tenants to open Domains + DNS → Prepare records → publish TXT + DNS-only CNAME → Verify and connect. Apex and proxied/flattened CNAMEs are unsupported. Recheck can briefly take a host offline if DNS/provider checks fail — plan with the tenant before re-verifying a live domain.

@@ -66,11 +66,14 @@ export function DnsLookupPanel({ selected, c, locale }: { selected?: FriskyDomai
   const records = expectedRecords(selected);
   const statusText = (query: DnsLookupQuery) => ({ records: c.dnsLookupRecords, no_records: c.dnsLookupNoRecords, nxdomain: c.dnsLookupNxdomain, resolver_error: c.dnsLookupResolverError })[query.status];
 
+  const selectedNeedsProof = !!selected && (!selected.txtRecordValue || !selected.cnameTarget || !selected.verificationToken);
+
   return <section className="dns-lookup-panel" aria-labelledby="dns-lookup-title">
     <div className="dns-lookup-header">
       <div><p className="label">DNS-WIZARD</p><h3 id="dns-lookup-title">{c.dnsLookupTitle}</h3><p>{c.dnsLookupBody}</p></div>
       <span className="status blue">{c.dnsLookupReadOnly}</span>
     </div>
+    {selectedNeedsProof ? <div className="dns-ops-banner dns-ops-banner-warn" role="status"><strong>{c.dnsReverifyBannerTitle}</strong><p>{c.dnsLookupNeedsProof}</p></div> : null}
     <form className="dns-lookup-form" onSubmit={submit}>
       <label>{c.dnsLookupName}<input value={domain} placeholder="_dmarc.example.com" maxLength={253} autoCapitalize="none" autoCorrect="off" spellCheck={false} onChange={(event) => { clearResult(); setDomain(event.target.value); }} /></label>
       <label>{c.dnsLookupType}<select value={type} onChange={(event) => { clearResult(); setType(event.target.value as DnsRecordType | "ALL"); }}><option value="ALL">{c.dnsLookupAll}</option>{DNS_RECORD_TYPES.map((recordType) => <option key={recordType} value={recordType}>{recordType}</option>)}</select></label>
