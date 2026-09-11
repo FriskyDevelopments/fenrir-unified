@@ -200,7 +200,7 @@ function DashboardPage() {
       <div
         role="status"
         aria-live="polite"
-        className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050909]"
+        className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#12171c]"
       >
         <div
           aria-hidden="true"
@@ -229,7 +229,7 @@ function DashboardPage() {
           <div className="mt-7 h-px w-full overflow-hidden bg-white/10">
             <motion.div
               aria-hidden="true"
-              className="h-full w-1/2 bg-gradient-to-r from-transparent via-primary to-emerald-300"
+              className="h-full w-1/2 bg-gradient-to-r from-transparent via-[#c2a469] to-[#7fae9d]"
               animate={reduceMotion ? { x: "50%" } : { x: ["-100%", "200%"] }}
               transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
             />
@@ -250,12 +250,12 @@ function DashboardPage() {
       </a>
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_12%_5%,hsl(var(--primary)/0.2),transparent_26%),radial-gradient(circle_at_91%_28%,#7c3aed1e,transparent_30%)]"
+        className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_12%_5%,rgba(194,164,105,0.18),transparent_28%),radial-gradient(circle_at_91%_28%,rgba(127,174,157,0.1),transparent_32%)]"
       />
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/72 backdrop-blur-2xl supports-[backdrop-filter]:bg-background/58">
         <motion.div
           aria-hidden="true"
-          className="absolute inset-x-0 bottom-[-1px] h-px origin-left bg-gradient-to-r from-primary via-emerald-300 to-primary shadow-[0_0_14px_hsl(var(--primary)/0.7)]"
+          className="absolute inset-x-0 bottom-[-1px] h-px origin-left bg-gradient-to-r from-[#c2a469] via-[#7fae9d] to-[#c2a469] shadow-[0_0_14px_rgba(194,164,105,0.55)]"
           style={{ scaleX: reduceMotion ? scrollYProgress : smoothScrollProgress }}
         />
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4 sm:px-6">
@@ -324,7 +324,7 @@ function DashboardPage() {
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55 }}
-          className="relative overflow-hidden rounded-[2rem] border border-primary/25 bg-[#050909]/90 shadow-[0_42px_130px_-70px_hsl(var(--primary)/0.8)]"
+          className="relative overflow-hidden rounded-[2rem] border border-[#c2a469]/28 bg-[#12171c]/92 shadow-[0_42px_130px_-70px_rgba(194,164,105,0.55)]"
         >
           <motion.div
             aria-hidden="true"
@@ -338,7 +338,7 @@ function DashboardPage() {
           />
           <motion.div
             aria-hidden="true"
-            className="pointer-events-none absolute -right-44 bottom-0 h-[30rem] w-[30rem] rounded-full bg-emerald-400/8 blur-[120px]"
+            className="pointer-events-none absolute -right-44 bottom-0 h-[30rem] w-[30rem] rounded-full bg-[#7fae9d]/10 blur-[120px]"
             animate={reduceMotion ? undefined : { x: [0, -120, -36, 0], y: [0, -90, 24, 0] }}
             transition={{ duration: 26, repeat: Infinity, ease: "easeInOut" }}
           />
@@ -349,7 +349,7 @@ function DashboardPage() {
           <div className="relative grid min-h-[530px] lg:grid-cols-[1.1fr_.9fr] xl:grid-cols-[1.25fr_.75fr]">
             <div className="flex flex-col justify-between border-b border-border/60 p-7 sm:p-10 lg:border-b-0 lg:border-r lg:p-14">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/8 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-300">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#c2a469]/30 bg-[#c2a469]/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#c2a469]">
                   {telegramId ? (
                     <Radio className="h-3.5 w-3.5" />
                   ) : (

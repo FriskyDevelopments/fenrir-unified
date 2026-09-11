@@ -19,10 +19,12 @@ verification tokens, fabricated evidence hashes, client credential vault, or AI
 placeholders. The existing MyFenrir DNS+RDAP availability search already covers
 name discovery and was left unchanged.
 
-The shipped entry is `src/main.tsx` → `src/App.tsx`. The new
-`src/components/DnsLookupPanel.tsx` is mounted in that entry's existing DNS section
-(visible under Command, Domains, and DNS Wizard). The separate legacy
-`src/routes/DashboardRoute.tsx` is not the integration surface.
+The shipped entry remains `src/main.tsx` → `src/App.tsx`. As of
+`feat/myfenrir-dashboard-dns-rebuild` (2026-09-11), `DnsWizard` lives in
+`src/routes/dashboardPanels.tsx` and embeds `DnsLookupPanel`. App imports that
+shared wizard; `DashboardRoute` mounts the same component with ownership-proof
+`connectDomain` wiring. Operator IA merges Domains + DNS Wizard into one nav item.
+UI chrome uses Fenrir gold/ink (not neon-lime).
 
 The panel uses existing design tokens and English/Spanish/French/German `Copy`
 translations. Users can query a complete domain or owner such as
@@ -182,3 +184,25 @@ record types on `example.com` with no resolver errors. The same runtime rejected
 a synthetic provider redirect without creation or a redirect-target request.
 An independent review exercised 50 redirect scenarios across both applications.
 These checks do not claim a customer hostname attachment or production user login.
+
+## Release risks (Frisky OK required)
+
+These risks were identified on draft PR #29 and remain **accepted-or-fix before
+production** — this branch documents them; it does not silently change lifecycle
+semantics.
+
+1. **Existing domain rows without proof fields**  
+   Public room/bridge resolution now requires a valid stored ownership challenge
+   (`_fenrir.<host>` TXT + exact CNAME) plus verified status and active HTTPS.
+   Legacy rows that only have Pages attachment state will **stop resolving
+   publicly** until the operator runs Prepare DNS records → Verify and connect
+   again. Apex hosts and proxied/flattened CNAMEs are unsupported by this flow.
+
+2. **Recheck temporarily removes public routing**  
+   Verify/recheck moves the row through pending/provisioning while DNS and Pages
+   are re-checked. A DNS or provider failure can leave the hostname unavailable
+   until a later successful retry. Alternatives (keep-last-known-good until the
+   new proof succeeds) need an explicit product decision before release.
+
+No automatic backfill migration ships with this code. Coordinate customer
+comms or a soft-launch allowlist before flipping production.

@@ -1,4 +1,4 @@
-import { DnsLookupPanel } from "./components/DnsLookupPanel";
+import { DnsWizard } from "./routes/dashboardPanels";
 import { connectDomain, fetchDomainCapabilities } from "./services/domainConnect";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { copy, detectLocale, languageNames, locales, type Copy, type Locale } from "./i18n";
@@ -746,7 +746,7 @@ const uiCopy: Record<Locale, {
 };
 
 const confettiPieces = Array.from({ length: 28 }, (_, index) => index);
-const pageKeys = ["command", "links", "domains", "dns", "locks", "rooms", "telegram", "revocations", "audit", "faq", "billing", "brands"] as const;
+const pageKeys = ["command", "domains", "locks", "rooms", "telegram", "billing", "audit"] as const;
 const legalRoutes = new Set(["/legal", "/terms", "/privacy", "/acceptable-use"]);
 const liveRoomProviders: Array<{ id: LiveRoomProvider; name: string; icon: string; brand: string; hint: string; placeholder: string }> = [
   {
@@ -1008,25 +1008,26 @@ type FenrirRole = "owner" | "admin" | "user";
 const dashboardPageAliases: Record<string, PageKey> = {
   main: "command",
   command: "command",
-  links: "links",
-  "all-links": "links",
-  vaults: "links",
+  links: "command",
+  "all-links": "command",
+  vaults: "command",
   domains: "domains",
-  dns: "dns",
-  "dns-wizard": "dns",
+  dns: "domains",
+  "dns-wizard": "domains",
   locks: "locks",
+  gates: "locks",
   "telegram-locks": "locks",
   rooms: "rooms",
   "live-rooms": "rooms",
   telegram: "telegram",
-  revocations: "revocations",
+  revocations: "audit",
   audit: "audit",
-  faq: "faq",
-  faqs: "faq",
+  faq: "command",
+  faqs: "command",
   billing: "billing",
-  brands: "brands",
-  "community-brands": "brands",
-  "neon-nexus": "brands"
+  brands: "locks",
+  "community-brands": "locks",
+  "neon-nexus": "locks"
 };
 
 function isAuthCallbackPath(pathname: string) {
@@ -1041,7 +1042,7 @@ function activePageFromLocation(path: string, hash: string): PageKey {
   const hashKey = hash.replace(/^#\/?/, "").replace(/^\/+|\/+$/g, "");
   const key = routeKey || hashKey;
   if (path.startsWith("/admin")) return "locks";
-  if (path.startsWith("/portal")) return "links";
+  if (path.startsWith("/portal")) return "command";
   if (isAuthCallbackPath(path)) return "command";
   return dashboardPageAliases[key] ?? "command";
 }
@@ -1448,7 +1449,7 @@ export function App() {
     const domainId = selectedDomainRecord?.id;
     if (!domainId) {
       setNotice(`${c.chooseDomain}. ${c.easyCloudflareBody ?? ""}`.trim());
-      navigateActive("dns");
+      navigateActive("domains");
       return;
     }
     if (!roomTargetInput.trim()) {
@@ -1498,11 +1499,11 @@ export function App() {
       setNotice(c.inboxStepRoomNeed);
     }
     if (kind === "vault") {
-      navigateActive("links");
+      navigateActive("command");
       setNotice(c.inboxStepVaultNeed);
     }
     if (kind === "domain") {
-      navigateActive("dns");
+      navigateActive("domains");
       setDomainInput((current) => current || ui.setupInputCustomDomain);
       setNotice(c.inboxStepDomainNeed);
     }
@@ -1659,14 +1660,14 @@ export function App() {
   const show = (...pages: PageKey[]) => pages.includes(active);
 
   return (
-    <div className="app threshold-dashboard">
+    <div className="app threshold-dashboard fenrir-ops-shell">
       {activationVisible && <ProtocolActivated />}
       <aside className="sidebar threshold-rail">
         <div className="brand">
           <img className="brand-wordmark" src="/fenrir-cut-wordmark.svg" alt="Fenrir" />
           <div className="brand-lockup">
             <b>MyFenrir</b>
-            <small>CONTROL PLANE · R/01</small>
+            <small>Operator plane · gold / ink</small>
           </div>
         </div>
         <nav>
@@ -1697,25 +1698,14 @@ export function App() {
           <span className="wallpaper-paw">F</span>
           <span className="wallpaper-bot">◈</span>
         </div>
-        <header className="topbar threshold-topbar">
-          <div className="threshold-engine" aria-hidden="true">
-            <span className="threshold-engine-ring ring-a" />
-            <span className="threshold-engine-ring ring-b" />
-            <span className="threshold-engine-ring ring-c" />
-            <span className="threshold-engine-scan" />
-            <span className="threshold-engine-core"><b>R/01</b><small>THRESHOLD<br />ONLINE</small></span>
-            <span className="threshold-engine-node node-a" />
-            <span className="threshold-engine-node node-b" />
-            <span className="threshold-engine-node node-c" />
-          </div>
-          <div>
+        <header className="topbar threshold-topbar command-hero">
+          <div className="command-hero-copy">
             <p className="label">{c.heroLabel}</p>
             <h1>{c.heroTitle}</h1>
             <p className="hero-owner">{c.heroOwner}</p>
-            <div className="guardian-pills">
-              {c.guardianPills.map((pill) => (
-                <span key={pill}>{pill}</span>
-              ))}
+            <div className="command-hero-actions">
+              <button type="button" className="primary" onClick={() => navigateActive("domains")}>{c.nav[1]}</button>
+              <button type="button" className="ghost" onClick={() => navigateActive("locks")}>{c.nav[2]}</button>
             </div>
             <BrandSignature c={c} />
           </div>
@@ -1773,7 +1763,7 @@ export function App() {
           />
         )}
 
-      {show("command", "faq") && <ClientWalkthroughPanel c={c} ui={ui} />}
+      {show("command") && <ClientWalkthroughPanel c={c} ui={ui} />}
 
         {show("command") && <SetupInboxWizard onStart={startWizard} c={c} ui={ui} />}
 
@@ -1781,7 +1771,7 @@ export function App() {
           <ExampleDiagramCard c={c} ui={ui} />
         )}
 
-        {show("command", "links") && <LinkVaultPanel
+        {show("command") && <LinkVaultPanel
           c={c}
           ui={ui}
           bridges={state.bridges}
@@ -1821,7 +1811,7 @@ export function App() {
         </section>
 
         {show("billing") && <ProductionReadinessPanel c={c} readiness={readiness} loadFailed={readinessError} />}
-        {show("command", "brands") && <CommunityBridgeHandoffPanel />}
+        {show("command", "locks") && <CommunityBridgeHandoffPanel />}
 
         <div className="content-grid">
           {show("command", "locks", "telegram") && <CommunityBridgeHandoffPanel />}
@@ -1862,9 +1852,8 @@ export function App() {
             onStars={() => void startTelegramStars()}
           />}
 
-          {show("command", "domains", "dns") && <section className="panel wide">
+          {show("command", "domains") && <section className="panel wide">
             <PanelTitle title={c.dnsWizard} subtitle={c.dnsConnectIntro} />
-            <DnsLookupPanel selected={selectedDomainRecord} c={c} locale={locale} />
             {!domainConnectReady && <p className="status amber">{c.dnsConnectUnavailable}</p>}
             <LiveDomainSearchPanel
               value={domainSearchInput}
@@ -1913,7 +1902,7 @@ export function App() {
               <span className={selectedDomainRecord ? "active" : ""}><b>3</b> DNS</span>
               <span className={selectedDomainRecord?.certificateStatus === "active" ? "active" : ""}><b>4</b> Live</span>
             </div>
-            <DnsWizard domains={state.domains} selected={selectedDomainRecord} onSelect={setSelectedDomain} c={c} />
+            <DnsWizard domains={state.domains} selected={selectedDomainRecord} onSelect={setSelectedDomain} c={c} locale={locale} />
             <RecommendedTools state={state} c={c} onOpen={(slug) => {
               const link = commerceService.click(slug);
               const label = link?.label ?? slug;
@@ -2054,7 +2043,7 @@ export function App() {
             <p className="muted">{c.opsStackBody}</p>
           </section>}
 
-          {show("locks", "revocations") && <section className="panel">
+          {show("locks", "audit") && <section className="panel">
             <PanelTitle title={c.revocations} subtitle={c.revocationsSub} />
             <div className="timeline">
               {state.invites.filter((invite) => invite.status === "revoked").map((invite) => (
@@ -2080,12 +2069,12 @@ export function App() {
             </div>
           </section>}
 
-          {show("audit", "revocations") && <section className="panel wide">
+          {show("audit") && <section className="panel wide">
             <PanelTitle title={c.auditLog} subtitle={c.auditLogSub} />
             <AuditLog state={state} />
           </section>}
 
-          {show("command", "faq") && <FaqPanel c={c} />}
+          {show("command") && <FaqPanel c={c} />}
         </div>
         <BrandSignature c={c} compact />
       </main>
@@ -4806,56 +4795,6 @@ function LiveRoomGallery({
         </article>
       );
       })}
-    </div>
-  );
-}
-
-function DnsWizard({ domains, selected, onSelect, c }: { domains: FriskyDomain[]; selected: FriskyDomain | null | undefined; onSelect: (id: string) => void; c: Copy }) {
-  if (!selected) return null;
-  return (
-    <div className="dns-layout">
-      <div className="domain-list">
-        {domains.map((domain) => (
-          <button className={domain.id === selected.id ? "active-line" : ""} key={domain.id} onClick={() => onSelect(domain.id)}>
-            <b>{domain.domain}</b>
-            <span className={`status ${domain.status === "verified" ? "good" : domain.status === "failed" ? "danger" : "amber"}`}>{domain.status}</span>
-          </button>
-        ))}
-      </div>
-      <div className="dns-records">
-        <div className="cloudflare-recommendation">
-          <b>{c.dnsConnectPrepare}</b>
-          <p>{c.dnsConnectIntro}</p>
-          <p className="frisky-tip"><b>{c.friskyTip}</b> {c.friskyTipBody}</p>
-          <div className="step-line">
-            <span className="status good">{c.steps[0]}</span>
-            <span className={selected.status === "verified" ? "status good" : "status amber"}>{c.steps[1]}</span>
-            <span className={selected.certificateStatus === "active" ? "status good" : "status amber"}>{c.steps[2]} {selected.certificateStatus}</span>
-            <span className={selected.status === "verified" && selected.certificateStatus === "active" ? "status good" : "status amber"}>{c.steps[3]}</span>
-          </div>
-        </div>
-        {selected.txtRecordValue && <DnsRecord type="TXT" name={selected.txtRecordName} value={selected.txtRecordValue} purpose={c.txtPurpose} />}
-        {selected.cnameTarget && <DnsRecord type="CNAME" name={selected.cnameHost} value={selected.cnameTarget} purpose={c.dnsConnectIntro} />}
-        <div className="provider-tabs">
-          {["Cloudflare recommended", "Dynadot registrar", "Namecheap registrar", "Generic registrar"].map((provider) => (
-            <div className="provider" key={provider}>
-              <b>{provider}</b>
-              <small>{c.friskyTipBody}</small>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DnsRecord({ type, name, value, purpose }: { type: string; name: string; value: string; purpose: string }) {
-  return (
-    <div className="dns-record">
-      <span>{type}</span>
-      <code>Name: {name}</code>
-      <code>Value: {value}</code>
-      <small>TTL: Auto · {purpose}</small>
     </div>
   );
 }

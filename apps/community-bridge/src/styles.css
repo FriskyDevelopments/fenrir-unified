@@ -82,7 +82,7 @@
   --popover: oklch(0.183 0.031 263.4);
   --popover-foreground: oklch(0.869 0.02 252.9);
 
-  --primary: oklch(0.637 0.208 25.3); /* #ef4444 */
+  --primary: oklch(0.74 0.07 85); /* Fenrir gold #c2a469 */
   --primary-foreground: oklch(0.149 0.017 259.9);
   --secondary: oklch(0.279 0.037 260); /* #1e293b */
   --secondary-foreground: oklch(0.869 0.02 252.9);
@@ -93,7 +93,7 @@
   --accent: oklch(0.577 0.215 27.3); /* #dc2626 */
   --accent-foreground: oklch(0.929 0.013 255.5);
 
-  --destructive: oklch(0.637 0.208 25.3);
+  --destructive: oklch(0.74 0.07 85);
   --destructive-foreground: oklch(0.929 0.013 255.5);
 
   --success: oklch(0.773 0.153 163.2); /* #34d399 */
@@ -103,9 +103,9 @@
 
   --border: oklch(1 0 0 / 8%);
   --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.637 0.208 25.3);
+  --ring: oklch(0.74 0.07 85);
 
-  --chart-1: oklch(0.637 0.208 25.3);
+  --chart-1: oklch(0.74 0.07 85);
   --chart-2: oklch(0.577 0.215 27.3);
   --chart-3: oklch(0.773 0.153 163.2);
   --chart-4: oklch(0.711 0.035 256.8);
@@ -113,26 +113,26 @@
 
   --sidebar: oklch(0.183 0.031 263.4);
   --sidebar-foreground: oklch(0.869 0.02 252.9);
-  --sidebar-primary: oklch(0.637 0.208 25.3);
+  --sidebar-primary: oklch(0.74 0.07 85);
   --sidebar-primary-foreground: oklch(0.149 0.017 259.9);
   --sidebar-accent: oklch(0.279 0.037 260);
   --sidebar-accent-foreground: oklch(0.869 0.02 252.9);
   --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.637 0.208 25.3);
+  --sidebar-ring: oklch(0.74 0.07 85);
 
   /* Signature gradients — accents only, never large fills */
   --gradient-cosmic: conic-gradient(
     from 140deg,
-    oklch(0.637 0.208 25.3),
+    oklch(0.74 0.07 85),
     oklch(0.577 0.215 27.3),
     oklch(0.723 0.192 149.6),
     oklch(0.773 0.153 163.2),
-    oklch(0.637 0.208 25.3)
+    oklch(0.74 0.07 85)
   );
-  --gradient-nexus: linear-gradient(135deg, oklch(0.637 0.208 25.3), oklch(0.773 0.153 163.2));
+  --gradient-nexus: linear-gradient(135deg, oklch(0.74 0.07 85), oklch(0.773 0.153 163.2));
 
   /* Elevation / glow */
-  --glow-primary: 0 0 40px -8px oklch(0.637 0.208 25.3 / 45%);
+  --glow-primary: 0 0 40px -8px oklch(0.74 0.07 85 / 45%);
   --glow-accent: 0 0 40px -8px oklch(0.723 0.192 149.6 / 40%);
   --drop-elev: 0 24px 60px -20px oklch(0.05 0.02 260 / 80%);
 }

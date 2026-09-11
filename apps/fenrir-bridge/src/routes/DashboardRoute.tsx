@@ -21,6 +21,7 @@ import {
 } from "../services/api";
 import type { AppState, FriskyBridge, FriskyDomain, FriskyLiveRoom, LiveRoomProvider, Plan } from "../services/types";
 import { communityBridgeDashboardUrl, communityBridgeUrlForLocale } from "../services/communityBridge";
+import { connectDomain, fetchDomainCapabilities } from "../services/domainConnect";
 import { uiCopy, type UiCopy } from "../app/uiCopy";
 import {
   addDomainTag,
@@ -138,6 +139,8 @@ export function DashboardRoute() {
   const [readinessError, setReadinessError] = useState(false);
   const [activationVisible, setActivationVisible] = useState(true);
   const [fenrirRole, setFenrirRole] = useState<FenrirRole | null>(null);
+  const [domainConnectReady, setDomainConnectReady] = useState(false);
+  const [domainConnectBusy, setDomainConnectBusy] = useState(false);
 
   function triggerCelebration(title: string, detail: string, tone: Celebration["tone"]) {
     const id = Date.now();
@@ -196,6 +199,15 @@ export function DashboardRoute() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    void fetchDomainCapabilities(controller.signal)
+      .then((ready) => { if (!cancelled) setDomainConnectReady(ready); })
+      .catch(() => { if (!cancelled) setDomainConnectReady(false); });
+    return () => { cancelled = true; controller.abort(); };
   }, []);
 
   useEffect(() => {
@@ -351,30 +363,24 @@ export function DashboardRoute() {
     return <div className="boot">{c.boot}</div>;
   }
 
-  async function addNewDomain() {
-    if (!domainInput.trim()) return;
+  function domainConnectError(cause: unknown) {
+    const code = cause instanceof Error ? cause.message : "";
+    return code === "authentication_required" ? c.dnsConnectAuth : /zone_not_in_account|dedicated_subdomain_required/.test(code) ? c.dnsConnectZone : /conflict|claim_changed|domain_unavailable/.test(code) ? c.dnsConnectConflict : /pending|proof_required/.test(code) ? c.dnsConnectPending : c.dnsConnectError;
+  }
+
+  async function addNewDomain(input = domainInput) {
+    if (!input.trim() || domainConnectBusy || !domainConnectReady) return;
     const tags = parseDomainTags(domainTagsInput);
+    setDomainConnectBusy(true);
     try {
-      const result = await domainService.create(domainInput.trim());
-      if (!result?.ok || !result.data) {
-        const fail = result as { error?: string; message?: string } | null;
-        setNotice(fail?.message || fail?.error || "Connect failed.");
-        return;
-      }
-      setDomainTagsById((current) => ({ ...current, [result.data.id]: tags }));
-      const ssl = result.data.certificateStatus === "active" ? "Live." : "SSL is provisioning.";
-      setNotice(`${result.data.domain} connected. ${ssl}`);
+      const data = await connectDomain({ domain: input.trim() });
+      setDomainTagsById((current) => ({ ...current, [data.id]: tags }));
+      setSelectedDomain(data.id);
+      setNotice(c.dnsConnectCreated);
       setDomainInput("");
       await refresh();
-    } catch (error) {
-      const code = error instanceof Error ? error.message : "";
-      if (code === "zone_not_in_account") setNotice("That domain is not in this Cloudflare account. Add the zone, then click Connect.");
-      else if (code === "connect_not_configured") setNotice("Connect is not configured on this Worker yet.");
-      else if (code === "authentication_required") setNotice(c.signedOut);
-      else if (code === "invalid_domain") setNotice("Enter a domain like pupfrisky.com.");
-      else if (code === "pages_domain_attach_failed") setNotice("Cloudflare could not attach that hostname.");
-      else setNotice(code || "Connect failed.");
-    }
+    } catch (cause) { setNotice(domainConnectError(cause)); }
+    finally { setDomainConnectBusy(false); }
   }
 
   async function runDomainSearch(seed = domainSearchInput) {
@@ -392,18 +398,15 @@ export function DashboardRoute() {
   }
 
   async function checkDns(domain: FriskyDomain) {
-    setNotice("Checking live DNS propagation...");
-    const result = await domainService.checkDns(domain.id);
-    if (!result.ok) {
-      setNotice(result.error?.message ?? "Connect check failed.");
-      return;
-    }
-    const live = result.data.certificateStatus === "active";
-    setNotice(live ? `${domain.domain} is live.` : `${domain.domain} attached. SSL ${result.data.certificateStatus}.`);
-    if (live) {
-      triggerCelebration("Domain live", `${domain.domain} is serving on this Cloudflare account.`, "dns");
-    }
-    await refresh();
+    if (domainConnectBusy || !domainConnectReady) return;
+    setDomainConnectBusy(true);
+    try {
+      const data = await connectDomain({ domainId: domain.id });
+      const ready = data.status === "verified" && data.certificateStatus === "active";
+      setNotice(ready ? c.dnsConnectReady : c.dnsConnectPending);
+      if (ready) triggerCelebration(c.dnsConnectReady, data.domain, "dns");
+    } catch (cause) { setNotice(domainConnectError(cause)); }
+    finally { setDomainConnectBusy(false); await refresh(); }
   }
 
   async function createBridge() {
@@ -506,11 +509,11 @@ export function DashboardRoute() {
       setNotice(c.inboxStepRoomNeed);
     }
     if (kind === "vault") {
-      navigateActive("links");
+      navigateActive("command");
       setNotice(c.inboxStepVaultNeed);
     }
     if (kind === "domain") {
-      navigateActive("dns");
+      navigateActive("domains");
       setDomainInput((current) => current || ui.setupInputCustomDomain);
       setNotice(c.inboxStepDomainNeed);
     }
@@ -697,14 +700,14 @@ export function DashboardRoute() {
   const show = (...pages: PageKey[]) => pages.includes(active);
 
   return (
-    <div className="app threshold-dashboard">
+    <div className="app threshold-dashboard fenrir-ops-shell">
       {activationVisible && <ProtocolActivated />}
       <aside className="sidebar threshold-rail">
         <div className="brand">
           <img className="brand-wordmark" src="/fenrir-cut-wordmark.svg" alt="Fenrir" />
           <div className="brand-lockup">
             <b>MyFenrir</b>
-            <small>CONTROL PLANE · R/01</small>
+            <small>Operator plane · gold / ink</small>
           </div>
         </div>
         <nav>
@@ -734,25 +737,14 @@ export function DashboardRoute() {
           <span className="wallpaper-paw">F</span>
           <span className="wallpaper-bot">◈</span>
         </div>
-        <header className="topbar threshold-topbar">
-          <div className="threshold-engine" aria-hidden="true">
-            <span className="threshold-engine-ring ring-a" />
-            <span className="threshold-engine-ring ring-b" />
-            <span className="threshold-engine-ring ring-c" />
-            <span className="threshold-engine-scan" />
-            <span className="threshold-engine-core"><b>R/01</b><small>THRESHOLD<br />ONLINE</small></span>
-            <span className="threshold-engine-node node-a" />
-            <span className="threshold-engine-node node-b" />
-            <span className="threshold-engine-node node-c" />
-          </div>
-          <div>
+        <header className="topbar threshold-topbar command-hero">
+          <div className="command-hero-copy">
             <p className="label">{c.heroLabel}</p>
             <h1>{c.heroTitle}</h1>
             <p className="hero-owner">{c.heroOwner}</p>
-            <div className="guardian-pills">
-              {c.guardianPills.map((pill) => (
-                <span key={pill}>{pill}</span>
-              ))}
+            <div className="command-hero-actions">
+              <button type="button" className="primary" onClick={() => navigateActive("domains")}>{c.nav[1]}</button>
+              <button type="button" className="ghost" onClick={() => navigateActive("locks")}>{c.nav[2]}</button>
             </div>
             <BrandSignature c={c} />
           </div>
@@ -810,7 +802,7 @@ export function DashboardRoute() {
           />
         )}
 
-      {show("command", "faq") && <ClientWalkthroughPanel c={c} ui={ui} />}
+      {show("command") && <ClientWalkthroughPanel c={c} ui={ui} />}
 
         {show("command") && <SetupInboxWizard onStart={startWizard} c={c} ui={ui} />}
 
@@ -818,7 +810,7 @@ export function DashboardRoute() {
           <ExampleDiagramCard c={c} ui={ui} />
         )}
 
-        {show("command", "links") && <LinkVaultPanel
+        {show("command") && <LinkVaultPanel
           c={c}
           ui={ui}
           bridges={state.bridges}
@@ -858,7 +850,7 @@ export function DashboardRoute() {
         </section>
 
         {show("billing") && <ProductionReadinessPanel c={c} readiness={readiness} loadFailed={readinessError} />}
-        {show("command", "brands") && <CommunityBridgeHandoffPanel />}
+        {show("command", "locks") && <CommunityBridgeHandoffPanel />}
 
         <div className="content-grid">
           {show("command", "locks", "telegram") && <CommunityBridgeHandoffPanel />}
@@ -905,7 +897,7 @@ export function DashboardRoute() {
             onStars={() => void startTelegramStars()}
           />}
 
-          {show("command", "domains", "dns") && <section className="panel wide">
+          {show("command", "domains") && <section className="panel wide">
             <PanelTitle title={c.dnsWizard} subtitle={c.dnsWizardSub} />
             <LiveDomainSearchPanel
               value={domainSearchInput}
@@ -936,9 +928,10 @@ export function DashboardRoute() {
                 </div>
               </div>
               <div className="domain-builder-actions">
-              <button onClick={addNewDomain}>{c.addDomain}</button>
-              {selectedDomainRecord && <button className="secondary" onClick={() => checkDns(selectedDomainRecord)}>{c.checkDns}</button>}
+              <button disabled={!domainConnectReady || domainConnectBusy} onClick={() => void addNewDomain()}>{c.dnsConnectPrepare}</button>
+              {selectedDomainRecord && <button disabled={!domainConnectReady || domainConnectBusy} className="secondary" onClick={() => selectedDomainRecord.txtRecordValue ? void checkDns(selectedDomainRecord) : void addNewDomain(selectedDomainRecord.domain)}>{selectedDomainRecord.txtRecordValue ? c.dnsConnectCheck : c.dnsConnectPrepare}</button>}
               </div>
+              {!domainConnectReady && <p className="status amber">{c.dnsConnectUnavailable}</p>}
             </div>
             {selectedDomainRecord && (
               <div className="domain-tag-strip" aria-label="Selected domain tags">
@@ -953,7 +946,7 @@ export function DashboardRoute() {
               <span className={selectedDomainRecord?.certificateStatus === "active" ? "active" : ""}><b>4</b> Live</span>
             </div>
             <DomainChoice c={c} />
-            <DnsWizard domains={state.domains} selected={selectedDomainRecord} onSelect={setSelectedDomain} c={c} />
+            <DnsWizard domains={state.domains} selected={selectedDomainRecord} onSelect={setSelectedDomain} c={c} locale={locale} />
             <RecommendedTools state={state} c={c} onOpen={(slug) => {
               const link = commerceService.click(slug);
               const label = link?.label ?? slug;
@@ -1086,7 +1079,7 @@ export function DashboardRoute() {
             <p className="muted">{c.opsStackBody}</p>
           </section>}
 
-          {show("locks", "revocations") && <section className="panel">
+          {show("locks", "audit") && <section className="panel">
             <PanelTitle title={c.revocations} subtitle={c.revocationsSub} />
             <div className="timeline">
               {state.invites.filter((invite) => invite.status === "revoked").map((invite) => (
@@ -1113,12 +1106,12 @@ export function DashboardRoute() {
             </div>
           </section>}
 
-          {show("audit", "revocations") && <section className="panel wide">
+          {show("audit") && <section className="panel wide">
             <PanelTitle title={c.auditLog} subtitle={c.auditLogSub} />
             <AuditLog state={state} />
           </section>}
 
-          {show("command", "faq") && <FaqPanel c={c} />}
+          {show("command") && <FaqPanel c={c} />}
         </div>
         <BrandSignature c={c} compact />
       </main>

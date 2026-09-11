@@ -7785,3 +7785,112 @@ p {
   .dns-lookup-form, .dns-lookup-resolvers { grid-template-columns: minmax(0, 1fr); }
   .dns-lookup-form button { width: 100%; }
 }
+
+/* ── MyFenrir ops shell rebuild (2026-09-11) ───────────────────────────────
+   Dark full-bleed, Fenrir gold/ink, intentional type. No neon-lime, no SaaS purple. */
+.fenrir-ops-shell {
+  --ops-gold: #c2a469;
+  --ops-ink: #12171c;
+  --ops-paper: #e9ebe7;
+  background:
+    radial-gradient(ellipse 70% 45% at 12% -10%, rgba(194, 164, 105, 0.16), transparent 55%),
+    radial-gradient(ellipse 55% 40% at 92% 8%, rgba(127, 174, 157, 0.08), transparent 50%),
+    linear-gradient(180deg, #141a20, #12171c 42%, #0e1318);
+}
+
+.fenrir-ops-shell .threshold-rail {
+  background: linear-gradient(180deg, rgba(16, 21, 26, 0.96), rgba(14, 19, 24, 0.98));
+  border-right: 1px solid rgba(194, 164, 105, 0.16);
+}
+
+.fenrir-ops-shell .threshold-rail nav button {
+  letter-spacing: 0.04em;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.fenrir-ops-shell .threshold-rail nav button.active {
+  background: rgba(194, 164, 105, 0.12);
+  border-color: rgba(194, 164, 105, 0.35);
+  color: var(--ops-paper);
+}
+
+.fenrir-ops-shell .command-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) auto minmax(220px, 0.7fr);
+  gap: 1.25rem;
+  align-items: end;
+  padding: clamp(1.4rem, 3vw, 2.4rem);
+  border: 1px solid rgba(194, 164, 105, 0.22);
+  border-radius: 28px;
+  background:
+    linear-gradient(135deg, rgba(194, 164, 105, 0.1), transparent 42%),
+    linear-gradient(180deg, rgba(32, 40, 50, 0.92), rgba(18, 23, 28, 0.96));
+  overflow: hidden;
+}
+
+.fenrir-ops-shell .command-hero-copy h1 {
+  font-family: var(--display);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  max-width: 16ch;
+  margin: 0.35rem 0 0.75rem;
+}
+
+.fenrir-ops-shell .command-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0 0.75rem;
+}
+
+.fenrir-ops-shell .command-hero-actions button {
+  min-height: 2.75rem;
+  padding: 0.7rem 1.15rem;
+  border-radius: 999px;
+}
+
+.fenrir-ops-shell .command-hero-actions .primary {
+  background: var(--ops-gold);
+  color: var(--ops-ink);
+  border: 1px solid transparent;
+  font-weight: 600;
+}
+
+.fenrir-ops-shell .command-hero-actions .ghost {
+  border: 1px solid rgba(233, 235, 231, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.fenrir-ops-shell .panel.wide,
+.fenrir-ops-shell .panel {
+  border-color: rgba(194, 164, 105, 0.14);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+}
+
+.fenrir-ops-shell .dns-wizard-shell {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.fenrir-ops-shell .dns-lookup-panel {
+  border-color: rgba(194, 164, 105, 0.22);
+  background: linear-gradient(180deg, rgba(27, 34, 42, 0.95), rgba(18, 23, 28, 0.98));
+}
+
+.fenrir-ops-shell .dns-lookup-comparison {
+  color: var(--ops-gold);
+}
+
+@media (max-width: 920px) {
+  .fenrir-ops-shell .command-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fenrir-ops-shell .threshold-rail nav button {
+    transition: none;
+  }
+}
