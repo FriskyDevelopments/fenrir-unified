@@ -1,5 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Google Meet room">
-  <rect width="64" height="64" rx="14" fill="#00832D"/>
-  <rect x="14" y="23" width="22" height="18" rx="4" fill="#fff"/>
-  <path d="M38 29l10-5v16l-10-5z" fill="#fff"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" aria-label="Google Meet room" role="img" viewBox="0 0 64 64"><rect width="64" height="64" fill="#00832D" rx="14"/><rect width="22" height="18" x="14" y="23" fill="#fff" rx="4"/><path fill="#fff" d="M38 29l10-5v16l-10-5z"/></svg>
