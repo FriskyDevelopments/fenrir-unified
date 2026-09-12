@@ -52,6 +52,7 @@ const SECRET_ALIASES = {
 export const FRISKYDEV_APP_HOSTS = [
   "forge.friskydev.com",
   "paperclip.friskydev.com",
+  "clip.friskydev.com",
   "mcp.friskydev.com",
 ];
 
