@@ -21,15 +21,18 @@
     }
   },
   // Worker as origin for /auth/* on Fenrir, Telegram identity link start/complete,
-  // and the login gate on forge/paperclip (already live). Do not attach this
+  // and the login gate on forge/paperclip/clip (already live). Do not attach this
   // Worker to folios.works. Do not steal gate.myfenrir.com/tg.
+  // clip.friskydev.com keeps its Grok desk on / — only login + auth are claimed.
   "routes": [
     { "pattern": "myfenrir.com/auth/*", "zone_name": "myfenrir.com" },
     { "pattern": "www.myfenrir.com/auth/*", "zone_name": "myfenrir.com" },
     { "pattern": "myfenrir.com/api/telegram/link*", "zone_name": "myfenrir.com" },
     { "pattern": "www.myfenrir.com/api/telegram/link*", "zone_name": "myfenrir.com" },
     { "pattern": "forge.friskydev.com/*", "zone_name": "friskydev.com" },
-    { "pattern": "paperclip.friskydev.com/*", "zone_name": "friskydev.com" }
+    { "pattern": "paperclip.friskydev.com/*", "zone_name": "friskydev.com" },
+    { "pattern": "clip.friskydev.com/login*", "zone_name": "friskydev.com" },
+    { "pattern": "clip.friskydev.com/auth/*", "zone_name": "friskydev.com" }
   ],
   "vars": {
     "BASE_URL": "https://myfenrir.com",
@@ -38,15 +41,13 @@
     "LOGOUT_REDIRECT": "https://myfenrir.com/login",
     "SESSION_TTL_SECONDS": "604800",
     "SESSION_COOKIE_NAME": "fenrir_session",
-    "ALLOWED_REDIRECT_HOSTS": "myfenrir.com,www.myfenrir.com,forge.friskydev.com,paperclip.friskydev.com,mcp.friskydev.com",
-    "TRUSTED_ORIGINS": "https://myfenrir.com,https://www.myfenrir.com,https://forge.friskydev.com,https://paperclip.friskydev.com,https://mcp.friskydev.com",
+    "ALLOWED_REDIRECT_HOSTS": "myfenrir.com,www.myfenrir.com,forge.friskydev.com,paperclip.friskydev.com,clip.friskydev.com,mcp.friskydev.com",
+    "TRUSTED_ORIGINS": "https://myfenrir.com,https://www.myfenrir.com,https://forge.friskydev.com,https://paperclip.friskydev.com,https://clip.friskydev.com,https://mcp.friskydev.com",
     "FENRIR_AUTH_LOG_CHAT_ID": "-1004450930780"
   },
-  // Replace id after: wrangler kv namespace create FENRIR_AUTH_SESSIONS
   "kv_namespaces": [
     { "binding": "SESSIONS", "id": "9e3b6917e8354d66aa3f4375f345e440" }
   ],
-  // Existing fenrir-bridge D1 (telegram_account_link_codes). Do not invent a new DB.
   "d1_databases": [
     {
       "binding": "DB",
