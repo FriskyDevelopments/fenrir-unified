@@ -35,9 +35,10 @@ function configuredEnv(extra = {}) {
   };
 }
 
-test("forge and paperclip are allowed auth hosts; folios.works is not", () => {
+test("forge, paperclip, and clip are allowed auth hosts; folios.works is not", () => {
   assert.equal(isAllowedAuthHost("forge.friskydev.com"), true);
   assert.equal(isAllowedAuthHost("paperclip.friskydev.com"), true);
+  assert.equal(isAllowedAuthHost("clip.friskydev.com"), true);
   assert.equal(isAllowedAuthHost("mcp.friskydev.com"), true);
   assert.equal(isAllowedAuthHost("myfenrir.com"), true);
   assert.equal(isAllowedAuthHost("www.myfenrir.com"), true);
@@ -45,9 +46,10 @@ test("forge and paperclip are allowed auth hosts; folios.works is not", () => {
   assert.equal(isAllowedAuthHost("www.folios.works"), false);
 });
 
-test("cookie domain is friskydev.com on Forge/Paperclip and myfenrir.com on Fenrir", () => {
+test("cookie domain is friskydev.com on Forge/Paperclip/Clip and myfenrir.com on Fenrir", () => {
   assert.equal(cookieDomainForHost("forge.friskydev.com"), "friskydev.com");
   assert.equal(cookieDomainForHost("paperclip.friskydev.com"), "friskydev.com");
+  assert.equal(cookieDomainForHost("clip.friskydev.com"), "friskydev.com");
   assert.equal(cookieDomainForHost("myfenrir.com"), "myfenrir.com");
   assert.equal(cookieDomainForHost("www.myfenrir.com"), "myfenrir.com");
   assert.equal(cookieDomainForHost("fenrir-auth-worker.example.workers.dev"), "");
@@ -87,6 +89,19 @@ test("paperclip Apple start 302s with form_post and paperclip callback", async (
   assert.equal(location.origin + location.pathname, "https://appleid.apple.com/auth/authorize");
   assert.equal(location.searchParams.get("redirect_uri"), "https://paperclip.friskydev.com/auth/apple/callback");
   assert.equal(location.searchParams.get("response_mode"), "form_post");
+});
+
+test("clip Google start 302s with clip callback and settings return host is allowed", async () => {
+  const response = await worker.fetch(
+    new Request("https://clip.friskydev.com/auth/google?redirect=https://clip.friskydev.com/settings"),
+    configuredEnv(),
+  );
+  assert.equal(response.status, 302);
+  const location = new URL(response.headers.get("location"));
+  assert.equal(location.origin + location.pathname, "https://accounts.google.com/o/oauth2/v2/auth");
+  assert.equal(location.searchParams.get("redirect_uri"), "https://clip.friskydev.com/auth/google/callback");
+  const env = bindRequest(configuredEnv(), new Request("https://clip.friskydev.com/auth/me"));
+  assert.equal(cfg(env).allowedRedirectHosts.includes("clip.friskydev.com"), true);
 });
 
 test("forge login page includes all three provider buttons", async () => {
