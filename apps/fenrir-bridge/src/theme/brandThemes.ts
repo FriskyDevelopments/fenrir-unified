@@ -29,7 +29,7 @@ export type BrandTheme = {
 export const brandThemes: Record<BrandKey, BrandTheme> = {
   fenrir: {
     key: "fenrir",
-    productName: "Fenrir Bridge",
+    productName: "Frisky Bridge",
     systemRole: "trusted protocol",
     logoSrc: "/fenrir-cut-wordmark.svg",
     logoAlt: "Fenrir",

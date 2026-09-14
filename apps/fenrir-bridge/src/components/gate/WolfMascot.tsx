@@ -6,7 +6,7 @@ import type { SVGProps } from "react";
  */
 export function WolfMascot({
   className = "",
-  label = "FENRIR · PROTOCOL",
+  label = "FRISKY · PROTOCOL",
   ...svgProps
 }: SVGProps<SVGSVGElement> & { label?: string }) {
   return (

@@ -22,7 +22,7 @@ export function GateShell({
   brandSub = "Community · Gate",
   logoSrc,
   topRight,
-  footerLeft = "FENRIR · PROTOCOL",
+  footerLeft = "FRISKY · PROTOCOL",
   footerStatus = "Status: protocol active",
   children
 }: GateShellProps) {
