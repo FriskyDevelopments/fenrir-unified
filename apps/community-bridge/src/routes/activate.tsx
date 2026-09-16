@@ -45,7 +45,7 @@ const BOT_URL = `https://t.me/${BOT_USERNAME}`;
 // www.myfenrir.com, where this endpoint mints the single-use Telegram deep link
 // and immediately redirects to the bot. A cross-origin fetch from Community
 // Bridge would not reliably carry that session.
-const MYFENRIR_LINK_URL = "https://www.myfenrir.com/api/telegram/link/start";
+const MYFENRIR_LINK_URL = "https://myfenrir.com/api/telegram/link/start";
 const CODE_LENGTH = 6;
 
 const FAILURE_COPY: Record<DemoRedeemFailure, string> = {

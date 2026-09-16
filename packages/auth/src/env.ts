@@ -1,8 +1,8 @@
 import type { FriskyAuthEnv, FriskyAuthOptions, FriskySocialProvider } from "./types";
 
 const DEFAULT_ORIGINS = [
-  "https://www.myfenrir.com",
   "https://myfenrir.com",
+  "https://www.myfenrir.com",
   "https://auth.myfenrir.com",
   "http://localhost:5173",
   "http://localhost:8788",

@@ -35,7 +35,7 @@ function gateReturnPath(slug: string) {
 }
 
 function communitySsoUrl(slug: string, brandId: string) {
-  const url = new URL("https://www.myfenrir.com/api/auth/community-sso");
+  const url = new URL("https://myfenrir.com/api/auth/community-sso");
   url.searchParams.set("next", `https://communities.myfenrir.com${gateReturnPath(slug)}`);
   url.searchParams.set("brand", brandId);
   // The Gate is the public source of the community's visual identity. Carry

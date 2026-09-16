@@ -133,10 +133,10 @@ test("OPTIONS preflight from www is allowed with credentials", async () => {
   assert.equal(response.headers.get("Access-Control-Allow-Credentials"), "true");
 });
 
-test("www.myfenrir.com /auth/health is served by the same Worker", async () => {
+test("www.myfenrir.com /auth/health 301s to apex (auth Worker wins over fenrir-redirects)", async () => {
   const response = await worker.fetch(new Request("https://www.myfenrir.com/auth/health"), configuredEnv());
-  assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, service: "fenrir-auth-worker" });
+  assert.equal(response.status, 301);
+  assert.equal(response.headers.get("location"), "https://myfenrir.com/auth/health");
 });
 
 test("/auth/api stays 404 on Fenrir even with a KV session", async () => {
