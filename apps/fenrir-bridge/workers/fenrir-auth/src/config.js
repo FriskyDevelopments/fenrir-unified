@@ -152,9 +152,17 @@ export function cfg(env) {
   const requestOriginValue = String(env?.AUTH_REQUEST_ORIGIN || "").replace(/\/$/, "");
   const defaultBase = (env.BASE_URL || "https://myfenrir.com").replace(/\/$/, "");
   const hostOk = requestHost && isAllowedAuthHost(requestHost);
-  const baseUrl = hostOk
-    ? (requestOriginValue || `https://${requestHost}`)
-    : defaultBase;
+  // Always emit apex redirect_uri / start URLs on MyFenrir. www still hits this
+  // Worker (more-specific than fenrir-redirects), so request-host baseUrl caused
+  // https://www.myfenrir.com/auth/{provider}/callback and double-login cookies.
+  let baseUrl;
+  if (isMyFenrirHost(requestHost)) {
+    baseUrl = "https://myfenrir.com";
+  } else if (hostOk) {
+    baseUrl = requestOriginValue || `https://${requestHost}`;
+  } else {
+    baseUrl = defaultBase;
+  }
   const cookieDomain = requestHost
     ? cookieDomainForHost(requestHost, env.COOKIE_DOMAIN || "myfenrir.com")
     : (env.COOKIE_DOMAIN || "myfenrir.com");

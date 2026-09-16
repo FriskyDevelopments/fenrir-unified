@@ -11,7 +11,7 @@ const DEFAULT_TARGET_URL = "https://communities.myfenrir.com/gate?onboarding=1";
 // authenticated instead of re-verifying. No Fenrir session => it falls back to
 // the Community Bridge login (never a hard error). This is the link that was
 // missing: every "Open Community Bridge" entry now carries the session.
-const COMMUNITY_SSO_HANDOFF = "https://www.myfenrir.com/api/auth/community-sso";
+const COMMUNITY_SSO_HANDOFF = "https://myfenrir.com/api/auth/community-sso";
 
 const configuredTargetUrl = (
   import.meta.env.VITE_COMMUNITY_BRIDGE_DASHBOARD_URL ??

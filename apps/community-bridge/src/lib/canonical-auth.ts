@@ -1,6 +1,6 @@
 import type { ProviderId } from "@/config/brands";
 
-export const CANONICAL_AUTH_ORIGIN = "https://www.myfenrir.com";
+export const CANONICAL_AUTH_ORIGIN = "https://myfenrir.com";
 
 export function canonicalCommunityOAuthUrl(input: {
   provider: ProviderId;

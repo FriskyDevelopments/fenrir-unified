@@ -129,3 +129,15 @@ test("forge session cookie is scoped to friskydev.com, not myfenrir.com", async 
   assert.match(cookie, /Domain=friskydev.com/);
   assert.doesNotMatch(cookie, /Domain=myfenrir.com/);
 });
+
+test("www.myfenrir.com auth requests 301 to apex before OAuth", async () => {
+  const response = await worker.fetch(new Request("https://www.myfenrir.com/auth/google?redirect=/main"), configuredEnv());
+  assert.equal(response.status, 301);
+  assert.equal(response.headers.get("location"), "https://myfenrir.com/auth/google?redirect=/main");
+});
+
+test("MyFenrir OAuth redirect_uri is always apex even if request host is www", () => {
+  const env = bindRequest(configuredEnv(), new Request("https://www.myfenrir.com/auth/providers"));
+  assert.equal(cfg(env).baseUrl, "https://myfenrir.com");
+  assert.equal(cfg(env).cookieDomain, "myfenrir.com");
+});

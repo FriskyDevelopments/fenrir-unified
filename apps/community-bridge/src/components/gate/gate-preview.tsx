@@ -12,7 +12,7 @@ import {
 function gateLoginHref(slug?: string, brandId?: string) {
   const next = slug ? `/g/${encodeURIComponent(slug)}` : "/";
   const ssoNext = `https://communities.myfenrir.com${next}`;
-  const sso = new URL("https://www.myfenrir.com/api/auth/community-sso");
+  const sso = new URL("https://myfenrir.com/api/auth/community-sso");
   sso.searchParams.set("next", ssoNext);
   if (brandId) sso.searchParams.set("brand", brandId);
 

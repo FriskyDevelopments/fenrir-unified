@@ -370,8 +370,19 @@ async function handleAppShell(request, env) {
   return html(loginPage(env, { error, user: session?.user || null }));
 }
 
+function canonicalizeWwwToApex(request) {
+  const url = new URL(request.url);
+  if (url.hostname.toLowerCase() !== "www.myfenrir.com") return null;
+  url.hostname = "myfenrir.com";
+  url.protocol = "https:";
+  return Response.redirect(url.toString(), 301);
+}
+
 export default {
   async fetch(request, env) {
+    const wwwRedirect = canonicalizeWwwToApex(request);
+    if (wwwRedirect) return wwwRedirect;
+
     env = bindRequest(env, request);
 
     if (!isFenrirHost(request)) {
