@@ -1,3 +1,9 @@
-export async function onRequestGet(context: any) {
-  return Response.redirect(new URL("/waitlist/index.html", context.request.url).toString(), 302);
+export async function onRequestGet() {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: "/waitlist/",
+      "Cache-Control": "no-store",
+    },
+  });
 }

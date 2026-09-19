@@ -432,11 +432,10 @@ export const authService = {
       return;
     }
     const returnTo = safeCurrentAuthReturnPath();
-    if (await workerAuthIsLive()) {
-      window.location.assign(`${workerAuthUrl(`/auth/${provider}`)}?redirect=${encodeURIComponent(returnTo)}`);
-      return;
-    }
-    window.location.assign(`/api/auth/login/${provider}?return_to=${encodeURIComponent(returnTo)}`);
+    // Always start Better Auth on /auth/{provider}. The legacy
+    // /api/auth/login/:provider path still 302s Apple to www, which 301s
+    // back to apex and browsers hit ERR_TOO_MANY_REDIRECTS.
+    window.location.assign(`${workerAuthUrl(`/auth/${provider}`)}?redirect=${encodeURIComponent(returnTo)}`);
   },
   async authCapabilities() {
     return apiRequest<{

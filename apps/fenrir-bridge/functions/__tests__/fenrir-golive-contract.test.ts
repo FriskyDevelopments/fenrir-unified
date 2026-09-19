@@ -10,6 +10,7 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 describe("Fenrir go-live auth contract (Folios#29 bits on myfenrir.com)", () => {
   it("canonicalizes www.myfenrir.com to the apex in Pages _redirects", () => {
     const redirects = readFileSync(path.join(root, "public/_redirects"), "utf8");
+    expect(redirects).toMatch(/https:\/\/www\.myfenrir\.com\/\s+https:\/\/myfenrir\.com\/\s+301/);
     expect(redirects).toMatch(/https:\/\/www\.myfenrir\.com\/\*\s+https:\/\/myfenrir\.com\/:splat\s+301/);
     expect(redirects).not.toMatch(/https:\/\/myfenrir\.com\/\*\s+https:\/\/www\.myfenrir\.com/);
   });

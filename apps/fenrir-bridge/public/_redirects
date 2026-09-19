@@ -15,5 +15,11 @@
 # Canonical host: www historically had no auth Worker route, so /auth/* hit the
 # SPA catch-all and login looked broken. Send www to the apex before the splat.
 # More-specific Workers (auth/*, gate/*) still win over this Pages file.
+#
+# Explicit `/` is required: Cloudflare Pages host-specific `/*` does not match
+# the empty splat, so https://www.myfenrir.com/ served the SPA HTML while
+# /assets/* 301'd to apex. CSP `script-src 'self'` then blocked the JS and
+# the homepage rendered blank (banner-only).
+https://www.myfenrir.com/     https://myfenrir.com/          301
 https://www.myfenrir.com/*    https://myfenrir.com/:splat    301
 /* /index.html 200
