@@ -888,7 +888,7 @@ const normalizeText = (value) => (value || "").trim();
 const BRIDGE_TARGET = "managed MyFenrir Gate";
 // Account linking is owned by Fenrir Bridge (FriskyDev). Community Bridge's
 // /activate 6-character paste is not the production linker — use link-start.
-const FRISKY_TELEGRAM_LINK_START = "https://www.myfenrir.com/api/telegram/link/start";
+const FRISKY_TELEGRAM_LINK_START = "https://myfenrir.com/api/telegram/link/start";
 const COMMUNITY_BRIDGE_CONTINUE_URL = "https://communities.myfenrir.com/gate?onboarding=1";
 const MYFENRIR_APP_URL = "https://communities.myfenrir.com/gate";
 const MYFENRIR_FRONTEND_URL = "https://communities.myfenrir.com/gate";

@@ -33,7 +33,7 @@ const appSource = readFileSync(
 
 describe("Community Bridge Telegram chain (after FriskyDev link)", () => {
   it("keeps walkthrough step 1 on FriskyDev link-start", () => {
-    expect(walkthrough).toContain("https://www.myfenrir.com/api/telegram/link/start");
+    expect(walkthrough).toContain("https://myfenrir.com/api/telegram/link/start");
     expect(walkthrough).toContain("Link FriskyDev ID");
     expect(walkthrough).toContain("https://t.me/Myfenrir_bot?start=account");
     expect(walkthrough).toContain("https://t.me/Myfenrir_bot?startgroup=discover");
@@ -47,7 +47,7 @@ describe("Community Bridge Telegram chain (after FriskyDev link)", () => {
   });
 
   it("does not use Community Bridge 6-char paste as production linking", () => {
-    expect(activate).toContain("https://www.myfenrir.com/api/telegram/link/start");
+    expect(activate).toContain("https://myfenrir.com/api/telegram/link/start");
     expect(activate).toContain("if (!demo)");
     expect(activate).toContain("Continue securely");
   });
@@ -61,7 +61,7 @@ describe("Community Bridge Telegram chain (after FriskyDev link)", () => {
   });
 
   it("Bot OS continues on communities.myfenrir.com after FriskyDev is linked", () => {
-    expect(botOs).toContain('const FRISKY_TELEGRAM_LINK_START = "https://www.myfenrir.com/api/telegram/link/start"');
+    expect(botOs).toContain('const FRISKY_TELEGRAM_LINK_START = "https://myfenrir.com/api/telegram/link/start"');
     expect(botOs).toContain(
       'const COMMUNITY_BRIDGE_CONTINUE_URL = "https://communities.myfenrir.com/gate?onboarding=1"',
     );

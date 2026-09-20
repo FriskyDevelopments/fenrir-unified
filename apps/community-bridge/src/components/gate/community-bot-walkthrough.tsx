@@ -47,7 +47,7 @@ const telegramPreviewSteps = [
     title: "Link your FriskyDev ID",
     message: "Connect this Telegram account to your FriskyDev identity.",
     detail:
-      "Opens www.myfenrir.com/api/telegram/link/start. Sign in with Better Auth if needed. There is no 6-character paste code.",
+      "Opens myfenrir.com/api/telegram/link/start. Sign in with Better Auth if needed. There is no 6-character paste code.",
   },
   {
     label: "Account",
@@ -79,7 +79,7 @@ const telegramPreviewSteps = [
 ] as const;
 
 const telegramStepLinks = [
-  // Step 1 is FriskyDev identity on www.myfenrir.com. Steps 2–5 stay on
+  // Step 1 is FriskyDev identity on myfenrir.com (apex). Steps 2–5 stay on
   // Community Bridge + @Myfenrir_bot. Never send this walkthrough to /main.
   "https://myfenrir.com/api/telegram/link/start",
   "https://t.me/Myfenrir_bot?start=account",
