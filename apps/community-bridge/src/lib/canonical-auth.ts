@@ -27,8 +27,8 @@ export function canonicalCommunityOAuthUrl(input: {
   const postAuth = new URL("/main", CANONICAL_AUTH_ORIGIN);
   postAuth.searchParams.set("next", `${handoff.pathname}${handoff.search}`);
 
-  const login = new URL(`/api/auth/login/${input.provider}`, CANONICAL_AUTH_ORIGIN);
-  login.searchParams.set("return_to", `${postAuth.pathname}${postAuth.search}`);
+  const login = new URL(`/auth/${input.provider}`, CANONICAL_AUTH_ORIGIN);
+  login.searchParams.set("redirect", `${postAuth.pathname}${postAuth.search}`);
   return login.toString();
 }
 

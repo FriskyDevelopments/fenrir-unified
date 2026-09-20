@@ -37,7 +37,8 @@ const checks = [
     name: "new social login prefers Fenrir Better Auth Worker /auth/{provider}, Pages OAuth until that Worker is live",
     pass: apiSource.includes("/auth/${provider}") &&
       apiSource.includes('workerAuthUrl("/auth/providers")') &&
-      apiSource.includes("/api/auth/login/${provider}") &&
+      apiSource.includes("workerAuthUrl(`/auth/${provider}`)") &&
+      !apiSource.includes("/api/auth/login/${provider}") &&
       apiSource.includes("workerAuthIsLive") &&
       apiSource.includes('workerAuthUrl("/auth/ready")') &&
       !apiSource.includes('workerAuthUrl("/auth/health")') &&
@@ -66,7 +67,8 @@ const checks = [
     pass: (() => {
       const redirects = readFileSync(join(root, "public/_redirects"), "utf8");
       const hops = readFileSync(join(root, "workers/fenrir-redirects/worker.js"), "utf8");
-      return /https:\/\/www\.myfenrir\.com\/\*\s+https:\/\/myfenrir\.com\/:splat\s+301/.test(redirects)
+      return /https:\/\/www\.myfenrir\.com\/\s+https:\/\/myfenrir\.com\/\s+301/.test(redirects)
+        && /https:\/\/www\.myfenrir\.com\/\*\s+https:\/\/myfenrir\.com\/:splat\s+301/.test(redirects)
         && hops.includes('url.hostname === "www.myfenrir.com"')
         && hops.includes('url.hostname = "myfenrir.com"')
         && apiSource.includes('from "./authOrigin"')

@@ -7,4 +7,4 @@ Disallow: /room/
 Disallow: /go/
 Disallow: /vault
 
-Sitemap: https://www.myfenrir.com/sitemap.xml
+Sitemap: https://myfenrir.com/sitemap.xml
