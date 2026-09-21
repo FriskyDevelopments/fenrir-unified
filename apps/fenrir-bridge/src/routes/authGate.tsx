@@ -11,7 +11,7 @@ import { BrandSignature } from "./routeCommon";
 import { HumanVerificationGate } from "../components/HumanVerificationGate";
 import { loginPageErrorMessage } from "../services/authErrors";
 
-function postLoginDestination() {
+export function postLoginDestination() {
   const requested = new URLSearchParams(window.location.search).get("next");
   return requested?.startsWith("/") && !requested.startsWith("//") ? requested : managedDashboardPath;
 }
