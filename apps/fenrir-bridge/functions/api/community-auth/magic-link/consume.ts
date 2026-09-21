@@ -14,7 +14,6 @@ import {
   signCommunitySession
 } from "../../../_lib/community-auth";
 import { noStoreJson } from "../../../_lib/responses";
-import { mintSupabaseSharedSessionCookies } from "../../../_lib/supabase-shared-session";
 
 type MagicLinkConsume = {
   token?: unknown;
@@ -85,13 +84,6 @@ async function consumeMagicLink(context: any, token: string, redirectAfter: bool
     const session = await signCommunitySession(payload, context.env);
     const cookie = communitySessionSetCookie(session);
 
-    // ADDITIVE unification (same as OAuth callback): mint the Supabase session
-    // cookie on `.myfenrir.com` so communities.myfenrir.com shares this identity.
-    const supabaseCookies = await mintSupabaseSharedSessionCookies(context.env, user.email, {
-      name: user.display_name ?? user.email,
-      fenrirUserId: user.id,
-    });
-
     await createCommunitySessionRecord(context.env, {
       userId: user.id,
       sessionHash: await sha256Hex(session),
@@ -106,7 +98,6 @@ async function consumeMagicLink(context: any, token: string, redirectAfter: bool
         "Cache-Control": "no-store",
       });
       headers.append("Set-Cookie", cookie);
-      for (const supabaseCookie of supabaseCookies) headers.append("Set-Cookie", supabaseCookie);
       return new Response(null, { status: 302, headers });
     }
 
@@ -134,7 +125,6 @@ async function consumeMagicLink(context: any, token: string, redirectAfter: bool
       headers: (() => {
         const headers = new Headers();
         headers.append("Set-Cookie", cookie);
-        for (const supabaseCookie of supabaseCookies) headers.append("Set-Cookie", supabaseCookie);
         return headers;
       })(),
     });

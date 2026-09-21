@@ -36,7 +36,15 @@ async function buildFenrirQr(url: string) {
     color: { dark: "#123A86", light: "#F2F7FF" },
   });
 
-  const [qr, mark] = await Promise.all([loadImage(rawQr), loadImage("/fenrir-mark.svg")]);
+  // El QR es lo único imprescindible. La marca central es decoración y NO debe
+  // poder tumbar el compartir: en producción `/fenrir-mark.svg` responde 302
+  // hacia frisky.cloudflareaccess.com (Cloudflare Access intercepta los
+  // estáticos de la raíz), así que `loadImage` recibía un documento HTML,
+  // disparaba `onerror`, rechazaba toda la promesa y el usuario sólo veía
+  // "Could not build the QR code." — un QR perfectamente válido tirado a la
+  // basura por un logotipo. Ahora la marca es opcional.
+  const qr = await loadImage(rawQr);
+  const mark = await loadImage("/fenrir-mark.svg").catch(() => null);
   const canvas = document.createElement("canvas");
   canvas.width = 720;
   canvas.height = 720;
@@ -54,17 +62,25 @@ async function buildFenrirQr(url: string) {
   context.drawImage(qr, 40, 40, 640, 640);
 
   // Keep the mark compact and use high error correction so branded PNGs remain robust.
-  const plateSize = 88;
-  const plateX = (720 - plateSize) / 2;
-  const plateY = (720 - plateSize) / 2;
-  context.fillStyle = "#07111F";
-  context.beginPath();
-  context.roundRect(plateX, plateY, plateSize, plateSize, 24);
-  context.fill();
-  context.strokeStyle = "#8B5CF6";
-  context.lineWidth = 5;
-  context.stroke();
-  context.drawImage(mark, plateX + 10, plateY + 10, plateSize - 20, plateSize - 20);
+  if (mark) {
+    const plateSize = 88;
+    const plateX = (720 - plateSize) / 2;
+    const plateY = (720 - plateSize) / 2;
+    context.fillStyle = "#07111F";
+    context.beginPath();
+    // `roundRect` no existe antes de Safari 16.4: sin este guardia el catch de
+    // arriba convertía un navegador algo viejo en "no pude construir el QR".
+    if (typeof context.roundRect === "function") {
+      context.roundRect(plateX, plateY, plateSize, plateSize, 24);
+    } else {
+      context.rect(plateX, plateY, plateSize, plateSize);
+    }
+    context.fill();
+    context.strokeStyle = "#8B5CF6";
+    context.lineWidth = 5;
+    context.stroke();
+    context.drawImage(mark, plateX + 10, plateY + 10, plateSize - 20, plateSize - 20);
+  }
 
   return canvas.toDataURL("image/png");
 }

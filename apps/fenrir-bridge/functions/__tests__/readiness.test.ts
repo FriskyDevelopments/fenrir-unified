@@ -13,6 +13,7 @@ describe("production readiness", () => {
         APPLE_TEAM_ID: "apple-team",
         APPLE_KEY_ID: "apple-key",
         APPLE_PRIVATE_KEY: "apple-private-key",
+        APPLE_CLIENT_SECRET: "apple-client-secret",
         DB: {},
         NEON_DATABASE_URL: "postgres://private"
       },
@@ -39,5 +40,16 @@ describe("production readiness", () => {
     expect(snapshot.auth.googleConfigured).toBe(true);
     expect(snapshot.auth.microsoftConfigured).toBe(false);
     expect(snapshot.app.readyForPaidUsers).toBe(true);
+  });
+
+  it("does not treat Apple as configured without APPLE_CLIENT_SECRET", () => {
+    const snapshot = computeReadiness({
+      APPLE_CLIENT_ID: "apple-id",
+      APPLE_TEAM_ID: "apple-team",
+      APPLE_KEY_ID: "apple-key",
+      APPLE_PRIVATE_KEY: "apple-private-key",
+    });
+
+    expect(snapshot.auth.appleConfigured).toBe(false);
   });
 });

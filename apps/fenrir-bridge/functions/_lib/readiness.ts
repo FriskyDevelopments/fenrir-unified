@@ -43,7 +43,12 @@ export function computeReadiness(
 ): ReadinessSnapshot {
   const directGoogle = nonEmpty(env.GOOGLE_CLIENT_ID) && nonEmpty(env.GOOGLE_CLIENT_SECRET);
   const directMicrosoft = nonEmpty(env.MICROSOFT_CLIENT_ID) && nonEmpty(env.MICROSOFT_CLIENT_SECRET);
-  const directApple = nonEmpty(env.APPLE_CLIENT_ID) && nonEmpty(env.APPLE_TEAM_ID) && nonEmpty(env.APPLE_KEY_ID) && nonEmpty(env.APPLE_PRIVATE_KEY);
+  const directApple =
+    nonEmpty(env.APPLE_CLIENT_ID) &&
+    nonEmpty(env.APPLE_TEAM_ID) &&
+    nonEmpty(env.APPLE_KEY_ID) &&
+    nonEmpty(env.APPLE_PRIVATE_KEY) &&
+    nonEmpty(env.APPLE_CLIENT_SECRET);
 
   const auth = {
     googleConfigured: directGoogle,
