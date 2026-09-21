@@ -11,7 +11,7 @@ import { BrandSignature } from "./routeCommon";
 import { HumanVerificationGate } from "../components/HumanVerificationGate";
 import { loginPageErrorMessage } from "../services/authErrors";
 
-export function postLoginDestination() {
+function postLoginDestination() {
   const requested = new URLSearchParams(window.location.search).get("next");
   return requested?.startsWith("/") && !requested.startsWith("//") ? requested : managedDashboardPath;
 }
@@ -118,7 +118,6 @@ export function AuthGate({ c, locale, onLocale }: { c: Copy; locale: Locale; onL
 function providerLabel(provider: AuthProvider, c: Copy) {
   if (provider === "apple") return c.continueApple;
   if (provider === "google") return c.continueGoogle;
-  if (provider === "authentik") return c.continueAuthentik;
   return c.continueMicrosoft;
 }
 
