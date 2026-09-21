@@ -81,7 +81,7 @@ const telegramPreviewSteps = [
 const telegramStepLinks = [
   // Step 1 is FriskyDev identity on www.myfenrir.com. Steps 2–5 stay on
   // Community Bridge + @Myfenrir_bot. Never send this walkthrough to /main.
-  "https://myfenrir.com/api/telegram/link/start",
+  "https://www.myfenrir.com/api/telegram/link/start",
   "https://t.me/Myfenrir_bot?start=account",
   "https://t.me/Myfenrir_bot?startgroup=discover",
   "https://t.me/Myfenrir_bot?start=mapping",

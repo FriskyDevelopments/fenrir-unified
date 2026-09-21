@@ -31,7 +31,7 @@ import { isDemoMode } from "@/config/demo-mode";
 const TELEGRAM_BOT_USERNAME =
   (import.meta.env["VITE_TELEGRAM_BOT_USERNAME"] as string | undefined) ?? "Myfenrir_bot";
 const TELEGRAM_BOT_URL = `https://t.me/${TELEGRAM_BOT_USERNAME}`;
-const MYFENRIR_LINK_URL = "https://myfenrir.com/api/telegram/link/start";
+const MYFENRIR_LINK_URL = "https://www.myfenrir.com/api/telegram/link/start";
 
 export const Route = createFileRoute("/gate")({
   ssr: false,
