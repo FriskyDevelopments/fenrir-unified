@@ -75,10 +75,10 @@ const routeSource = read("src/routes/g.$slug.tsx");
 // Lo que el guardia SÍ debe seguir impidiendo es que entren condiciones de
 // identidad de Telegram en `needsSso`: eso pertenece a la seguridad post-SSO.
 const needsSsoLine = routeSource.match(/const needsSso = .*;/)?.[0] ?? "";
-if (!/const needsSso = (!checkingAccess && !session|checkingAccess \|\| !session);/.test(needsSsoLine)) {
-  fail(
-    "public Gate must derive needsSso only from checkingAccess/session; found: " + needsSsoLine,
-  );
+if (
+  !/const needsSso = (!checkingAccess && !session|checkingAccess \|\| !session);/.test(needsSsoLine)
+) {
+  fail("public Gate must derive needsSso only from checkingAccess/session; found: " + needsSsoLine);
 }
 if (/telegram|identity|community_id|communityConfirmed/i.test(needsSsoLine)) {
   fail(

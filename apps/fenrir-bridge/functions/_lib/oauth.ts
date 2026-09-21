@@ -1,5 +1,6 @@
 import { createSessionPayload, readCookie, type SessionPayload } from "./auth";
 import { requireEnv, type BillingEnv } from "./billing-env";
+import { preservedLoginNext } from "./fenrir-login";
 
 export type OAuthEnv = BillingEnv & {
   GOOGLE_CLIENT_ID?: string;
@@ -10,23 +11,19 @@ export type OAuthEnv = BillingEnv & {
   APPLE_TEAM_ID?: string;
   APPLE_KEY_ID?: string;
   APPLE_PRIVATE_KEY?: string;
-  /** JWT ES256 que consume better-auth. Sin esto Apple NO funciona, por mucho
-   *  que estén los otros cuatro: ver isDirectOAuthAvailable. */
-  APPLE_CLIENT_SECRET?: string;
   /**
-   * Authentik broker (https://authentik.friskydev.com). The issuer is per-application and
-   * ends with a slash, e.g. `https://authentik.friskydev.com/application/o/<app-slug>/`.
+   * @deprecated Authentik is leftover. The Authentik VM was destroyed 2026-08-28.
+   * These env names may still exist in old dashboards; they must never enable login.
    */
   AUTHENTIK_ISSUER?: string;
   AUTHENTIK_CLIENT_ID?: string;
   AUTHENTIK_CLIENT_SECRET?: string;
   /**
-   * Hard kill switch. Must be exactly "true" for Authentik to be offered at all.
-   * Credentials alone are deliberately NOT enough: this keeps a half-finished Authentik
-   * rollout from appearing on a live gate, and lets the flag be flipped off instantly
-   * without unbinding secrets. The live Google/Microsoft/Apple path is untouched by it.
+   * @deprecated No-op. Authentik is retired leftover identity, not Fenrir login.
+   * Even AUTHENTIK_ENABLED=true does not offer the provider.
    */
   AUTHENTIK_ENABLED?: string;
+  FRISKY_AUTH_ENABLED?: string;
 };
 
 export type OAuthProvider = "google" | "microsoft" | "apple" | "authentik";
@@ -66,26 +63,24 @@ const transactionCookie = "fenrir_oauth_tx";
 const transactionMaxAge = 10 * 60;
 
 export function isOAuthProvider(value: unknown): value is OAuthProvider {
+  return value === "google" || value === "microsoft" || value === "apple";
+}
+
+/**
+ * Determines whether a value identifies an OAuth provider supported by Community Gate, including the legacy Authentik identifier.
+ *
+ * @param value - The value to evaluate
+ * @returns `true` if the value is a supported Community Gate OAuth provider, `false` otherwise.
+ */
+export function isCommunityOAuthProvider(value: unknown): value is OAuthProvider {
   return value === "google" || value === "microsoft" || value === "apple" || value === "authentik";
 }
 
 /**
- * Providers offered by the Community Gate. Deliberately narrower than isOAuthProvider():
- */
-export function isCommunityOAuthProvider(
-  value: unknown
-): value is OAuthProvider {
-  return (
-    value === "google" ||
-    value === "microsoft" ||
-    value === "apple" ||
-    value === "authentik"
-  );
-}
-
-/**
- * Authentik exposes ONE global authorize/token/userinfo triple and a per-application
- * JWKS + issuer. Derived from AUTHENTIK_ISSUER so a single env var configures the lot.
+ * Constructs legacy Authentik OIDC endpoint URLs from an issuer URL.
+ *
+ * @param issuer - The Authentik issuer URL
+ * @returns The normalized issuer and its authorization, token, userinfo, and JWKS endpoints
  */
 export function authentikEndpoints(issuer: string) {
   const normalizedIssuer = issuer.trim().replace(/\/*$/, "/");
@@ -95,80 +90,45 @@ export function authentikEndpoints(issuer: string) {
     authorize: `${origin}/application/o/authorize/`,
     token: `${origin}/application/o/token/`,
     userinfo: `${origin}/application/o/userinfo/`,
-    jwks: `${normalizedIssuer}jwks/`,
+    jwks: `${normalizedIssuer}jwks/`
   };
 }
 
-export function isDirectOAuthAvailable(
-  provider: OAuthProvider,
-  env: OAuthEnv
-): boolean {
-  if (provider === "google") {
-    return Boolean(
-      env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim()
-    );
-  }
-  if (provider === "microsoft") {
-    return Boolean(
-      env.MICROSOFT_CLIENT_ID?.trim() && env.MICROSOFT_CLIENT_SECRET?.trim()
-    );
-  }
-  if (provider === "apple") {
-    // APPLE_CLIENT_SECRET es lo que better-auth consume de verdad: el JWT ES256
-    // firmado con la .p8. El trío TEAM_ID/KEY_ID/PRIVATE_KEY es material de la
-    // arquitectura anterior y su presencia NO significa que Apple funcione.
-    //
-    // Sin esta condición, /api/auth/providers anunciaba "apple" y el usuario lo
-    // elegía, fallaba en el intercambio de código con invalid_client, y se
-    // llevaba la impresión de que el login está roto. Anunciar un proveedor que
-    // revienta es peor que no anunciarlo.
-    //
-    // Se comprueba el secreto, no un flag manual: Apple reaparece sola en
-    // cuanto se ate APPLE_CLIENT_SECRET, sin que nadie tenga que acordarse de
-    // quitar un interruptor. Hoy no existe —falta registrar el Services ID en
-    // Apple Developer— y por eso no debe aparecer.
-    return Boolean(
-      env.APPLE_CLIENT_ID?.trim() &&
-        env.APPLE_TEAM_ID?.trim() &&
-        env.APPLE_KEY_ID?.trim() &&
-        env.APPLE_PRIVATE_KEY?.trim() &&
-        env.APPLE_CLIENT_SECRET?.trim()
-    );
-  }
-  if (provider === "authentik") {
-    // Flag first: an unset/false AUTHENTIK_ENABLED means the provider does not exist,
-    // no matter what credentials are bound.
-    if (env.AUTHENTIK_ENABLED?.trim().toLowerCase() !== "true") return false;
-    if (
-      !env.AUTHENTIK_ISSUER?.trim() ||
-      !env.AUTHENTIK_CLIENT_ID?.trim() ||
-      !env.AUTHENTIK_CLIENT_SECRET?.trim()
-    ) {
+/**
+ * Determines whether the specified OAuth provider has the credentials required for direct authentication.
+ *
+ * @param provider - The OAuth provider to check
+ * @param env - Environment configuration containing provider credentials
+ * @returns `true` if the provider's required credentials are configured, `false` otherwise.
+ */
+export function isDirectOAuthAvailable(provider: OAuthProvider, env: OAuthEnv): boolean {
+  switch (provider) {
+    case "google":
+      return Boolean(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim());
+    case "microsoft":
+      return Boolean(env.MICROSOFT_CLIENT_ID?.trim() && env.MICROSOFT_CLIENT_SECRET?.trim());
+    case "apple":
+      return Boolean(env.APPLE_CLIENT_ID?.trim() && env.APPLE_TEAM_ID?.trim() && env.APPLE_KEY_ID?.trim() && env.APPLE_PRIVATE_KEY?.trim());
+    case "authentik":
+      // Authentik VM destroyed 2026-08-28. Never offer it as live identity,
+      // even if leftover AUTHENTIK_* secrets or AUTHENTIK_ENABLED are still bound.
+      return false;
+    default: {
+      const _exhaustive: never = provider;
+      void _exhaustive;
       return false;
     }
-    // A malformed issuer would blow up later inside the redirect; fail closed here.
-    try {
-      authentikEndpoints(env.AUTHENTIK_ISSUER);
-    } catch {
-      return false;
-    }
-    return true;
   }
-  return false;
 }
 
-export async function createOAuthTransaction(
-  provider: OAuthProvider,
-  env: OAuthEnv,
-  returnTo: string
-): Promise<OAuthTransaction> {
+export async function createOAuthTransaction(provider: OAuthProvider, env: OAuthEnv, returnTo: string): Promise<OAuthTransaction> {
   return {
     provider,
     state: randomUrlToken(32),
     verifier: randomUrlToken(64),
     nonce: randomUrlToken(32),
     returnTo: safeReturnPath(returnTo),
-    exp: Math.floor(Date.now() / 1000) + transactionMaxAge,
+    exp: Math.floor(Date.now() / 1000) + transactionMaxAge
   };
 }
 
@@ -188,16 +148,21 @@ export async function createCommunityOAuthTransaction(
     nonce: randomUrlToken(32),
     returnTo: safeCommunityReturnPath(options.returnTo),
     exp: Math.floor(Date.now() / 1000) + transactionMaxAge,
-    community: options.community,
+    community: options.community
   };
 }
 
-export async function getAuthorizationUrl(
-  provider: OAuthProvider,
-  env: OAuthEnv,
-  redirectUri: string,
-  tx: OAuthTransaction
-): Promise<string> {
+/**
+ * Builds a provider-specific OAuth authorization URL.
+ *
+ * @param provider - The OAuth provider to authorize with
+ * @param env - Environment configuration containing the provider credentials
+ * @param redirectUri - Callback URI for the authorization response
+ * @param tx - OAuth transaction containing the state, nonce, and PKCE verifier
+ * @returns The authorization URL
+ * @throws If the provider credentials are missing or the provider is unsupported or retired
+ */
+export async function getAuthorizationUrl(provider: OAuthProvider, env: OAuthEnv, redirectUri: string, tx: OAuthTransaction): Promise<string> {
   const codeChallenge = await pkceChallenge(tx.verifier);
 
   if (provider === "google") {
@@ -212,7 +177,7 @@ export async function getAuthorizationUrl(
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
       access_type: "online",
-      prompt: "select_account",
+      prompt: "select_account"
     });
     return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   }
@@ -228,7 +193,7 @@ export async function getAuthorizationUrl(
       nonce: tx.nonce,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
-      response_mode: "query",
+      response_mode: "query"
     });
     return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`;
   }
@@ -244,100 +209,55 @@ export async function getAuthorizationUrl(
       state: tx.state,
       nonce: tx.nonce,
       code_challenge: codeChallenge,
-      code_challenge_method: "S256",
+      code_challenge_method: "S256"
     });
     return `https://appleid.apple.com/auth/authorize?${params.toString()}`;
   }
 
   if (provider === "authentik") {
-    const clientId = requireEnv(env.AUTHENTIK_CLIENT_ID, "AUTHENTIK_CLIENT_ID");
-    const endpoints = authentikEndpoints(
-      requireEnv(env.AUTHENTIK_ISSUER, "AUTHENTIK_ISSUER")
-    );
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: "openid email profile",
-      state: tx.state,
-      nonce: tx.nonce,
-      code_challenge: codeChallenge,
-      code_challenge_method: "S256",
-      response_mode: "query",
-    });
-    return `${endpoints.authorize}?${params.toString()}`;
+    throw new Error("authentik_retired");
   }
 
-  throw new Error(`unsupported_provider:${provider}`);
+    throw new Error(`unsupported_provider:${provider}`);
 }
 
-export async function transactionSetCookie(
-  tx: OAuthTransaction,
-  env: OAuthEnv,
-  domain?: string
-) {
+export async function transactionSetCookie(tx: OAuthTransaction, env: OAuthEnv, domain?: string) {
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(tx)));
-  const signature = await hmac(
-    requireEnv(env.SESSION_SECRET, "SESSION_SECRET"),
-    encoded
-  );
-  let header = `${transactionCookie}=${encoded}.${signature}; Path=/api/auth; HttpOnly; Secure; SameSite=${transactionSameSite(
-    tx.provider
-  )}; Max-Age=${transactionMaxAge}`;
+  const signature = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
+  let header = `${transactionCookie}=${encoded}.${signature}; Path=/api/auth; HttpOnly; Secure; SameSite=${transactionSameSite(tx.provider)}; Max-Age=${transactionMaxAge}`;
   if (domain) header += `; Domain=${domain}`;
   return header;
 }
 
-export async function signSessionTransfer(
-  session: SessionPayload,
-  returnTo: string,
-  env: OAuthEnv
-) {
+export async function signSessionTransfer(session: SessionPayload, returnTo: string, env: OAuthEnv) {
   const payload: OAuthSessionTransfer = {
     session,
     returnTo: safeReturnPath(returnTo),
-    exp: Math.floor(Date.now() / 1000) + 60,
+    exp: Math.floor(Date.now() / 1000) + 60
   };
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(payload)));
-  const signature = await hmac(
-    requireEnv(env.SESSION_SECRET, "SESSION_SECRET"),
-    encoded
-  );
+  const signature = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   return `${encoded}.${signature}`;
 }
 
-export async function readSessionTransfer(
-  token: string,
-  env: OAuthEnv
-): Promise<OAuthSessionTransfer | null> {
+export async function readSessionTransfer(token: string, env: OAuthEnv): Promise<OAuthSessionTransfer | null> {
   const [encoded, signature] = token.split(".");
   if (!encoded || !signature) return null;
-  const expected = await hmac(
-    requireEnv(env.SESSION_SECRET, "SESSION_SECRET"),
-    encoded
-  );
+  const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
   let transfer: OAuthSessionTransfer;
   try {
-    transfer = JSON.parse(
-      new TextDecoder().decode(base64UrlToBytes(encoded))
-    ) as OAuthSessionTransfer;
+    transfer = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthSessionTransfer;
   } catch {
     return null;
   }
   if (!transfer || typeof transfer !== "object") return null;
-  if (!transfer.exp || transfer.exp < Math.floor(Date.now() / 1000))
-    return null;
-  if (
-    !transfer.session?.email ||
-    !transfer.session?.frisky_user_id ||
-    !transfer.session?.frisky_org_id
-  )
-    return null;
+  if (!transfer.exp || transfer.exp < Math.floor(Date.now() / 1000)) return null;
+  if (!transfer.session?.email || !transfer.session?.frisky_user_id || !transfer.session?.frisky_org_id) return null;
   return {
     session: transfer.session,
     returnTo: safeReturnPath(transfer.returnTo),
-    exp: transfer.exp,
+    exp: transfer.exp
   };
 }
 
@@ -350,19 +270,10 @@ export function clearTransactionCookie(domain?: string) {
 const communityTransactionCookie = "fenrir_community_oauth_tx";
 const communityTransactionPath = "/api/community-auth";
 
-export async function communityTransactionSetCookie(
-  tx: OAuthTransaction,
-  env: OAuthEnv,
-  domain?: string
-) {
+export async function communityTransactionSetCookie(tx: OAuthTransaction, env: OAuthEnv, domain?: string) {
   const encoded = base64Url(new TextEncoder().encode(JSON.stringify(tx)));
-  const signature = await hmac(
-    requireEnv(env.SESSION_SECRET, "SESSION_SECRET"),
-    encoded
-  );
-  let header = `${communityTransactionCookie}=${encoded}.${signature}; Path=${communityTransactionPath}; HttpOnly; Secure; SameSite=${transactionSameSite(
-    tx.provider
-  )}; Max-Age=${transactionMaxAge}`;
+  const signature = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
+  let header = `${communityTransactionCookie}=${encoded}.${signature}; Path=${communityTransactionPath}; HttpOnly; Secure; SameSite=${transactionSameSite(tx.provider)}; Max-Age=${transactionMaxAge}`;
   if (domain) header += `; Domain=${domain}`;
   return header;
 }
@@ -377,18 +288,12 @@ function transactionSameSite(provider: OAuthProvider) {
   return provider === "apple" ? "None" : "Lax";
 }
 
-export async function readCommunityOAuthTransaction(
-  request: Request,
-  env: OAuthEnv
-): Promise<OAuthTransaction | null> {
+export async function readCommunityOAuthTransaction(request: Request, env: OAuthEnv): Promise<OAuthTransaction | null> {
   const token = readCookie(request, communityTransactionCookie);
   if (!token) return null;
   const [encoded, signature] = token.split(".");
   if (!encoded || !signature) return null;
-  const expected = await hmac(
-    requireEnv(env.SESSION_SECRET, "SESSION_SECRET"),
-    encoded
-  );
+  const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
   const tx = decodeTransaction(encoded);
   if (!tx) return null;
@@ -414,18 +319,12 @@ export function safeCommunityReturnPath(value: string | null | undefined) {
   return value;
 }
 
-export async function readOAuthTransaction(
-  request: Request,
-  env: OAuthEnv
-): Promise<OAuthTransaction | null> {
+export async function readOAuthTransaction(request: Request, env: OAuthEnv): Promise<OAuthTransaction | null> {
   const token = readCookie(request, transactionCookie);
   if (!token) return null;
   const [encoded, signature] = token.split(".");
   if (!encoded || !signature) return null;
-  const expected = await hmac(
-    requireEnv(env.SESSION_SECRET, "SESSION_SECRET"),
-    encoded
-  );
+  const expected = await hmac(requireEnv(env.SESSION_SECRET, "SESSION_SECRET"), encoded);
   if (!timingSafeEqual(signature, expected)) return null;
   const tx = decodeTransaction(encoded);
   if (!tx) return null;
@@ -437,9 +336,7 @@ export async function readOAuthTransaction(
 function decodeTransaction(encoded: string): OAuthTransaction | null {
   let tx: OAuthTransaction;
   try {
-    tx = JSON.parse(
-      new TextDecoder().decode(base64UrlToBytes(encoded))
-    ) as OAuthTransaction;
+    tx = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as OAuthTransaction;
   } catch {
     return null;
   }
@@ -448,22 +345,17 @@ function decodeTransaction(encoded: string): OAuthTransaction | null {
   return tx;
 }
 
-export function validateOAuthTransaction(
-  tx: OAuthTransaction | null,
-  provider: OAuthProvider,
-  state: string | null
-) {
+export function validateOAuthTransaction(tx: OAuthTransaction | null, provider: OAuthProvider, state: string | null) {
   if (!tx) throw new Error("oauth_state_missing");
   if (tx.provider !== provider) throw new Error("oauth_provider_mismatch");
-  if (!state || !timingSafeEqual(tx.state, state))
-    throw new Error("oauth_state_invalid");
+  if (!state || !timingSafeEqual(tx.state, state)) throw new Error("oauth_state_invalid");
 }
 
 /**
- * Verify the provider round trip and return the raw identity, WITHOUT minting an
- * operator session or applying the operator admin allow-list. The Community Gate
- * bridge builds its own Neon session from this; exchangeCodeForSession() is the
- * operator path and keeps the allow-list check.
+ * Exchanges an OAuth authorization code for a verified provider identity without creating a session or applying an administrator allowlist.
+ *
+ * @returns The verified OAuth identity associated with the authorization code.
+ * @throws An error if the provider is retired or unsupported.
  */
 export async function exchangeCodeForIdentity(
   provider: OAuthProvider,
@@ -472,14 +364,10 @@ export async function exchangeCodeForIdentity(
   redirectUri: string,
   tx: OAuthTransaction
 ): Promise<OAuthIdentity> {
-  if (provider === "google")
-    return exchangeGoogleCode(env, code, redirectUri, tx);
-  if (provider === "microsoft")
-    return exchangeMicrosoftCode(env, code, redirectUri, tx);
-  if (provider === "apple")
-    return exchangeAppleCode(env, code, redirectUri, tx);
-  if (provider === "authentik")
-    return exchangeAuthentikCode(env, code, redirectUri, tx);
+  if (provider === "google") return exchangeGoogleCode(env, code, redirectUri, tx);
+  if (provider === "microsoft") return exchangeMicrosoftCode(env, code, redirectUri, tx);
+  if (provider === "apple") return exchangeAppleCode(env, code, redirectUri, tx);
+  if (provider === "authentik") throw new Error("authentik_retired");
   throw new Error(`exchange_not_implemented_for:${provider}`);
 }
 
@@ -490,13 +378,7 @@ export async function exchangeCodeForSession(
   redirectUri: string,
   tx: OAuthTransaction
 ): Promise<DirectOAuthSession> {
-  const identity = await exchangeCodeForIdentity(
-    provider,
-    env,
-    code,
-    redirectUri,
-    tx
-  );
+  const identity = await exchangeCodeForIdentity(provider, env, code, redirectUri, tx);
   assertAdminAllowed(identity.email, env.SUPABASE_ADMIN_EMAILS);
   return {
     identityId: identity.identityId,
@@ -504,55 +386,38 @@ export async function exchangeCodeForSession(
       email: identity.email,
       name: identity.name,
       provider: identity.provider,
-      identityId: identity.identityId,
-    }),
+      identityId: identity.identityId
+    })
   };
 }
 
 export function safeReturnPath(value: string | null | undefined) {
-  if (!value || !value.startsWith("/") || value.startsWith("//"))
-    return "/main";
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/main";
+  const preserved = preservedLoginNext(value);
+  if (preserved) return preserved;
   const pathname = value.split(/[?#]/, 1)[0] || "/";
-  if (
-    pathname === "/" ||
-    pathname === "/login" ||
-    pathname.startsWith("/auth/") ||
-    pathname.startsWith("/api/auth/")
-  )
-    return "/main";
+  if (pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) return "/main";
   return value;
 }
 
-async function exchangeGoogleCode(
-  env: OAuthEnv,
-  code: string,
-  redirectUri: string,
-  tx: OAuthTransaction
-): Promise<OAuthIdentity> {
+async function exchangeGoogleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
   const clientId = requireEnv(env.GOOGLE_CLIENT_ID, "GOOGLE_CLIENT_ID");
-  const clientSecret = requireEnv(
-    env.GOOGLE_CLIENT_SECRET,
-    "GOOGLE_CLIENT_SECRET"
-  );
+  const clientSecret = requireEnv(env.GOOGLE_CLIENT_SECRET, "GOOGLE_CLIENT_SECRET");
 
-  const tokens = await exchangeToken(
-    "https://oauth2.googleapis.com/token",
-    {
-      code,
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-      code_verifier: tx.verifier,
-    },
-    "google"
-  );
+  const tokens = await exchangeToken("https://oauth2.googleapis.com/token", {
+    code,
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+    grant_type: "authorization_code",
+    code_verifier: tx.verifier
+  }, "google");
 
   const claims = await verifyIdToken(tokens.id_token, {
     issuer: /^(https:\/\/accounts\.google\.com|accounts\.google\.com)$/,
     audience: clientId,
     nonce: tx.nonce,
-    jwksUrl: "https://www.googleapis.com/oauth2/v3/certs",
+    jwksUrl: "https://www.googleapis.com/oauth2/v3/certs"
   });
   const email = stringClaim(claims.email, "google_missing_email");
   const sub = stringClaim(claims.sub, "google_missing_sub");
@@ -563,45 +428,32 @@ async function exchangeGoogleCode(
     name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
     identityId,
     // Google only omits email_verified for unverified accounts — default closed.
-    emailVerified: parseBoolClaim(claims.email_verified, false),
+    emailVerified: parseBoolClaim(claims.email_verified, false)
   };
 }
 
-async function exchangeMicrosoftCode(
-  env: OAuthEnv,
-  code: string,
-  redirectUri: string,
-  tx: OAuthTransaction
-): Promise<OAuthIdentity> {
+async function exchangeMicrosoftCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
   const clientId = requireEnv(env.MICROSOFT_CLIENT_ID, "MICROSOFT_CLIENT_ID");
-  const clientSecret = requireEnv(
-    env.MICROSOFT_CLIENT_SECRET,
-    "MICROSOFT_CLIENT_SECRET"
-  );
+  const clientSecret = requireEnv(env.MICROSOFT_CLIENT_SECRET, "MICROSOFT_CLIENT_SECRET");
 
-  const tokens = await exchangeToken(
-    "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-    {
-      code,
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-      code_verifier: tx.verifier,
-    },
-    "microsoft"
-  );
+  const tokens = await exchangeToken("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
+    code,
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+    grant_type: "authorization_code",
+    code_verifier: tx.verifier
+  }, "microsoft");
 
   const claims = await verifyIdToken(tokens.id_token, {
     issuer: /^https:\/\/login\.microsoftonline\.com\/[0-9a-f-]+\/v2\.0$/i,
     audience: clientId,
     nonce: tx.nonce,
-    jwksUrl: "https://login.microsoftonline.com/common/discovery/v2.0/keys",
+    jwksUrl: "https://login.microsoftonline.com/common/discovery/v2.0/keys"
   });
-  const email =
-    typeof claims.email === "string" && claims.email.trim().length > 0
-      ? claims.email
-      : stringClaim(claims.preferred_username, "microsoft_missing_email");
+  const email = typeof claims.email === "string" && claims.email.trim().length > 0
+    ? claims.email
+    : stringClaim(claims.preferred_username, "microsoft_missing_email");
   const sub = stringClaim(claims.sub, "microsoft_missing_sub");
   const identityId = `microsoft:${sub}`;
   return {
@@ -610,40 +462,36 @@ async function exchangeMicrosoftCode(
     name: typeof claims.name === "string" ? claims.name : email.split("@")[0],
     identityId,
     // Entra ID only emits email_verified/xms_edov for federated-domain edge cases.
-    emailVerified: parseBoolClaim(
-      claims.email_verified ?? claims.xms_edov,
-      true
-    ),
+    emailVerified: parseBoolClaim(claims.email_verified ?? claims.xms_edov, true)
   };
 }
 
-async function exchangeAppleCode(
-  env: OAuthEnv,
-  code: string,
-  redirectUri: string,
-  tx: OAuthTransaction
-): Promise<OAuthIdentity> {
+/**
+ * Exchanges an Apple authorization code for a verified OAuth identity.
+ *
+ * @param code - The authorization code issued by Apple
+ * @param redirectUri - The redirect URI used during authorization
+ * @param tx - The OAuth transaction containing the PKCE verifier and nonce
+ * @returns The verified Apple identity
+ */
+async function exchangeAppleCode(env: OAuthEnv, code: string, redirectUri: string, tx: OAuthTransaction): Promise<OAuthIdentity> {
   const clientId = requireEnv(env.APPLE_CLIENT_ID, "APPLE_CLIENT_ID");
   const clientSecret = await createAppleClientSecret(env);
 
-  const tokens = await exchangeToken(
-    "https://appleid.apple.com/auth/token",
-    {
-      code,
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-      code_verifier: tx.verifier,
-    },
-    "apple"
-  );
+  const tokens = await exchangeToken("https://appleid.apple.com/auth/token", {
+    code,
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+    grant_type: "authorization_code",
+    code_verifier: tx.verifier
+  }, "apple");
 
   const claims = await verifyIdToken(tokens.id_token, {
     issuer: "https://appleid.apple.com",
     audience: clientId,
     nonce: tx.nonce,
-    jwksUrl: "https://appleid.apple.com/auth/keys",
+    jwksUrl: "https://appleid.apple.com/auth/keys"
   });
   const email = stringClaim(claims.email, "apple_id_token_missing_email");
   const sub = stringClaim(claims.sub, "apple_missing_sub");
@@ -654,112 +502,8 @@ async function exchangeAppleCode(
     name: email.split("@")[0],
     identityId,
     // Apple omits email_verified for the private-relay alias, which is verified by construction.
-    emailVerified: parseBoolClaim(claims.email_verified, true),
+    emailVerified: parseBoolClaim(claims.email_verified, true)
   };
-}
-
-/**
- * Authentik as an OIDC broker. Same shape as the direct providers — the difference is that
- * Google / Microsoft / Apple sit BEHIND Authentik as federated sources, so this single
- * exchange covers all of them and `sub` is Authentik's stable user id, not the upstream one.
- *
- * That stability is the whole point: a user who signs in via Google today and Microsoft
- * tomorrow keeps ONE `authentik:<sub>` identity, because Authentik does the account
- * linking on its side instead of the bridge minting a second row per upstream provider.
- */
-async function exchangeAuthentikCode(
-  env: OAuthEnv,
-  code: string,
-  redirectUri: string,
-  tx: OAuthTransaction
-): Promise<OAuthIdentity> {
-  const clientId = requireEnv(env.AUTHENTIK_CLIENT_ID, "AUTHENTIK_CLIENT_ID");
-  const clientSecret = requireEnv(
-    env.AUTHENTIK_CLIENT_SECRET,
-    "AUTHENTIK_CLIENT_SECRET"
-  );
-  const endpoints = authentikEndpoints(
-    requireEnv(env.AUTHENTIK_ISSUER, "AUTHENTIK_ISSUER")
-  );
-
-  const tokens = await exchangeToken(
-    endpoints.token,
-    {
-      code,
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-      code_verifier: tx.verifier,
-    },
-    "authentik"
-  );
-
-  const claims = await verifyIdToken(tokens.id_token, {
-    // Pinned to THIS application's issuer, so a token minted for a DIFFERENT Authentik
-    // application on the same host is rejected. Anchored regex only to tolerate the
-    // trailing slash — Authentik emits `iss` with one, config may be pasted without.
-    issuer: new RegExp(
-      `^${escapeRegExp(endpoints.issuer.replace(/\/$/, ""))}\\/?$`
-    ),
-    audience: clientId,
-    nonce: tx.nonce,
-    jwksUrl: endpoints.jwks,
-  });
-
-  const sub = stringClaim(claims.sub, "authentik_missing_sub");
-  // Authentik only puts email/preferred_username in the id_token when the email/profile
-  // scope mappings are attached to the provider. Fall back to /userinfo rather than
-  // dead-ending the sign-in on a scope-mapping mistake.
-  let email =
-    typeof claims.email === "string" && claims.email.trim()
-      ? claims.email.trim()
-      : "";
-  let name =
-    typeof claims.name === "string" && claims.name.trim()
-      ? claims.name.trim()
-      : "";
-  let emailVerifiedClaim = claims.email_verified;
-
-  if (!email && tokens.access_token) {
-    const info = await fetchAuthentikUserInfo(
-      endpoints.userinfo,
-      tokens.access_token
-    );
-    if (typeof info.email === "string") email = info.email.trim();
-    if (!name && typeof info.name === "string") name = info.name.trim();
-    if (emailVerifiedClaim === undefined)
-      emailVerifiedClaim = info.email_verified;
-  }
-
-  if (!email) throw new Error("authentik_missing_email");
-
-  return {
-    provider: "authentik",
-    email,
-    name: name || email.split("@")[0],
-    identityId: `authentik:${sub}`,
-    // Authentik is our own broker: it either federated from a provider that already
-    // verified the address, or the operator created the account by hand. It omits
-    // email_verified unless the mapping is configured, so absence means "trusted",
-    // an explicit false still blocks.
-    emailVerified: parseBoolClaim(emailVerifiedClaim, true),
-  };
-}
-
-async function fetchAuthentikUserInfo(
-  userinfoUrl: string,
-  accessToken: string
-) {
-  const response = await httpFetch(userinfoUrl, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
-    },
-  });
-  if (!response.ok)
-    throw new Error(`authentik_userinfo_failed:${response.status}`);
-  return (await response.json()) as Record<string, unknown>;
 }
 
 let fetchOverride: typeof fetch | null = null;
@@ -773,51 +517,39 @@ function httpFetch(input: RequestInfo | URL, init?: RequestInit) {
   return (fetchOverride ?? fetch)(input, init);
 }
 
-async function exchangeToken(
-  url: string,
-  params: Record<string, string>,
-  provider: OAuthProvider
-) {
+async function exchangeToken(url: string, params: Record<string, string>, provider: OAuthProvider) {
   const tokenRes = await httpFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(params),
+    body: new URLSearchParams(params)
   });
 
   if (!tokenRes.ok) {
-    throw new Error(
-      `${provider}_token_exchange_failed:${await tokenRes.text()}`
-    );
+    throw new Error(`${provider}_token_exchange_failed:${await tokenRes.text()}`);
   }
 
-  const tokens = (await tokenRes.json()) as {
-    id_token?: string;
-    access_token?: string;
-  };
+  const tokens = await tokenRes.json() as { id_token?: string; access_token?: string };
   if (!tokens.id_token) throw new Error(`${provider}_missing_id_token`);
   // access_token is only consumed by the Authentik /userinfo fallback; the direct
   // providers ignore it and read everything off the verified id_token.
   return { id_token: tokens.id_token, access_token: tokens.access_token };
 }
 
-async function verifyIdToken(
-  token: string,
-  options: {
-    issuer: string | RegExp;
-    audience: string;
-    nonce: string;
-    jwksUrl: string;
-  }
-) {
+async function verifyIdToken(token: string, options: {
+  issuer: string | RegExp;
+  audience: string;
+  nonce: string;
+  jwksUrl: string;
+}) {
   const { header, payload, signedData, signature } = decodeJwtParts(token);
   const alg = stringClaim(header.alg, "id_token_missing_alg");
   const kid = stringClaim(header.kid, "id_token_missing_kid");
   if (alg !== "RS256") throw new Error(`unsupported_id_token_alg:${alg}`);
 
-  const jwks = (await httpFetch(options.jwksUrl).then((response) => {
+  const jwks = await httpFetch(options.jwksUrl).then((response) => {
     if (!response.ok) throw new Error("jwks_fetch_failed");
     return response.json();
-  })) as { keys?: JsonWebKey[] };
+  }) as { keys?: JsonWebKey[] };
   const jwk = jwks.keys?.find((key) => key.kid === kid && key.kty === "RSA");
   if (!jwk) throw new Error("id_token_key_not_found");
 
@@ -828,35 +560,19 @@ async function verifyIdToken(
     false,
     ["verify"]
   );
-  const verified = await crypto.subtle.verify(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    signature,
-    new TextEncoder().encode(signedData)
-  );
+  const verified = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, signature, new TextEncoder().encode(signedData));
   if (!verified) throw new Error("id_token_signature_invalid");
 
   const issuer = stringClaim(payload.iss, "id_token_missing_issuer");
-  if (
-    typeof options.issuer === "string"
-      ? issuer !== options.issuer
-      : !options.issuer.test(issuer)
-  ) {
+  if (typeof options.issuer === "string" ? issuer !== options.issuer : !options.issuer.test(issuer)) {
     throw new Error("id_token_issuer_invalid");
   }
 
   const audience = payload.aud;
-  const audienceValid = Array.isArray(audience)
-    ? audience.includes(options.audience)
-    : audience === options.audience;
+  const audienceValid = Array.isArray(audience) ? audience.includes(options.audience) : audience === options.audience;
   if (!audienceValid) throw new Error("id_token_audience_invalid");
-  if (payload.nonce !== options.nonce)
-    throw new Error("id_token_nonce_invalid");
-  if (
-    typeof payload.exp !== "number" ||
-    payload.exp < Math.floor(Date.now() / 1000)
-  )
-    throw new Error("id_token_expired");
+  if (payload.nonce !== options.nonce) throw new Error("id_token_nonce_invalid");
+  if (typeof payload.exp !== "number" || payload.exp < Math.floor(Date.now() / 1000)) throw new Error("id_token_expired");
   return payload;
 }
 
@@ -873,12 +589,10 @@ async function createAppleClientSecret(env: OAuthEnv): Promise<string> {
     iat: now,
     exp: now + 86400 * 180,
     aud: "https://appleid.apple.com",
-    sub: clientId,
+    sub: clientId
   };
 
-  const token = `${base64Url(
-    new TextEncoder().encode(JSON.stringify(header))
-  )}.${base64Url(new TextEncoder().encode(JSON.stringify(payload)))}`;
+  const token = `${base64Url(new TextEncoder().encode(JSON.stringify(header)))}.${base64Url(new TextEncoder().encode(JSON.stringify(payload)))}`;
   const privateKey = await crypto.subtle.importKey(
     "pkcs8",
     pemToBinary(privateKeyPem),
@@ -899,23 +613,15 @@ function decodeJwtParts(token: string) {
   const parts = token.split(".");
   if (parts.length !== 3) throw new Error("invalid_jwt_format");
   return {
-    header: JSON.parse(
-      new TextDecoder().decode(base64UrlToBytes(parts[0]))
-    ) as Record<string, unknown>,
-    payload: JSON.parse(
-      new TextDecoder().decode(base64UrlToBytes(parts[1]))
-    ) as Record<string, unknown>,
+    header: JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[0]))) as Record<string, unknown>,
+    payload: JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[1]))) as Record<string, unknown>,
     signedData: `${parts[0]}.${parts[1]}`,
-    signature: base64UrlToBytes(parts[2]),
+    signature: base64UrlToBytes(parts[2])
   };
 }
 
 async function pkceChallenge(verifier: string) {
-  return base64Url(
-    new Uint8Array(
-      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))
-    )
-  );
+  return base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
 }
 
 function randomUrlToken(byteLength: number) {
@@ -925,18 +631,8 @@ function randomUrlToken(byteLength: number) {
 }
 
 async function hmac(secret: string, data: string) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    new TextEncoder().encode(data)
-  );
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
   return base64Url(new Uint8Array(signature));
 }
 
@@ -980,10 +676,7 @@ function assertAdminAllowed(email: string, allowlist?: string) {
 }
 
 function pemToBinary(pem: string): ArrayBuffer {
-  const base64 = pem
-    .replace(/\\n/g, "\n")
-    .replace(/-----(BEGIN|END) PRIVATE KEY-----/g, "")
-    .replace(/\s/g, "");
+  const base64 = pem.replace(/\\n/g, "\n").replace(/-----(BEGIN|END) PRIVATE KEY-----/g, "").replace(/\s/g, "");
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) {
@@ -995,17 +688,11 @@ function pemToBinary(pem: string): ArrayBuffer {
 function base64Url(bytes: Uint8Array) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 function base64UrlToBytes(value: string) {
-  const padded = value
-    .replace(/-/g, "+")
-    .replace(/_/g, "/")
-    .padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
   const binary = atob(padded);
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }

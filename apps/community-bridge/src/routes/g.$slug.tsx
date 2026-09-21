@@ -428,9 +428,7 @@ function GateSecurityPanel({
             className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs"
           >
             <span>{STAGE_LABEL[stage.key]}</span>
-            <span
-              className={`font-mono uppercase tracking-[0.16em] ${STATUS_TONE[stage.status]}`}
-            >
+            <span className={`font-mono uppercase tracking-[0.16em] ${STATUS_TONE[stage.status]}`}>
               {STATUS_LABEL[stage.status]}
             </span>
           </div>
