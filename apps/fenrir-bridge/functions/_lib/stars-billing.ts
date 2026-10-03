@@ -13,7 +13,7 @@ export async function applyStarsEntitlementForTelegramUser(
   db: D1Database,
   env: BillingEnv,
   telegramUserId: string,
-  input: { starsAmount: number; payload: string; chargeId: string }
+  input: { starsAmount: number; payload: string; chargeId: string; periodEnd?: string }
 ) {
   const link = await db
     .prepare(
@@ -49,7 +49,8 @@ export async function applyStarsEntitlementForTelegramUser(
     stripe_customer_id: `stars_${telegramUserId}`,
     plan,
     status: "active",
-    current_period_end: null,
+    // Never NULL: the access check treats a NULL period end as active forever.
+    current_period_end: input.periodEnd ?? new Date(Date.now() + 30 * 86400000).toISOString(),
     cancel_at_period_end: false
   });
 
