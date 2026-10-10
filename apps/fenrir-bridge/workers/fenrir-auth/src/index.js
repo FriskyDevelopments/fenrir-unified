@@ -97,6 +97,22 @@ function wantsHtml(request) {
   return accept.includes("text/html");
 }
 
+// Only a stored, consumed OAuth state may return a provider cancellation to
+// Coach's isolated broker. Never read a callback override from this request.
+function coachFailureReturn(saved, providerName, error) {
+  if (saved?.provider !== providerName || typeof saved.returnTo !== "string") return null;
+  try {
+    const dest = new URL(saved.returnTo);
+    if (dest.origin !== "https://myfenrir.com" || dest.username || dest.password || dest.hash ||
+        dest.pathname !== "/auth/coach/complete" || [...dest.searchParams.keys()].join(",") !== "flow" ||
+        !/^[A-Za-z0-9_-]{43}$/.test(dest.searchParams.get("flow") || "")) return null;
+    dest.searchParams.set("error", error === "access_denied" ? "access_denied" : "provider_error");
+    return dest.toString();
+  } catch {
+    return null;
+  }
+}
+
 function authFailure(request, env, error, status = 400, extra = {}) {
   if (wantsHtml(request)) {
     const dest = new URL("/login", cfg(env).baseUrl);
@@ -253,7 +269,15 @@ async function handleCallback(request, env, providerName) {
   }
 
   const err = params.get("error");
-  if (err) return authFailure(request, env, "provider_error", 400, { detail: err, description: params.get("error_description") });
+  if (err) {
+    const state = params.get("state");
+    if (typeof state === "string" && /^[A-Za-z0-9_-]{32}$/.test(state)) {
+      const saved = await consumeOAuthState(env, state);
+      const returnTo = coachFailureReturn(saved, providerName, err);
+      if (returnTo) return redirect(returnTo, { "Referrer-Policy": "no-referrer" });
+    }
+    return authFailure(request, env, "provider_error", 400, { detail: err, description: params.get("error_description") });
+  }
 
   const code = params.get("code");
   const state = params.get("state");
