@@ -1,0 +1,194 @@
+/*
+ * Rotating CTA badge — circular button with a revolving decorative caption
+ * and an icon that swaps on hover/focus.
+ *
+ * Rules this file follows:
+ * - No literal colours in the default (crimson) tone. Everything resolves to
+ *   MyFenrir design-system tokens declared in src/styles.css.
+ * - Flat selectors only. The source snippet used native CSS nesting; this app
+ *   has no PostCSS nesting plugin and Vite does not flatten nesting, so it is
+ *   written out longhand instead of relying on browser support.
+ * - Motion is opt-out via prefers-reduced-motion.
+ */
+
+.rcta {
+  /* geometry */
+  --rcta-size: 100px;
+  --rcta-core-size: 40px;
+  --rcta-ring-inset: 7px;
+  /* degrees per character — set inline by the component as 360/length */
+  --rcta-step: 20deg;
+
+  /* palette — design-system tokens only */
+  --rcta-surface: var(--primary);
+  --rcta-surface-hover: var(--background);
+  --rcta-on-surface: var(--primary-foreground);
+  --rcta-core-bg: var(--card);
+  --rcta-core-fg: var(--primary);
+  --rcta-core-fg-hover: var(--foreground);
+  --rcta-focus: var(--ring);
+
+  position: relative;
+  display: grid;
+  place-content: center;
+  width: var(--rcta-size);
+  height: var(--rcta-size);
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--rcta-surface);
+  color: var(--rcta-on-surface);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    background 300ms ease,
+    transform 200ms ease;
+}
+
+/* ── revolving caption (decorative, aria-hidden in the component) ───────── */
+
+.rcta__text {
+  position: absolute;
+  inset: 0;
+  animation: rcta-text-rotation 8s linear infinite;
+}
+
+.rcta__text > span {
+  position: absolute;
+  inset: var(--rcta-ring-inset);
+  transform: rotate(calc(var(--rcta-step) * var(--index)));
+}
+
+@keyframes rcta-text-rotation {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* ── inner disc + swapping icons ────────────────────────────────────────── */
+
+.rcta__core {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--rcta-core-size);
+  height: var(--rcta-core-size);
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--rcta-core-bg);
+  color: var(--rcta-core-fg);
+  transition: color 300ms ease;
+}
+
+.rcta__icon {
+  display: flex;
+}
+
+.rcta__icon--copy {
+  position: absolute;
+  transform: translate(-150%, 150%);
+}
+
+/* ── interaction: hover and keyboard focus behave identically ───────────── */
+
+.rcta:hover,
+.rcta:focus-visible {
+  background: var(--rcta-surface-hover);
+}
+
+.rcta:hover {
+  transform: scale(1.05);
+}
+
+.rcta:active {
+  transform: scale(0.95);
+}
+
+.rcta:hover .rcta__core,
+.rcta:focus-visible .rcta__core {
+  color: var(--rcta-core-fg-hover);
+}
+
+.rcta:hover .rcta__icon--lead,
+.rcta:focus-visible .rcta__icon--lead {
+  transition: transform 0.3s ease-in-out;
+  transform: translate(150%, -150%);
+}
+
+.rcta:hover .rcta__icon--copy,
+.rcta:focus-visible .rcta__icon--copy {
+  transition: transform 0.3s ease-in-out 0.1s;
+  transform: translate(0);
+}
+
+/* The source CSS only styled :hover and :active — a keyboard user saw nothing.
+   This is the visible focus ring, drawn with the design-system --ring. */
+.rcta:focus-visible {
+  outline: 2px solid var(--rcta-focus);
+  outline-offset: 3px;
+}
+
+.rcta:disabled,
+.rcta[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.rcta:disabled:hover,
+.rcta[aria-disabled="true"]:hover {
+  transform: none;
+}
+
+/* ── tone: telegram ─────────────────────────────────────────────────────────
+ * Telegram's own blue on a Telegram CTA is correct and recognisable, but it is
+ * NOT a MyFenrir design-system colour. It is declared once, here, scoped to
+ * this variant. Do not promote it into styles.css.
+ */
+.rcta[data-tone="telegram"] {
+  --rcta-brand-telegram: #2aabee;
+  --rcta-brand-telegram-ink: #ffffff;
+
+  --rcta-surface: var(--rcta-brand-telegram);
+  --rcta-on-surface: var(--rcta-brand-telegram-ink);
+  --rcta-surface-hover: var(--background);
+  --rcta-core-bg: var(--card);
+  --rcta-core-fg: var(--rcta-brand-telegram);
+  --rcta-core-fg-hover: var(--rcta-brand-telegram-ink);
+  --rcta-focus: var(--rcta-brand-telegram);
+}
+
+/* ── reduced motion ─────────────────────────────────────────────────────────
+ * An infinite animation with no escape hatch is a real accessibility problem.
+ * Here the ring stops, the scale is dropped, and the icon swap is removed so
+ * nothing translates across the disc.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .rcta {
+    transition: background 300ms ease;
+  }
+
+  .rcta__text {
+    animation: none;
+  }
+
+  .rcta:hover,
+  .rcta:active {
+    transform: none;
+  }
+
+  .rcta:hover .rcta__icon--lead,
+  .rcta:focus-visible .rcta__icon--lead {
+    transition: none;
+    transform: none;
+  }
+
+  .rcta__icon--copy {
+    display: none;
+  }
+}

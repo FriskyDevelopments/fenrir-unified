@@ -36,6 +36,7 @@ import { Route as GSlugRouteImport } from './routes/g.$slug'
 import { Route as GateMediaSplatRouteImport } from './routes/gate-media.$'
 import { Route as GatesIndexRouteImport } from './routes/gates.index'
 import { Route as GatesIdRouteImport } from './routes/gates.$id'
+import { Route as PreviewRotatingCtaRouteImport } from './routes/preview.rotating-cta'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ApiInternalTelegramDestinationRouteImport } from './routes/api.internal.telegram-destination'
@@ -179,6 +180,11 @@ const GatesIdRoute = GatesIdRouteImport.update({
   path: '/gates/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreviewRotatingCtaRoute = PreviewRotatingCtaRouteImport.update({
+  id: '/preview/rotating-cta',
+  path: '/preview/rotating-cta',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   id: '/.lovable/oauth/consent',
   path: '/.lovable/oauth/consent',
@@ -230,6 +236,7 @@ export interface FileRoutesByFullPath {
   '/g/$slug': typeof GSlugRoute
   '/gate-media/$': typeof GateMediaSplatRoute
   '/gates/$id': typeof GatesIdRoute
+  '/preview/rotating-cta': typeof PreviewRotatingCtaRoute
   '/gates/': typeof GatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -263,6 +270,7 @@ export interface FileRoutesByTo {
   '/g/$slug': typeof GSlugRoute
   '/gate-media/$': typeof GateMediaSplatRoute
   '/gates/$id': typeof GatesIdRoute
+  '/preview/rotating-cta': typeof PreviewRotatingCtaRoute
   '/gates': typeof GatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -297,6 +305,7 @@ export interface FileRoutesById {
   '/g/$slug': typeof GSlugRoute
   '/gate-media/$': typeof GateMediaSplatRoute
   '/gates/$id': typeof GatesIdRoute
+  '/preview/rotating-cta': typeof PreviewRotatingCtaRoute
   '/gates/': typeof GatesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -332,6 +341,7 @@ export interface FileRouteTypes {
     | '/g/$slug'
     | '/gate-media/$'
     | '/gates/$id'
+    | '/preview/rotating-cta'
     | '/gates/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -365,6 +375,7 @@ export interface FileRouteTypes {
     | '/g/$slug'
     | '/gate-media/$'
     | '/gates/$id'
+    | '/preview/rotating-cta'
     | '/gates'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -398,6 +409,7 @@ export interface FileRouteTypes {
     | '/g/$slug'
     | '/gate-media/$'
     | '/gates/$id'
+    | '/preview/rotating-cta'
     | '/gates/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -432,6 +444,7 @@ export interface RootRouteChildren {
   GSlugRoute: typeof GSlugRoute
   GateMediaSplatRoute: typeof GateMediaSplatRoute
   GatesIdRoute: typeof GatesIdRoute
+  PreviewRotatingCtaRoute: typeof PreviewRotatingCtaRoute
   GatesIndexRoute: typeof GatesIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -629,6 +642,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GatesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preview/rotating-cta': {
+      id: '/preview/rotating-cta'
+      path: '/preview/rotating-cta'
+      fullPath: '/preview/rotating-cta'
+      preLoaderRoute: typeof PreviewRotatingCtaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.lovable/oauth/consent': {
       id: '/.lovable/oauth/consent'
       path: '/.lovable/oauth/consent'
@@ -699,6 +719,7 @@ const rootRouteChildren: RootRouteChildren = {
   GSlugRoute: GSlugRoute,
   GateMediaSplatRoute: GateMediaSplatRoute,
   GatesIdRoute: GatesIdRoute,
+  PreviewRotatingCtaRoute: PreviewRotatingCtaRoute,
   GatesIndexRoute: GatesIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
