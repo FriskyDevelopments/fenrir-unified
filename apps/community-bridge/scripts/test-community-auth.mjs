@@ -132,6 +132,7 @@ test("capabilities use only the Community identity project's enabled providers",
       supabaseUrl: "https://community-project.supabase.co/",
       publishableKey: "synthetic-public-key",
     },
+    undefined,
     async (url, options) => {
       request = { url, options };
       return Response.json({
@@ -149,6 +150,32 @@ test("capabilities use only the Community identity project's enabled providers",
   ]);
 });
 
+test("enabled providers with no brand overlap leave no available sign-in options", () => {
+  assert.deepEqual(availableBrandProviders(["apple"], ["google", "microsoft"]), []);
+});
+
+test("stalled capability discovery settles when its bounded signal is aborted", async () => {
+  const controller = new AbortController();
+  const pending = loadCommunityProviders(
+    {
+      supabaseUrl: "https://community-project.supabase.co",
+      publishableKey: "synthetic-public-key",
+    },
+    controller.signal,
+    async (_url, options) =>
+      new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener(
+          "abort",
+          () => reject(options.signal?.reason ?? new DOMException("Aborted", "AbortError")),
+          { once: true },
+        );
+      }),
+  );
+
+  controller.abort();
+  await assert.rejects(pending, { name: "AbortError" });
+});
+
 for (const body of [null, [], { external: null }, { external: { google: "true" } }]) {
   test(`malformed capability response fails closed ${JSON.stringify(body)}`, async () => {
     assert.deepEqual(
@@ -157,6 +184,7 @@ for (const body of [null, [], { external: null }, { external: { google: "true" }
           supabaseUrl: "https://community-project.supabase.co",
           publishableKey: "synthetic-public-key",
         },
+        undefined,
         async () => Response.json(body),
       ),
       [],

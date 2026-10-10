@@ -11,17 +11,18 @@ Before deploying this route:
    Record the current endpoint, allowed updates, pending update count and error
    metadata, excluding bot tokens and secret values. Do not use the MyFenrir
    Stars bot for this route.
-2. Provision `LOCK_BOT_WEBHOOK_SECRET` as an encrypted binding in the
-   `fenrir-bridge` Cloudflare Pages production and preview environments through
-   the approved secret manager. Use Telegram-compatible random secrets
+2. Before deployment, provision `LOCK_BOT_WEBHOOK_SECRET`, `LOCK_BOT_DNS_SECRET`,
+   and exactly one bot-token binding (`LOCK_BOT_TOKEN` or
+   `FENRIR_LOCK_BOT_TOKEN`) as encrypted bindings in both the `fenrir-bridge`
+   Cloudflare Pages production and preview environments through the approved
+   secret manager. Use Telegram-compatible random webhook secrets
    (1–256 characters from `A-Z`, `a-z`, `0-9`, `_`, `-`). Keep values out of
    command arguments, logs, source files and review comments.
-3. Confirm each environment also has its intended `LOCK_BOT_TOKEN` (or existing
-   `FENRIR_LOCK_BOT_TOKEN`) binding. Domain ownership verification also requires
-   the separate `LOCK_BOT_DNS_SECRET` binding. Test preview using a separate test bot and
-   its own secret. Telegram supports one webhook per bot: registering the
+3. Confirm production and preview each use their intended bot and distinct
+   secrets. Test preview using a separate test bot and its own secret. Telegram
+   supports one webhook per bot: registering the
    production bot on preview would redirect production updates there.
-4. Register each intended bot using Telegram `setWebhook`, setting `url` to
+4. Before release, register each intended bot using Telegram `setWebhook`, setting `url` to
    that environment's `/api/lock-bot/webhook`, `secret_token` to the exact bound
    value, and `allowed_updates` to `["message", "callback_query"]`. Preserve
    pending updates; do not enable `drop_pending_updates`. For an existing live
@@ -44,9 +45,10 @@ No live provisioning or Telegram registration is performed by the local tests.
 ## PR #23 metadata preflight (2026-09-06)
 
 Read-only `wrangler pages secret list` checks for both production and preview
-confirmed that `LOCK_BOT_WEBHOOK_SECRET`, `LOCK_BOT_DNS_SECRET`, `LOCK_BOT_TOKEN`
-and `FENRIR_LOCK_BOT_TOKEN` are absent. This is an outstanding release prerequisite;
-the PR repair did not provision bindings or register a Telegram webhook.
+confirmed that `LOCK_BOT_WEBHOOK_SECRET`, `LOCK_BOT_DNS_SECRET`, and both possible
+bot-token bindings are absent. Provision the two required secrets and exactly one
+bot-token binding in both environments before deployment, then register the intended
+Telegram webhook before release. The PR repair did not perform these release operations.
 
 References: [Cloudflare Pages secrets](https://developers.cloudflare.com/pages/functions/bindings/#secrets),
 [Telegram setWebhook](https://core.telegram.org/bots/api#setwebhook),

@@ -100,13 +100,15 @@ export function RotatingCtaButton(props: RotatingCtaButtonProps) {
   };
 
   if (typeof href === "string") {
-    const anchorProps = rest as React.AnchorHTMLAttributes<HTMLAnchorElement>;
+    const { style: anchorStyle, ...anchorProps } =
+      rest as React.AnchorHTMLAttributes<HTMLAnchorElement>;
     const disabled =
       anchorProps["aria-disabled"] === true || anchorProps["aria-disabled"] === "true";
     return (
       <a
         {...shared}
         {...anchorProps}
+        style={{ ...anchorStyle, ...shared.style }}
         href={disabled ? undefined : href}
         tabIndex={disabled ? -1 : anchorProps.tabIndex}
         onClick={(event) => {
@@ -131,9 +133,10 @@ export function RotatingCtaButton(props: RotatingCtaButtonProps) {
     );
   }
 
-  const buttonProps = rest as React.ButtonHTMLAttributes<HTMLButtonElement>;
+  const { style: buttonStyle, ...buttonProps } =
+    rest as React.ButtonHTMLAttributes<HTMLButtonElement>;
   return (
-    <button type="button" {...shared} {...buttonProps}>
+    <button type="button" {...shared} {...buttonProps} style={{ ...buttonStyle, ...shared.style }}>
       {inner}
     </button>
   );

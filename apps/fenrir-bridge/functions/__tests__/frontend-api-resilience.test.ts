@@ -7,7 +7,7 @@ vi.mock("../../src/services/friskyAuth", () => ({
   signOutFriskyAuthClient: friskyAuth.signOut,
 }));
 
-import { appService, authService } from "../../src/services/api";
+import { appService, authService, mediaService, webauthnService } from "../../src/services/api";
 import { postLoginDestination } from "../../src/routes/authGate";
 import { fetchWithTimeout, withDeadline } from "../../src/services/request";
 
@@ -107,6 +107,32 @@ describe("browser session and workspace recovery", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     const pending = expect(appService.load()).rejects.toThrow("request_timeout");
+
+    await vi.advanceTimersByTimeAsync(12_000);
+    await pending;
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+  });
+
+  it("aborts a stalled WebAuthn request at the shared deadline", async () => {
+    const fetchMock = vi.fn(() => new Promise(() => {}));
+    vi.stubGlobal("fetch", fetchMock);
+    const pending = expect(webauthnService.registerOptions()).rejects.toThrow("request_timeout");
+
+    await vi.advanceTimersByTimeAsync(12_000);
+    await pending;
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+  });
+
+  it("aborts a media upload when its response body stalls", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => new Promise(() => {}),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const pending = expect(
+      mediaService.upload(new File(["avatar"], "avatar.png", { type: "image/png" }), "avatar")
+    ).rejects.toThrow("request_timeout");
 
     await vi.advanceTimersByTimeAsync(12_000);
     await pending;

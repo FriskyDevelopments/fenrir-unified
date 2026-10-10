@@ -394,23 +394,31 @@ function devApiFallback<T>(path: string, init: RequestInit | undefined, reason: 
 }
 
 async function webauthnPost<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(path, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: body !== undefined ? JSON.stringify(body) : "{}",
-  });
-  const data = (await withDeadline(response.json()).catch(() => null)) as
-    | T
-    | { error?: string }
-    | null;
-  if (!response.ok) {
-    throw new Error(
-      (data as { error?: string } | null)?.error ??
-        `api_error_${response.status}`
-    );
+  const controller = new AbortController();
+  try {
+    return await withDeadline((async () => {
+      const response = await fetch(path, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: body !== undefined ? JSON.stringify(body) : "{}",
+        signal: controller.signal,
+      });
+      const data = (await response.json().catch(() => null)) as
+        | T
+        | { error?: string }
+        | null;
+      if (!response.ok) {
+        throw new Error(
+          (data as { error?: string } | null)?.error ??
+            `api_error_${response.status}`
+        );
+      }
+      return data as T;
+    })());
+  } finally {
+    controller.abort();
   }
-  return data as T;
 }
 
 export const webauthnService = {
@@ -920,17 +928,25 @@ export const mediaService = {
     form.append("file", file);
     form.append("kind", kind);
 
-    const response = await fetch("/api/media/upload", {
-      method: "POST",
-      credentials: "include",
-      body: form,
-    });
-    const body = (await withDeadline(response.json()).catch(() => null)) as
-      | (MediaUploadResult & { error?: string })
-      | null;
-    if (!response.ok || !body?.ok) {
-      throw new Error(body?.error ?? `media_upload_failed_${response.status}`);
+    const controller = new AbortController();
+    try {
+      return await withDeadline((async () => {
+        const response = await fetch("/api/media/upload", {
+          method: "POST",
+          credentials: "include",
+          body: form,
+          signal: controller.signal,
+        });
+        const body = (await response.json().catch(() => null)) as
+          | (MediaUploadResult & { error?: string })
+          | null;
+        if (!response.ok || !body?.ok) {
+          throw new Error(body?.error ?? `media_upload_failed_${response.status}`);
+        }
+        return body;
+      })());
+    } finally {
+      controller.abort();
     }
-    return body;
   },
 };

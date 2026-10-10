@@ -87,6 +87,7 @@ export async function startCommunityOAuth(
 /** Public provider capabilities from the same project that owns Community sessions. */
 export async function loadCommunityProviders(
   configuration: { supabaseUrl: string; publishableKey: string },
+  signal?: AbortSignal,
   fetcher: typeof fetch = fetch,
 ): Promise<ProviderId[]> {
   const response = await fetcher(
@@ -94,6 +95,7 @@ export async function loadCommunityProviders(
     {
       credentials: "omit",
       headers: { Accept: "application/json", apikey: configuration.publishableKey },
+      signal,
     },
   );
   const body = (await response.json().catch(() => null)) as {
