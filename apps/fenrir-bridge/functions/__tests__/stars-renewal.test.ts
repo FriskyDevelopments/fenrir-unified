@@ -68,7 +68,7 @@ describe("Stars subscription renewals (month 2+)", () => {
     const iFirst = src.indexOf("const valid = isValidStarsPayment(");
     expect(iRenew).toBeGreaterThan(0);
     expect(iRenew).toBeLessThan(iFirst);
-    expect(src).toMatch(/applyStarsMembership\(env, telegramUserId, starsPaidThrough\(payment\)\)/);
+    expect(src).toMatch(/applyStarsMembership\(env, telegramUserId, starsPaidThrough\(payment, messageMs\)\)/);
     // renewals must not re-trigger the referral reward
     const block = src.slice(iRenew, iFirst);
     expect(block).not.toMatch(/recordReferralConversion/);
