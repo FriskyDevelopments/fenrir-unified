@@ -144,6 +144,19 @@ export async function releaseStripeEvent(db: D1Database, eventId: string) {
   await db.prepare(`DELETE FROM stripe_events WHERE id = ?`).bind(eventId).run();
 }
 
+/** Whop idempotency ledger. Apply docs/whop-d1-schema.sql before enabling. */
+export async function tryClaimWhopEvent(db: D1Database, eventId: string) {
+  const result = await db
+    .prepare(`INSERT OR IGNORE INTO whop_events (id, received_at) VALUES (?, ?)`)
+    .bind(eventId, nowIso())
+    .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+export async function releaseWhopEvent(db: D1Database, eventId: string) {
+  await db.prepare(`DELETE FROM whop_events WHERE id = ?`).bind(eventId).run();
+}
+
 export async function resolveBillingForOrg(env: BillingEnv, orgId: string) {
   if (!env.DB) {
     return { customer: null as BillingCustomerRow | null, subscription: null as BillingSubscriptionRow | null };
