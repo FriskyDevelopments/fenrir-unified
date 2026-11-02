@@ -111,6 +111,58 @@ export function isValidStarsPayment(payment, order, telegramUserId, expectedAmou
 }
 
 /**
+ * Telegram Stars subscription RENEWALS.
+ *
+ * A Stars subscription is one invoice that Telegram re-charges every 30 days.
+ * Each renewal arrives as a new `successful_payment` carrying the SAME
+ * `invoice_payload` as the first charge, with `is_recurring: true` and WITHOUT
+ * `is_first_recurring`. By then the order is already `paid`, so
+ * isValidStarsPayment (which demands `pending`) rejected every renewal:
+ * Telegram took the Stars, the bot answered "did not match an active invoice",
+ * and access lapsed at day 30. Money taken, access denied.
+ *
+ * A renewal is accepted only if it belongs to an order that was ALREADY paid by
+ * the same Telegram user, in XTR, for exactly the amount that order was minted
+ * at. The amount is NOT compared with today's list price: Telegram keeps
+ * charging the price the member subscribed at, and a price rise must never
+ * reach backwards (same rule as STARS_MIN_GRANT_AMOUNT). The floor still blocks
+ * hand-made test rows.
+ */
+export function isStarsRenewal(payment) {
+  return payment?.is_recurring === true && payment?.is_first_recurring !== true;
+}
+
+export function isValidStarsRenewal(payment, order, telegramUserId) {
+  const amount = Number(order?.amount);
+  return Boolean(
+    isStarsRenewal(payment) &&
+      payment?.invoice_payload?.startsWith("fenrir_stars:") &&
+      order &&
+      order.status === "paid" &&
+      String(order.telegram_user_id) === String(telegramUserId) &&
+      payment.currency === "XTR" &&
+      Number.isFinite(amount) &&
+      amount >= STARS_MIN_GRANT_AMOUNT &&
+      payment.total_amount === amount
+  );
+}
+
+/**
+ * Where the paid period ends. Telegram sends `subscription_expiration_date`
+ * (unix seconds) on subscription payments; trust it only when it is a sane
+ * future date within one period plus a day of slack, otherwise fall back to the
+ * fixed 30-day clock. NEVER null: the access check treats NULL as forever.
+ */
+export function starsPaidThrough(payment, now = Date.now()) {
+  const exp = Number(payment?.subscription_expiration_date);
+  if (Number.isFinite(exp) && exp > 0) {
+    const ms = exp * 1000;
+    if (ms > now && ms <= now + (STARS_PERIOD_DAYS + 1) * 86400000) return new Date(ms).toISOString();
+  }
+  return new Date(now + STARS_PERIOD_DAYS * 86400000).toISOString();
+}
+
+/**
  * `apiVersion` pins Stripe-Version for a single call.
  *
  * Without it every request inherits whatever version the ACCOUNT defaults to,
@@ -1067,7 +1119,7 @@ async function resolveBotAccess(env, telegramUserId) {
   };
 }
 
-async function applyStarsMembership(env, telegramUserId) {
+async function applyStarsMembership(env, telegramUserId, periodEnd = starsPeriodEnd()) {
   const [link, entitlement] = await Promise.all([
     env.DB.prepare(
       `SELECT frisky_org_id, frisky_user_id FROM telegram_identity_links WHERE telegram_user_id = ? LIMIT 1`
@@ -1118,7 +1170,7 @@ async function applyStarsMembership(env, telegramUserId) {
         current_period_end = excluded.current_period_end,
         cancel_at_period_end = 0,
         updated_at = excluded.updated_at`
-    ).bind(`stars:${telegramUserId}`, link.frisky_org_id, `stars_${telegramUserId}`, safePlan, starsPeriodEnd(), ts, ts),
+    ).bind(`stars:${telegramUserId}`, link.frisky_org_id, `stars_${telegramUserId}`, safePlan, periodEnd, ts, ts),
     env.DB.prepare(
       `UPDATE telegram_stars_entitlements
        SET frisky_org_id = ?, frisky_user_id = ?, plan = ?, updated_at = ?
@@ -2499,6 +2551,45 @@ async function sendIdentityWelcome(env, channel, message) {
   });
 }
 
+/**
+ * Record a Stars renewal: refresh the entitlement row (new charge id, status
+ * active) without touching the order, which stays `paid`. Idempotent per
+ * charge id so a redelivered webhook does not double-process.
+ */
+async function markRenewal(env, payment, message, order) {
+  const ts = nowIso();
+  const telegramUserId = String(message.from?.id || order?.telegram_user_id || message.chat.id);
+  const current = await getEntitlement(env, telegramUserId);
+  if (current && current.telegram_payment_charge_id === payment.telegram_payment_charge_id) {
+    return { duplicate: true, telegramUserId };
+  }
+  await env.DB.prepare(
+    `INSERT INTO telegram_stars_entitlements (
+      telegram_user_id, telegram_chat_id, status, stars_amount, currency,
+      telegram_payment_charge_id, payload, created_at, updated_at
+    ) VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(telegram_user_id) DO UPDATE SET
+      status = 'active',
+      stars_amount = excluded.stars_amount,
+      currency = excluded.currency,
+      telegram_payment_charge_id = excluded.telegram_payment_charge_id,
+      payload = excluded.payload,
+      updated_at = excluded.updated_at`
+  )
+    .bind(
+      telegramUserId,
+      String(message.chat.id),
+      payment.total_amount,
+      payment.currency,
+      payment.telegram_payment_charge_id,
+      payment.invoice_payload,
+      ts,
+      ts
+    )
+    .run();
+  return { duplicate: false, telegramUserId };
+}
+
 async function markPaid(env, payment, message, order) {
   const ts = nowIso();
   const telegramUserId = String(message.from?.id || order?.telegram_user_id || message.chat.id);
@@ -3524,6 +3615,36 @@ async function handleTelegramWebhook(request, env, url) {
     const payment = message.successful_payment;
     const order = await getOrder(env, payment.invoice_payload);
     const telegramUserId = String(message.from?.id || message.chat.id);
+    if (isStarsRenewal(payment)) {
+      // Monthly renewal of an existing subscription (see isValidStarsRenewal).
+      if (!isValidStarsRenewal(payment, order, telegramUserId)) {
+        console.error(
+          "stars_renewal_validation_failed",
+          telegramUserId,
+          "paid",
+          String(payment?.total_amount),
+          "order",
+          String(order?.amount),
+          "status",
+          String(order?.status)
+        );
+        await telegramApi(env, channel, "sendMessage", {
+          chat_id: message.chat.id,
+          text: "A Stars renewal arrived that did not match a paid MyFenrir subscription. Membership was not changed. Contact support with your Telegram payment receipt."
+        });
+        return json({ ok: true });
+      }
+      const renewal = await markRenewal(env, payment, message, order);
+      if (renewal.duplicate) return json({ ok: true });
+      const membership = await applyStarsMembership(env, telegramUserId, starsPaidThrough(payment));
+      await telegramApi(env, channel, "sendMessage", {
+        chat_id: message.chat.id,
+        text: membership.applied
+          ? `The Pack renewed.\n\nAccess: active\nStars: ${payment.total_amount}\nPayment rail: Telegram Stars\nRenews monthly.`
+          : `Stars renewal confirmed (${payment.total_amount} Stars). Open MyFenrir → Settings → Link Telegram so The Pack applies to your workspace.`
+      });
+      return json({ ok: true });
+    }
     const valid = isValidStarsPayment(payment, order, telegramUserId, starsPrice(env));
     if (!valid) {
       console.error(
@@ -3543,7 +3664,7 @@ async function handleTelegramWebhook(request, env, url) {
       return json({ ok: true });
     }
     await markPaid(env, payment, message, order);
-    const membership = await applyStarsMembership(env, telegramUserId);
+    const membership = await applyStarsMembership(env, telegramUserId, starsPaidThrough(payment));
     // Referral attribution: if this buyer arrived via a ref link, this is the
     // paid conversion — reward the referrer once (idempotent, self-reward blocked).
     await recordReferralConversion(env, telegramUserId, "stars", channel);

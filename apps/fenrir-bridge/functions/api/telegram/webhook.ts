@@ -45,6 +45,9 @@ type TelegramMessage = {
     total_amount: number;
     invoice_payload: string;
     telegram_payment_charge_id: string;
+    is_recurring?: boolean;
+    is_first_recurring?: boolean;
+    subscription_expiration_date?: number;
   };
 };
 
@@ -457,13 +460,24 @@ async function handleSuccessfulPayment(
   const telegramUserId = String(
     message.from?.id ?? order?.telegram_user_id ?? message.chat.id
   );
+  // A monthly Stars renewal reuses the first charge's payload, so its order is
+  // already `paid`. Without this branch every renewal was rejected: Telegram
+  // took the Stars and access lapsed at day 30.
+  const isRenewal = payment.is_recurring === true && payment.is_first_recurring !== true;
   const valid =
     payment.invoice_payload.startsWith("fenrir_stars:") &&
     order &&
-    order.status === "pending" &&
+    order.status === (isRenewal ? "paid" : "pending") &&
     String(order.telegram_user_id) === telegramUserId &&
     payment.currency === "XTR" &&
     payment.total_amount === Number(order.amount);
+
+  const expMs = Number(payment.subscription_expiration_date) * 1000;
+  const now = Date.now();
+  const periodEnd =
+    Number.isFinite(expMs) && expMs > now && expMs <= now + 31 * 86400000
+      ? new Date(expMs).toISOString()
+      : new Date(now + 30 * 86400000).toISOString();
 
   if (!valid) {
     await telegramApi(
@@ -495,6 +509,7 @@ async function handleSuccessfulPayment(
       starsAmount: payment.total_amount,
       payload: payment.invoice_payload,
       chargeId: payment.telegram_payment_charge_id,
+      periodEnd,
     }
   );
 
