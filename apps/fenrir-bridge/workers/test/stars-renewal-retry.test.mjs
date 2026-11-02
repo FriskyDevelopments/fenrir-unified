@@ -80,3 +80,39 @@ test('invalid secret does not process a payment', async () => {
   assert.equal(end(f),undefined);
   assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM telegram_stars_entitlements').get().n,0);
 });
+
+function firstPayment(charge, date) {
+  return { message:{ date, chat:{id:42}, from:{id:42}, successful_payment:{
+    invoice_payload:'fenrir_stars:42:first', currency:'XTR', total_amount:1150,
+    is_recurring:true, is_first_recurring:true, telegram_payment_charge_id:charge,
+    subscription_expiration_date: date + 30*86400 } } };
+}
+function withPendingOrder(f) {
+  f.sql.exec(`ALTER TABLE telegram_stars_orders ADD COLUMN telegram_payment_charge_id TEXT;
+    ALTER TABLE telegram_stars_orders ADD COLUMN paid_at TEXT;
+    INSERT INTO telegram_stars_orders (payload, telegram_user_id, amount, status) VALUES ('fenrir_stars:42:first','42',1150,'pending');`);
+  return f;
+}
+const deliverAt = (f, data) => {
+  const request = new Request('https://example.test/api/telegram/webhook', { method:'POST',
+    headers:{'content-type':'application/json','x-telegram-bot-api-secret-token':'secret'}, body:JSON.stringify(data) });
+  return worker.fetch(request, { DB:f.db, TELEGRAM_PROD_BOT_TOKEN:'test', TELEGRAM_WEBHOOK_SECRET:'secret', FENRIR_STARS_PRICE:'1150', STARS_PRICE:'1150' });
+};
+
+test('first payment: failed membership write returns 500 and is retried on redelivery', async () => {
+  const f=withPendingOrder(fixture()), msg=firstPayment('first-1',now);
+  f.failNextBatch();
+  assert.equal((await deliverAt(f,msg)).status,500);
+  assert.equal(end(f),undefined);
+  assert.equal(f.sql.prepare("SELECT status FROM telegram_stars_orders WHERE payload='fenrir_stars:42:first'").get().status,'paid');
+  assert.equal((await deliverAt(f,msg)).status,200);
+  assert.equal(end(f),new Date((now+30*86400)*1000).toISOString());
+});
+
+test('first payment: a different charge on a paid order is not a redelivery', async () => {
+  const f=withPendingOrder(fixture());
+  assert.equal((await deliverAt(f,firstPayment('first-1',now))).status,200);
+  f.sql.exec('DELETE FROM billing_subscriptions');
+  assert.equal((await deliverAt(f,firstPayment('forged',now))).status,200);
+  assert.equal(end(f),undefined);
+});

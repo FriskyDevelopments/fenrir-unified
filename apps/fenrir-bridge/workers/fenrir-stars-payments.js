@@ -111,6 +111,42 @@ export function isValidStarsPayment(payment, order, telegramUserId, expectedAmou
 }
 
 /**
+ * A first-payment REDELIVERY: Telegram re-sends the same successful_payment
+ * (same charge id) when a previous delivery got a non-2xx response. By then
+ * markPaid already flipped the order to `paid`, so isValidStarsPayment rejects
+ * it and a failed membership write would never be retried. Accept it only when
+ * the order was paid by this exact charge, user and amount.
+ */
+export function isStarsFirstPaymentRedelivery(payment, order, telegramUserId) {
+  const amount = Number(order?.amount);
+  return Boolean(
+    !isStarsRenewal(payment) &&
+      payment?.invoice_payload?.startsWith("fenrir_stars:") &&
+      order &&
+      order.status === "paid" &&
+      payment.telegram_payment_charge_id &&
+      order.telegram_payment_charge_id === payment.telegram_payment_charge_id &&
+      String(order.telegram_user_id) === String(telegramUserId) &&
+      payment.currency === "XTR" &&
+      Number.isFinite(amount) &&
+      amount >= STARS_MIN_GRANT_AMOUNT &&
+      payment.total_amount === amount
+  );
+}
+
+/**
+ * Telegram's message timestamp, so a redelivery computes the same fallback
+ * period end as the original delivery instead of drifting with retry time.
+ */
+export function starsMessageMs(message, now = Date.now()) {
+  const ms = Number(message?.date) * 1000;
+  if (!Number.isSafeInteger(ms) || ms <= 0 || ms > now + 300000) {
+    throw new Error("stars_payment_invalid_message_date");
+  }
+  return ms;
+}
+
+/**
  * Telegram Stars subscription RENEWALS.
  *
  * A Stars subscription is one invoice that Telegram re-charges every 30 days.
@@ -3642,10 +3678,7 @@ async function handleTelegramWebhook(request, env, url) {
       const renewal = await markRenewal(env, payment, message, order);
       // The Telegram message timestamp makes the fallback deterministic across
       // redeliveries. Never derive a new period from retry processing time.
-      const messageMs = Number(message.date) * 1000;
-      if (!Number.isSafeInteger(messageMs) || messageMs <= 0 || messageMs > Date.now() + 300000) {
-        throw new Error("stars_payment_invalid_message_date");
-      }
+      const messageMs = starsMessageMs(message);
       const membership = await applyStarsMembership(env, telegramUserId, starsPaidThrough(payment, messageMs));
       if (renewal.duplicate) return json({ ok: true });
       await telegramApi(env, channel, "sendMessage", {
@@ -3655,6 +3688,12 @@ async function handleTelegramWebhook(request, env, url) {
           : `Stars renewal confirmed (${payment.total_amount} Stars). Open MyFenrir → Settings → Link Telegram so The Pack applies to your workspace.`
       });
       return json({ ok: true });
+    }
+    if (isStarsFirstPaymentRedelivery(payment, order, telegramUserId)) {
+      // markPaid already ran for this exact charge; only the membership write
+      // may be missing. Retry it, idempotently, without re-messaging the buyer.
+      await applyStarsMembership(env, telegramUserId, starsPaidThrough(payment, starsMessageMs(message)));
+      return json({ ok: true, duplicate: true });
     }
     const valid = isValidStarsPayment(payment, order, telegramUserId, starsPrice(env));
     if (!valid) {
@@ -3674,8 +3713,9 @@ async function handleTelegramWebhook(request, env, url) {
       });
       return json({ ok: true });
     }
+    const firstMessageMs = starsMessageMs(message);
     await markPaid(env, payment, message, order);
-    const membership = await applyStarsMembership(env, telegramUserId, starsPaidThrough(payment));
+    const membership = await applyStarsMembership(env, telegramUserId, starsPaidThrough(payment, firstMessageMs));
     // Referral attribution: if this buyer arrived via a ref link, this is the
     // paid conversion — reward the referrer once (idempotent, self-reward blocked).
     await recordReferralConversion(env, telegramUserId, "stars", channel);
@@ -4091,7 +4131,7 @@ export default {
         return json({ ok: true });
       }
       // Preserve the original body for identifying payment failures. Ordinary
-      // bot failures remain 200 to avoid reply loops; a failed renewal update must
+      // bot failures remain 200 to avoid reply loops; a failed payment update must
       // receive a non-2xx response so Telegram can redeliver it.
       const paymentProbe = request.clone();
       try {
@@ -4099,7 +4139,9 @@ export default {
       } catch (err) {
         console.error("stars_webhook_unhandled_error", String((err && err.stack) || err));
         const update = await paymentProbe.json().catch(() => null);
-        if (isStarsRenewal(update?.message?.successful_payment)) return json({ ok: false }, { status: 500 });
+        // Any paid charge (first payment or renewal) must be retried, or a
+        // paying member can be left without access.
+        if (update?.message?.successful_payment) return json({ ok: false }, { status: 500 });
         return json({ ok: true });
       }
     }

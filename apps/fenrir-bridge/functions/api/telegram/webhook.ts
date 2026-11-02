@@ -37,6 +37,7 @@ type TelegramUpdate = {
 
 type TelegramMessage = {
   message_id: number;
+  date?: number;
   text?: string;
   chat: { id: number; type?: string };
   from?: { id: number; username?: string; first_name?: string };
@@ -464,20 +465,35 @@ async function handleSuccessfulPayment(
   // already `paid`. Without this branch every renewal was rejected: Telegram
   // took the Stars and access lapsed at day 30.
   const isRenewal = payment.is_recurring === true && payment.is_first_recurring !== true;
-  const valid =
+  const basic =
     payment.invoice_payload.startsWith("fenrir_stars:") &&
     order &&
-    order.status === (isRenewal ? "paid" : "pending") &&
     String(order.telegram_user_id) === telegramUserId &&
     payment.currency === "XTR" &&
     payment.total_amount === Number(order.amount);
+  // Redelivery of a first payment whose membership write failed: the order is
+  // already `paid` by this exact charge, so retry the grant instead of
+  // rejecting it (which would leave a paying member without access).
+  const firstRedelivery =
+    Boolean(basic) &&
+    !isRenewal &&
+    order!.status === "paid" &&
+    Boolean(payment.telegram_payment_charge_id) &&
+    order!.telegram_payment_charge_id ===
+      payment.telegram_payment_charge_id;
+  const valid =
+    Boolean(basic) && (firstRedelivery || order!.status === (isRenewal ? "paid" : "pending"));
 
-  const expMs = Number(payment.subscription_expiration_date) * 1000;
+  // Use Telegram's message time, not processing time, so a redelivery computes
+  // the same fallback period end as the original delivery.
   const now = Date.now();
+  const msgMs = Number(message.date) * 1000;
+  const base = Number.isSafeInteger(msgMs) && msgMs > 0 && msgMs <= now + 300000 ? msgMs : now;
+  const expMs = Number(payment.subscription_expiration_date) * 1000;
   const periodEnd =
-    Number.isFinite(expMs) && expMs > now && expMs <= now + 31 * 86400000
+    Number.isFinite(expMs) && expMs > base && expMs <= base + 31 * 86400000
       ? new Date(expMs).toISOString()
-      : new Date(now + 30 * 86400000).toISOString();
+      : new Date(base + 30 * 86400000).toISOString();
 
   if (!valid) {
     await telegramApi(
@@ -492,7 +508,7 @@ async function handleSuccessfulPayment(
     return;
   }
 
-  await markStarsPaid(env.DB!, {
+  if (!firstRedelivery) await markStarsPaid(env.DB!, {
     payload: payment.invoice_payload,
     telegramUserId,
     telegramChatId: String(message.chat.id),
@@ -512,6 +528,9 @@ async function handleSuccessfulPayment(
       periodEnd,
     }
   );
+
+  // Redelivered first payment: grant retried, buyer was already messaged.
+  if (firstRedelivery) return;
 
   const linkHint = entitlement.applied
     ? `Workspace plan: *${entitlement.plan}*`
