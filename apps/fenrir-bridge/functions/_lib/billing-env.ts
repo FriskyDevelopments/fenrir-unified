@@ -16,6 +16,13 @@ export type BillingEnv = AuthEnv & {
   STRIPE_COURTESY_COUPON_ID?: string;
   /** Card billing is deliberately opt-in while Telegram Stars is the launch rail. */
   CARD_BILLING_ENABLED?: string;
+  /** Whop card rail (separate flag from CARD_BILLING_ENABLED / Stripe). */
+  WHOP_BILLING_ENABLED?: string;
+  WHOP_WEBHOOK_SECRET?: string;
+  WHOP_API_KEY?: string;
+  WHOP_STARTER_PLAN_ID?: string;
+  WHOP_PRO_PLAN_ID?: string;
+  WHOP_OPERATOR_PLAN_ID?: string;
   FENRIR_COURTESY_CODE?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_PROD_BOT_TOKEN?: string;
