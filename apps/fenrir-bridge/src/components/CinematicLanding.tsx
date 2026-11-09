@@ -3,7 +3,6 @@ import { knowledgeBaseUrl } from "../services/knowledgeBase";
 
 const particles = Array.from({ length: 14 }, (_, index) => index + 1);
 const titleLetters = ["F", "E", "N", "R", "I", "R"];
-const protocolRail = ["IDENTITY", "COMMUNITIES", "TELEGRAM LOCK", "STARS PAYMENTS", "PROTOCOL SERVICES"];
 
 const cinematicStyles = `
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Orbitron:wght@500;600;700;800&display=swap");
@@ -135,9 +134,9 @@ const cinematicStyles = `
 @media (max-width: 720px) {
   .cinematic-landing { padding: 2.5rem 1.25rem 1.75rem; }
   .cinematic-landing__wolf { width: 88vw; right: -14%; bottom: -3%; opacity: .6; }
-  .cinematic-landing__eyebrow { margin-bottom: 1.1rem; letter-spacing: .24em; }
+  .cinematic-landing__eyebrow { margin-bottom: 1.1rem; letter-spacing: .18em; }
   .cinematic-landing__title { font-size: clamp(3.25rem, 19vw, 6.5rem); }
-  .cinematic-landing__pitch { color: rgb(214 230 239 / 72%); }
+  .cinematic-landing__pitch { color: rgb(214 230 239 / 80%); }
   .cinematic-landing__actions { align-items: stretch; }
   .cinematic-landing__enter,
   .cinematic-landing__docs { flex: 1 1 12rem; }
@@ -157,9 +156,9 @@ const cinematicStyles = `
 
 .cinematic-landing__eyebrow {
   margin: 0 0 1.5rem;
-  color: rgb(218 246 255 / 72%);
-  font: 500 clamp(.65rem, 1.3vw, .78rem)/1 Orbitron, sans-serif;
-  letter-spacing: .38em;
+  color: rgb(218 246 255 / 86%);
+  font: 500 clamp(.75rem, 1.3vw, .82rem)/1 Orbitron, sans-serif;
+  letter-spacing: .26em;
   text-transform: uppercase;
   animation: cinematic-arrive .9s cubic-bezier(.16, 1, .3, 1) both;
 }
@@ -202,19 +201,21 @@ const cinematicStyles = `
 }
 
 .cinematic-landing__tagline {
-  max-width: 27rem;
-  margin: 0 auto 1.1rem;
-  color: rgb(225 239 247 / 72%);
-  font-size: clamp(.93rem, 1.8vw, 1.08rem);
-  line-height: 1.65;
+  max-width: 36rem;
+  margin: 0 auto 1rem;
+  color: #eaf6fb;
+  font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+  font-weight: 600;
+  line-height: 1.4;
+  text-wrap: balance;
   animation: cinematic-arrive 1s cubic-bezier(.16, 1, .3, 1) .55s both;
 }
 
 .cinematic-landing__pitch {
   max-width: 33rem;
   margin: 0 auto 2rem;
-  color: rgb(200 220 232 / 58%);
-  font-size: clamp(.8rem, 1.5vw, .92rem);
+  color: rgb(214 230 239 / 78%);
+  font-size: clamp(.875rem, 1.5vw, .95rem);
   line-height: 1.7;
   animation: cinematic-arrive 1s cubic-bezier(.16, 1, .3, 1) .68s both;
 }
@@ -397,19 +398,15 @@ export function CinematicLanding() {
           {titleLetters.map((letter, index) => <span key={`${letter}-${index}`}>{letter}</span>)}
         </h1>
         <div className="cinematic-landing__line" aria-hidden="true" />
-        <p className="cinematic-landing__tagline">The signal is yours. The way in is waiting.</p>
-        <p className="cinematic-landing__pitch">
-          Fenrir is the front door of the Frisky ecosystem: one identity for your Telegram
-          communities, invite rotation, and Stars payments — behind a single gate.
+        <p className="cinematic-landing__tagline">
+          One identity for your Telegram communities: invites and Stars payments behind a single door.
         </p>
+        <p className="cinematic-landing__pitch">The front door of the Frisky ecosystem, with invite rotation built in.</p>
         <div className="cinematic-landing__actions">
           <a className="cinematic-landing__enter" href="/login">Enter</a>
           <a className="cinematic-landing__docs" href={knowledgeBaseUrl} target="_blank" rel="noreferrer">
             Wiki <i>↗</i>
           </a>
-        </div>
-        <div className="cinematic-landing__rail" aria-hidden="true">
-          {protocolRail.map((lane) => <span key={lane}>{lane}</span>)}
         </div>
       </section>
     </main>

@@ -60,14 +60,16 @@
         font-size: 11px;
       }
 
+      /* plain text link: ENTER stays the only glowing CTA on the page */
       .partner-perk-banner .perk-action {
         flex: 0 0 auto;
-        color: #141a20;
-        border-radius: 999px;
-        padding: 5px 10px;
-        background: #c2a469;
-        box-shadow: none;
+        color: #d9bf86;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        text-decoration-thickness: 1px;
+        font-weight: 600;
       }
+      .partner-perk-banner a:hover .perk-action { color: #f0dcaa; }
 
       .fenrir-wow-shell .partner-perk-banner { display: none; }
 
