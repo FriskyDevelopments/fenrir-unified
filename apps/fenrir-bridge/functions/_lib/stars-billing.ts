@@ -43,6 +43,19 @@ export async function applyStarsEntitlementForTelegramUser(
     return { applied: false as const, reason: "telegram_not_linked" as const, plan };
   }
 
+  // Never shorten paid-through access: an older or duplicate delivery must not
+  // move current_period_end backwards.
+  const requestedEnd = input.periodEnd ?? new Date(Date.now() + 30 * 86400000).toISOString();
+  const existing = await db
+    .prepare(`SELECT current_period_end FROM billing_subscriptions WHERE stripe_subscription_id = ? LIMIT 1`)
+    .bind(subscriptionId)
+    .first<{ current_period_end: string | null }>();
+  const existingMs = existing?.current_period_end ? Date.parse(existing.current_period_end) : NaN;
+  const periodEnd =
+    Number.isFinite(existingMs) && existingMs > Date.parse(requestedEnd)
+      ? existing!.current_period_end!
+      : requestedEnd;
+
   await upsertSubscription(db, {
     stripe_subscription_id: subscriptionId,
     frisky_org_id: link.frisky_org_id,
@@ -50,7 +63,7 @@ export async function applyStarsEntitlementForTelegramUser(
     plan,
     status: "active",
     // Never NULL: the access check treats a NULL period end as active forever.
-    current_period_end: input.periodEnd ?? new Date(Date.now() + 30 * 86400000).toISOString(),
+    current_period_end: periodEnd,
     cancel_at_period_end: false
   });
 
